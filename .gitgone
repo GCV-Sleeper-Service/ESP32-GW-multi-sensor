@@ -1,0 +1,4 @@
+secrets/*.yaml
+!secrets/secrets-example.yaml
+.build/
+.pio/
