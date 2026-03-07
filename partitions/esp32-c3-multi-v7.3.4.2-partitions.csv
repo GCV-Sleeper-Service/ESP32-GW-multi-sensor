@@ -1,0 +1,10 @@
+# esp32-c3-multi-v7.3.4.2-partitions.csv
+# Version-aligned copy of the unchanged partition layout used by the stable v7.2.5/v7.3.x builds.
+# Name,     Type, SubType,  Offset,   Size,      Flags
+nvs,        data, nvs,      0x9000,   0x4000,
+otadata,    data, ota,      0xD000,   0x2000,
+phy_init,   data, phy,      0xF000,   0x1000,
+ota_0,      app,  ota_0,    0x10000,  0x1B0000,
+ota_1,      app,  ota_1,    ,         0x1B0000,
+history,    data, nvs,      ,         0x80000,
+coredump,   data, coredump, ,         0x10000,
