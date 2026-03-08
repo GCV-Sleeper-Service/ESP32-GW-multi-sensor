@@ -2,6 +2,10 @@ name: ESP32 Gateway CI
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   preflight-and-compile:
@@ -30,22 +34,16 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install esphome
-          node --version
-          npm --version
-          python --version
-          esphome version
+          echo "node=$(node --version) npm=$(npm --version) python=$(python --version) esphome=$(esphome version)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare working directories
         shell: bash
         run: |
-          set -euo pipefail
-          mkdir -p build-logs
-          mkdir -p artifacts/firmware
+          mkdir -p build-logs artifacts/firmware
 
       - name: Create temporary compile secrets
         shell: bash
         run: |
-          set -euo pipefail
           cat > firmware/secrets.yaml <<'EOF'
           wifi_ssid: "CI-DUMMY-SSID"
           wifi_password: "CI-DUMMY-PASSWORD"
@@ -56,67 +54,54 @@ jobs:
       - name: Run preflight
         shell: bash
         run: |
-          set -euo pipefail
           bash ./scripts/preflight.sh 2>&1 | tee build-logs/preflight.log
 
       - name: Compile firmware
         shell: bash
         run: |
-          set -euo pipefail
           esphome compile firmware/esp32-c3-multi-sensor.yaml 2>&1 | tee build-logs/compile.log
 
       - name: Stage firmware artifacts
         if: always()
         shell: bash
         run: |
-          set -euo pipefail
           find firmware/.esphome/build -type f \( \
             -name 'firmware.bin' -o \
             -name 'firmware.ota.bin' -o \
             -name 'firmware.factory.bin' \
-          \) -exec cp -v {} artifacts/firmware/ \; || true
-
+          \) -exec cp -v {} artifacts/firmware/ \; 2>/dev/null || true
           echo "Staged firmware files:"
-          ls -lah artifacts/firmware || true
+          ls -lah artifacts/firmware/ 2>/dev/null || echo "(none)"
 
       - name: Write build summary
         if: always()
         shell: bash
         run: |
           {
-            echo "## ESP32 Gateway CI summary"
-            echo
-            echo "- Workflow: preflight + compile"
-            printf -- '- Ref: `%s`\n' "$GITHUB_REF_NAME"
-            printf -- '- Commit: `%s`\n' "$GITHUB_SHA"
-            echo
+            echo "## ESP32 Gateway CI — $(cat VERSION)"
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Ref | \`${GITHUB_REF_NAME}\` |"
+            echo "| Commit | \`${GITHUB_SHA::8}\` |"
+            echo "| Event | ${GITHUB_EVENT_NAME} |"
 
             if [[ -f build-logs/preflight.log ]]; then
-              pass_count=$(grep -c ': PASS' build-logs/preflight.log || true)
-              skip_count=$(grep -c ': SKIP' build-logs/preflight.log || true)
-              echo "### Preflight"
-              echo "- PASS checks: ${pass_count}"
-              echo "- SKIP checks: ${skip_count}"
-              echo
+              pass=$(grep -c ': PASS' build-logs/preflight.log 2>/dev/null || echo 0)
+              fail=$(grep -c ': FAIL' build-logs/preflight.log 2>/dev/null || echo 0)
+              echo "| Preflight | ${pass} pass / ${fail} fail |"
             fi
 
             if [[ -f build-logs/compile.log ]]; then
-              build_time=$(grep -E 'SUCCESS] Took ' build-logs/compile.log | tail -n1 | sed -E 's/.*SUCCESS\] Took ([0-9.]+ seconds).*/\1/' || true)
-              ram_line=$(grep -E '^RAM:' build-logs/compile.log | tail -n1 || true)
-              flash_line=$(grep -E '^Flash:' build-logs/compile.log | tail -n1 || true)
-              build_info=$(grep -E '^INFO Build Info:' build-logs/compile.log | tail -n1 || true)
-
-              echo "### Compile"
-              [[ -n "$build_time" ]] && echo "- Duration: ${build_time}"
-              [[ -n "$ram_line" ]] && echo "- ${ram_line}"
-              [[ -n "$flash_line" ]] && echo "- ${flash_line}"
-              [[ -n "$build_info" ]] && echo "- ${build_info}"
-              echo
+              duration=$(grep -oP 'SUCCESS\] Took \K[0-9.]+ seconds' build-logs/compile.log 2>/dev/null | tail -1 || true)
+              ram=$(grep -E '^RAM:' build-logs/compile.log | tail -1 || true)
+              flash=$(grep -E '^Flash:' build-logs/compile.log | tail -1 || true)
+              [[ -n "$duration" ]] && echo "| Compile time | ${duration} |"
+              [[ -n "$ram" ]] && echo "| RAM | ${ram} |"
+              [[ -n "$flash" ]] && echo "| Flash | ${flash} |"
             fi
 
-            firmware_count=$(find artifacts/firmware -maxdepth 1 -type f | wc -l | tr -d ' ')
-            echo "### Artifacts"
-            echo "- Firmware files staged: ${firmware_count}"
+            fw_count=$(find artifacts/firmware -maxdepth 1 -type f 2>/dev/null | wc -l)
+            echo "| Firmware files | ${fw_count} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload logs and firmware artifacts
