@@ -1,86 +1,83 @@
-name: CI - Preflight and Compile
+name: ESP32 Gateway CI
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - '.github/workflows/ci.yml'
-      - 'dashboard/**'
-      - 'firmware/**'
-      - 'partitions/**'
-      - 'scripts/**'
-      - 'Docs/**'
-      - 'VERSION'
-      - '.gitignore'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - '.github/workflows/ci.yml'
-      - 'dashboard/**'
-      - 'firmware/**'
-      - 'partitions/**'
-      - 'scripts/**'
-      - 'Docs/**'
-      - 'VERSION'
-      - '.gitignore'
-
-permissions:
-  contents: read
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   preflight-and-compile:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+
+    permissions:
+      contents: read
 
     steps:
-      - name: Check out repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
-      - name: Install ESPHome
+      - name: Install dependencies
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-          pip install esphome==2026.2.1
+          pip install esphome
+          node --version
+          npm --version
+          python --version
+          esphome version
+
+      - name: Prepare working directories
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build-logs
+          mkdir -p artifacts/firmware
 
       - name: Create temporary compile secrets
         shell: bash
         run: |
+          set -euo pipefail
           cat > firmware/secrets.yaml <<'EOF'
-          wifi_ssid: "ci-placeholder-ssid"
-          wifi_password: "ci-placeholder-password"
-          gateway_mgmt_username: "ci-admin"
+          wifi_ssid: "CI-DUMMY-SSID"
+          wifi_password: "CI-DUMMY-PASSWORD"
+          gateway_mgmt_username: "ci-user"
           gateway_mgmt_password: "ci-password"
           EOF
-
-      - name: Prepare log folder
-        run: mkdir -p build-logs
-
-      - name: Make scripts executable
-        run: chmod +x scripts/*.sh
 
       - name: Run preflight
         shell: bash
         run: |
-          ./scripts/preflight.sh 2>&1 | tee build-logs/preflight.log
+          set -euo pipefail
+          bash ./scripts/preflight.sh 2>&1 | tee build-logs/preflight.log
 
       - name: Compile firmware
         shell: bash
         run: |
+          set -euo pipefail
           esphome compile firmware/esp32-c3-multi-sensor.yaml 2>&1 | tee build-logs/compile.log
+
+      - name: Stage firmware artifacts
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          find firmware/.esphome/build -type f \( \
+            -name 'firmware.bin' -o \
+            -name 'firmware.ota.bin' -o \
+            -name 'firmware.factory.bin' \
+          \) -exec cp -v {} artifacts/firmware/ \; || true
+
+          echo "Staged firmware files:"
+          ls -lah artifacts/firmware || true
 
       - name: Write build summary
         if: always()
@@ -108,12 +105,18 @@ jobs:
               ram_line=$(grep -E '^RAM:' build-logs/compile.log | tail -n1 || true)
               flash_line=$(grep -E '^Flash:' build-logs/compile.log | tail -n1 || true)
               build_info=$(grep -E '^INFO Build Info:' build-logs/compile.log | tail -n1 || true)
+
               echo "### Compile"
               [[ -n "$build_time" ]] && echo "- Duration: ${build_time}"
               [[ -n "$ram_line" ]] && echo "- ${ram_line}"
               [[ -n "$flash_line" ]] && echo "- ${flash_line}"
               [[ -n "$build_info" ]] && echo "- ${build_info}"
+              echo
             fi
+
+            firmware_count=$(find artifacts/firmware -maxdepth 1 -type f | wc -l | tr -d ' ')
+            echo "### Artifacts"
+            echo "- Firmware files staged: ${firmware_count}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload logs and firmware artifacts
@@ -125,6 +128,10 @@ jobs:
           if-no-files-found: warn
           path: |
             build-logs/
-            firmware/.esphome/build/**/firmware.bin
-            firmware/.esphome/build/**/firmware.ota.bin
-            firmware/.esphome/build/**/firmware.factory.bin
+            artifacts/firmware/
+
+      - name: Remove temporary secrets
+        if: always()
+        shell: bash
+        run: |
+          rm -f firmware/secrets.yaml
