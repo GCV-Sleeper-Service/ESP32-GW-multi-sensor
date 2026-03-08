@@ -86,33 +86,35 @@ jobs:
         if: always()
         shell: bash
         run: |
-          echo "## ESP32 Gateway CI summary" >> "$GITHUB_STEP_SUMMARY"
-          echo >> "$GITHUB_STEP_SUMMARY"
-          echo "- Workflow: preflight + compile" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Ref: \\`${GITHUB_REF_NAME}\\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Commit: \\`${GITHUB_SHA}\\`" >> "$GITHUB_STEP_SUMMARY"
-          echo >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## ESP32 Gateway CI summary"
+            echo
+            echo "- Workflow: preflight + compile"
+            printf -- '- Ref: `%s`\n' "$GITHUB_REF_NAME"
+            printf -- '- Commit: `%s`\n' "$GITHUB_SHA"
+            echo
 
-          if [[ -f build-logs/preflight.log ]]; then
-            pass_count=$(grep -c ': PASS' build-logs/preflight.log || true)
-            skip_count=$(grep -c ': SKIP' build-logs/preflight.log || true)
-            echo "### Preflight" >> "$GITHUB_STEP_SUMMARY"
-            echo "- PASS checks: ${pass_count}" >> "$GITHUB_STEP_SUMMARY"
-            echo "- SKIP checks: ${skip_count}" >> "$GITHUB_STEP_SUMMARY"
-            echo >> "$GITHUB_STEP_SUMMARY"
-          fi
+            if [[ -f build-logs/preflight.log ]]; then
+              pass_count=$(grep -c ': PASS' build-logs/preflight.log || true)
+              skip_count=$(grep -c ': SKIP' build-logs/preflight.log || true)
+              echo "### Preflight"
+              echo "- PASS checks: ${pass_count}"
+              echo "- SKIP checks: ${skip_count}"
+              echo
+            fi
 
-          if [[ -f build-logs/compile.log ]]; then
-            build_time=$(grep -E 'SUCCESS] Took ' build-logs/compile.log | tail -n1 | sed -E 's/.*SUCCESS\] Took ([0-9.]+ seconds).*/\1/' || true)
-            ram_line=$(grep -E '^RAM:' build-logs/compile.log | tail -n1 || true)
-            flash_line=$(grep -E '^Flash:' build-logs/compile.log | tail -n1 || true)
-            build_info=$(grep -E '^INFO Build Info:' build-logs/compile.log | tail -n1 || true)
-            echo "### Compile" >> "$GITHUB_STEP_SUMMARY"
-            [[ -n "$build_time" ]] && echo "- Duration: ${build_time}" >> "$GITHUB_STEP_SUMMARY"
-            [[ -n "$ram_line" ]] && echo "- ${ram_line}" >> "$GITHUB_STEP_SUMMARY"
-            [[ -n "$flash_line" ]] && echo "- ${flash_line}" >> "$GITHUB_STEP_SUMMARY"
-            [[ -n "$build_info" ]] && echo "- ${build_info}" >> "$GITHUB_STEP_SUMMARY"
-          fi
+            if [[ -f build-logs/compile.log ]]; then
+              build_time=$(grep -E 'SUCCESS] Took ' build-logs/compile.log | tail -n1 | sed -E 's/.*SUCCESS\] Took ([0-9.]+ seconds).*/\1/' || true)
+              ram_line=$(grep -E '^RAM:' build-logs/compile.log | tail -n1 || true)
+              flash_line=$(grep -E '^Flash:' build-logs/compile.log | tail -n1 || true)
+              build_info=$(grep -E '^INFO Build Info:' build-logs/compile.log | tail -n1 || true)
+              echo "### Compile"
+              [[ -n "$build_time" ]] && echo "- Duration: ${build_time}"
+              [[ -n "$ram_line" ]] && echo "- ${ram_line}"
+              [[ -n "$flash_line" ]] && echo "- ${flash_line}"
+              [[ -n "$build_info" ]] && echo "- ${build_info}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload logs and firmware artifacts
         if: always()
