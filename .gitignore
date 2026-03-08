@@ -1,3 +1,4 @@
+firmware/secrets.yaml
 secrets/*.yaml
 !secrets/secrets-example.yaml
 .build/
