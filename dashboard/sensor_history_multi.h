@@ -1203,6 +1203,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     uint32_t uptime_s = (uint32_t) (uptime_us / 1000000LL);
     uint32_t free_heap = esp_get_free_heap_size();
 
+    // Keep each snprintf well under 64 bytes to avoid silent truncation.
     char num[64];
 
     resp->print("{\"ok\":true,\"version\":\"");
@@ -1229,9 +1230,15 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
     resp->print("],");
 
-    snprintf(num, sizeof(num),
-             "\"ram_history_points_per_series\":%d,\"persist_days\":%d,\"free_heap\":%u}",
-             HISTORY_POINTS_PER_SERIES, PERSIST_DAYS, (unsigned) free_heap);
+    // Each field printed separately to stay within the 64-byte buffer.
+    snprintf(num, sizeof(num), "\"ram_history_points_per_series\":%d,",
+             HISTORY_POINTS_PER_SERIES);
+    resp->print(num);
+
+    snprintf(num, sizeof(num), "\"persist_days\":%d,", PERSIST_DAYS);
+    resp->print(num);
+
+    snprintf(num, sizeof(num), "\"free_heap\":%u}", (unsigned) free_heap);
     resp->print(num);
 
     request->send(resp);
