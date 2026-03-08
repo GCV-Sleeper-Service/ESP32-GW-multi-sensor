@@ -44,12 +44,12 @@ jobs:
       - name: Create temporary compile secrets
         shell: bash
         run: |
-          cat > firmware/secrets.yaml <<'EOF'
+          cat > firmware/secrets.yaml <<'EOF_SECRETS'
           wifi_ssid: "CI-DUMMY-SSID"
           wifi_password: "CI-DUMMY-PASSWORD"
           gateway_mgmt_username: "ci-user"
           gateway_mgmt_password: "ci-password"
-          EOF
+          EOF_SECRETS
 
       - name: Run preflight
         shell: bash
@@ -72,6 +72,29 @@ jobs:
           \) -exec cp -v {} artifacts/firmware/ \; 2>/dev/null || true
           echo "Staged firmware files:"
           ls -lah artifacts/firmware/ 2>/dev/null || echo "(none)"
+
+      - name: Write artifact manifest
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "# Artifact manifest"
+            echo
+            echo "Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "Ref: ${GITHUB_REF_NAME}"
+            echo "Commit: ${GITHUB_SHA}"
+            echo
+            echo "## Files"
+            find build-logs artifacts -type f | sort
+          } | tee artifacts-manifest.txt
+
+          {
+            echo
+            echo "## Artifact contents"
+            echo '```text'
+            find build-logs artifacts -type f | sort
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Write build summary
         if: always()
@@ -114,6 +137,7 @@ jobs:
           path: |
             build-logs/
             artifacts/firmware/
+            artifacts-manifest.txt
 
       - name: Remove temporary secrets
         if: always()

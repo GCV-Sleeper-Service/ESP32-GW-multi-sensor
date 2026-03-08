@@ -36,6 +36,7 @@
 //   POST /api/reboot          -> reboot the ESP (requires Basic auth)
 //   POST /api/delete-data     -> erase persisted history and clear RAM (requires Basic auth)
 //   GET  /api/storage-stats   -> partition sizes + live NVS usage + retained-history estimates (including retention_days from PERSIST_DAYS)
+//   GET  /api/status          -> version, uptime, sensor status, heap (no auth)
 //
 // FRAMEWORK: ESPHome ESP-IDF via AsyncWebHandler + partition-specific NVS APIs
 // ═══════════════════════════════════════════════════════════════════
@@ -796,9 +797,10 @@ static void schedule_reboot_() {
 
 class HistoryWebHandler : public AsyncWebHandler {
  public:
-  HistoryWebHandler(std::string username, std::string password)
+  HistoryWebHandler(std::string username, std::string password, std::string version)
       : mgmt_username_(std::move(username)),
-        mgmt_password_(std::move(password)) {}
+        mgmt_password_(std::move(password)),
+        firmware_version_(std::move(version)) {}
 
   bool canHandle(AsyncWebServerRequest *request) const override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
@@ -813,6 +815,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (strcmp(p, "/dashboard.html") == 0) return true;
       if (strcmp(p, "/dashboard-download") == 0) return true;
       if (strcmp(p, "/api/storage-stats") == 0) return true;
+      if (strcmp(p, "/api/status") == 0) return true;
       if (strcmp(p, "/favicon.ico") == 0) return true;
       return false;
     }
@@ -865,6 +868,10 @@ class HistoryWebHandler : public AsyncWebHandler {
       handle_storage_stats_(request);
       return;
     }
+    if (strcmp(p, "/api/status") == 0) {
+      handle_status_(request);
+      return;
+    }
     if (strcmp(p, "/sensors.json") == 0) {
       handle_manifest_(request);
       return;
@@ -880,6 +887,7 @@ class HistoryWebHandler : public AsyncWebHandler {
  private:
   std::string mgmt_username_;
   std::string mgmt_password_;
+  std::string firmware_version_;
   mutable uint8_t failed_auth_count_{0};
   mutable int64_t lockout_until_ms_{0};
 
@@ -1187,6 +1195,55 @@ class HistoryWebHandler : public AsyncWebHandler {
     request->send(resp);
   }
 
+  void handle_status_(AsyncWebServerRequest *request) const {
+    auto *resp = request->beginResponseStream("application/json");
+    resp->addHeader("Cache-Control", "no-store");
+
+    int64_t uptime_us = esp_timer_get_time();
+    uint32_t uptime_s = (uint32_t) (uptime_us / 1000000LL);
+    uint32_t free_heap = esp_get_free_heap_size();
+
+    // Keep each snprintf well under 64 bytes to avoid silent truncation.
+    char num[64];
+
+    resp->print("{\"ok\":true,\"version\":\"");
+    resp->print(firmware_version_.c_str());
+    resp->print("\",");
+
+    snprintf(num, sizeof(num), "\"uptime_seconds\":%u,\"sensor_count\":%d,",
+             (unsigned) uptime_s, NUM_SENSORS);
+    resp->print(num);
+
+    resp->print("\"sensors\":[");
+    for (int i = 0; i < NUM_SENSORS; i++) {
+      if (i > 0) resp->print(",");
+      resp->print("{\"id\":\"");
+      resp->print(sensors[i].id);
+      resp->print("\",\"name\":\"");
+      resp->print(sensors[i].name);
+      snprintf(num, sizeof(num),
+               "\",\"last_seen\":%u,\"temp_valid\":%s,\"hum_valid\":%s}",
+               (unsigned) sensors[i].last_seen_epoch,
+               sensors[i].temp_valid ? "true" : "false",
+               sensors[i].hum_valid ? "true" : "false");
+      resp->print(num);
+    }
+    resp->print("],");
+
+    // Each field printed separately to stay within the 64-byte buffer.
+    snprintf(num, sizeof(num), "\"ram_history_points_per_series\":%d,",
+             HISTORY_POINTS_PER_SERIES);
+    resp->print(num);
+
+    snprintf(num, sizeof(num), "\"persist_days\":%d,", PERSIST_DAYS);
+    resp->print(num);
+
+    snprintf(num, sizeof(num), "\"free_heap\":%u}", (unsigned) free_heap);
+    resp->print(num);
+
+    request->send(resp);
+  }
+
   void handle_history_(AsyncWebServerRequest *request,
                        const char *rest) const {
     const char *slash = strchr(rest, '/');
@@ -1265,7 +1322,8 @@ class HistoryWebHandler : public AsyncWebHandler {
 static void register_history_handler(
     esphome::web_server_base::WebServerBase *base,
     const char *mgmt_username,
-    const char *mgmt_password) {
+    const char *mgmt_password,
+    const char *firmware_version = "unknown") {
 
   if (base == nullptr) {
     ESP_LOGE(TAG, "WebServerBase is null — cannot register endpoints");
@@ -1276,7 +1334,8 @@ static void register_history_handler(
 
   static auto *handler = new HistoryWebHandler(
       mgmt_username == nullptr ? std::string() : std::string(mgmt_username),
-      mgmt_password == nullptr ? std::string() : std::string(mgmt_password));
+      mgmt_password == nullptr ? std::string() : std::string(mgmt_password),
+      firmware_version == nullptr ? std::string("unknown") : std::string(firmware_version));
   base->add_handler(handler);
 
   ESP_LOGI(TAG,
@@ -1290,6 +1349,7 @@ static void register_history_handler(
   }
   ESP_LOGI(TAG, "  management -> POST /api/reboot, POST /api/delete-data (Basic auth)");
   ESP_LOGI(TAG, "  storage    -> GET /api/storage-stats");
+  ESP_LOGI(TAG, "  status     -> GET /api/status");
   ESP_LOGI(TAG, "  storage -> dedicated NVS partition: %s / namespace: %s",
            HISTORY_PARTITION_LABEL, HISTORY_NAMESPACE);
 }

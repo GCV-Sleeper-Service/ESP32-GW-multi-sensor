@@ -57,6 +57,7 @@ check_contains "theme_redraw_present" dashboard/dashboard.js "refreshChartsAfter
 check_contains "bind_events_present" dashboard/dashboard.js "function bindEvents()"
 check_contains "state_write_chokepoints_present" dashboard/dashboard.js "App.State.setSensors("
 check_contains "recolor_updates_point_markers" dashboard/dashboard.js "pointBackgroundColor"
+check_contains "status_endpoint_present" dashboard/sensor_history_multi.h "handle_status_("
 check_not_contains "yaml_no_old_versioned_header_name" firmware/esp32-c3-multi-sensor.yaml "dashboard-v7.3.4.2.h"
 check_not_contains "yaml_no_old_versioned_history_name" firmware/esp32-c3-multi-sensor.yaml "sensor_history_multi-v7.3.4.2.h"
 check_not_contains "yaml_no_old_versioned_partition_name" firmware/esp32-c3-multi-sensor.yaml "esp32-c3-multi-v7.3.4.2-partitions.csv"
