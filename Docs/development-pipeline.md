@@ -1,386 +1,245 @@
-# ESP32 Gateway Development Pipeline
+# Development Pipeline
 
-_Last updated: 2026-03-06_
+_Last updated: 2026-03-08 — v7.3.5.0_
 
-## Purpose
-
-This document defines the recommended development and delivery workflow for the ESP32 Multi-Sensor BLE Gateway project so future iterations are faster, more reproducible, and less dependent on one-off ZIP transfers.
-
-The goal is to reduce friction in this cycle:
-
-1. user reports build/test results
-2. assistant prepares next version
-3. user downloads ZIP, unpacks, copies to ESPHome LXC, archives old files manually
-4. user runs compile/build and tests again
-5. if files expire in-chat, baseline must be re-uploaded
-
-The recommended solution is to make **GitHub the canonical source of truth** and use ZIP bundles only as a temporary transport format when needed.
+This document defines how development works for the ESP32 Multi-Sensor BLE Gateway, from code changes through CI validation to device deployment.
 
 ---
 
-## Recommended operating model
+## Operating Model
 
-### Canonical source of truth
-Use a GitHub repository as the permanent project record.
+**GitHub is the canonical source of truth.** All code, documentation, scripts, and CI configuration live in the repository. ZIP bundles are no longer used for delivery or continuity.
 
-That repository should contain:
-- firmware files
-- dashboard source and generated header
-- partition layout
-- helper scripts
-- versioned documentation
-- versioned development notes
-- test worksheet(s)
+### Role Summary
 
-### Delivery model
-Use this hybrid model:
-- **GitHub repo** = system of record
-- **chat-delivered ZIP** = temporary handoff artifact only when needed
-- **tagged GitHub versions** = official known-good build checkpoints
-
-This gives the best balance between reliability and convenience.
+| Role | Who | What |
+|------|-----|------|
+| Code author | Claude (assistant) | Provides complete replacement files |
+| Commit gateway | You | Applies files, commits, pushes |
+| CI validation | GitHub Actions | Automatic on push/PR |
+| Device testing | You | Flash, curl, browser check |
+| Bug diagnosis | Claude (assistant) | From your reported output/logs |
+| Release tagging | You | After merge + device confirmation |
 
 ---
 
-## Why this is better
+## Development Workflow
 
-### 1. Fewer re-uploads
-If the repository is public, a fresh chat session can start from the repo/tag instead of requiring all files to be uploaded again.
+### For each feature or fix
 
-### 2. Better rollback
-Any known-good tag can be checked out directly in the ESPHome LXC and rebuilt.
+```
+1.  Create feature branch
+      git checkout -b feature/<name>
 
-### 3. Cleaner deployment
-Instead of unzip + SCP + manual folder juggling, the container can `git pull`, `git checkout <tag>`, and compile.
+2.  Apply code changes (complete replacement files from assistant)
 
-### 4. Better continuity
-Version headers, docs, changelog, and code can all stay synchronized under source control.
+3.  Quick local validation
+      ./scripts/test-local.sh --quick
 
----
+4.  Local compile (if quick test passes)
+      esphome compile firmware/esp32-c3-multi-sensor.yaml
 
-## Important constraint
+5.  Commit and push
+      git add <changed files>
+      git commit -m "<description>"
+      git push origin feature/<name>
 
-The assistant can prepare code, documentation, commit-ready content, release notes, and exact file-level changes, but cannot directly push to your GitHub repository from this chat environment.
+6.  Open draft PR on GitHub
 
-So the working model is:
-- assistant prepares the versioned update
-- user commits/pushes accepted changes to GitHub
-- future sessions use GitHub as baseline
+7.  CI runs automatically — check Actions tab
 
----
+8.  If CI green: flash to ESP and test on real device
+      esphome run firmware/esp32-c3-multi-sensor.yaml
 
-## Recommended repository structure
+9.  Device validation
+      - curl endpoints
+      - browser dashboard check
+      - fill in test report if significant change
 
-```text
-ESP32-Gateway/
-├─ firmware/
-│  └─ esp32-c3-multi-sensor.yaml
-├─ dashboard/
-│  ├─ dashboard.html
-│  ├─ dashboard.js
-│  ├─ dashboard.h
-│  └─ sensor_history_multi.h
-├─ partitions/
-│  └─ esp32-c3-multi-partitions.csv
-├─ scripts/
-│  ├─ generate-header.sh
-│  ├─ preflight.sh
-│  └─ deploy-to-esphome.sh
-├─ Docs/
-│  ├─ v7.x.x-documentation.md
-│  ├─ v7.x.x-development-notes.md
-│  ├─ v7.x.x-consolidated-test-worksheet.md
-│  └─ v7.x.x-pre-phase1-expert-opinion.md
-├─ secrets/
-│  └─ secrets-example.yaml
-├─ VERSION
-├─ README.md
-└─ .gitignore
+10. If device test fails:
+      - report the failure (curl output, browser console, ESPHome logs)
+      - assistant provides fixed replacement files
+      - repeat from step 2 on same branch
+
+11. When everything passes:
+      - convert draft PR to ready
+      - merge PR
+      - pull main locally
+      - delete feature branch
+      - tag if milestone version
 ```
 
-### Why this structure works well
-- it separates firmware, dashboard, scripts, and docs cleanly
-- it keeps generated deliverables close to their source
-- it makes version auditing easier
-- it fits the project’s current documentation-heavy workflow
-
----
-
-## Generated files policy
-
-For this project, generated files should be committed to Git.
-
-That includes at least:
-- `dashboard.h` generated from dashboard HTML
-- versioned documentation and notes
-- test worksheet files
-
-### Why commit generated files here
-For this project, reproducibility and handoff reliability matter more than keeping the repo “pure.”
-
-Advantages:
-- every tagged version is self-contained
-- rebuilds are easier from older tags
-- fewer “works only after regeneration” problems
-- less ambiguity in fresh-start sessions
-
----
-
-## Versioning model
-
-### Branching
-Keep the workflow simple:
-- `main` = latest known-good build
-- optional `dev` branch only if you want a staging area
-
-For this project, `main + tags` is usually enough.
-
-### Tags
-Tag every accepted build, for example:
-- `v7.3.4.1`
-- `v7.3.4.2`
-- `v7.4.0`
-
-### VERSION file
-Add a plain text `VERSION` file in repo root.
-
-Example:
-
-```text
-7.3.4.2
-```
-
-Use it as the one obvious place to confirm the current build number.
-
----
-
-## Recommended release discipline
-
-A build becomes a known-good tag only after:
-1. assistant-side preflight/static checks pass
-2. ESPHome compile succeeds on user side
-3. user smoke tests pass on actual device/browser paths
-4. version headers/comments/docs are aligned
-
-Only then:
-- commit
-- tag
-- push
-- optionally create a GitHub Release
-
----
-
-## ESPHome LXC workflow
-
-### Initial one-time setup
-Clone the repo once into the ESPHome container.
+### After merge
 
 ```bash
-cd /config
-git clone https://github.com/YOUR-USER/YOUR-REPO.git esp32-gateway
-cd esp32-gateway
-```
-
-### Build latest main
-```bash
-cd /config/esp32-gateway
+cd ~/config/ESP32-GW-multi-sensor
 git checkout main
 git pull --ff-only
-esphome compile firmware/esp32-c3-multi-sensor.yaml
-```
+git branch -d feature/<name>
 
-### Build a specific tagged version
-```bash
-cd /config/esp32-gateway
-git fetch --all --tags
-git checkout v7.3.4.2
-esphome compile firmware/esp32-c3-multi-sensor.yaml
-```
-
-### Why this is better than ZIP + SCP
-- no repeated unpacking
-- no manual copy into `/config`
-- no manual version archive folders needed
-- exact rollback is easy
-
----
-
-## Suggested deploy script
-
-Create `scripts/deploy-to-esphome.sh`:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-REPO_DIR="/config/esp32-gateway"
-VERSION="${1:-main}"
-
-cd "$REPO_DIR"
-
-git fetch --all --tags
-
-if git rev-parse "$VERSION" >/dev/null 2>&1; then
-  git checkout "$VERSION"
-else
-  git checkout main
-  git pull --ff-only
-fi
-
-./scripts/preflight.sh
-esphome compile firmware/esp32-c3-multi-sensor.yaml
-```
-
-Run it like:
-
-```bash
-bash /config/esp32-gateway/scripts/deploy-to-esphome.sh v7.3.4.2
-```
-
-or:
-
-```bash
-bash /config/esp32-gateway/scripts/deploy-to-esphome.sh main
+# If milestone version:
+git tag v<x.y.z>
+git push origin --tags
 ```
 
 ---
 
-## Secrets handling
+## CI Pipeline
 
-Do not store real secrets in Git.
+GitHub Actions runs on every push to `main`, every PR targeting `main`, and manual `workflow_dispatch`.
 
-### Recommended policy
-- keep `secrets-example.yaml` in the repo
-- keep the real `secrets.yaml` only locally / in the container
-- add the real secrets file to `.gitignore`
+### What CI validates
 
-Suggested `.gitignore` lines:
+1. Preflight checks (file existence, cross-reference integrity, JS syntax + runtime smoke)
+2. ESPHome firmware compile
+3. Build summary output
+4. Firmware artifact staging and upload
 
-```gitignore
+### What CI does NOT cover (manual)
+
+- Flashing firmware to the real device
+- BLE sensor validation
+- Browser testing against the live gateway
+- Cloudflare/internet path validation
+
+### Branch protection on `main`
+
+- Requires pull request before merging
+- Requires the `preflight-and-compile` status check to pass
+- No direct pushes to `main`
+
+---
+
+## Versioning
+
+### Scheme
+
+The project uses a four-part version: `major.minor.patch.hotfix`
+
+- **Major** (7.x) — Significant architecture changes
+- **Minor** (7.4.x) — New features
+- **Patch** (7.3.5.x) — Bug fixes, small additions
+- **Hotfix** (7.3.4.2) — Targeted fixes within a patch
+
+### Version locations (must stay synchronized)
+
+- `VERSION` file (root)
+- YAML header comment (`firmware/esp32-c3-multi-sensor.yaml`)
+- `App.version` in `dashboard/dashboard.js`
+- `register_history_handler()` call in YAML lambda
+
+### Tags
+
+Tag every accepted build with `v` prefix: `v7.3.5.0`, `v7.4.0`, etc.
+
+---
+
+## Scripts Reference
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `scripts/test-local.sh` | Full local validation | `./scripts/test-local.sh` or `--quick` |
+| `scripts/preflight.sh` | Cross-reference and syntax checks | `./scripts/preflight.sh` |
+| `scripts/compile-with-log.sh` | Compile with timestamped log | `./scripts/compile-with-log.sh` |
+| `scripts/generate-header.sh` | Regenerate dashboard.h from HTML | `./scripts/generate-header.sh` |
+| `scripts/deploy-to-esphome.sh` | Checkout version + preflight + compile | `./scripts/deploy-to-esphome.sh v7.3.5.0` |
+
+---
+
+## File Delivery Model
+
+The assistant delivers complete replacement files, not patches or diffs. This means:
+
+- Every modified file is delivered as a full, ready-to-copy replacement
+- You copy the file into the repo, overwriting the existing version
+- No manual merging is required
+- The preflight script validates cross-references after replacement
+
+When HTML changes, `dashboard.h` must be regenerated:
+
+```bash
+./scripts/generate-header.sh
+```
+
+---
+
+## Documentation Updates Per Build
+
+For each accepted build, update:
+
+- `VERSION` file
+- `Docs/changelog.md` (add entry)
+- `Docs/build-history.md` (add entry)
+- `Docs/esp32-gateway-fresh-start-handoff.md` (update current state)
+- `Docs/bugs-and-lessons-learned.md` (if applicable)
+
+The assistant will prepare these updates alongside the code changes.
+
+---
+
+## Generated Files Policy
+
+Generated files are committed to Git:
+
+- `dashboard.h` (generated from dashboard.html)
+- Documentation and notes
+
+This ensures every tagged version is self-contained and buildable without running generation steps first.
+
+---
+
+## Secrets Handling
+
+Real secrets never enter Git.
+
+- `secrets/secrets-example.yaml` — committed, public template
+- `secrets/secrets.yaml` — local only, gitignored
+- `firmware/secrets.yaml` — symlink to `../secrets/secrets.yaml`, gitignored
+- CI generates temporary compile-only dummy secrets per run
+
+---
+
+## Local Build Environment
+
+### Prerequisites
+
+- ESPHome 2025.11.0 or later
+- Node.js (for JS validation in preflight)
+- Git
+
+### LXC Container Setup (one-time)
+
+```bash
+cd /root/config
+git clone https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor.git
+cd ESP32-GW-multi-sensor
+cp secrets/secrets-example.yaml secrets/secrets.yaml
+# Edit secrets/secrets.yaml with real credentials
+ln -s ../secrets/secrets.yaml firmware/secrets.yaml
+```
+
+### Building a specific tagged version
+
+```bash
+cd /root/config/ESP32-GW-multi-sensor
+git fetch --all --tags
+git checkout v7.3.5.0
+esphome compile firmware/esp32-c3-multi-sensor.yaml
+```
+
+---
+
+## Gitignore Rules
+
+```
+firmware/secrets.yaml
 secrets/*.yaml
 !secrets/secrets-example.yaml
 .build/
 .pio/
+build-logs/
+artifacts/
+firmware/.esphome/
 ```
 
----
-
-## Suggested Git workflow for accepted builds
-
-### After accepting a build
-From your workstation / repo working copy:
-
-```bash
-git add .
-git commit -m "v7.3.4.2 hotfix: export serialization, chart recolor, theme redraw"
-git tag v7.3.4.2
-git push origin main --tags
-```
-
-### In ESPHome LXC
-```bash
-cd /config/esp32-gateway
-git fetch --all --tags
-git checkout v7.3.4.2
-bash scripts/deploy-to-esphome.sh v7.3.4.2
-```
-
----
-
-## Recommended release checklist
-
-Every build should include:
-- updated codebase
-- aligned version headers/comments
-- `Docs/v7.x.x-documentation.md`
-- `Docs/v7.x.x-development-notes.md`
-- `Docs/v7.x.x-consolidated-test-worksheet.md`
-- `Docs/v7.x.x-pre-phase1-expert-opinion.md` when applicable
-- regenerated `dashboard.h` if HTML changed
-- updated preflight checks if failure modes changed
-
-Before tagging a release, confirm:
-- compile success
-- dashboard loads and connects
-- target feature fix works
-- no regression on theme/range/export/auth flows
-- browser smoke check done where relevant
-
----
-
-## Process for future chat sessions
-
-### Best way to start a fresh session
-Provide:
-- GitHub repo URL
-- latest known-good tag
-- summary of new requested change
-- any new error screenshots/logs
-
-Example:
-
-> Repo: `https://github.com/<user>/<repo>`  
-> Baseline: `v7.3.4.2`  
-> Next step: Import v1 with validation report before write  
-> New issue: theme toggle still leaves legend contrast weak on Firefox mobile
-
-### What the assistant should then do
-- review the repo/tag baseline
-- inspect the requested change against current code/docs
-- produce the next build update with aligned docs and tests
-- keep the solution narrow and user-first
-
----
-
-## Public vs private repository guidance
-
-### Public repo
-Best option for continuity across fresh sessions.
-
-Benefit:
-- future sessions can reference the same baseline without re-uploading files
-
-### Private repo
-Still useful for your workflow, but the assistant will not be able to pull it directly from this chat unless you upload files or use an available connector.
-
-If the main goal is minimizing re-uploads in fresh sessions, a **public repo** is the cleanest option.
-
----
-
-## Recommended migration plan
-
-### Step 1
-Create or use the GitHub repository for this project.
-
-### Step 2
-Push the current known-good build as baseline.
-
-### Step 3
-Restructure into the recommended repo layout.
-
-### Step 4
-Add:
-- `.gitignore`
-- `VERSION`
-- `scripts/deploy-to-esphome.sh`
-
-### Step 5
-Clone the repo once into the ESPHome LXC.
-
-### Step 6
-From then on:
-- GitHub tag = canonical build checkpoint
-- LXC builds from Git checkout
-- ZIPs become optional transport only
-
----
-
-## Bottom-line recommendation
-
-The most efficient long-term workflow is:
-- GitHub as the canonical source of truth
-- tagged known-good builds
-- LXC pulling directly from GitHub
-- chat-based ZIPs only as a temporary handoff tool when needed
-
-This reduces repetitive file handling, makes rollback trivial, improves fresh-session continuity, and fits the project’s versioned documentation requirements well.
+Raw build logs go in `build-logs/` (gitignored). Curated documentation goes in `Docs/` (committed).
