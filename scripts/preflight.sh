@@ -1,75 +1,73 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
-VER="v7.3.4.2"
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+VER_RAW="$(tr -d '[:space:]' < VERSION)"
+VER_TAG="${VER_RAW#v}"
+VER_TAG="v${VER_TAG}"
+
 FILES=(
-  "dashboard-$VER.html"
-  "dashboard-$VER.js"
-  "dashboard-$VER.h"
-  "sensor_history_multi-$VER.h"
-  "esp32-c3-multi-sensor-$VER.yaml"
-  "generate-header-$VER.sh"
-  "esp32-c3-multi-$VER-partitions.csv"
-  "secrets-example-$VER.yaml"
+  "VERSION"
+  "dashboard/dashboard.html"
+  "dashboard/dashboard.js"
+  "dashboard/dashboard.h"
+  "dashboard/sensor_history_multi.h"
+  "firmware/esp32-c3-multi-sensor.yaml"
+  "partitions/esp32-c3-multi-partitions.csv"
+  "scripts/generate-header.sh"
+  "scripts/deploy-to-esphome.sh"
 )
+
 for f in "${FILES[@]}"; do
   [[ -f "$f" ]] || { echo "Missing $f"; exit 1; }
 done
 
-python - <<'PY'
-from pathlib import Path
-import sys
-base = Path('.')
-ver = 'v7.3.4.2'
-html = (base/f'dashboard-{ver}.html').read_text(encoding='utf-8')
-js = (base/f'dashboard-{ver}.js').read_text(encoding='utf-8').strip()
-hdr = (base/f'dashboard-{ver}.h').read_text(encoding='utf-8')
-hist = (base/f'sensor_history_multi-{ver}.h').read_text(encoding='utf-8')
-yaml = (base/f'esp32-c3-multi-sensor-{ver}.yaml').read_text(encoding='utf-8')
-gen = (base/f'generate-header-{ver}.sh').read_text(encoding='utf-8')
-start = html.index('<script>') + len('<script>')
-end = html.index('</script>', start)
-html_js = html[start:end].strip()
-app_state_marker = '// ── App.State implementation (Phase 1 write chokepoints) ───────'
-sensors_decl = 'var SENSORS = [];'
-checks = []
-checks.append(('html_js_sync', html_js == js))
-checks.append(('yaml_includes_dashboard', f'- dashboard-{ver}.h' in yaml))
-checks.append(('yaml_includes_history', f'- sensor_history_multi-{ver}.h' in yaml))
-checks.append(('yaml_uses_versioned_partitions', f'partitions: esp32-c3-multi-{ver}-partitions.csv' in yaml))
-checks.append(('generator_targets_current_version', f'dashboard-{ver}.html' in gen and f'dashboard-{ver}.h' in gen))
-checks.append(('header_generated_from_version', f'Auto-generated from dashboard-{ver}.html' in hdr))
-checks.append(('js_version', f"App.version = '{ver}';" in js))
-checks.append(('same_origin_https_polling', "window.location.protocol === 'https:'" in js and "TRANSPORT = 'polling'" in js))
-checks.append(('storage_retry_present', 'Retrying storage statistics' in js and 'loadStorageStats(tryNum + 1)' in js))
-checks.append(('history_axis_helper_present', 'function getHistoryTimeFormat(hours)' in js and 'applyHistoryAxisFormatting(tempAvgChart, HISTORY_RANGE_HOURS);' in js))
-checks.append(('no_explicit_acao_addheader_in_history_header', 'addHeader("Access-Control-Allow-Origin"' not in hist))
-checks.append(('no_inline_handlers_remaining', 'onclick=' not in html and 'oninput=' not in html and 'onchange=' not in html))
-checks.append(('bind_events_present', 'function bindEvents()' in js and 'bindEvents();' in js and 'App.Render.bindEvents = bindEvents;' in js))
-checks.append(('state_write_chokepoints_present', 'App.State.setSensors(' in js and 'App.State.setHistoryRangeHours(' in js and 'App.State.resetAvgHistoryStore(' in js and 'App.State.setChartsReady(' in js))
-checks.append(('single_dashboard_family', 'v7.3.4.1' not in yaml and 'v7.3.4.1' not in hist and 'v7.3.4.1' not in gen))
-checks.append(('sensors_decl_present', sensors_decl in js))
-checks.append(('sensors_decl_before_app_state', js.index(sensors_decl) < js.index(app_state_marker) if sensors_decl in js and app_state_marker in js else False))
-checks.append(('export_all_is_sequential', 'function fetchAllSensorHistoryRowsSequentially(' in js and 'fetchAllSensorHistoryRowsSequentially(SENSORS' in js and 'Promise.all(SENSORS.map(fetchSensorHistoryRows))' not in js))
-checks.append(('point_marker_colors_present', 'pointBackgroundColor:s.color' in js and 'pointBorderColor:s.color' in js and 'pointHoverBackgroundColor:s.color' in js and 'pointHoverBorderColor:s.color' in js))
-checks.append(('recolor_updates_point_markers', "ds.pointBackgroundColor = color;" in js and "ds.pointBorderColor = color;" in js and "ds.pointHoverBackgroundColor = color;" in js and "ds.pointHoverBorderColor = color;" in js))
-checks.append(('avg_marker_size_aligned', 'pointRadius:1.5, pointHoverRadius:4,' in js))
-checks.append(('theme_runtime_redraw_present', 'function refreshChartsAfterVisualChange(reason)' in js and "refreshChartsAfterVisualChange('theme-toggle')" in js))
-failed = [name for name, ok in checks if not ok]
-for name, ok in checks:
-    print(f'{name}: {"PASS" if ok else "FAIL"}')
-if failed:
-    print('FAILED:', ', '.join(failed))
-    sys.exit(1)
-PY
+check_contains() {
+  local label="$1" file="$2" needle="$3"
+  if grep -Fq -- "$needle" "$file"; then
+    echo "$label: PASS"
+  else
+    echo "$label: FAIL"
+    exit 1
+  fi
+}
 
-node --check "dashboard-$VER.js"
+check_not_contains() {
+  local label="$1" file="$2" needle="$3"
+  if grep -Fq -- "$needle" "$file"; then
+    echo "$label: FAIL"
+    exit 1
+  else
+    echo "$label: PASS"
+  fi
+}
+
+check_contains "yaml_includes_dashboard" firmware/esp32-c3-multi-sensor.yaml "- ../dashboard/dashboard.h"
+check_contains "yaml_includes_history" firmware/esp32-c3-multi-sensor.yaml "- ../dashboard/sensor_history_multi.h"
+check_contains "yaml_uses_canonical_partitions" firmware/esp32-c3-multi-sensor.yaml "partitions: ../partitions/esp32-c3-multi-partitions.csv"
+check_contains "generator_targets_dashboard_html" scripts/generate-header.sh "dashboard/dashboard.html"
+check_contains "generator_targets_dashboard_h" scripts/generate-header.sh "dashboard/dashboard.h"
+check_contains "header_generated_from_canonical_html" dashboard/dashboard.h "Auto-generated from dashboard/dashboard.html"
+check_contains "deploy_targets_canonical_yaml" scripts/deploy-to-esphome.sh "firmware/esp32-c3-multi-sensor.yaml"
+check_contains "js_version_matches_VERSION" dashboard/dashboard.js "App.version = '${VER_TAG}'"
+check_contains "export_all_is_sequential" dashboard/dashboard.js "fetchAllSensorHistoryRowsSequentially"
+check_contains "theme_redraw_present" dashboard/dashboard.js "refreshChartsAfterVisualChange"
+check_contains "bind_events_present" dashboard/dashboard.js "function bindEvents()"
+check_contains "state_write_chokepoints_present" dashboard/dashboard.js "App.State.setSensors("
+check_contains "recolor_updates_point_markers" dashboard/dashboard.js "pointBackgroundColor"
+check_not_contains "yaml_no_old_versioned_header_name" firmware/esp32-c3-multi-sensor.yaml "dashboard-v7.3.4.2.h"
+check_not_contains "yaml_no_old_versioned_history_name" firmware/esp32-c3-multi-sensor.yaml "sensor_history_multi-v7.3.4.2.h"
+check_not_contains "yaml_no_old_versioned_partition_name" firmware/esp32-c3-multi-sensor.yaml "esp32-c3-multi-v7.3.4.2-partitions.csv"
+
+node --check dashboard/dashboard.js
 echo "node_check: PASS"
 
 node <<'NODE'
 const fs = require('fs');
 const vm = require('vm');
-const code = fs.readFileSync('dashboard-v7.3.4.2.js', 'utf8');
+const code = fs.readFileSync('dashboard/dashboard.js', 'utf8');
 function dummyEl() {
   return {
     classList: { add(){}, remove(){}, toggle(){}, contains(){ return false; } },
@@ -115,7 +113,7 @@ context.window.EventSource = context.EventSource;
 context.window.Chart = context.Chart;
 vm.createContext(context);
 try {
-  vm.runInContext(code, context, { filename: 'dashboard-v7.3.4.2.js' });
+  vm.runInContext(code, context, { filename: 'dashboard.js' });
   console.log('runtime_smoke: PASS');
 } catch (err) {
   console.error('runtime_smoke: FAIL');

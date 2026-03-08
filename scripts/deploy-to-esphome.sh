@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR="/config/esp32-gateway"
-VERSION="${1:-main}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 
-cd "$REPO_DIR"
+VERSION_REF="${1:-main}"
 
-git fetch --all --tags
-
-if git rev-parse "$VERSION" >/dev/null 2>&1; then
-  git checkout "$VERSION"
+if [[ "$VERSION_REF" != "main" ]]; then
+  git fetch --all --tags
+  if git rev-parse "$VERSION_REF" >/dev/null 2>&1; then
+    git checkout "$VERSION_REF"
+  else
+    echo "Git ref not found: $VERSION_REF" >&2
+    exit 1
+  fi
 else
   git checkout main
   git pull --ff-only

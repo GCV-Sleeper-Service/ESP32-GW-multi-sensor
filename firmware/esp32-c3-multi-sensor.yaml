@@ -5,7 +5,7 @@
 # - 15-minute averages stored in 24h RAM ring buffers
 # - Hourly persistence at minute ${persist_minute} into a dedicated history NVS partition
 # - Merged /history/* HTTP endpoints for RAM + persisted history
-# - Embedded dashboard served from dashboard-v7.3.4.2.h
+# - Embedded dashboard served from ../dashboard/dashboard.h
 # - Dashboard keeps the Phase 1 bindEvents() + App.State structure from 7.3.4.x
 # - Export All now serializes retained-history fetches to reduce ESP/proxy request bursts
 # - Sensor recolor updates both line color and point-marker color across charts
@@ -15,11 +15,11 @@
 # - Dashboard management actions: reboot and delete retained history remain protected by Basic auth
 #
 # Required files
-# - esp32-c3-multi-sensor-v7.3.4.2.yaml
-# - dashboard-v7.3.4.2.h
-# - sensor_history_multi-v7.3.4.2.h
-# - esp32-c3-multi-v7.3.4.2-partitions.csv
-# - secrets.yaml
+# - firmware/esp32-c3-multi-sensor.yaml
+# - ../dashboard/dashboard.h
+# - ../dashboard/sensor_history_multi.h
+# - ../partitions/esp32-c3-multi-partitions.csv
+# - ../secrets.yaml
 
 # ─── Hourly persistence schedule ──
 substitutions:
@@ -34,8 +34,8 @@ esphome:
   min_version: 2025.11.0
   name_add_mac_suffix: false
   includes:
-    - dashboard-v7.3.4.2.h
-    - sensor_history_multi-v7.3.4.2.h
+    - ../dashboard/dashboard.h
+    - ../dashboard/sensor_history_multi.h
   on_boot:
     # Priority -100: run after web server is fully initialized.
     # Registers custom /history/*, /sensors.json, /dashboard.html,
@@ -43,7 +43,7 @@ esphome:
     # register_history_handler() restores the newest persisted
     # hourly segments into RAM on boot so charts still have a recent
     # baseline after a restart.
-    # Dashboard content remains embedded through dashboard-v7.3.4.2.h.
+    # Dashboard content remains embedded through ../dashboard/dashboard.h.
     priority: -100
     then:
       - lambda: |-
@@ -59,7 +59,7 @@ esphome:
 esp32:
   variant: esp32c3
   flash_size: 4MB
-  partitions: esp32-c3-multi-v7.3.4.2-partitions.csv
+  partitions: ../partitions/esp32-c3-multi-partitions.csv
   framework:
     type: esp-idf
     sdkconfig_options:
@@ -80,7 +80,7 @@ ota:
   - platform: esphome
 
 # ─── Embedded dashboard approach ─────────────────────────────────
-# The dashboard is compiled into dashboard-v7.3.4.2.h and served by
+# The dashboard is compiled into ../dashboard/dashboard.h and served by
 # the custom history handler through /dashboard, /dashboard.html, and
 # /dashboard-download. v7.3.4.2 keeps the storage-stats endpoint, preserves
 # Phase 1 structural enforcement for the dashboard event/state layer, and
@@ -502,7 +502,7 @@ sensor:
 # ╔══════════════════════════════════════════════════════════════════╗
 # ║  Text Sensors — per-sensor current readings + averages           ║
 # ║                                                                  ║
-# ║  Dashboard routes are backed by dashboard-v7.3.4.2.h      ║
+# ║  Dashboard routes are backed by ../dashboard/dashboard.h      ║
 # ║  Phase 1 UI logic now uses bindEvents() + App.State      ║
 # ║  Per-sensor text sensors include current values, averages,       ║
 # ║  battery, and last-seen timestamps.                              ║
