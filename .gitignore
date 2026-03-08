@@ -3,3 +3,6 @@ secrets/*.yaml
 !secrets/secrets-example.yaml
 .build/
 .pio/
+build-logs/
+artifacts/
+firmware/.esphome/
