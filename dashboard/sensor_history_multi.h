@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.3.4.2.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.3.5.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.3.4.2 note: retained-history backend logic is intentionally carried
 // forward unchanged from the stabilized v7.3.3 baseline. This version bump

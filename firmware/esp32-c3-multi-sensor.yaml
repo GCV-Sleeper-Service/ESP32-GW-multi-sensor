@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.3.4.2
+# ESP32-C3 Multi-Sensor Gateway - v7.3.5.0
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -48,7 +48,7 @@ esphome:
     priority: -100
     then:
       - lambda: |-
-          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.3.4.2");
+          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.3.5.0");
           id(dashboard_link).publish_state(
             "Open /dashboard or /dashboard.html in your browser for the live dashboard with the available retained history (about 45 days total in this v7.3.4.2 targeted hotfix build). /dashboard-download still provides a standalone dashboard file. This build preserves the 7.3.4 structural-enforcement work and fixes four user-visible dashboard issues: merged Export All now fetches sequentially to avoid request bursts, chart point markers stay in sync with sensor recolor changes, 15-minute markers match the smaller real-time size, and theme changes force a chart redraw so users do not need Ctrl+F5. The dashboard still provides the dedicated tools section below the top cards, with ESP Management and Documentation split into two mini cards below the gateway card and a full-width History Storage panel below the top row showing partition sizes, live NVS usage, and retained-history estimates. "
             "The ESPHome v3 built-in web page shows text sensor states as plain text, so clickable HTML links are not rendered here.");
