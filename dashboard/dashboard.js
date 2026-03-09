@@ -1303,7 +1303,7 @@ function buildImportSegments(points) {
     var currentLen = 0;
     for (var i = 0; i < lines.length; i++) {
       var lineLen = lines[i].length + 1;  // +1 for semicolon separator
-      if (currentLen + lineLen > 440 && currentBatch.length > 0) {
+      if (currentLen + lineLen > 200 && currentBatch.length > 0) {
         batches.push({ data: currentBatch.join(';'), pointCount: currentBatch.length, isLast: false });
         currentBatch = [];
         currentLen = 0;
@@ -1318,6 +1318,15 @@ function buildImportSegments(points) {
   });
 
   return batches;
+}
+
+function safeJsonResponse(r) {
+  var status = r.status;
+  return r.text().then(function(body) {
+    if (!r.ok) throw new Error('HTTP ' + status + ': ' + body.substring(0, 100));
+    try { return JSON.parse(body); }
+    catch(e) { throw new Error('HTTP ' + status + ' non-JSON: ' + body.substring(0, 100)); }
+  });
 }
 
 function executeImport(batches, statusEl) {
@@ -1337,7 +1346,7 @@ function executeImport(batches, statusEl) {
       method: 'POST', cache: 'no-store',
       headers: { 'Authorization': authHeader }
     })
-    .then(function(r) { return r.json(); })
+    .then(safeJsonResponse)
     .then(function(data) {
       if (!data.ok) throw new Error(data.message || 'Begin failed');
 
@@ -1359,7 +1368,7 @@ function executeImport(batches, statusEl) {
             method: 'POST', cache: 'no-store',
             headers: headers
           })
-          .then(function(r) { return r.json(); })
+          .then(safeJsonResponse)
           .then(function(result) {
             if (!result.ok) throw new Error(result.message || 'Data write failed at batch ' + idx);
             totalAccepted += (result.accepted || 0);
@@ -1377,7 +1386,7 @@ function executeImport(batches, statusEl) {
         method: 'POST', cache: 'no-store',
         headers: { 'Authorization': authHeader }
       })
-      .then(function(r) { return r.json(); })
+      .then(safeJsonResponse)
       .then(function(data) {
         if (!data.ok) throw new Error(data.message || 'Finish failed');
         var msg = 'Import complete: ' + data.segments_written + ' segments, ' +
