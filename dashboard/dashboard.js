@@ -743,7 +743,7 @@ function checkStaleness() {
     else if (age > 120000) te.classList.add('stale-warn');   // >2 min
   });
 }
-setInterval(checkStaleness, 10000);
+var stalenessIntervalId = setInterval(checkStaleness, 10000);
 
 // RSSI update
 function updateRSSI(sensorId, dbm) {
@@ -949,6 +949,7 @@ function applyStorageStats(data) {
 }
 
 function loadStorageStats(attempt) {
+  if (isImportActive()) return Promise.resolve(null);
   var statusEl = document.getElementById('storage-status');
   var tryNum = Number(attempt || 0);
   if (statusEl) {
@@ -974,6 +975,98 @@ function loadStorageStats(attempt) {
         statusEl.textContent = 'Storage stats failed: ' + err.message + hint;
       }
       throw err;
+    });
+}
+
+
+var importState = {
+  active: false,
+  authHeader: '',
+  startedAt: 0
+};
+var pollingLiveIntervalId = null;
+var pollingDeviceIntervalId = null;
+var storageStatsIntervalId = null;
+var historyBootstrapTimerId = null;
+
+function isImportActive() {
+  return !!importState.active;
+}
+
+function stopPolling() {
+  if (pollingLiveIntervalId) {
+    clearInterval(pollingLiveIntervalId);
+    pollingLiveIntervalId = null;
+  }
+  if (pollingDeviceIntervalId) {
+    clearInterval(pollingDeviceIntervalId);
+    pollingDeviceIntervalId = null;
+  }
+}
+
+function stopStorageRefresh() {
+  if (storageStatsIntervalId) {
+    clearInterval(storageStatsIntervalId);
+    storageStatsIntervalId = null;
+  }
+}
+
+function suspendDashboardNetworkActivity(statusEl) {
+  importState.active = true;
+  importState.startedAt = Date.now();
+  stopPolling();
+  stopStorageRefresh();
+  if (historyBootstrapTimerId) {
+    clearTimeout(historyBootstrapTimerId);
+    historyBootstrapTimerId = null;
+  }
+  if (evtSource) {
+    try { evtSource.close(); } catch (_e) {}
+    evtSource = null;
+  }
+  if (statusEl) statusEl.textContent = 'Pausing dashboard refresh during import...';
+}
+
+function resumeDashboardNetworkActivity() {
+  importState.active = false;
+  if (TRANSPORT === 'sse') {
+    try { connectSSE(); } catch (e) { logNonFatal('resume SSE after import', e); }
+  } else {
+    try { startPolling(); } catch (e2) { logNonFatal('resume polling after import', e2); }
+  }
+  if (!storageStatsIntervalId) {
+    storageStatsIntervalId = setInterval(function() {
+      if (isImportActive()) return;
+      loadStorageStats().catch(function(){});
+    }, 60000);
+  }
+}
+
+function isTransientImportError(err) {
+  var msg = (err && err.message ? err.message : String(err || '')).toLowerCase();
+  if (!msg) return false;
+  return /http\s+(502|503|504|520|522|524)\b/.test(msg) ||
+    msg.indexOf('failed to fetch') >= 0 ||
+    msg.indexOf('networkerror') >= 0 ||
+    msg.indexOf('load failed') >= 0 ||
+    msg.indexOf('bad gateway') >= 0 ||
+    msg.indexOf('connection reset') >= 0;
+}
+
+function importFetchJsonWithRetry(url, options, label, statusEl, attempt) {
+  var tryNum = Number(attempt || 1);
+  return fetch(url, options)
+    .then(safeJsonResponse)
+    .catch(function(err) {
+      if (!isTransientImportError(err) || tryNum >= 3) throw err;
+      var waitMs = 500 * Math.pow(2, tryNum - 1);
+      if (statusEl) {
+        statusEl.textContent = 'Transient tunnel/origin error during ' + label +
+          '; retrying in ' + waitMs + ' ms (attempt ' + (tryNum + 1) + '/3)...';
+      }
+      return delay(waitMs).then(function() {
+        return importFetchJsonWithRetry(url, options, label, statusEl, tryNum + 1);
+      });
     });
 }
 
@@ -1132,6 +1225,10 @@ function importHistoryData() {
   var statusEl = document.getElementById('mgmt-status');
   var fileInput = document.getElementById('importFileInput');
   if (!fileInput) return;
+  if (isImportActive()) {
+    if (statusEl) statusEl.textContent = 'Import already in progress...';
+    return;
+  }
 
   // Reset file input so re-selecting the same file triggers change.
   fileInput.value = '';
@@ -1330,6 +1427,11 @@ function safeJsonResponse(r) {
 }
 
 function executeImport(batches, statusEl) {
+  if (isImportActive()) {
+    if (statusEl) statusEl.textContent = 'Import already in progress...';
+    return;
+  }
+
   if (statusEl) statusEl.textContent = 'Authenticating...';
 
   requestManagementCredentials('history import').then(function(creds) {
@@ -1339,65 +1441,112 @@ function executeImport(batches, statusEl) {
     }
 
     var authHeader = 'Basic ' + btoa(creds.username + ':' + creds.password);
+    var pacing = {
+      pauseBeforeBeginMs: 250,
+      dataBatchGapMs: 120,
+      writeBatchGapMs: 320,
+      postFinishReloadDelayMs: 500
+    };
 
-    // Step 1: Begin import (clears history).
-    if (statusEl) statusEl.textContent = 'Clearing history for import...';
-    return fetch(ESP_HOST + '/api/import/begin', {
-      method: 'POST', cache: 'no-store',
-      headers: { 'Authorization': authHeader }
-    })
-    .then(safeJsonResponse)
-    .then(function(data) {
-      if (!data.ok) throw new Error(data.message || 'Begin failed');
+    importState.authHeader = authHeader;
+    suspendDashboardNetworkActivity(statusEl);
 
-      // Step 2: Send batches sequentially via URL query params.
-      var totalAccepted = 0;
-      var totalRejected = 0;
-      return batches.reduce(function(chain, batch, idx) {
-        return chain.then(function() {
-          if (statusEl) {
-            statusEl.textContent = 'Importing batch ' + (idx + 1) + ' / ' + batches.length +
-              ' (' + batch.pointCount + ' points)...';
-          }
-          var pathPrefix = batch.isLast ? '/api/import/w/' : '/api/import/d/';
-          return fetch(ESP_HOST + pathPrefix + batch.data, {
-            method: 'POST', cache: 'no-store',
+    return delay(pacing.pauseBeforeBeginMs)
+      .then(function() {
+        if (statusEl) statusEl.textContent = 'Clearing history for import...';
+        return importFetchJsonWithRetry(
+          ESP_HOST + '/api/import/begin',
+          {
+            method: 'POST',
+            cache: 'no-store',
             headers: { 'Authorization': authHeader }
-          })
-          .then(safeJsonResponse)
-          .then(function(result) {
-            if (!result.ok) throw new Error(result.message || 'Data write failed at batch ' + idx);
-            totalAccepted += (result.accepted || 0);
-            totalRejected += (result.rejected || 0);
+          },
+          'begin',
+          statusEl
+        );
+      })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || 'Begin failed');
+
+        var totalAccepted = 0;
+        var totalRejected = 0;
+
+        return batches.reduce(function(chain, batch, idx) {
+          return chain.then(function() {
+            if (statusEl) {
+              statusEl.textContent = 'Importing batch ' + (idx + 1) + ' / ' + batches.length +
+                ' (' + batch.pointCount + ' points)...';
+            }
+
+            var pathPrefix = batch.isLast ? '/api/import/w/' : '/api/import/d/';
+            return importFetchJsonWithRetry(
+              ESP_HOST + pathPrefix + batch.data,
+              {
+                method: 'POST',
+                cache: 'no-store',
+                headers: { 'Authorization': authHeader }
+              },
+              'batch ' + (idx + 1) + ' of ' + batches.length,
+              statusEl
+            )
+            .then(function(result) {
+              if (!result.ok) throw new Error(result.message || 'Data write failed at batch ' + (idx + 1));
+              totalAccepted += (result.accepted || 0);
+              totalRejected += (result.rejected || 0);
+              return delay(batch.isLast ? pacing.writeBatchGapMs : pacing.dataBatchGapMs);
+            });
+          });
+        }, Promise.resolve()).then(function() {
+          return { accepted: totalAccepted, rejected: totalRejected };
+        });
+      })
+      .then(function(totals) {
+        if (statusEl) statusEl.textContent = 'Finalizing import...';
+        return importFetchJsonWithRetry(
+          ESP_HOST + '/api/import/finish',
+          {
+            method: 'POST',
+            cache: 'no-store',
+            headers: { 'Authorization': authHeader }
+          },
+          'finish',
+          statusEl
+        )
+        .then(function(data) {
+          if (!data.ok) throw new Error(data.message || 'Finish failed');
+          var msg = 'Import complete: ' + data.segments_written + ' segments, ' +
+            totals.accepted + ' accepted';
+          if (totals.rejected > 0) msg += ', ' + totals.rejected + ' rejected';
+          if (statusEl) statusEl.textContent = msg + ' \u2714';
+          resetHistoryVisuals();
+          return delay(pacing.postFinishReloadDelayMs).then(function() {
+            resumeDashboardNetworkActivity();
+            loadHistory();
+            loadStorageStats().catch(function(){});
           });
         });
-      }, Promise.resolve()).then(function() {
-        return { accepted: totalAccepted, rejected: totalRejected };
-      });
-    })
-    .then(function(totals) {
-      // Step 3: Finish import.
-      if (statusEl) statusEl.textContent = 'Finalizing import...';
-      return fetch(ESP_HOST + '/api/import/finish', {
-        method: 'POST', cache: 'no-store',
-        headers: { 'Authorization': authHeader }
       })
-      .then(safeJsonResponse)
-      .then(function(data) {
-        if (!data.ok) throw new Error(data.message || 'Finish failed');
-        var msg = 'Import complete: ' + data.segments_written + ' segments, ' +
-          totals.accepted + ' accepted';
-        if (totals.rejected > 0) msg += ', ' + totals.rejected + ' rejected';
-        if (statusEl) statusEl.textContent = msg + ' \u2714';
-        // Reload history and storage stats.
-        resetHistoryVisuals();
-        loadHistory();
-        loadStorageStats().catch(function(){});
+      .catch(function(err) {
+        if (statusEl) statusEl.textContent = 'Import failed: ' + err.message;
+        throw err;
+      })
+      .then(function(result) {
+        if (isImportActive()) resumeDashboardNetworkActivity();
+        importState.authHeader = '';
+        return result;
+      }, function(err) {
+        if (isImportActive()) resumeDashboardNetworkActivity();
+        importState.authHeader = '';
+        throw err;
       });
-    })
-    .catch(function(err) {
-      if (statusEl) statusEl.textContent = 'Import failed: ' + err.message;
-    });
+  }).catch(function(err) {
+    if (err && err.message === 'Authentication cancelled') {
+      if (statusEl) statusEl.textContent = 'Import cancelled';
+      return;
+    }
+    if (statusEl && err && err.message && statusEl.textContent.indexOf('Import failed:') !== 0) {
+      statusEl.textContent = 'Import failed: ' + err.message;
+    }
   });
 }
 
@@ -1845,6 +1994,7 @@ function parseCompactHistory(text) {
 }
 
 function loadHistory() {
+  if (isImportActive()) return Promise.resolve(false);
   var badge = document.getElementById('histBadge');
   badge.textContent = 'loading...'; badge.classList.add('empty');
   var loaded = 0, sensorIdx = 0;
@@ -2009,7 +2159,13 @@ function connectSSE() {
 
 // ── REST polling (Cloudflare mode) ──────────────────────────────
 var pollFailCount = 0;
-function pollEntity(path) { return fetch(ESP_HOST + path, {cache:'no-store'}).then(function(r) { if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(function(d) { handleState(d); return true; }).catch(function() { return false; }); }
+function pollEntity(path) {
+  if (isImportActive()) return Promise.resolve(false);
+  return fetch(ESP_HOST + path, {cache:'no-store'})
+    .then(function(r) { if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(d) { handleState(d); return true; })
+    .catch(function() { return false; });
+}
 function delay(ms) { return new Promise(function(resolve) { setTimeout(resolve, ms); }); }
 function pollAll(paths, batchSize, gapMs) {
   batchSize = batchSize || 4; gapMs = gapMs || 120;
@@ -2024,12 +2180,19 @@ function pollAll(paths, batchSize, gapMs) {
   });
 }
 function startPolling() {
+  stopPolling();
   dlog('Starting REST polling (batched)...');
   var livePaths = POLL_SHARED.slice();
   SENSORS.forEach(function(s) { livePaths = livePaths.concat(s.restPaths); });
   pollAll(POLL_DEVICE.concat(livePaths)).then(function() { dlog('Initial poll done', 'ok'); });
-  setInterval(function() { pollAll(livePaths); }, 15000);
-  setInterval(function() { pollAll(POLL_DEVICE); }, 300000);
+  pollingLiveIntervalId = setInterval(function() {
+    if (isImportActive()) return;
+    pollAll(livePaths);
+  }, 15000);
+  pollingDeviceIntervalId = setInterval(function() {
+    if (isImportActive()) return;
+    pollAll(POLL_DEVICE);
+  }, 300000);
 }
 
 // ╔════════════════════════════════════════════════════════════════╗
@@ -2087,8 +2250,14 @@ App.Boot.start = function() {
     if (TRANSPORT === 'sse') { try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); } }
     else { try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); } }
     loadStorageStats().catch(function(){});
-    setInterval(function() { loadStorageStats().catch(function(){}); }, 60000);
-    setTimeout(loadHistory, 2000);
+    storageStatsIntervalId = setInterval(function() {
+      if (isImportActive()) return;
+      loadStorageStats().catch(function(){});
+    }, 60000);
+    historyBootstrapTimerId = setTimeout(function() {
+      if (isImportActive()) return;
+      loadHistory();
+    }, 2000);
   });
 };
 
