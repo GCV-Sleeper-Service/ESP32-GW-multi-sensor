@@ -1,0 +1,941 @@
+# ESP32-C3 Multi-Sensor Gateway - v7.4.0
+#
+# Current package summary
+# - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
+# - 15-minute averages stored in 24h RAM ring buffers
+# - Hourly persistence at minute ${persist_minute} into a dedicated history NVS partition
+# - Merged /history/* HTTP endpoints for RAM + persisted history
+# - Embedded dashboard served from ../dashboard/dashboard.h
+# - Dashboard keeps the Phase 1 bindEvents() + App.State structure from 7.3.4.x
+# - Export All now serializes retained-history fetches to reduce ESP/proxy request bursts
+# - Sensor recolor updates both line color and point-marker color across charts
+# - 15-minute chart markers now match the smaller real-time marker size
+# - Theme toggle now forces a runtime chart redraw so users do not need Ctrl+F5
+# - Keeps storage stats panel fed by GET /api/storage-stats
+# - Adds lightweight GET /api/status for version/health checks
+# - Dashboard management actions: reboot and delete retained history remain protected by Basic auth
+#
+# Required files
+# - firmware/esp32-c3-multi-sensor.yaml
+# - ../dashboard/dashboard.h
+# - ../dashboard/sensor_history_multi.h
+# - ../partitions/esp32-c3-multi-partitions.csv
+# - ../secrets.yaml
+
+# ─── Hourly persistence schedule ──
+substitutions:
+  persist_minute: "10"
+  mgmt_auth_username: !secret gateway_mgmt_username
+  mgmt_auth_password: !secret gateway_mgmt_password
+
+# ─── Core ESPHome configuration ─────────────────────────────────
+esphome:
+  name: "esp32-c3-multi"
+  friendly_name: ESP32-C3 Multi-Sensor GW
+  min_version: 2025.11.0
+  name_add_mac_suffix: false
+  includes:
+    - ../dashboard/dashboard.h
+    - ../dashboard/sensor_history_multi.h
+  on_boot:
+    # Priority -100: run after web server is fully initialized.
+    # Registers custom /history/*, /sensors.json, /dashboard.html,
+    # /dashboard-download, /api/storage-stats, and /api/status via AsyncWebHandler.
+    # register_history_handler() restores the newest persisted
+    # hourly segments into RAM on boot so charts still have a recent
+    # baseline after a restart.
+    # Dashboard content remains embedded through ../dashboard/dashboard.h.
+    priority: -100
+    then:
+      - lambda: |-
+          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.4.0");
+          id(dashboard_link).publish_state(
+            "Open /dashboard or /dashboard.html in your browser for the live dashboard with the available retained history (about 45 days total in this v7.3.4.2 targeted hotfix build). /dashboard-download still provides a standalone dashboard file. This build preserves the 7.3.4 structural-enforcement work and fixes four user-visible dashboard issues: merged Export All now fetches sequentially to avoid request bursts, chart point markers stay in sync with sensor recolor changes, 15-minute markers match the smaller real-time size, and theme changes force a chart redraw so users do not need Ctrl+F5. The dashboard still provides the dedicated tools section below the top cards, with ESP Management and Documentation split into two mini cards below the gateway card and a full-width History Storage panel below the top row showing partition sizes, live NVS usage, and retained-history estimates. "
+            "The ESPHome v3 built-in web page shows text sensor states as plain text, so clickable HTML links are not rendered here.");
+
+# ─── Chip and framework ─────────────────────────────────────────
+# ESP-IDF (not Arduino) for better BLE + WiFi coexistence.
+# 13 sockets required for ESP32-C3 init sequence:
+# WiFi + BLE/NimBLE + mDNS + SNTP + web server + API + OTA
+esp32:
+  variant: esp32c3
+  flash_size: 4MB
+  partitions: ../partitions/esp32-c3-multi-partitions.csv
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_LWIP_MAX_SOCKETS: "13"
+      CONFIG_HTTPD_MAX_REQ_HDR_LEN: "2048"
+      CONFIG_HTTPD_MAX_URI_LEN: "2048"
+
+logger:
+  level: INFO
+  logs:
+    wifi: WARN
+    api: WARN
+
+# ─── Debug component ─────────────────────────────────────────────
+# Required by the debug sensors/text_sensors below.
+debug:
+  update_interval: 30s
+
+ota:
+  - platform: esphome
+
+# ─── Embedded dashboard approach ─────────────────────────────────
+# The dashboard is compiled into ../dashboard/dashboard.h and served by
+# the custom history handler through /dashboard, /dashboard.html, and
+# /dashboard-download. v7.3.4.2 keeps the storage-stats endpoint, preserves
+# Phase 1 structural enforcement for the dashboard event/state layer, and
+# applies a narrow UI hotfix set: serialized merged export, point-marker
+# recolor sync, smaller 15-minute markers, and forced chart redraw on
+# theme changes.
+
+# ─── Home Assistant API ──────────────────────────────────────────
+# reboot_timeout: 0s — CRITICAL: prevents reboot when no HA connected.
+api:
+  encryption:
+    key: "6+Hp4ywnRtYt7IEjB/BpsKbjsI9guOoJeSXJ47ya3/k="
+  reboot_timeout: 0s
+
+# ─── WiFi ────────────────────────────────────────────────────────
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  use_address: 192.168.120.189
+
+# ─── Time synchronization ───────────────────────────────────────
+# 15-minute averaging remains aligned to :00, :15, :30, :45.
+# 15-minute averages remain aligned to :00, :15, :30, :45.
+# 24h of averages stay in RAM (96 points per series). The firmware then
+# persists one hourly segment to the dedicated history NVS partition at
+# minute ${persist_minute}, limiting worst-case power-loss exposure to
+# about one hour while retaining about 45 days in flash.
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: "America/Los_Angeles"
+    on_time:
+      - seconds: 0
+        minutes: /15
+        then:
+          - lambda: |-
+              // ════════════════════════════════════════════════════════
+              // 15-minute averaging lambda
+              //
+              // For each sensor: compute averages, store in the 24h RAM
+              // ring buffer (or explicit gap), format output strings,
+              // and publish to template text_sensors.
+              // ════════════════════════════════════════════════════════
+              auto now = id(sntp_time).now();
+              if (!now.is_valid()) return;
+              uint32_t epoch = now.timestamp;
+
+              // ── Office ─────────────────────────────────────
+              sensors[0].compute_and_format(epoch);
+              id(avg_temp_office).publish_state(sensors[0].temp_avg_str);
+              id(avg_hum_office).publish_state(sensors[0].hum_avg_str);
+              if (sensors[0].batt_last >= 0)
+                id(battery_office).publish_state(sensors[0].batt_str);
+
+              // ── First Floor ────────────────────────────────
+              sensors[1].compute_and_format(epoch);
+              id(avg_temp_first_floor).publish_state(sensors[1].temp_avg_str);
+              id(avg_hum_first_floor).publish_state(sensors[1].hum_avg_str);
+              if (sensors[1].batt_last >= 0)
+                id(battery_first_floor).publish_state(sensors[1].batt_str);
+
+              // ── Outside ────────────────────────────────────
+              sensors[2].compute_and_format(epoch);
+              id(avg_temp_outside).publish_state(sensors[2].temp_avg_str);
+              id(avg_hum_outside).publish_state(sensors[2].hum_avg_str);
+              if (sensors[2].batt_last >= 0)
+                id(battery_outside).publish_state(sensors[2].batt_str);
+
+              // ── Shared clock update ────────────────────────
+              char time_buf[20];
+              snprintf(time_buf, sizeof(time_buf), "%02d:%02d %02d/%02d",
+                       now.hour, now.minute, now.month, now.day_of_month);
+              id(current_time).publish_state(time_buf);
+
+      - seconds: 0
+        minutes: ${persist_minute}
+        then:
+          - lambda: |-
+              // Hourly history-partition persistence is deliberately offset from the
+              // top-of-hour average to avoid running both paths at once.
+              // At :10 it stores the previous 1h segment (4 x 15m points).
+              auto now = id(sntp_time).now();
+              if (!now.is_valid()) return;
+              persist_hourly_segment(now.timestamp);
+
+
+
+# ─── Web server ──────────────────────────────────────────────────
+# Sorting groups control the layout of the built-in ESP web page.
+# Dashboard Download is placed between About and sensor groups
+# per the user's requested ordering.
+web_server_base:
+  id: web_base
+
+web_server:
+  port: 80
+  version: 3
+  log: false
+  sorting_groups:
+    - id: group_about
+      name: "About This Gateway"
+      sorting_weight: 1
+    - id: group_dashboard
+      name: "Dashboard Access"
+      sorting_weight: 5
+    - id: group_office
+      name: "Office"
+      sorting_weight: 10
+    - id: group_first_floor
+      name: "First Floor"
+      sorting_weight: 20
+    - id: group_outside
+      name: "Outside"
+      sorting_weight: 30
+    - id: group_diag
+      name: "Diagnostics-Info"
+      sorting_weight: 40
+
+
+# ─── BLE tracker ─────────────────────────────────────────────────
+esp32_ble_tracker:
+
+
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  BLE Sensors — 3× ThermoPro TP357                               ║
+# ║                                                                  ║
+# ║  Each sensor callback:                                           ║
+# ║    1. Feeds value to SensorSlot accumulator (add_temp/add_hum)   ║
+# ║    2. Updates last_seen_epoch + publishes Last Seen text         ║
+# ║    3. Formats and publishes current reading text_sensor           ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+sensor:
+
+  # ══════════════════════════════════════════════════════════════════
+  # SENSOR 0: OFFICE — MAC DB:06:2C:58:8A:59
+  # ══════════════════════════════════════════════════════════════════
+  - platform: thermopro_ble
+    mac_address: "DB:06:2C:58:8A:59"
+    temperature:
+      id: raw_temp_office
+      name: "Office Temp Raw"
+      internal: true
+      on_value:
+        then:
+          - lambda: |-
+              sensors[0].add_temp(x);
+              auto now = id(sntp_time).now();
+              if (now.is_valid()) {
+                sensors[0].mark_seen(now.timestamp);
+                char seen_buf[20];
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
+                         now.hour, now.minute, now.second,
+                         now.month, now.day_of_month);
+                id(last_seen_office).publish_state(seen_buf);
+              }
+              if (!isnan(x) && x > -50.0f && x < 80.0f) {
+                float f = x * 9.0f / 5.0f + 32.0f;
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%.1f \xC2\xB0" "C / %.1f \xC2\xB0" "F", x, f);
+                id(cur_temp_office).publish_state(buf);
+              }
+    humidity:
+      id: raw_hum_office
+      name: "Office Hum Raw"
+      internal: true
+      on_value:
+        then:
+          - lambda: |-
+              sensors[0].add_hum(x);
+              auto now = id(sntp_time).now();
+              if (now.is_valid()) {
+                sensors[0].mark_seen(now.timestamp);
+                char seen_buf[20];
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
+                         now.hour, now.minute, now.second,
+                         now.month, now.day_of_month);
+                id(last_seen_office).publish_state(seen_buf);
+              }
+              if (!isnan(x) && x >= 0.0f && x <= 100.0f) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%.1f %%", x);
+                id(cur_hum_office).publish_state(buf);
+              }
+    battery_level:
+      id: raw_batt_office
+      name: "Office Battery Raw"
+      internal: true
+      on_value:
+        then:
+          - lambda: |-
+              sensors[0].set_battery(x);
+              auto now = id(sntp_time).now();
+              if (now.is_valid()) {
+                sensors[0].mark_seen(now.timestamp);
+                char seen_buf[20];
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
+                         now.hour, now.minute, now.second,
+                         now.month, now.day_of_month);
+                id(last_seen_office).publish_state(seen_buf);
+              }
+              if (sensors[0].batt_last >= 0)
+                id(battery_office).publish_state(sensors[0].batt_str);
+
+  # ══════════════════════════════════════════════════════════════════
+  # SENSOR 1: FIRST FLOOR — MAC D5:D8:4C:25:06:49
+  # ══════════════════════════════════════════════════════════════════
+  - platform: thermopro_ble
+    mac_address: "D5:D8:4C:25:06:49"
+    temperature:
+      id: raw_temp_first_floor
+      name: "First Floor Temp Raw"
+      internal: true
+      on_value:
+        then:
+          - lambda: |-
+              sensors[1].add_temp(x);
+              auto now = id(sntp_time).now();
+              if (now.is_valid()) {
+                sensors[1].mark_seen(now.timestamp);
+                char seen_buf[20];
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
+                         now.hour, now.minute, now.second,
+                         now.month, now.day_of_month);
+                id(last_seen_first_floor).publish_state(seen_buf);
+              }
+              if (!isnan(x) && x > -50.0f && x < 80.0f) {
+                float f = x * 9.0f / 5.0f + 32.0f;
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%.1f \xC2\xB0" "C / %.1f \xC2\xB0" "F", x, f);
+                id(cur_temp_first_floor).publish_state(buf);
+              }
+    humidity:
+      id: raw_hum_first_floor
+      name: "First Floor Hum Raw"
+      internal: true
+      on_value:
+        then:
+          - lambda: |-
+              sensors[1].add_hum(x);
+              auto now = id(sntp_time).now();
+              if (now.is_valid()) {
+                sensors[1].mark_seen(now.timestamp);
+                char seen_buf[20];
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
+                         now.hour, now.minute, now.second,
+                         now.month, now.day_of_month);
+                id(last_seen_first_floor).publish_state(seen_buf);
+              }
+              if (!isnan(x) && x >= 0.0f && x <= 100.0f) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%.1f %%", x);
+                id(cur_hum_first_floor).publish_state(buf);
+              }
+    battery_level:
+      id: raw_batt_first_floor
+      name: "First Floor Battery Raw"
+      internal: true
+      on_value:
+        then:
+          - lambda: |-
+              sensors[1].set_battery(x);
+              auto now = id(sntp_time).now();
+              if (now.is_valid()) {
+                sensors[1].mark_seen(now.timestamp);
+                char seen_buf[20];
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
+                         now.hour, now.minute, now.second,
+                         now.month, now.day_of_month);
+                id(last_seen_first_floor).publish_state(seen_buf);
+              }
+              if (sensors[1].batt_last >= 0)
+                id(battery_first_floor).publish_state(sensors[1].batt_str);
+
+  # ══════════════════════════════════════════════════════════════════
+  # SENSOR 2: OUTSIDE — MAC DF:EB:DE:19:11:6C
+  # ══════════════════════════════════════════════════════════════════
+  - platform: thermopro_ble
+    mac_address: "DF:EB:DE:19:11:6C"
+    temperature:
+      id: raw_temp_outside
+      name: "Outside Temp Raw"
+      internal: true
+      on_value:
+        then:
+          - lambda: |-
+              sensors[2].add_temp(x);
+              auto now = id(sntp_time).now();
+              if (now.is_valid()) {
+                sensors[2].mark_seen(now.timestamp);
+                char seen_buf[20];
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
+                         now.hour, now.minute, now.second,
+                         now.month, now.day_of_month);
+                id(last_seen_outside).publish_state(seen_buf);
+              }
+              if (!isnan(x) && x > -50.0f && x < 80.0f) {
+                float f = x * 9.0f / 5.0f + 32.0f;
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%.1f \xC2\xB0" "C / %.1f \xC2\xB0" "F", x, f);
+                id(cur_temp_outside).publish_state(buf);
+              }
+    humidity:
+      id: raw_hum_outside
+      name: "Outside Hum Raw"
+      internal: true
+      on_value:
+        then:
+          - lambda: |-
+              sensors[2].add_hum(x);
+              auto now = id(sntp_time).now();
+              if (now.is_valid()) {
+                sensors[2].mark_seen(now.timestamp);
+                char seen_buf[20];
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
+                         now.hour, now.minute, now.second,
+                         now.month, now.day_of_month);
+                id(last_seen_outside).publish_state(seen_buf);
+              }
+              if (!isnan(x) && x >= 0.0f && x <= 100.0f) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%.1f %%", x);
+                id(cur_hum_outside).publish_state(buf);
+              }
+    battery_level:
+      id: raw_batt_outside
+      name: "Outside Battery Raw"
+      internal: true
+      on_value:
+        then:
+          - lambda: |-
+              sensors[2].set_battery(x);
+              auto now = id(sntp_time).now();
+              if (now.is_valid()) {
+                sensors[2].mark_seen(now.timestamp);
+                char seen_buf[20];
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
+                         now.hour, now.minute, now.second,
+                         now.month, now.day_of_month);
+                id(last_seen_outside).publish_state(seen_buf);
+              }
+              if (sensors[2].batt_last >= 0)
+                id(battery_outside).publish_state(sensors[2].batt_str);
+
+
+  # ── Diagnostic sensors ─────────────────────────────────────────
+  - platform: debug
+    free:
+      name: "Free Heap"
+      web_server:
+        sorting_group_id: group_diag
+        sorting_weight: 30
+    loop_time:
+      name: "Loop Time"
+      web_server:
+        sorting_group_id: group_diag
+        sorting_weight: 31
+
+  - platform: uptime
+    name: "Uptime"
+    web_server:
+      sorting_group_id: group_diag
+      sorting_weight: 32
+
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    icon: "mdi:wifi"
+    update_interval: 30s
+    web_server:
+      sorting_group_id: group_diag
+      sorting_weight: 33
+
+  # ── BLE RSSI per sensor ────────────────────────────────────────
+  # Uses ESPHome's built-in ble_rssi platform to track passive signal
+  # strength from each ThermoPro BLE advertisement for dashboard bars.
+  - platform: ble_rssi
+    mac_address: "DB:06:2C:58:8A:59"
+    name: "Office RSSI"
+    id: office_rssi
+    icon: "mdi:signal"
+    filters:
+      - exponential_moving_average:
+          alpha: 0.3
+          send_every: 3
+          send_first_at: 1
+    web_server:
+      sorting_group_id: group_office
+      sorting_weight: 16
+
+  - platform: ble_rssi
+    mac_address: "D5:D8:4C:25:06:49"
+    name: "First Floor RSSI"
+    id: first_floor_rssi
+    icon: "mdi:signal"
+    filters:
+      - exponential_moving_average:
+          alpha: 0.3
+          send_every: 3
+          send_first_at: 1
+    web_server:
+      sorting_group_id: group_first_floor
+      sorting_weight: 16
+
+  - platform: ble_rssi
+    mac_address: "DF:EB:DE:19:11:6C"
+    name: "Outside RSSI"
+    id: outside_rssi
+    icon: "mdi:signal"
+    filters:
+      - exponential_moving_average:
+          alpha: 0.3
+          send_every: 3
+          send_first_at: 1
+    web_server:
+      sorting_group_id: group_outside
+      sorting_weight: 16
+
+
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  Text Sensors — per-sensor current readings + averages           ║
+# ║                                                                  ║
+# ║  Dashboard routes are backed by ../dashboard/dashboard.h      ║
+# ║  Phase 1 UI logic now uses bindEvents() + App.State      ║
+# ║  Per-sensor text sensors include current values, averages,       ║
+# ║  battery, and last-seen timestamps.                              ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+text_sensor:
+
+  # ── About ──────────────────────────────────────────────────────
+  - platform: template
+    name: "Description"
+    id: about_description
+    icon: "mdi:information-outline"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_about
+      sorting_weight: 1
+
+  # ── Shared ─────────────────────────────────────────────────────
+  - platform: template
+    name: "Current Time"
+    id: current_time
+    icon: "mdi:timeline-clock"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_about
+      sorting_weight: 2
+
+  # ── Dashboard Access ───────────────────────────────────────────
+  # This is plain text because the built-in ESPHome web_server shows
+  # text_sensor state as text rather than rendering clickable HTML.
+  - platform: template
+    name: "Dashboard Paths"
+    id: dashboard_link
+    icon: "mdi:monitor-dashboard"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_dashboard
+      sorting_weight: 1
+
+  # ══════════════════════════════════════════════════════════════════
+  # OFFICE — current readings + 15m averages + battery + last seen
+  # ══════════════════════════════════════════════════════════════════
+  - platform: template
+    name: "Office Temperature"
+    id: cur_temp_office
+    icon: "mdi:thermometer"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_office
+      sorting_weight: 1
+
+  - platform: template
+    name: "Office Humidity"
+    id: cur_hum_office
+    icon: "mdi:water-percent"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_office
+      sorting_weight: 2
+
+  - platform: template
+    name: "Office Temp (15m avg)"
+    id: avg_temp_office
+    icon: "mdi:chart-line"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_office
+      sorting_weight: 3
+
+  - platform: template
+    name: "Office Humidity (15m avg)"
+    id: avg_hum_office
+    icon: "mdi:chart-line"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_office
+      sorting_weight: 4
+
+  - platform: template
+    name: "Office Battery"
+    id: battery_office
+    icon: "mdi:battery"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_office
+      sorting_weight: 5
+
+  - platform: template
+    name: "Office Last Seen"
+    id: last_seen_office
+    icon: "mdi:clock-check-outline"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_office
+      sorting_weight: 6
+
+  # ══════════════════════════════════════════════════════════════════
+  # FIRST FLOOR
+  # ══════════════════════════════════════════════════════════════════
+  - platform: template
+    name: "First Floor Temperature"
+    id: cur_temp_first_floor
+    icon: "mdi:thermometer"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_first_floor
+      sorting_weight: 1
+
+  - platform: template
+    name: "First Floor Humidity"
+    id: cur_hum_first_floor
+    icon: "mdi:water-percent"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_first_floor
+      sorting_weight: 2
+
+  - platform: template
+    name: "First Floor Temp (15m avg)"
+    id: avg_temp_first_floor
+    icon: "mdi:chart-line"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_first_floor
+      sorting_weight: 3
+
+  - platform: template
+    name: "First Floor Humidity (15m avg)"
+    id: avg_hum_first_floor
+    icon: "mdi:chart-line"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_first_floor
+      sorting_weight: 4
+
+  - platform: template
+    name: "First Floor Battery"
+    id: battery_first_floor
+    icon: "mdi:battery"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_first_floor
+      sorting_weight: 5
+
+  - platform: template
+    name: "First Floor Last Seen"
+    id: last_seen_first_floor
+    icon: "mdi:clock-check-outline"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_first_floor
+      sorting_weight: 6
+
+  # ══════════════════════════════════════════════════════════════════
+  # OUTSIDE
+  # ══════════════════════════════════════════════════════════════════
+  - platform: template
+    name: "Outside Temperature"
+    id: cur_temp_outside
+    icon: "mdi:thermometer"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_outside
+      sorting_weight: 1
+
+  - platform: template
+    name: "Outside Humidity"
+    id: cur_hum_outside
+    icon: "mdi:water-percent"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_outside
+      sorting_weight: 2
+
+  - platform: template
+    name: "Outside Temp (15m avg)"
+    id: avg_temp_outside
+    icon: "mdi:chart-line"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_outside
+      sorting_weight: 3
+
+  - platform: template
+    name: "Outside Humidity (15m avg)"
+    id: avg_hum_outside
+    icon: "mdi:chart-line"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_outside
+      sorting_weight: 4
+
+  - platform: template
+    name: "Outside Battery"
+    id: battery_outside
+    icon: "mdi:battery"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_outside
+      sorting_weight: 5
+
+  - platform: template
+    name: "Outside Last Seen"
+    id: last_seen_outside
+    icon: "mdi:clock-check-outline"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_outside
+      sorting_weight: 6
+
+  # ── Device diagnostics / About section ─────────────────────────
+  # Parses the raw debug device payload into individual template fields
+  # for chip, features, cores, revision, CPU, and framework details.
+  - platform: debug
+    device:
+      id: debug_device_raw
+      internal: true
+      on_value:
+        then:
+          - lambda: |-
+              std::string info = x;
+              size_t p, e;
+
+              p = info.find("Chip:");
+              if (p != std::string::npos) {
+                e = info.find("CPU Frequency:");
+                std::string chip_block;
+                if (e != std::string::npos) {
+                  chip_block = info.substr(p + 6, e - p - 6);
+                  while (!chip_block.empty() && (chip_block.back() == '|' || chip_block.back() == ' '))
+                    chip_block.pop_back();
+                } else {
+                  e = info.find('|', p);
+                  chip_block = info.substr(p + 6,
+                    (e != std::string::npos) ? e - p - 6 : std::string::npos);
+                }
+
+                size_t feat_pos = chip_block.find("Features:");
+                if (feat_pos != std::string::npos) {
+                  std::string model = chip_block.substr(0, feat_pos);
+                  while (!model.empty() && model.back() == ' ')
+                    model.pop_back();
+                  id(diag_chip).publish_state(model);
+                } else {
+                  id(diag_chip).publish_state(chip_block);
+                }
+
+                size_t core_pos = chip_block.find("Cores:");
+                if (feat_pos != std::string::npos) {
+                  size_t start = feat_pos + 9;
+                  if (start < chip_block.size() && chip_block[start] == ' ')
+                    start++;
+                  std::string features;
+                  if (core_pos != std::string::npos)
+                    features = chip_block.substr(start, core_pos - start);
+                  else
+                    features = chip_block.substr(start);
+                  while (!features.empty() && features.back() == ' ')
+                    features.pop_back();
+                  id(diag_features).publish_state(features);
+                }
+
+                size_t rev_pos = chip_block.find("Revision:");
+                if (core_pos != std::string::npos) {
+                  size_t start = core_pos + 6;
+                  if (start < chip_block.size() && chip_block[start] == ' ')
+                    start++;
+                  std::string cores;
+                  if (rev_pos != std::string::npos)
+                    cores = chip_block.substr(start, rev_pos - start);
+                  else
+                    cores = chip_block.substr(start);
+                  while (!cores.empty() && cores.back() == ' ')
+                    cores.pop_back();
+                  id(diag_cores).publish_state(cores);
+                }
+
+                if (rev_pos != std::string::npos) {
+                  size_t start = rev_pos + 9;
+                  if (start < chip_block.size() && chip_block[start] == ' ')
+                    start++;
+                  std::string rev = chip_block.substr(start);
+                  while (!rev.empty() && rev.back() == ' ')
+                    rev.pop_back();
+                  id(diag_revision).publish_state(rev);
+                }
+              }
+
+              p = info.find("CPU Frequency:");
+              if (p != std::string::npos) {
+                e = info.find('|', p);
+                std::string cpu = info.substr(p + 15,
+                  (e != std::string::npos) ? e - p - 15 : std::string::npos);
+                while (!cpu.empty() && cpu.back() == ' ')
+                  cpu.pop_back();
+                id(diag_cpu).publish_state(cpu);
+              }
+
+              p = info.find("Framework:");
+              if (p != std::string::npos) {
+                e = info.find('|', p);
+                std::string fw = info.substr(p + 11,
+                  (e != std::string::npos) ? e - p - 11 : std::string::npos);
+                while (!fw.empty() && fw.back() == ' ')
+                  fw.pop_back();
+
+                size_t p2 = info.find("ESP-IDF:");
+                if (p2 != std::string::npos) {
+                  size_t e2 = info.find('|', p2);
+                  std::string idf = info.substr(p2 + 8,
+                    (e2 != std::string::npos) ? e2 - p2 - 8 : std::string::npos);
+                  while (!idf.empty() && idf.back() == ' ')
+                    idf.pop_back();
+                  fw += " | IDF " + idf;
+                }
+                id(diag_framework).publish_state(fw);
+              }
+    reset_reason:
+      name: "Reset Reason"
+      icon: "mdi:restart"
+      web_server:
+        sorting_group_id: group_diag
+        sorting_weight: 35
+
+  - platform: template
+    name: "Chip"
+    id: diag_chip
+    icon: "mdi:chip"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_diag
+      sorting_weight: 3
+
+  - platform: template
+    name: "Features"
+    id: diag_features
+    icon: "mdi:format-list-bulleted"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_diag
+      sorting_weight: 4
+
+  - platform: template
+    name: "Cores"
+    id: diag_cores
+    icon: "mdi:cpu-64-bit"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_diag
+      sorting_weight: 5
+
+  - platform: template
+    name: "Revision"
+    id: diag_revision
+    icon: "mdi:tag"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_diag
+      sorting_weight: 6
+
+  - platform: template
+    name: "CPU Frequency"
+    id: diag_cpu
+    icon: "mdi:speedometer"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_diag
+      sorting_weight: 7
+
+  - platform: template
+    name: "Framework"
+    id: diag_framework
+    icon: "mdi:code-braces"
+    update_interval: never
+    web_server:
+      sorting_group_id: group_diag
+      sorting_weight: 8
+
+  - platform: version
+    name: "ESPHome Version"
+    icon: "mdi:package-variant"
+    web_server:
+      sorting_group_id: group_diag
+      sorting_weight: 9
+
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+      icon: "mdi:ip-network"
+      web_server:
+        sorting_group_id: group_diag
+        sorting_weight: 10
+    mac_address:
+      name: "MAC Address"
+      icon: "mdi:network"
+      web_server:
+        sorting_group_id: group_diag
+        sorting_weight: 11
+
+
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  Intervals                                                      ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+
+interval:
+  # Clock display refresh (every 10 seconds)
+  - interval: 10s
+    then:
+      - lambda: |-
+          auto now = id(sntp_time).now();
+          if (now.is_valid()) {
+            char buf[20];
+            snprintf(buf, sizeof(buf), "%02d:%02d:%02d %02d/%02d",
+                     now.hour, now.minute, now.second,
+                     now.month, now.day_of_month);
+            id(current_time).publish_state(buf);
+          }
+
+  # One-time About description (5 seconds after boot)
+  - interval: 5s
+    then:
+      - lambda: |-
+          static bool published = false;
+          if (!published) {
+            id(about_description).publish_state(
+              "Multi-sensor BLE gateway. "
+              "3x ThermoPro: Office, First Floor, Outside. "
+              "15-minute averages, 24h RAM history plus about 45 days of hourly flash history via /history/* endpoints in a dedicated history partition. "
+              "Embedded dashboard served via /dashboard and /dashboard.html, with /dashboard-download for file export. "
+              "Features: 24h/7d/30d/45d min/max, RSSI signal bars, dew point, comfort estimate, management actions, and CSV export. ");
+            published = true;
+          }
