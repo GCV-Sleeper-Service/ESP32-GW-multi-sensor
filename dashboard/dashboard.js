@@ -259,8 +259,13 @@ function getExportSensorPrefix(sensor) {
   return sensorSlug((sensor && sensor.id) || (sensor && sensor.name) || '');
 }
 
-function getSingleSensorExportColumns() {
-  return EXPORT_SHARED_COLUMNS.concat(EXPORT_SENSOR_SUFFIXES);
+function getSingleSensorExportColumns(sensor) {
+  var cols = EXPORT_SHARED_COLUMNS.slice();
+  var prefix = getExportSensorPrefix(sensor);
+  EXPORT_SENSOR_SUFFIXES.forEach(function(suffix) {
+    cols.push(prefix + '_' + suffix);
+  });
+  return cols;
 }
 
 function getMergedExportColumns(sensors) {
@@ -375,8 +380,8 @@ function fetchAllSensorHistoryRowsSequentially(sensors, onProgress) {
   });
 }
 
-function buildSingleSensorCsv(meta, rows) {
-  var lines = [getSingleSensorExportColumns().join(',')];
+function buildSingleSensorCsv(meta, sensor, rows) {
+  var lines = [getSingleSensorExportColumns(sensor).join(',')];
   rows.forEach(function(row) {
     lines.push([
       csvEscape(meta.gatewayHost),
@@ -845,7 +850,7 @@ function exportSensorCSV(sensorId, sensorName) {
   ]).then(function(results) {
     var meta = results[0];
     var rows = results[1];
-    var csv = buildSingleSensorCsv(meta, rows);
+    var csv = buildSingleSensorCsv(meta, sensor, rows);
     triggerCsvDownload(csv, 'gateway-history-' + getExportSensorPrefix(sensor) + '-' + currentExportDateTag() + '.csv');
     if (statusEl) statusEl.textContent = sensorName + ' exported (' + rows.length + ' rows) \u2714';
   }).catch(function(e) {
@@ -1252,7 +1257,7 @@ function processImportFile(csvText, fileName) {
   var statusEl = document.getElementById('mgmt-status');
   if (statusEl) statusEl.textContent = 'Parsing CSV...';
 
-  var result = parseImportCsv(csvText);
+  var result = parseImportCsv(csvText, fileName);
   if (result.error) {
     if (statusEl) statusEl.textContent = 'Import error: ' + result.error;
     return;
@@ -1269,9 +1274,10 @@ function processImportFile(csvText, fileName) {
   // Show confirmation with summary.
   var sensorNames = {};
   result.points.forEach(function(p) { sensorNames[p.sensor] = true; });
+  var estimate = estimateImportDuration(batches.length);
   var msg = 'Import ' + result.points.length + ' data points (' + batches.length +
     ' batches) for sensor(s): ' + Object.keys(sensorNames).join(', ') +
-    '.\n\nThis will REPLACE all existing history. Continue?';
+    '.\nApproximate time: ~' + estimate.label + ' (' + estimate.mode + ').\n\nThis will REPLACE all existing history. Continue?';
   if (!confirm(msg)) {
     if (statusEl) statusEl.textContent = 'Import cancelled';
     return;
@@ -1280,7 +1286,7 @@ function processImportFile(csvText, fileName) {
   executeImport(batches, statusEl);
 }
 
-function parseImportCsv(csvText) {
+function parseImportCsv(csvText, fileName) {
   var lines = csvText.split(/\r?\n/).filter(function(l) { return l.trim() !== ''; });
   if (lines.length < 2) return { error: 'File too short (need header + data)', points: [] };
 
@@ -1289,7 +1295,11 @@ function parseImportCsv(csvText) {
   if (tsIdx < 0) return { error: 'Missing "timestamp" column in header', points: [] };
 
   // Detect format: single-sensor or merged.
-  var sensorColumns = detectImportColumns(header);
+  var detection = detectImportColumns(header, fileName);
+  if (detection.error) {
+    return { error: detection.error, points: [] };
+  }
+  var sensorColumns = detection.results;
   if (sensorColumns.length === 0) {
     return { error: 'Could not find temp_c / humidity_pct columns in header', points: [] };
   }
@@ -1329,31 +1339,81 @@ function parseImportCsv(csvText) {
   return { points: points, rejected: rejected, error: null };
 }
 
-function detectImportColumns(header) {
+function estimateImportDuration(batchCount) {
+  var isCloudflarePath = (!IS_FILE_MODE && window.location.protocol === 'https:') || /^https:/i.test(ESP_HOST);
+  var secondsPerBatch = isCloudflarePath ? 1.9 : 1.25;
+  var baseSeconds = isCloudflarePath ? 8 : 6;
+  var totalSeconds = Math.max(8, Math.round(baseSeconds + (batchCount * secondsPerBatch)));
+  return {
+    seconds: totalSeconds,
+    label: formatDurationLabel(totalSeconds),
+    mode: isCloudflarePath ? 'Cloudflare / remote access estimate' : 'LAN / direct access estimate'
+  };
+}
+
+function formatDurationLabel(totalSeconds) {
+  totalSeconds = Math.max(0, Math.round(totalSeconds || 0));
+  var minutes = Math.floor(totalSeconds / 60);
+  var seconds = totalSeconds % 60;
+  if (minutes <= 0) return seconds + ' sec';
+  if (seconds === 0) return minutes + ' min';
+  return minutes + ' min ' + seconds + ' sec';
+}
+
+function detectSensorIdFromImportFileName(fileName) {
+  var knownSensors = (typeof SENSORS !== 'undefined') ? SENSORS : [];
+  var normalized = sensorSlug((fileName || '').replace(/\.[^.]+$/, ''));
+  if (!normalized) return '';
+
+  var candidates = [];
+  for (var si = 0; si < knownSensors.length; si++) {
+    var sensor = knownSensors[si];
+    var checks = [
+      sensorSlug(sensor && sensor.id),
+      sensorSlug(sensor && sensor.name),
+      sensorSlug(getExportSensorPrefix(sensor))
+    ].filter(Boolean);
+
+    for (var ci = 0; ci < checks.length; ci++) {
+      var token = checks[ci];
+      if (normalized.indexOf(token) >= 0) {
+        candidates.push(sensor.id);
+        break;
+      }
+    }
+  }
+
+  if (candidates.length === 1) return candidates[0];
+  return '';
+}
+
+function detectImportColumns(header, fileName) {
   var results = [];
 
-  // Check for single-sensor format: temp_c, humidity_pct directly.
+  // Check for single-sensor legacy format: temp_c, humidity_pct directly.
   var tempIdx = header.indexOf('temp_c');
   var humIdx = header.indexOf('humidity_pct');
   if (tempIdx >= 0 || humIdx >= 0) {
-    // Try to detect which sensor from filename context — fall back to first known sensor.
-    // For single-sensor export, the sensor ID is not in the CSV. We'll prompt later if needed.
-    // For now, map to first sensor.
-    var sensorId = (typeof SENSORS !== 'undefined' && SENSORS.length > 0) ? SENSORS[0].id : 'office';
-
-    // Check if there are prefixed columns too (merged format).
+    // Check if there are prefixed columns too (merged format or new single-sensor export).
     var hasPrefixed = false;
     for (var h = 0; h < header.length; h++) {
       if (header[h].match(/^.+_temp_c$/)) { hasPrefixed = true; break; }
     }
 
     if (!hasPrefixed) {
-      results.push({ sensorId: sensorId, tempIdx: tempIdx, humIdx: humIdx });
-      return results;
+      var detectedSensorId = detectSensorIdFromImportFileName(fileName);
+      if (!detectedSensorId) {
+        return {
+          results: [],
+          error: 'Legacy single-sensor CSV detected (temp_c/humidity_pct), but the sensor could not be identified from the file name. Re-export from the updated dashboard or rename the file to include the sensor name (for example: outside, office, first_floor).'
+        };
+      }
+      results.push({ sensorId: detectedSensorId, tempIdx: tempIdx, humIdx: humIdx });
+      return { results: results, error: null };
     }
   }
 
-  // Check for merged format: {prefix}_temp_c, {prefix}_humidity_pct
+  // Check for prefixed format: {prefix}_temp_c, {prefix}_humidity_pct
   var knownSensors = (typeof SENSORS !== 'undefined') ? SENSORS : [];
   for (var si = 0; si < knownSensors.length; si++) {
     var prefix = getExportSensorPrefix(knownSensors[si]).toLowerCase();
@@ -1364,7 +1424,7 @@ function detectImportColumns(header) {
     }
   }
 
-  return results;
+  return { results: results, error: null };
 }
 
 function buildImportSegments(points) {
@@ -1471,11 +1531,14 @@ function executeImport(batches, statusEl) {
         var totalAccepted = 0;
         var totalRejected = 0;
 
+        var estimate = estimateImportDuration(batches.length);
         return batches.reduce(function(chain, batch, idx) {
           return chain.then(function() {
             if (statusEl) {
+              var remainingBatches = Math.max(0, batches.length - (idx + 1));
+              var remainingSeconds = Math.round((estimate.seconds / Math.max(1, batches.length)) * remainingBatches);
               statusEl.textContent = 'Importing batch ' + (idx + 1) + ' / ' + batches.length +
-                ' (' + batch.pointCount + ' points)...';
+                ' (' + batch.pointCount + ' points, ~' + formatDurationLabel(remainingSeconds) + ' left)...';
             }
 
             var pathPrefix = batch.isLast ? '/api/import/w/' : '/api/import/d/';
