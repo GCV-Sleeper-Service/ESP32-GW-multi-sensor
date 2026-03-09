@@ -2005,7 +2005,7 @@ function buildImportSegments(points) {
     var currentLen = 0;
     for (var i = 0; i < lines.length; i++) {
       var lineLen = lines[i].length + 1;  // +1 for semicolon separator
-      if (currentLen + lineLen > 200 && currentBatch.length > 0) {
+      if (currentLen + lineLen > 100 && currentBatch.length > 0) {
         batches.push({ data: currentBatch.join(';'), pointCount: currentBatch.length, isLast: false });
         currentBatch = [];
         currentLen = 0;

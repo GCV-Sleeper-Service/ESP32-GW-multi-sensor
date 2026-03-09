@@ -65,6 +65,7 @@ esp32:
     type: esp-idf
     sdkconfig_options:
       CONFIG_LWIP_MAX_SOCKETS: "13"
+      CONFIG_HTTPD_MAX_REQ_HDR_LEN: "1024"
 
 logger:
   level: INFO
