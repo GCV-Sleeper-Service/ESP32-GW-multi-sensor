@@ -36,7 +36,7 @@
 //   POST /api/reboot          -> reboot the ESP (requires Basic auth)
 //   POST /api/delete-data     -> erase persisted history and clear RAM (requires Basic auth)
 //   POST /api/import/begin    -> clear history and prepare for CSV import (requires Basic auth)
-//   POST /api/import/segment  -> receive one hourly segment of import data (requires Basic auth)
+//   POST /api/import/data?d=  -> receive import data via URL query param (requires Basic auth)
 //   POST /api/import/finish   -> finalize import metadata and restore RAM (requires Basic auth)
 //   GET  /api/storage-stats   -> partition sizes + live NVS usage + retained-history estimates (including retention_days from PERSIST_DAYS)
 //   GET  /api/status          -> version, uptime, sensor status, heap (no auth)
@@ -827,7 +827,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (strcmp(p, "/api/reboot") == 0) return true;
       if (strcmp(p, "/api/delete-data") == 0) return true;
       if (strcmp(p, "/api/import/begin") == 0) return true;
-      if (strcmp(p, "/api/import/segment") == 0) return true;
+      if (strncmp(p, "/api/import/data", 16) == 0) return true;
       if (strcmp(p, "/api/import/finish") == 0) return true;
       return false;
     }
@@ -858,8 +858,8 @@ class HistoryWebHandler : public AsyncWebHandler {
         handle_import_begin_(request);
         return;
       }
-      if (strcmp(p, "/api/import/segment") == 0) {
-        handle_import_segment_(request);
+      if (strncmp(p, "/api/import/data", 16) == 0) {
+        handle_import_data_(request, p);
         return;
       }
       if (strcmp(p, "/api/import/finish") == 0) {
@@ -902,25 +902,6 @@ class HistoryWebHandler : public AsyncWebHandler {
     request->send(404);
   }
 
-  void handleBody(AsyncWebServerRequest *request, uint8_t *data,
-                  size_t len, size_t index, size_t total) override {
-    // Only accumulate body for import/segment requests.
-    char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
-    auto url = request->url_to(url_buf);
-    if (strcmp(url.c_str(), "/api/import/segment") != 0) return;
-
-    if (index == 0) {
-      import_body_len_ = 0;
-    }
-    size_t space = IMPORT_BODY_MAX - import_body_len_;
-    size_t copy = len < space ? len : space;
-    if (copy > 0) {
-      std::memcpy(import_body_ + import_body_len_, data, copy);
-      import_body_len_ += copy;
-    }
-    import_body_[import_body_len_] = '\0';
-  }
-
  private:
   std::string mgmt_username_;
   std::string mgmt_password_;
@@ -929,12 +910,10 @@ class HistoryWebHandler : public AsyncWebHandler {
   mutable int64_t lockout_until_ms_{0};
 
   // ── Import state ──────────────────────────────────────────────
-  static constexpr size_t IMPORT_BODY_MAX = 1280;
-  mutable char import_body_[IMPORT_BODY_MAX + 1];
-  mutable size_t import_body_len_{0};
   mutable bool import_active_{false};
   mutable uint16_t import_segments_written_{0};
   mutable HistoryMeta import_meta_;
+  mutable SegmentSnapshot *import_snapshot_{nullptr};
 
   static int64_t now_ms_() {
     return esp_timer_get_time() / 1000;
@@ -1131,17 +1110,23 @@ class HistoryWebHandler : public AsyncWebHandler {
 
   // ── Import v1 handlers ────────────────────────────────────────
   //
-  //   POST /api/import/begin   — clear history, prepare for import
-  //   POST /api/import/segment — receive one hourly segment, write to NVS
-  //   POST /api/import/finish  — finalize metadata, restore to RAM
+  //   POST /api/import/begin  — auth, clear history, allocate snapshot buffer
+  //   POST /api/import/data?d=SENSOR,SERIES,EPOCH,VALUE;...&w=1 — data via URL query
+  //   POST /api/import/finish — finalize metadata, restore RAM, free buffer
   //
-  //   Body format for /segment (text/plain, one line per data point):
-  //     sensor_id,series,epoch,value
-  //   where series is "temp" or "hum".
-  //   Max 24 lines per segment (NUM_SENSORS * 2 series * 4 points).
+  //   Data is passed in the URL query parameter 'd' as semicolon-delimited
+  //   lines: sensor_id,series,epoch,value (series is "temp" or "hum").
+  //   When &w=1 is present, the current snapshot is written to NVS.
+  //   This avoids POST body handling which is not supported in ESPHome ESP-IDF.
 
   void handle_import_begin_(AsyncWebServerRequest *request) {
     if (!authenticate_management_(request)) return;
+
+    // Clean up any leftover import state.
+    if (import_snapshot_ != nullptr) {
+      delete import_snapshot_;
+      import_snapshot_ = nullptr;
+    }
 
     bool ok = clear_persisted_history_();
     if (!ok) {
@@ -1149,7 +1134,13 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    // Initialize import tracking state.
+    import_snapshot_ = allocate_snapshot_();
+    if (import_snapshot_ == nullptr) {
+      send_json_error_(request, 500, "Failed to allocate import buffer");
+      return;
+    }
+    std::memset(import_snapshot_, 0, sizeof(SegmentSnapshot));
+
     import_active_ = true;
     import_segments_written_ = 0;
     import_meta_ = default_history_meta_();
@@ -1161,56 +1152,54 @@ class HistoryWebHandler : public AsyncWebHandler {
     ESP_LOGI(TAG, "Import begun — history partition cleared");
   }
 
-  void handle_import_segment_(AsyncWebServerRequest *request) {
+  void handle_import_data_(AsyncWebServerRequest *request, const char *full_url) {
     if (!authenticate_management_(request)) return;
 
-    if (!import_active_) {
+    if (!import_active_ || import_snapshot_ == nullptr) {
       send_json_error_(request, 409, "No import in progress. Call /api/import/begin first.");
       return;
     }
 
-    if (import_body_len_ == 0) {
-      send_json_error_(request, 400, "Empty body — expected sensor data lines");
+    // Extract 'd=' parameter from the URL query string.
+    const char *d_param = strstr(full_url, "d=");
+    if (d_param == nullptr) {
+      send_json_error_(request, 400, "Missing d= query parameter");
       return;
     }
+    d_param += 2;  // Skip "d="
 
-    // Allocate a snapshot on the heap (too large for stack).
-    SegmentSnapshot *snapshot = allocate_snapshot_();
-    if (snapshot == nullptr) {
-      send_json_error_(request, 500, "Failed to allocate segment buffer");
-      return;
-    }
+    // Check for write flag: &w=1
+    bool do_write = (strstr(full_url, "w=1") != nullptr);
 
-    std::memset(snapshot, 0, sizeof(SegmentSnapshot));
-    snapshot->header.magic = HISTORY_META_MAGIC;
-    snapshot->header.version = HISTORY_META_VERSION;
-    snapshot->header.num_sensors = NUM_SENSORS;
-    snapshot->header.points_per_series = HISTORY_POINTS_PER_SERIES;
-    snapshot->header.points_per_segment = PERSIST_POINTS_PER_SEGMENT;
-
-    int accepted = 0;
-    int rejected = 0;
-    uint32_t first_epoch = 0;
-    uint32_t last_epoch = 0;
+    // Get current epoch for validation.
     uint32_t now_epoch = 0;
     {
       time_t t = ::time(nullptr);
       if (t > 1700000000) now_epoch = (uint32_t) t;
     }
 
-    // Parse body line by line.
-    char *body = import_body_;
-    char *line = body;
-    while (line < body + import_body_len_) {
-      char *eol = strchr(line, '\n');
-      if (eol != nullptr) *eol = '\0';
-      else eol = body + import_body_len_;
+    int accepted = 0;
+    int rejected = 0;
 
-      // Skip empty lines or comment lines.
-      if (line[0] == '\0' || line[0] == '#') {
-        line = eol + 1;
-        continue;
-      }
+    // Parse semicolon-delimited data lines from URL.
+    // Each line: sensor_id,series,epoch,value
+    const char *pos = d_param;
+    while (pos != nullptr && *pos != '\0' && *pos != '&') {
+      // Extract one line (until ; or & or end).
+      char line[80] = {};
+      const char *sep = pos;
+      while (*sep != '\0' && *sep != ';' && *sep != '&') sep++;
+      size_t line_len = sep - pos;
+      if (line_len >= sizeof(line)) line_len = sizeof(line) - 1;
+      std::memcpy(line, pos, line_len);
+      line[line_len] = '\0';
+
+      // Advance past separator.
+      if (*sep == ';') pos = sep + 1;
+      else pos = sep;  // Stop at & or end.
+
+      // Skip empty lines.
+      if (line[0] == '\0') continue;
 
       // Parse: sensor_id,series,epoch,value
       char sid[32] = {};
@@ -1219,143 +1208,112 @@ class HistoryWebHandler : public AsyncWebHandler {
       float value = 0.0f;
       int parsed = sscanf(line, "%31[^,],%7[^,],%u,%f", sid, ser, &epoch, &value);
 
-      if (parsed < 3) {
-        rejected++;
-        line = eol + 1;
-        continue;
-      }
+      if (parsed < 3) { rejected++; continue; }
 
       // Resolve sensor index.
       int sensor_idx = -1;
       for (int i = 0; i < NUM_SENSORS; i++) {
-        if (strcmp(sensors[i].id, sid) == 0) {
-          sensor_idx = i;
-          break;
-        }
+        if (strcmp(sensors[i].id, sid) == 0) { sensor_idx = i; break; }
       }
-      if (sensor_idx < 0) {
-        rejected++;
-        line = eol + 1;
-        continue;
-      }
+      if (sensor_idx < 0) { rejected++; continue; }
 
-      // Validate epoch (must be > 0 and not more than 1 day in the future).
+      // Validate epoch.
       if (epoch == 0 || (now_epoch > 0 && epoch > now_epoch + 86400)) {
-        rejected++;
-        line = eol + 1;
-        continue;
+        rejected++; continue;
       }
 
-      // Determine series and slot.
+      // Determine series.
       bool is_temp = (strcmp(ser, "temp") == 0);
       bool is_hum = (strcmp(ser, "hum") == 0);
-      if (!is_temp && !is_hum) {
-        rejected++;
-        line = eol + 1;
-        continue;
-      }
+      if (!is_temp && !is_hum) { rejected++; continue; }
 
       // Validate value ranges.
-      if (parsed == 4) {
-        if (is_temp && (value < -50.0f || value > 80.0f)) {
-          rejected++;
-          line = eol + 1;
-          continue;
-        }
-        if (is_hum && (value < 0.0f || value > 100.0f)) {
-          rejected++;
-          line = eol + 1;
-          continue;
-        }
+      if (parsed >= 4) {
+        if (is_temp && (value < -50.0f || value > 80.0f)) { rejected++; continue; }
+        if (is_hum && (value < 0.0f || value > 100.0f)) { rejected++; continue; }
       }
 
       // Place into snapshot.
       float store_value = (parsed >= 4) ? value : NAN;
       if (is_temp) {
-        int idx = snapshot->temp_counts[sensor_idx];
+        int idx = import_snapshot_->temp_counts[sensor_idx];
         if (idx < PERSIST_POINTS_PER_SEGMENT) {
-          snapshot->temp[sensor_idx][idx] = {epoch, store_value};
-          snapshot->temp_counts[sensor_idx]++;
+          import_snapshot_->temp[sensor_idx][idx] = {epoch, store_value};
+          import_snapshot_->temp_counts[sensor_idx]++;
           accepted++;
-        } else {
-          rejected++;
-        }
+        } else { rejected++; }
       } else {
-        int idx = snapshot->hum_counts[sensor_idx];
+        int idx = import_snapshot_->hum_counts[sensor_idx];
         if (idx < PERSIST_POINTS_PER_SEGMENT) {
-          snapshot->hum[sensor_idx][idx] = {epoch, store_value};
-          snapshot->hum_counts[sensor_idx]++;
+          import_snapshot_->hum[sensor_idx][idx] = {epoch, store_value};
+          import_snapshot_->hum_counts[sensor_idx]++;
           accepted++;
-        } else {
-          rejected++;
+        } else { rejected++; }
+      }
+    }
+
+    // If write flag is set, commit this snapshot to NVS.
+    int slot_written = -1;
+    if (do_write && accepted > 0) {
+      // Finalize snapshot header.
+      uint32_t first_epoch = 0, last_epoch = 0;
+      for (int i = 0; i < NUM_SENSORS; i++) {
+        for (int n = 0; n < import_snapshot_->temp_counts[i]; n++) {
+          uint32_t e = import_snapshot_->temp[i][n].epoch;
+          if (e > 0 && (first_epoch == 0 || e < first_epoch)) first_epoch = e;
+          if (e > last_epoch) last_epoch = e;
+        }
+        for (int n = 0; n < import_snapshot_->hum_counts[i]; n++) {
+          uint32_t e = import_snapshot_->hum[i][n].epoch;
+          if (e > 0 && (first_epoch == 0 || e < first_epoch)) first_epoch = e;
+          if (e > last_epoch) last_epoch = e;
         }
       }
+      import_snapshot_->header.magic = HISTORY_META_MAGIC;
+      import_snapshot_->header.version = HISTORY_META_VERSION;
+      import_snapshot_->header.num_sensors = NUM_SENSORS;
+      import_snapshot_->header.points_per_series = HISTORY_POINTS_PER_SERIES;
+      import_snapshot_->header.points_per_segment = PERSIST_POINTS_PER_SEGMENT;
+      import_snapshot_->header.saved_at_epoch = now_epoch > 0 ? now_epoch : last_epoch;
+      import_snapshot_->header.first_epoch = first_epoch;
+      import_snapshot_->header.last_epoch = last_epoch;
 
-      // Track epoch range.
-      if (first_epoch == 0 || epoch < first_epoch) first_epoch = epoch;
-      if (epoch > last_epoch) last_epoch = epoch;
+      // Write to NVS.
+      nvs_handle_t handle;
+      if (open_history_nvs_(&handle, NVS_READWRITE)) {
+        int slot = import_meta_.next_slot % PERSIST_SLOTS;
+        char key[12];
+        make_segment_key_(slot, key, sizeof(key));
 
-      line = eol + 1;
+        esp_err_t err = nvs_set_blob(handle, key, import_snapshot_, sizeof(*import_snapshot_));
+        if (err == ESP_OK) {
+          nvs_commit(handle);
+          import_meta_.last_written_slot = slot;
+          import_meta_.next_slot = (slot + 1) % PERSIST_SLOTS;
+          if (import_meta_.valid_segments < PERSIST_SLOTS) import_meta_.valid_segments++;
+          import_meta_.last_persist_epoch = last_epoch;
+          import_segments_written_++;
+          slot_written = slot;
+        }
+        nvs_close(handle);
+      }
+
+      // Clear snapshot for next segment.
+      std::memset(import_snapshot_, 0, sizeof(SegmentSnapshot));
     }
-
-    if (accepted == 0) {
-      delete snapshot;
-      send_json_error_(request, 400, "No valid data points in segment");
-      return;
-    }
-
-    // Finalize snapshot header.
-    snapshot->header.saved_at_epoch = now_epoch > 0 ? now_epoch : last_epoch;
-    snapshot->header.first_epoch = first_epoch;
-    snapshot->header.last_epoch = last_epoch;
-
-    // Write to NVS.
-    nvs_handle_t handle;
-    if (!open_history_nvs_(&handle, NVS_READWRITE)) {
-      delete snapshot;
-      send_json_error_(request, 500, "Failed to open NVS for writing");
-      return;
-    }
-
-    int slot = import_meta_.next_slot % PERSIST_SLOTS;
-    char key[12];
-    make_segment_key_(slot, key, sizeof(key));
-
-    esp_err_t err = nvs_set_blob(handle, key, snapshot, sizeof(*snapshot));
-    if (err != ESP_OK) {
-      nvs_close(handle);
-      delete snapshot;
-      char msg[80];
-      snprintf(msg, sizeof(msg), "NVS write failed for slot %d", slot);
-      send_json_error_(request, 500, msg);
-      return;
-    }
-    err = nvs_commit(handle);
-    nvs_close(handle);
-
-    if (err != ESP_OK) {
-      delete snapshot;
-      send_json_error_(request, 500, "NVS commit failed");
-      return;
-    }
-
-    // Update import tracking metadata.
-    import_meta_.last_written_slot = slot;
-    import_meta_.next_slot = (slot + 1) % PERSIST_SLOTS;
-    if (import_meta_.valid_segments < PERSIST_SLOTS) import_meta_.valid_segments++;
-    import_meta_.last_persist_epoch = last_epoch;
-    import_segments_written_++;
-
-    delete snapshot;
 
     // Send response.
     auto *resp = request->beginResponseStream("application/json");
     add_common_headers_(resp);
     char num[64];
     resp->print("{\"ok\":true,");
-    snprintf(num, sizeof(num), "\"slot\":%d,\"accepted\":%d,\"rejected\":%d}",
-             slot, accepted, rejected);
+    snprintf(num, sizeof(num), "\"accepted\":%d,\"rejected\":%d", accepted, rejected);
     resp->print(num);
+    if (slot_written >= 0) {
+      snprintf(num, sizeof(num), ",\"slot\":%d", slot_written);
+      resp->print(num);
+    }
+    resp->print("}");
     request->send(resp);
   }
 
@@ -1368,6 +1326,12 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
 
     import_active_ = false;
+
+    // Free the snapshot buffer.
+    if (import_snapshot_ != nullptr) {
+      delete import_snapshot_;
+      import_snapshot_ = nullptr;
+    }
 
     if (import_segments_written_ == 0) {
       auto *resp = request->beginResponseStream("application/json");

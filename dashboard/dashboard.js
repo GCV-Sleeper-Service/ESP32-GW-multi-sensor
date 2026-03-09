@@ -941,9 +941,9 @@ function applyStorageStats(data) {
     if (!ns.available) {
       statusEl.textContent = 'Live NVS entry statistics are unavailable on this build. Partition size and retained payload values are still shown.';
     } else if (h.namespace_initialized) {
-      statusEl.textContent = 'Values combine live NVS entry usage with retained-history payload estimates. Payload estimates intentionally exclude internal NVS allocator overhead.';
+      statusEl.textContent = 'Last persist: ' + formatEpochLocal(h.last_persist_epoch);
     } else {
-      statusEl.textContent = 'History namespace has not been created yet. This is normal until the first successful hourly persist cycle.';
+      statusEl.textContent = 'Awaiting first hourly persist cycle.';
     }
   }
 }
@@ -1167,20 +1167,20 @@ function processImportFile(csvText, fileName) {
   }
 
   // Build segments from points.
-  var segments = buildImportSegments(result.points);
+  var batches = buildImportSegments(result.points);
 
   // Show confirmation with summary.
   var sensorNames = {};
   result.points.forEach(function(p) { sensorNames[p.sensor] = true; });
-  var msg = 'Import ' + result.points.length + ' data points (' + segments.length +
-    ' hourly segments) for sensor(s): ' + Object.keys(sensorNames).join(', ') +
+  var msg = 'Import ' + result.points.length + ' data points (' + batches.length +
+    ' batches) for sensor(s): ' + Object.keys(sensorNames).join(', ') +
     '.\n\nThis will REPLACE all existing history. Continue?';
   if (!confirm(msg)) {
     if (statusEl) statusEl.textContent = 'Import cancelled';
     return;
   }
 
-  executeImport(segments, statusEl);
+  executeImport(batches, statusEl);
 }
 
 function parseImportCsv(csvText) {
@@ -1272,38 +1272,55 @@ function detectImportColumns(header) {
 
 function buildImportSegments(points) {
   // Group points into 1-hour segments aligned to hour boundaries.
-  // Each segment contains up to PERSIST_POINTS_PER_SEGMENT (4) points per sensor per series.
+  // Each segment contains up to 4 points per sensor per series.
+  // Each segment is split into URL-safe batches (max ~440 chars of data per batch)
+  // to fit within the ESP32 URL buffer limit (512 bytes).
   var segmentMap = {};
 
   points.forEach(function(p) {
-    // Align to hour boundary (floor to nearest hour).
     var hourEpoch = p.epoch - (p.epoch % 3600);
-    var key = hourEpoch;
-    if (!segmentMap[key]) segmentMap[key] = [];
-    segmentMap[key].push(p);
+    if (!segmentMap[hourEpoch]) segmentMap[hourEpoch] = [];
+    segmentMap[hourEpoch].push(p);
   });
 
-  // Convert to sorted array of segment objects.
   var hourKeys = Object.keys(segmentMap).map(Number).sort(function(a, b) { return a - b; });
+  var batches = [];
 
-  return hourKeys.map(function(hourEpoch) {
+  hourKeys.forEach(function(hourEpoch) {
     var segPoints = segmentMap[hourEpoch];
-    // Build the text body for this segment.
-    // Deduplicate: keep at most 4 points per sensor per series.
     var counts = {};
     var lines = [];
     segPoints.forEach(function(p) {
       var countKey = p.sensor + ',' + p.series;
       if (!counts[countKey]) counts[countKey] = 0;
-      if (counts[countKey] >= 4) return;  // Max 4 points per segment slot.
+      if (counts[countKey] >= 4) return;
       counts[countKey]++;
       lines.push(p.sensor + ',' + p.series + ',' + p.epoch + ',' + p.value.toFixed(2));
     });
-    return { hourEpoch: hourEpoch, body: lines.join('\n') + '\n', pointCount: lines.length };
+
+    // Split lines into batches that fit in ~440 chars (leaves room for URL path + params).
+    var currentBatch = [];
+    var currentLen = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var lineLen = lines[i].length + 1;  // +1 for semicolon separator
+      if (currentLen + lineLen > 440 && currentBatch.length > 0) {
+        batches.push({ data: currentBatch.join(';'), pointCount: currentBatch.length, isLast: false });
+        currentBatch = [];
+        currentLen = 0;
+      }
+      currentBatch.push(lines[i]);
+      currentLen += lineLen;
+    }
+    if (currentBatch.length > 0) {
+      // Mark the last batch of this hourly segment with write flag.
+      batches.push({ data: currentBatch.join(';'), pointCount: currentBatch.length, isLast: true });
+    }
   });
+
+  return batches;
 }
 
-function executeImport(segments, statusEl) {
+function executeImport(batches, statusEl) {
   if (statusEl) statusEl.textContent = 'Authenticating...';
 
   requestManagementCredentials('history import').then(function(creds) {
@@ -1324,23 +1341,24 @@ function executeImport(segments, statusEl) {
     .then(function(data) {
       if (!data.ok) throw new Error(data.message || 'Begin failed');
 
-      // Step 2: Send segments sequentially.
+      // Step 2: Send batches sequentially via URL query params.
       var totalAccepted = 0;
       var totalRejected = 0;
-      return segments.reduce(function(chain, seg, idx) {
+      return batches.reduce(function(chain, batch, idx) {
         return chain.then(function() {
           if (statusEl) {
-            statusEl.textContent = 'Importing segment ' + (idx + 1) + ' / ' + segments.length +
-              ' (' + seg.pointCount + ' points)...';
+            statusEl.textContent = 'Importing batch ' + (idx + 1) + ' / ' + batches.length +
+              ' (' + batch.pointCount + ' points)...';
           }
-          return fetch(ESP_HOST + '/api/import/segment', {
+          var url = ESP_HOST + '/api/import/data?d=' + batch.data;
+          if (batch.isLast) url += '&w=1';
+          return fetch(url, {
             method: 'POST', cache: 'no-store',
-            headers: { 'Authorization': authHeader, 'Content-Type': 'text/plain' },
-            body: seg.body
+            headers: { 'Authorization': authHeader }
           })
           .then(function(r) { return r.json(); })
           .then(function(result) {
-            if (!result.ok) throw new Error(result.message || 'Segment write failed at slot ' + idx);
+            if (!result.ok) throw new Error(result.message || 'Data write failed at batch ' + idx);
             totalAccepted += (result.accepted || 0);
             totalRejected += (result.rejected || 0);
           });
