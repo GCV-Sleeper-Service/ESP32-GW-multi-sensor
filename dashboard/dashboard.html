@@ -2040,11 +2040,14 @@ function executeImport(batches, statusEl) {
             statusEl.textContent = 'Importing batch ' + (idx + 1) + ' / ' + batches.length +
               ' (' + batch.pointCount + ' points)...';
           }
-          var url = ESP_HOST + '/api/import/data?d=' + batch.data;
-          if (batch.isLast) url += '&w=1';
-          return fetch(url, {
+          var headers = {
+            'Authorization': authHeader,
+            'X-Data': batch.data
+          };
+          if (batch.isLast) headers['X-Write'] = '1';
+          return fetch(ESP_HOST + '/api/import/data', {
             method: 'POST', cache: 'no-store',
-            headers: { 'Authorization': authHeader }
+            headers: headers
           })
           .then(function(r) { return r.json(); })
           .then(function(result) {

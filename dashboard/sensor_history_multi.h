@@ -36,7 +36,7 @@
 //   POST /api/reboot          -> reboot the ESP (requires Basic auth)
 //   POST /api/delete-data     -> erase persisted history and clear RAM (requires Basic auth)
 //   POST /api/import/begin    -> clear history and prepare for CSV import (requires Basic auth)
-//   POST /api/import/data?d=  -> receive import data via URL query param (requires Basic auth)
+//   POST /api/import/data     -> receive import data via X-Data header (requires Basic auth)
 //   POST /api/import/finish   -> finalize import metadata and restore RAM (requires Basic auth)
 //   GET  /api/storage-stats   -> partition sizes + live NVS usage + retained-history estimates (including retention_days from PERSIST_DAYS)
 //   GET  /api/status          -> version, uptime, sensor status, heap (no auth)
@@ -859,7 +859,7 @@ class HistoryWebHandler : public AsyncWebHandler {
         return;
       }
       if (strncmp(p, "/api/import/data", 16) == 0) {
-        handle_import_data_(request, p);
+        handle_import_data_(request);
         return;
       }
       if (strcmp(p, "/api/import/finish") == 0) {
@@ -970,7 +970,7 @@ class HistoryWebHandler : public AsyncWebHandler {
   void add_common_headers_(AsyncWebServerResponse *resp) const {
     resp->addHeader("Cache-Control", "no-store");
     resp->addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    resp->addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    resp->addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Data, X-Write");
   }
 
   void send_json_error_(AsyncWebServerRequest *request, int status_code,
@@ -1111,13 +1111,13 @@ class HistoryWebHandler : public AsyncWebHandler {
   // ── Import v1 handlers ────────────────────────────────────────
   //
   //   POST /api/import/begin  — auth, clear history, allocate snapshot buffer
-  //   POST /api/import/data?d=SENSOR,SERIES,EPOCH,VALUE;...&w=1 — data via URL query
+  //   POST /api/import/data — data in X-Data header, X-Write: 1 to commit segment
   //   POST /api/import/finish — finalize metadata, restore RAM, free buffer
   //
-  //   Data is passed in the URL query parameter 'd' as semicolon-delimited
+  //   Data is passed in the X-Data HTTP header as semicolon-delimited
   //   lines: sensor_id,series,epoch,value (series is "temp" or "hum").
-  //   When &w=1 is present, the current snapshot is written to NVS.
-  //   This avoids POST body handling which is not supported in ESPHome ESP-IDF.
+  //   When X-Write header is "1", the current snapshot is written to NVS.
+  //   Headers are used because ESPHome ESP-IDF does not expose POST body.
 
   void handle_import_begin_(AsyncWebServerRequest *request) {
     if (!authenticate_management_(request)) return;
@@ -1152,7 +1152,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     ESP_LOGI(TAG, "Import begun — history partition cleared");
   }
 
-  void handle_import_data_(AsyncWebServerRequest *request, const char *full_url) {
+  void handle_import_data_(AsyncWebServerRequest *request) {
     if (!authenticate_management_(request)) return;
 
     if (!import_active_ || import_snapshot_ == nullptr) {
@@ -1160,16 +1160,17 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    // Extract 'd=' parameter from the URL query string.
-    const char *d_param = strstr(full_url, "d=");
-    if (d_param == nullptr) {
-      send_json_error_(request, 400, "Missing d= query parameter");
+    // Read data from X-Data header and write flag from X-Write header.
+    auto data_hdr = request->get_header("X-Data");
+    if (!data_hdr.has_value() || data_hdr.value().empty()) {
+      send_json_error_(request, 400, "Missing X-Data header");
       return;
     }
-    d_param += 2;  // Skip "d="
+    const std::string &d_str = data_hdr.value();
+    const char *d_param = d_str.c_str();
 
-    // Check for write flag: &w=1
-    bool do_write = (strstr(full_url, "w=1") != nullptr);
+    auto write_hdr = request->get_header("X-Write");
+    bool do_write = write_hdr.has_value() && write_hdr.value() == "1";
 
     // Get current epoch for validation.
     uint32_t now_epoch = 0;
@@ -1181,14 +1182,14 @@ class HistoryWebHandler : public AsyncWebHandler {
     int accepted = 0;
     int rejected = 0;
 
-    // Parse semicolon-delimited data lines from URL.
+    // Parse semicolon-delimited data lines from header.
     // Each line: sensor_id,series,epoch,value
     const char *pos = d_param;
-    while (pos != nullptr && *pos != '\0' && *pos != '&') {
-      // Extract one line (until ; or & or end).
+    while (pos != nullptr && *pos != '\0') {
+      // Extract one line (until ; or end).
       char line[80] = {};
       const char *sep = pos;
-      while (*sep != '\0' && *sep != ';' && *sep != '&') sep++;
+      while (*sep != '\0' && *sep != ';') sep++;
       size_t line_len = sep - pos;
       if (line_len >= sizeof(line)) line_len = sizeof(line) - 1;
       std::memcpy(line, pos, line_len);
@@ -1196,7 +1197,7 @@ class HistoryWebHandler : public AsyncWebHandler {
 
       // Advance past separator.
       if (*sep == ';') pos = sep + 1;
-      else pos = sep;  // Stop at & or end.
+      else pos = sep;  // Stop at end.
 
       // Skip empty lines.
       if (line[0] == '\0') continue;
