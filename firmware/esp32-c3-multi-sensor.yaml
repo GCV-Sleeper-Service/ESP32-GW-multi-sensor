@@ -50,7 +50,7 @@ esphome:
       - lambda: |-
           register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.4.0");
           id(dashboard_link).publish_state(
-            "Open /dashboard or /dashboard.html in your browser for the live dashboard with the available retained history (about 45 days total in this v7.3.4.2 targeted hotfix build). /dashboard-download still provides a standalone dashboard file. This build preserves the 7.3.4 structural-enforcement work and fixes four user-visible dashboard issues: merged Export All now fetches sequentially to avoid request bursts, chart point markers stay in sync with sensor recolor changes, 15-minute markers match the smaller real-time size, and theme changes force a chart redraw so users do not need Ctrl+F5. The dashboard still provides the dedicated tools section below the top cards, with ESP Management and Documentation split into two mini cards below the gateway card and a full-width History Storage panel below the top row showing partition sizes, live NVS usage, and retained-history estimates. "
+            "Open /dashboard or /dashboard.html for the live dashboard. v7.4.0: multi-sensor BLE gateway with 45-day history, CSV export/import, dark/light mode, real-time and averaged charts, and ESP management. /dashboard-download provides a standalone copy. "
             "The ESPHome v3 built-in web page shows text sensor states as plain text, so clickable HTML links are not rendered here.");
 
 # ─── Chip and framework ─────────────────────────────────────────
@@ -65,7 +65,6 @@ esp32:
     type: esp-idf
     sdkconfig_options:
       CONFIG_LWIP_MAX_SOCKETS: "13"
-      CONFIG_HTTPD_MAX_REQ_HDR_LEN: "1024"
 
 logger:
   level: INFO
@@ -84,7 +83,7 @@ ota:
 # ─── Embedded dashboard approach ─────────────────────────────────
 # The dashboard is compiled into ../dashboard/dashboard.h and served by
 # the custom history handler through /dashboard, /dashboard.html, and
-# /dashboard-download. v7.3.4.2 keeps the storage-stats endpoint, preserves
+# /dashboard-download. v7.4.0 keeps all existing endpoints and adds import.
 # Phase 1 structural enforcement for the dashboard event/state layer, and
 # applies a narrow UI hotfix set: serialized merged export, point-marker
 # recolor sync, smaller 15-minute markers, and forced chart redraw on

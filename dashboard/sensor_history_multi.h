@@ -2,11 +2,9 @@
 // ═══════════════════════════════════════════════════════════════════
 // sensor_history_multi-v7.4.0.h - hourly persistence with dedicated history NVS partition
 //
-// v7.3.4.2 note: retained-history backend logic is intentionally carried
-// forward unchanged from the stabilized v7.3.3 baseline. This version bump
-// keeps backend behavior stable while the dashboard applies a narrow UI
-// hotfix set: serialized merged export, point-marker recolor sync, smaller
-// 15-minute markers, and forced theme-change redraws.
+// v7.4.0: adds CSV import via POST /api/import/{begin,d/,w/,finish}.
+// Data is passed in the URL path for proxy compatibility (Cloudflare).
+// Import is replacement-first: existing history is cleared before import.
 //
 // PURPOSE:
 //   Keeps 24 hours of 15-minute averages in RAM ring buffers for fast
@@ -20,7 +18,7 @@
 //   - 24h RAM retention (96 points per series)
 //   - Hourly persistence to the dedicated history NVS partition
 //   - Worst-case power-loss exposure of about one hour
-//   - Dashboard endpoints: reboot + delete history (Basic-auth protected with lockout); dashboard UI keeps centralized bindEvents() wiring and App.State write chokepoints while v7.3.4.2 adds serialized merged export, marker recolor sync, smaller 15-minute markers, and theme-change redraws
+//   - Dashboard endpoints: reboot + delete history (Basic-auth protected with lockout); dashboard UI keeps centralized bindEvents() wiring and App.State write chokepoints; v7.4.0 adds CSV import
 //
 // RETENTION MODEL:
 //   RAM: 24h rolling window, written every 15 minutes
@@ -36,7 +34,8 @@
 //   POST /api/reboot          -> reboot the ESP (requires Basic auth)
 //   POST /api/delete-data     -> erase persisted history and clear RAM (requires Basic auth)
 //   POST /api/import/begin    -> clear history and prepare for CSV import (requires Basic auth)
-//   POST /api/import/data     -> receive import data via X-Data header (requires Basic auth)
+//   POST /api/import/d/<data> -> add data points to current segment (requires Basic auth)
+//   POST /api/import/w/<data> -> add data points and write segment to NVS (requires Basic auth)
 //   POST /api/import/finish   -> finalize import metadata and restore RAM (requires Basic auth)
 //   GET  /api/storage-stats   -> partition sizes + live NVS usage + retained-history estimates (including retention_days from PERSIST_DAYS)
 //   GET  /api/status          -> version, uptime, sensor status, heap (no auth)
@@ -59,7 +58,7 @@
 
 // ── Dashboard payload ────────────────────────────────────────────
 // DASHBOARD_HTML[] is defined in a separate dashboard header file
-// (e.g. dashboard-v7.3.4.2.h) which MUST be listed BEFORE this file
+// (e.g. dashboard.h) which MUST be listed BEFORE this file
 // in the YAML includes: block.  Keeping the dashboard as a separate
 // include avoids duplicate-symbol errors when the dashboard version
 // is bumped independently of the history backend.
@@ -827,7 +826,8 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (strcmp(p, "/api/reboot") == 0) return true;
       if (strcmp(p, "/api/delete-data") == 0) return true;
       if (strcmp(p, "/api/import/begin") == 0) return true;
-      if (strncmp(p, "/api/import/data", 16) == 0) return true;
+      if (strncmp(p, "/api/import/d/", 14) == 0) return true;
+      if (strncmp(p, "/api/import/w/", 14) == 0) return true;
       if (strcmp(p, "/api/import/finish") == 0) return true;
       return false;
     }
@@ -858,8 +858,12 @@ class HistoryWebHandler : public AsyncWebHandler {
         handle_import_begin_(request);
         return;
       }
-      if (strncmp(p, "/api/import/data", 16) == 0) {
-        handle_import_data_(request);
+      if (strncmp(p, "/api/import/d/", 14) == 0) {
+        handle_import_data_(request, p + 14, false);
+        return;
+      }
+      if (strncmp(p, "/api/import/w/", 14) == 0) {
+        handle_import_data_(request, p + 14, true);
         return;
       }
       if (strcmp(p, "/api/import/finish") == 0) {
@@ -970,7 +974,7 @@ class HistoryWebHandler : public AsyncWebHandler {
   void add_common_headers_(AsyncWebServerResponse *resp) const {
     resp->addHeader("Cache-Control", "no-store");
     resp->addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    resp->addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Data, X-Write");
+    resp->addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
   }
 
   void send_json_error_(AsyncWebServerRequest *request, int status_code,
@@ -1110,14 +1114,16 @@ class HistoryWebHandler : public AsyncWebHandler {
 
   // ── Import v1 handlers ────────────────────────────────────────
   //
-  //   POST /api/import/begin  — auth, clear history, allocate snapshot buffer
-  //   POST /api/import/data — data in X-Data header, X-Write: 1 to commit segment
-  //   POST /api/import/finish — finalize metadata, restore RAM, free buffer
+  //   POST /api/import/begin    — auth, clear history, allocate snapshot buffer
+  //   POST /api/import/d/<data> — add data points (no NVS write)
+  //   POST /api/import/w/<data> — add data points AND write snapshot to NVS
+  //   POST /api/import/finish   — finalize metadata, restore RAM, free buffer
   //
-  //   Data is passed in the X-Data HTTP header as semicolon-delimited
-  //   lines: sensor_id,series,epoch,value (series is "temp" or "hum").
-  //   When X-Write header is "1", the current snapshot is written to NVS.
-  //   Headers are used because ESPHome ESP-IDF does not expose POST body.
+  //   Data is encoded in the URL path as semicolon-delimited lines:
+  //     sensor_id,series,epoch,value  (series is "temp" or "hum")
+  //   The URL path is always preserved by all proxies including Cloudflare.
+  //   /d/ adds data to the in-memory snapshot without writing.
+  //   /w/ adds data then commits the snapshot to NVS (use for last batch of each segment).
 
   void handle_import_begin_(AsyncWebServerRequest *request) {
     if (!authenticate_management_(request)) return;
@@ -1152,7 +1158,8 @@ class HistoryWebHandler : public AsyncWebHandler {
     ESP_LOGI(TAG, "Import begun — history partition cleared");
   }
 
-  void handle_import_data_(AsyncWebServerRequest *request) {
+  void handle_import_data_(AsyncWebServerRequest *request,
+                           const char *path_data, bool do_write) {
     if (!authenticate_management_(request)) return;
 
     if (!import_active_ || import_snapshot_ == nullptr) {
@@ -1160,17 +1167,12 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    // Read data from X-Data header and write flag from X-Write header.
-    auto data_hdr = request->get_header("X-Data");
-    if (!data_hdr.has_value() || data_hdr.value().empty()) {
-      send_json_error_(request, 400, "Missing X-Data header");
+    if (path_data == nullptr || path_data[0] == '\0') {
+      send_json_error_(request, 400, "No data in URL path");
       return;
     }
-    const std::string &d_str = data_hdr.value();
-    const char *d_param = d_str.c_str();
 
-    auto write_hdr = request->get_header("X-Write");
-    bool do_write = write_hdr.has_value() && write_hdr.value() == "1";
+    const char *d_param = path_data;
 
     // Get current epoch for validation.
     uint32_t now_epoch = 0;

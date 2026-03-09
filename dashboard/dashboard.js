@@ -1273,8 +1273,8 @@ function detectImportColumns(header) {
 function buildImportSegments(points) {
   // Group points into 1-hour segments aligned to hour boundaries.
   // Each segment contains up to 4 points per sensor per series.
-  // Each segment is split into URL-safe batches (max ~440 chars of data per batch)
-  // to fit within the ESP32 URL buffer limit (512 bytes).
+  // Each segment is split into URL-path-safe batches (max ~250 chars of data per batch)
+  // to fit within the ESP32 URL buffer limit (512 bytes with /api/import/d/ prefix).
   var segmentMap = {};
 
   points.forEach(function(p) {
@@ -1303,7 +1303,7 @@ function buildImportSegments(points) {
     var currentLen = 0;
     for (var i = 0; i < lines.length; i++) {
       var lineLen = lines[i].length + 1;  // +1 for semicolon separator
-      if (currentLen + lineLen > 100 && currentBatch.length > 0) {
+      if (currentLen + lineLen > 250 && currentBatch.length > 0) {
         batches.push({ data: currentBatch.join(';'), pointCount: currentBatch.length, isLast: false });
         currentBatch = [];
         currentLen = 0;
@@ -1359,14 +1359,10 @@ function executeImport(batches, statusEl) {
             statusEl.textContent = 'Importing batch ' + (idx + 1) + ' / ' + batches.length +
               ' (' + batch.pointCount + ' points)...';
           }
-          var headers = {
-            'Authorization': authHeader,
-            'X-Data': batch.data
-          };
-          if (batch.isLast) headers['X-Write'] = '1';
-          return fetch(ESP_HOST + '/api/import/data', {
+          var pathPrefix = batch.isLast ? '/api/import/w/' : '/api/import/d/';
+          return fetch(ESP_HOST + pathPrefix + batch.data, {
             method: 'POST', cache: 'no-store',
-            headers: headers
+            headers: { 'Authorization': authHeader }
           })
           .then(safeJsonResponse)
           .then(function(result) {
