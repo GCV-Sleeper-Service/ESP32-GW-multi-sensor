@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.3.5.0.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.4.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.3.4.2 note: retained-history backend logic is intentionally carried
 // forward unchanged from the stabilized v7.3.3 baseline. This version bump
@@ -35,6 +35,9 @@
 //   GET  /dashboard-download  -> embedded dashboard as attachment
 //   POST /api/reboot          -> reboot the ESP (requires Basic auth)
 //   POST /api/delete-data     -> erase persisted history and clear RAM (requires Basic auth)
+//   POST /api/import/begin    -> clear history and prepare for CSV import (requires Basic auth)
+//   POST /api/import/segment  -> receive one hourly segment of import data (requires Basic auth)
+//   POST /api/import/finish   -> finalize import metadata and restore RAM (requires Basic auth)
 //   GET  /api/storage-stats   -> partition sizes + live NVS usage + retained-history estimates (including retention_days from PERSIST_DAYS)
 //   GET  /api/status          -> version, uptime, sensor status, heap (no auth)
 //
@@ -823,6 +826,9 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (request->method() == HTTP_POST || request->method() == HTTP_OPTIONS) {
       if (strcmp(p, "/api/reboot") == 0) return true;
       if (strcmp(p, "/api/delete-data") == 0) return true;
+      if (strcmp(p, "/api/import/begin") == 0) return true;
+      if (strcmp(p, "/api/import/segment") == 0) return true;
+      if (strcmp(p, "/api/import/finish") == 0) return true;
       return false;
     }
 
@@ -846,6 +852,18 @@ class HistoryWebHandler : public AsyncWebHandler {
       }
       if (strcmp(p, "/api/delete-data") == 0) {
         handle_delete_data_(request);
+        return;
+      }
+      if (strcmp(p, "/api/import/begin") == 0) {
+        handle_import_begin_(request);
+        return;
+      }
+      if (strcmp(p, "/api/import/segment") == 0) {
+        handle_import_segment_(request);
+        return;
+      }
+      if (strcmp(p, "/api/import/finish") == 0) {
+        handle_import_finish_(request);
         return;
       }
       request->send(404);
@@ -884,12 +902,39 @@ class HistoryWebHandler : public AsyncWebHandler {
     request->send(404);
   }
 
+  void handleBody(AsyncWebServerRequest *request, uint8_t *data,
+                  size_t len, size_t index, size_t total) override {
+    // Only accumulate body for import/segment requests.
+    char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
+    auto url = request->url_to(url_buf);
+    if (strcmp(url.c_str(), "/api/import/segment") != 0) return;
+
+    if (index == 0) {
+      import_body_len_ = 0;
+    }
+    size_t space = IMPORT_BODY_MAX - import_body_len_;
+    size_t copy = len < space ? len : space;
+    if (copy > 0) {
+      std::memcpy(import_body_ + import_body_len_, data, copy);
+      import_body_len_ += copy;
+    }
+    import_body_[import_body_len_] = '\0';
+  }
+
  private:
   std::string mgmt_username_;
   std::string mgmt_password_;
   std::string firmware_version_;
   mutable uint8_t failed_auth_count_{0};
   mutable int64_t lockout_until_ms_{0};
+
+  // ── Import state ──────────────────────────────────────────────
+  static constexpr size_t IMPORT_BODY_MAX = 1280;
+  mutable char import_body_[IMPORT_BODY_MAX + 1];
+  mutable size_t import_body_len_{0};
+  mutable bool import_active_{false};
+  mutable uint16_t import_segments_written_{0};
+  mutable HistoryMeta import_meta_;
 
   static int64_t now_ms_() {
     return esp_timer_get_time() / 1000;
@@ -1081,6 +1126,285 @@ class HistoryWebHandler : public AsyncWebHandler {
       resp->print("{\"ok\":false,\"message\":\"Failed to clear history\"}");
     }
     request->send(resp);
+  }
+
+
+  // ── Import v1 handlers ────────────────────────────────────────
+  //
+  //   POST /api/import/begin   — clear history, prepare for import
+  //   POST /api/import/segment — receive one hourly segment, write to NVS
+  //   POST /api/import/finish  — finalize metadata, restore to RAM
+  //
+  //   Body format for /segment (text/plain, one line per data point):
+  //     sensor_id,series,epoch,value
+  //   where series is "temp" or "hum".
+  //   Max 24 lines per segment (NUM_SENSORS * 2 series * 4 points).
+
+  void handle_import_begin_(AsyncWebServerRequest *request) {
+    if (!authenticate_management_(request)) return;
+
+    bool ok = clear_persisted_history_();
+    if (!ok) {
+      send_json_error_(request, 500, "Failed to clear history partition");
+      return;
+    }
+
+    // Initialize import tracking state.
+    import_active_ = true;
+    import_segments_written_ = 0;
+    import_meta_ = default_history_meta_();
+
+    auto *resp = request->beginResponseStream("application/json");
+    add_common_headers_(resp);
+    resp->print("{\"ok\":true,\"message\":\"History cleared, ready for import\"}");
+    request->send(resp);
+    ESP_LOGI(TAG, "Import begun — history partition cleared");
+  }
+
+  void handle_import_segment_(AsyncWebServerRequest *request) {
+    if (!authenticate_management_(request)) return;
+
+    if (!import_active_) {
+      send_json_error_(request, 409, "No import in progress. Call /api/import/begin first.");
+      return;
+    }
+
+    if (import_body_len_ == 0) {
+      send_json_error_(request, 400, "Empty body — expected sensor data lines");
+      return;
+    }
+
+    // Allocate a snapshot on the heap (too large for stack).
+    SegmentSnapshot *snapshot = allocate_snapshot_();
+    if (snapshot == nullptr) {
+      send_json_error_(request, 500, "Failed to allocate segment buffer");
+      return;
+    }
+
+    std::memset(snapshot, 0, sizeof(SegmentSnapshot));
+    snapshot->header.magic = HISTORY_META_MAGIC;
+    snapshot->header.version = HISTORY_META_VERSION;
+    snapshot->header.num_sensors = NUM_SENSORS;
+    snapshot->header.points_per_series = HISTORY_POINTS_PER_SERIES;
+    snapshot->header.points_per_segment = PERSIST_POINTS_PER_SEGMENT;
+
+    int accepted = 0;
+    int rejected = 0;
+    uint32_t first_epoch = 0;
+    uint32_t last_epoch = 0;
+    uint32_t now_epoch = 0;
+    {
+      time_t t = ::time(nullptr);
+      if (t > 1700000000) now_epoch = (uint32_t) t;
+    }
+
+    // Parse body line by line.
+    char *body = import_body_;
+    char *line = body;
+    while (line < body + import_body_len_) {
+      char *eol = strchr(line, '\n');
+      if (eol != nullptr) *eol = '\0';
+      else eol = body + import_body_len_;
+
+      // Skip empty lines or comment lines.
+      if (line[0] == '\0' || line[0] == '#') {
+        line = eol + 1;
+        continue;
+      }
+
+      // Parse: sensor_id,series,epoch,value
+      char sid[32] = {};
+      char ser[8] = {};
+      unsigned int epoch = 0;
+      float value = 0.0f;
+      int parsed = sscanf(line, "%31[^,],%7[^,],%u,%f", sid, ser, &epoch, &value);
+
+      if (parsed < 3) {
+        rejected++;
+        line = eol + 1;
+        continue;
+      }
+
+      // Resolve sensor index.
+      int sensor_idx = -1;
+      for (int i = 0; i < NUM_SENSORS; i++) {
+        if (strcmp(sensors[i].id, sid) == 0) {
+          sensor_idx = i;
+          break;
+        }
+      }
+      if (sensor_idx < 0) {
+        rejected++;
+        line = eol + 1;
+        continue;
+      }
+
+      // Validate epoch (must be > 0 and not more than 1 day in the future).
+      if (epoch == 0 || (now_epoch > 0 && epoch > now_epoch + 86400)) {
+        rejected++;
+        line = eol + 1;
+        continue;
+      }
+
+      // Determine series and slot.
+      bool is_temp = (strcmp(ser, "temp") == 0);
+      bool is_hum = (strcmp(ser, "hum") == 0);
+      if (!is_temp && !is_hum) {
+        rejected++;
+        line = eol + 1;
+        continue;
+      }
+
+      // Validate value ranges.
+      if (parsed == 4) {
+        if (is_temp && (value < -50.0f || value > 80.0f)) {
+          rejected++;
+          line = eol + 1;
+          continue;
+        }
+        if (is_hum && (value < 0.0f || value > 100.0f)) {
+          rejected++;
+          line = eol + 1;
+          continue;
+        }
+      }
+
+      // Place into snapshot.
+      float store_value = (parsed >= 4) ? value : NAN;
+      if (is_temp) {
+        int idx = snapshot->temp_counts[sensor_idx];
+        if (idx < PERSIST_POINTS_PER_SEGMENT) {
+          snapshot->temp[sensor_idx][idx] = {epoch, store_value};
+          snapshot->temp_counts[sensor_idx]++;
+          accepted++;
+        } else {
+          rejected++;
+        }
+      } else {
+        int idx = snapshot->hum_counts[sensor_idx];
+        if (idx < PERSIST_POINTS_PER_SEGMENT) {
+          snapshot->hum[sensor_idx][idx] = {epoch, store_value};
+          snapshot->hum_counts[sensor_idx]++;
+          accepted++;
+        } else {
+          rejected++;
+        }
+      }
+
+      // Track epoch range.
+      if (first_epoch == 0 || epoch < first_epoch) first_epoch = epoch;
+      if (epoch > last_epoch) last_epoch = epoch;
+
+      line = eol + 1;
+    }
+
+    if (accepted == 0) {
+      delete snapshot;
+      send_json_error_(request, 400, "No valid data points in segment");
+      return;
+    }
+
+    // Finalize snapshot header.
+    snapshot->header.saved_at_epoch = now_epoch > 0 ? now_epoch : last_epoch;
+    snapshot->header.first_epoch = first_epoch;
+    snapshot->header.last_epoch = last_epoch;
+
+    // Write to NVS.
+    nvs_handle_t handle;
+    if (!open_history_nvs_(&handle, NVS_READWRITE)) {
+      delete snapshot;
+      send_json_error_(request, 500, "Failed to open NVS for writing");
+      return;
+    }
+
+    int slot = import_meta_.next_slot % PERSIST_SLOTS;
+    char key[12];
+    make_segment_key_(slot, key, sizeof(key));
+
+    esp_err_t err = nvs_set_blob(handle, key, snapshot, sizeof(*snapshot));
+    if (err != ESP_OK) {
+      nvs_close(handle);
+      delete snapshot;
+      char msg[80];
+      snprintf(msg, sizeof(msg), "NVS write failed for slot %d", slot);
+      send_json_error_(request, 500, msg);
+      return;
+    }
+    err = nvs_commit(handle);
+    nvs_close(handle);
+
+    if (err != ESP_OK) {
+      delete snapshot;
+      send_json_error_(request, 500, "NVS commit failed");
+      return;
+    }
+
+    // Update import tracking metadata.
+    import_meta_.last_written_slot = slot;
+    import_meta_.next_slot = (slot + 1) % PERSIST_SLOTS;
+    if (import_meta_.valid_segments < PERSIST_SLOTS) import_meta_.valid_segments++;
+    import_meta_.last_persist_epoch = last_epoch;
+    import_segments_written_++;
+
+    delete snapshot;
+
+    // Send response.
+    auto *resp = request->beginResponseStream("application/json");
+    add_common_headers_(resp);
+    char num[64];
+    resp->print("{\"ok\":true,");
+    snprintf(num, sizeof(num), "\"slot\":%d,\"accepted\":%d,\"rejected\":%d}",
+             slot, accepted, rejected);
+    resp->print(num);
+    request->send(resp);
+  }
+
+  void handle_import_finish_(AsyncWebServerRequest *request) {
+    if (!authenticate_management_(request)) return;
+
+    if (!import_active_) {
+      send_json_error_(request, 409, "No import in progress");
+      return;
+    }
+
+    import_active_ = false;
+
+    if (import_segments_written_ == 0) {
+      auto *resp = request->beginResponseStream("application/json");
+      add_common_headers_(resp);
+      resp->print("{\"ok\":true,\"segments_written\":0,\"message\":\"Import finished with no segments\"}");
+      request->send(resp);
+      return;
+    }
+
+    // Save the accumulated metadata to NVS.
+    nvs_handle_t handle;
+    if (!open_history_nvs_(&handle, NVS_READWRITE)) {
+      send_json_error_(request, 500, "Failed to open NVS to finalize metadata");
+      return;
+    }
+    bool meta_ok = save_history_meta_(handle, import_meta_);
+    nvs_close(handle);
+
+    if (!meta_ok) {
+      send_json_error_(request, 500, "Failed to write import metadata");
+      return;
+    }
+
+    // Restore newest segments into RAM so charts work immediately.
+    restore_from_nvs();
+
+    auto *resp = request->beginResponseStream("application/json");
+    add_common_headers_(resp);
+    char num[64];
+    resp->print("{\"ok\":true,");
+    snprintf(num, sizeof(num), "\"segments_written\":%u,",
+             (unsigned) import_segments_written_);
+    resp->print(num);
+    resp->print("\"message\":\"Import complete, history restored to RAM\"}");
+    request->send(resp);
+    ESP_LOGI(TAG, "Import finished — %u segments written, RAM restored",
+             (unsigned) import_segments_written_);
   }
 
 
@@ -1348,6 +1672,7 @@ static void register_history_handler(
              i, sensors[i].name, sensors[i].id);
   }
   ESP_LOGI(TAG, "  management -> POST /api/reboot, POST /api/delete-data (Basic auth)");
+  ESP_LOGI(TAG, "  import     -> POST /api/import/{begin,segment,finish} (Basic auth)");
   ESP_LOGI(TAG, "  storage    -> GET /api/storage-stats");
   ESP_LOGI(TAG, "  status     -> GET /api/status");
   ESP_LOGI(TAG, "  storage -> dedicated NVS partition: %s / namespace: %s",

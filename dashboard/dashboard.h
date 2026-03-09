@@ -516,7 +516,9 @@ static const char DASHBOARD_HTML[] DASHBOARD_STORAGE_ATTR = R"DASH64(
                   <div class="compact-grid">
                     <button class="compact-btn warn" data-action="reboot-esp">ESP Reboot</button>
                     <button class="compact-btn danger" data-action="delete-history">Delete Data</button>
+                    <button class="compact-btn" data-action="import-history" style="background:rgba(96,165,250,.1);color:#60a5fa;border-color:rgba(96,165,250,.3)">Import History</button>
                   </div>
+                  <input type="file" id="importFileInput" accept=".csv" style="display:none">
                   <div class="mini-status" id="mgmt-status">Local management actions for this ESP.</div>
                 </div>
               </div>
@@ -737,7 +739,7 @@ static const char DASHBOARD_HTML[] DASHBOARD_STORAGE_ATTR = R"DASH64(
 // The bulk of the logic still lives in existing functions so regression risk stays low.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.3.4.2';
+App.version = 'v7.4.0';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -1368,6 +1370,10 @@ function bindEvents() {
         deleteHistoryData();
         return;
       }
+      if (action === 'import-history') {
+        importHistoryData();
+        return;
+      }
       if (action === 'refresh-history') {
         event.preventDefault();
         event.stopPropagation();
@@ -1820,6 +1826,257 @@ function deleteHistoryData() {
     resetHistoryVisuals();
     loadStorageStats().catch(function(){});
   }).catch(function(){});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Import v1 — CSV import into NVS history
+// ═══════════════════════════════════════════════════════════════════
+
+function importHistoryData() {
+  var statusEl = document.getElementById('mgmt-status');
+  var fileInput = document.getElementById('importFileInput');
+  if (!fileInput) return;
+
+  // Reset file input so re-selecting the same file triggers change.
+  fileInput.value = '';
+  fileInput.onchange = function() {
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    if (statusEl) statusEl.textContent = 'Reading file...';
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      processImportFile(e.target.result, file.name);
+    };
+    reader.onerror = function() {
+      if (statusEl) statusEl.textContent = 'Failed to read file';
+    };
+    reader.readAsText(file);
+  };
+  fileInput.click();
+}
+
+function processImportFile(csvText, fileName) {
+  var statusEl = document.getElementById('mgmt-status');
+  if (statusEl) statusEl.textContent = 'Parsing CSV...';
+
+  var result = parseImportCsv(csvText);
+  if (result.error) {
+    if (statusEl) statusEl.textContent = 'Import error: ' + result.error;
+    return;
+  }
+
+  if (result.points.length === 0) {
+    if (statusEl) statusEl.textContent = 'No valid data points found in file';
+    return;
+  }
+
+  // Build segments from points.
+  var segments = buildImportSegments(result.points);
+
+  // Show confirmation with summary.
+  var sensorNames = {};
+  result.points.forEach(function(p) { sensorNames[p.sensor] = true; });
+  var msg = 'Import ' + result.points.length + ' data points (' + segments.length +
+    ' hourly segments) for sensor(s): ' + Object.keys(sensorNames).join(', ') +
+    '.\n\nThis will REPLACE all existing history. Continue?';
+  if (!confirm(msg)) {
+    if (statusEl) statusEl.textContent = 'Import cancelled';
+    return;
+  }
+
+  executeImport(segments, statusEl);
+}
+
+function parseImportCsv(csvText) {
+  var lines = csvText.split(/\r?\n/).filter(function(l) { return l.trim() !== ''; });
+  if (lines.length < 2) return { error: 'File too short (need header + data)', points: [] };
+
+  var header = lines[0].split(',').map(function(h) { return h.trim().toLowerCase(); });
+  var tsIdx = header.indexOf('timestamp');
+  if (tsIdx < 0) return { error: 'Missing "timestamp" column in header', points: [] };
+
+  // Detect format: single-sensor or merged.
+  var sensorColumns = detectImportColumns(header);
+  if (sensorColumns.length === 0) {
+    return { error: 'Could not find temp_c / humidity_pct columns in header', points: [] };
+  }
+
+  var points = [];
+  var rejected = 0;
+  var now = Math.floor(Date.now() / 1000);
+
+  for (var i = 1; i < lines.length; i++) {
+    var cols = lines[i].split(',');
+    var epochRaw = parseInt(cols[tsIdx], 10);
+    if (!isFinite(epochRaw) || epochRaw < 946684800) { rejected++; continue; }  // Before year 2000
+    if (epochRaw > now + 86400) { rejected++; continue; }  // More than 1 day in future
+
+    for (var s = 0; s < sensorColumns.length; s++) {
+      var sc = sensorColumns[s];
+      var tempStr = (sc.tempIdx >= 0 && sc.tempIdx < cols.length) ? cols[sc.tempIdx].trim() : '';
+      var humStr = (sc.humIdx >= 0 && sc.humIdx < cols.length) ? cols[sc.humIdx].trim() : '';
+
+      var tempVal = parseFloat(tempStr);
+      var humVal = parseFloat(humStr);
+      var hasTemp = isFinite(tempVal) && tempVal > -50 && tempVal < 80;
+      var hasHum = isFinite(humVal) && humVal >= 0 && humVal <= 100;
+
+      if (hasTemp) {
+        points.push({ sensor: sc.sensorId, series: 'temp', epoch: epochRaw, value: tempVal });
+      }
+      if (hasHum) {
+        points.push({ sensor: sc.sensorId, series: 'hum', epoch: epochRaw, value: humVal });
+      }
+    }
+  }
+
+  // Sort by epoch.
+  points.sort(function(a, b) { return a.epoch - b.epoch; });
+
+  return { points: points, rejected: rejected, error: null };
+}
+
+function detectImportColumns(header) {
+  var results = [];
+
+  // Check for single-sensor format: temp_c, humidity_pct directly.
+  var tempIdx = header.indexOf('temp_c');
+  var humIdx = header.indexOf('humidity_pct');
+  if (tempIdx >= 0 || humIdx >= 0) {
+    // Try to detect which sensor from filename context — fall back to first known sensor.
+    // For single-sensor export, the sensor ID is not in the CSV. We'll prompt later if needed.
+    // For now, map to first sensor.
+    var sensorId = (typeof SENSORS !== 'undefined' && SENSORS.length > 0) ? SENSORS[0].id : 'office';
+
+    // Check if there are prefixed columns too (merged format).
+    var hasPrefixed = false;
+    for (var h = 0; h < header.length; h++) {
+      if (header[h].match(/^.+_temp_c$/)) { hasPrefixed = true; break; }
+    }
+
+    if (!hasPrefixed) {
+      results.push({ sensorId: sensorId, tempIdx: tempIdx, humIdx: humIdx });
+      return results;
+    }
+  }
+
+  // Check for merged format: {prefix}_temp_c, {prefix}_humidity_pct
+  var knownSensors = (typeof SENSORS !== 'undefined') ? SENSORS : [];
+  for (var si = 0; si < knownSensors.length; si++) {
+    var prefix = getExportSensorPrefix(knownSensors[si]).toLowerCase();
+    var ti = header.indexOf(prefix + '_temp_c');
+    var hi = header.indexOf(prefix + '_humidity_pct');
+    if (ti >= 0 || hi >= 0) {
+      results.push({ sensorId: knownSensors[si].id, tempIdx: ti, humIdx: hi });
+    }
+  }
+
+  return results;
+}
+
+function buildImportSegments(points) {
+  // Group points into 1-hour segments aligned to hour boundaries.
+  // Each segment contains up to PERSIST_POINTS_PER_SEGMENT (4) points per sensor per series.
+  var segmentMap = {};
+
+  points.forEach(function(p) {
+    // Align to hour boundary (floor to nearest hour).
+    var hourEpoch = p.epoch - (p.epoch % 3600);
+    var key = hourEpoch;
+    if (!segmentMap[key]) segmentMap[key] = [];
+    segmentMap[key].push(p);
+  });
+
+  // Convert to sorted array of segment objects.
+  var hourKeys = Object.keys(segmentMap).map(Number).sort(function(a, b) { return a - b; });
+
+  return hourKeys.map(function(hourEpoch) {
+    var segPoints = segmentMap[hourEpoch];
+    // Build the text body for this segment.
+    // Deduplicate: keep at most 4 points per sensor per series.
+    var counts = {};
+    var lines = [];
+    segPoints.forEach(function(p) {
+      var countKey = p.sensor + ',' + p.series;
+      if (!counts[countKey]) counts[countKey] = 0;
+      if (counts[countKey] >= 4) return;  // Max 4 points per segment slot.
+      counts[countKey]++;
+      lines.push(p.sensor + ',' + p.series + ',' + p.epoch + ',' + p.value.toFixed(2));
+    });
+    return { hourEpoch: hourEpoch, body: lines.join('\n') + '\n', pointCount: lines.length };
+  });
+}
+
+function executeImport(segments, statusEl) {
+  if (statusEl) statusEl.textContent = 'Authenticating...';
+
+  requestManagementCredentials('history import').then(function(creds) {
+    if (!creds) {
+      if (statusEl) statusEl.textContent = 'Import cancelled';
+      return;
+    }
+
+    var authHeader = 'Basic ' + btoa(creds.username + ':' + creds.password);
+
+    // Step 1: Begin import (clears history).
+    if (statusEl) statusEl.textContent = 'Clearing history for import...';
+    return fetch(ESP_HOST + '/api/import/begin', {
+      method: 'POST', cache: 'no-store',
+      headers: { 'Authorization': authHeader }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) throw new Error(data.message || 'Begin failed');
+
+      // Step 2: Send segments sequentially.
+      var totalAccepted = 0;
+      var totalRejected = 0;
+      return segments.reduce(function(chain, seg, idx) {
+        return chain.then(function() {
+          if (statusEl) {
+            statusEl.textContent = 'Importing segment ' + (idx + 1) + ' / ' + segments.length +
+              ' (' + seg.pointCount + ' points)...';
+          }
+          return fetch(ESP_HOST + '/api/import/segment', {
+            method: 'POST', cache: 'no-store',
+            headers: { 'Authorization': authHeader, 'Content-Type': 'text/plain' },
+            body: seg.body
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(result) {
+            if (!result.ok) throw new Error(result.message || 'Segment write failed at slot ' + idx);
+            totalAccepted += (result.accepted || 0);
+            totalRejected += (result.rejected || 0);
+          });
+        });
+      }, Promise.resolve()).then(function() {
+        return { accepted: totalAccepted, rejected: totalRejected };
+      });
+    })
+    .then(function(totals) {
+      // Step 3: Finish import.
+      if (statusEl) statusEl.textContent = 'Finalizing import...';
+      return fetch(ESP_HOST + '/api/import/finish', {
+        method: 'POST', cache: 'no-store',
+        headers: { 'Authorization': authHeader }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || 'Finish failed');
+        var msg = 'Import complete: ' + data.segments_written + ' segments, ' +
+          totals.accepted + ' accepted';
+        if (totals.rejected > 0) msg += ', ' + totals.rejected + ' rejected';
+        if (statusEl) statusEl.textContent = msg + ' \u2714';
+        // Reload history and storage stats.
+        resetHistoryVisuals();
+        loadHistory();
+        loadStorageStats().catch(function(){});
+      });
+    })
+    .catch(function(err) {
+      if (statusEl) statusEl.textContent = 'Import failed: ' + err.message;
+    });
+  });
 }
 
 function updateBadge() {
