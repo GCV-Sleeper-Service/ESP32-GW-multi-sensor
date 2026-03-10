@@ -34,6 +34,7 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install esphome
+          npm install -g html-minifier-terser
           echo "node=$(node --version) npm=$(npm --version) python=$(python --version) esphome=$(esphome version)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare working directories
@@ -50,6 +51,22 @@ jobs:
           gateway_mgmt_username: "ci-user"
           gateway_mgmt_password: "ci-password"
           EOF_SECRETS
+
+      - name: Minify dashboard
+        shell: bash
+        run: |
+          bash ./scripts/minify-dashboard.sh 2>&1 | tee build-logs/minify.log
+          ORIG=$(awk '/Minified:/{print $2}' build-logs/minify.log | tr -d ',')
+          MINI=$(awk '/Minified:/{print $4}' build-logs/minify.log | tr -d ',')
+          echo "### Minification" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Before | After |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| ${ORIG} bytes | ${MINI} bytes |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Regenerate dashboard.h from minified source
+        shell: bash
+        run: |
+          bash ./scripts/generate-header.sh 2>&1 | tee build-logs/generate-header.log
 
       - name: Run preflight
         shell: bash

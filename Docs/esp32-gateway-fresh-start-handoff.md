@@ -1,9 +1,9 @@
 # ESP32 Gateway — Fresh Start Handoff
 
-_Last updated: 2026-03-09_
+_Last updated: 2026-03-10_
 _Repo: `GCV-Sleeper-Service/ESP32-GW-multi-sensor`_
-_Current version: v7.4.0.2 (pending compile/test)_
-_Branch: `main`_
+_Current version: v7.4.1.0 (pending local steps + compile/test)_
+_Branch: `feature/custom-date-range`_
 
 This is the single-source continuity document for resuming development in a fresh session.
 
@@ -17,7 +17,7 @@ See [architecture.md](architecture.md) for the full technical design.
 
 ---
 
-## Current State (v7.4.0.2)
+## Current State (v7.4.1.0)
 
 ### What is working
 
@@ -33,8 +33,23 @@ See [architecture.md](architecture.md) for the full technical design.
 - Dark/light mode with chart redraw
 - GitHub Actions CI: preflight + compile on every push/PR
 - Branch protection on `main`
+- **Dashboard minification pipeline** (v7.4.1.0): html-minifier-terser + terser, ~40KB flash savings
 
-### Import design summary
+### Minification pipeline summary
+
+**Local build sequence:**
+```
+dashboard.html → minify-dashboard.sh → dashboard.min.html (gitignored)
+                                      → generate-header.sh → dashboard.h (committed)
+```
+
+**Key behaviours:**
+- `dashboard.min.html` is never committed — it is a build artifact
+- `generate-header.sh` auto-detects `.min.html` when present (no argument needed)
+- CI installs `html-minifier-terser` and runs the full pipeline before preflight
+- Local builds without the tool installed still work (fallback to `.html`)
+
+### Import design summary (unchanged from v7.4.0.2)
 
 **Multi-sensor import** (`POST /api/import/begin`):
 - Erases all history before writing
@@ -48,27 +63,29 @@ See [architecture.md](architecture.md) for the full technical design.
 - Creates new segments for hours not found in existing data
 - Other sensors' data is preserved
 
-**Transport**: Data encoded in URL path (`/api/import/d/<data>`, `/api/import/w/<data>`). This is the only proxy-safe channel on this platform.
+**Transport**: Data encoded in URL path. This is the only proxy-safe channel on this platform.
 
-**Stabilization**: Dashboard suspends background polling/SSE during import, adds pacing delays and retry/backoff for Cloudflare reliability.
+### v7.4.1.0 status
 
-### v7.4.0.2 status
-
-- Preflight: PASS (23 checks)
+- Remote commit: DONE (VERSION, YAML, scripts, CI, .gitignore, docs)
+- Local sed steps: PENDING (dashboard.js, dashboard.html version strings)
+- Minification run: PENDING
+- Regenerate dashboard.h: PENDING
+- Preflight: PENDING
 - Compile: PENDING
 - Device test: PENDING
 
 ### Repository coordinates
 
 - **Repo:** `https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor`
-- **Branch:** `main` at v7.4.0.2
+- **Branch:** `feature/custom-date-range` at v7.4.1.0
 
 ### Resource usage (last measured at v7.4.0)
 
 | Metric | Value |
 |--------|-------|
 | RAM | ~15.8% of 327 KiB |
-| Flash | ~88.2% of 1.69 MiB |
+| Flash | ~88.2% of 1.69 MiB (expected ~86% after minification) |
 | Free heap | ~78-84 KiB typical |
 | History partition | 512 KiB dedicated |
 
@@ -86,22 +103,26 @@ See [architecture.md](architecture.md) for the full technical design.
 
 ## What Comes Next — Priority Order
 
-### Immediate: Validate v7.4.0.2
+### Immediate: Complete v7.4.1.0 validation
 
-1. Compile firmware
-2. Flash and test single-sensor import (verify other sensors preserved)
-3. Test multi-sensor import (regression check)
-4. Test both via LAN and Cloudflare
-5. If pass: tag v7.4.0.2
+1. Pull updated branch
+2. Apply sed version bumps (dashboard.js, dashboard.html)
+3. Install html-minifier-terser (if not already installed)
+4. Run: `./scripts/minify-dashboard.sh`
+5. Run: `./scripts/generate-header.sh`
+6. Run: `./scripts/preflight.sh` — must be 23/23 PASS
+7. Compile and flash
+8. Verify dashboard renders and flash usage is reduced
+9. Commit dashboard.js, dashboard.html, dashboard.h
+10. Tag v7.4.1.0, merge to main
 
-### After v7.4.0.2 validation
+### After v7.4.1.0 merge
 
-1. **Custom date range selector** — dashboard-only change
-2. **Playwright browser test automation** — mock backend, CI workflow
-3. **Configurable sensor count** — comment-based 1-4 sensor config
-4. **Dashboard minification** — free up flash headroom
+1. **Custom date range selector** (v7.4.2.x) — dashboard-only, HA-style calendar dialog
+2. **Playwright browser test automation** (v7.4.3.x) — mock backend + CI
+3. **Configurable sensor count** (v7.4.4.x) — docs + preflight validation
 
-See [future-plans.md](future-plans.md) for the complete roadmap.
+See [future-plans.md](future-plans.md) and [implementation-plan-next-features.md](implementation-plan-next-features.md) for detail.
 
 ---
 
@@ -117,6 +138,8 @@ See [future-plans.md](future-plans.md) for the complete roadmap.
 8. **When import data is a subset of storage structure, merge rather than replace** — epoch-to-slot map approach
 9. **Keep HTML/JS/.h synchronized** — any dashboard change must update all three
 10. **Check all version strings after every bump** — VERSION, YAML, JS, register_history_handler, HTML comments
+11. **Large files (>100KB) require local sed for version bumps** — GitHub API has payload limits; use targeted sed -i for single-line changes in dashboard.js and dashboard.html
+12. **generate-header.sh auto-detects .min.html** — CI gets minified binary automatically; local without tools falls back gracefully
 
 See [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) for the full record.
 
@@ -133,8 +156,10 @@ See [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) for the full reco
 | [build-history.md](build-history.md) | Curated build ledger |
 | [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) | Fixes, patterns, pitfalls |
 | [future-plans.md](future-plans.md) | Roadmap and feature assessment |
+| [implementation-plan-next-features.md](implementation-plan-next-features.md) | Detailed plans for next 4 features |
 | [v7.4.0-documentation.md](v7.4.0-documentation.md) | Import v1 per-version doc |
 | [device-test-report-template.md](device-test-report-template.md) | Post-flash testing checklist |
+| [session-log-2026-03-10-v7.4.1.0.md](session-log-2026-03-10-v7.4.1.0.md) | This session's log |
 
 ---
 
@@ -146,9 +171,9 @@ Provide the assistant with:
 2. Current test results (compile, LAN, Cloudflare)
 3. What you want to work on next
 
-Example:
+Example (after v7.4.1.0 validation):
 
 > Continuing the ESP32 BLE gateway project.
 > Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
-> v7.4.0.2 validated — single-sensor merge works, multi-sensor regression clean.
-> Next step: custom date range selector
+> v7.4.1.0 validated — minification working, flash at ~86%.
+> Next step: custom date range selector (v7.4.2.x)

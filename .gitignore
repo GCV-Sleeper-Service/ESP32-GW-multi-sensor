@@ -6,3 +6,7 @@ secrets/*.yaml
 build-logs/
 artifacts/
 firmware/.esphome/
+# Minification build artifact — do not commit
+dashboard/dashboard.min.html
+# node_modules (Playwright / minification tools if installed locally)
+node_modules/
