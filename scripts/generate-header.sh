@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
+# scripts/generate-header.sh
+# Generate dashboard/dashboard.h from the dashboard HTML source.
+#
+# Usage:
+#   ./scripts/generate-header.sh [input] [output]
+#
+# Defaults:
+#   input  = dashboard/dashboard.html  (or .min.html if it exists)
+#   output = dashboard/dashboard.h
+#
+# If dashboard/dashboard.min.html exists it is used automatically,
+# otherwise dashboard/dashboard.html is used. Pass an explicit input
+# path to override this behaviour.
+#
+# The generated .h is committed to the repo — it is the embedded
+# payload compiled into firmware.
+
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -6,6 +23,20 @@ cd "$ROOT"
 
 INPUT="${1:-dashboard/dashboard.html}"
 OUTPUT="${2:-dashboard/dashboard.h}"
+
+# Auto-upgrade to minified version if it exists and no explicit input given
+if [[ $# -eq 0 ]]; then
+  MINIFIED="${INPUT%.html}.min.html"
+  if [[ -f "$MINIFIED" ]]; then
+    INPUT="$MINIFIED"
+    echo "Using minified source: $INPUT"
+  fi
+fi
+
+if [[ ! -f "$INPUT" ]]; then
+  echo "ERROR: Input file not found: $INPUT"
+  exit 1
+fi
 
 cat > "$OUTPUT" <<'EOF2'
 #pragma once
