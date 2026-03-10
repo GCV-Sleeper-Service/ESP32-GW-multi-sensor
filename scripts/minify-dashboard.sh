@@ -33,12 +33,12 @@ fi
 if ! command -v html-minifier-terser &>/dev/null; then
   echo "ERROR: html-minifier-terser not found."
   echo "Install with: npm install -g html-minifier-terser"
-  echo "Or (if package.json present): npm install"
   exit 1
 fi
 
 ORIG=$(wc -c < "$INPUT")
 
+# html-minifier-terser reads from a file positional arg and writes to --output
 html-minifier-terser \
   --collapse-whitespace \
   --remove-comments \
@@ -49,8 +49,8 @@ html-minifier-terser \
   --use-short-doctype \
   --minify-css true \
   --minify-js '{"compress":{"dead_code":true,"drop_console":false,"passes":2},"mangle":true}' \
-  --input-path "$INPUT" \
-  --output-path "$OUTPUT"
+  --output "$OUTPUT" \
+  "$INPUT"
 
 MINI=$(wc -c < "$OUTPUT")
 SAVED=$((ORIG - MINI))
