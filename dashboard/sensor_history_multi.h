@@ -1,12 +1,10 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.3.5.0.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.4.0.h - hourly persistence with dedicated history NVS partition
 //
-// v7.3.4.2 note: retained-history backend logic is intentionally carried
-// forward unchanged from the stabilized v7.3.3 baseline. This version bump
-// keeps backend behavior stable while the dashboard applies a narrow UI
-// hotfix set: serialized merged export, point-marker recolor sync, smaller
-// 15-minute markers, and forced theme-change redraws.
+// v7.4.0: adds CSV import via POST /api/import/{begin,d/,w/,finish}.
+// Data is passed in the URL path for proxy compatibility (Cloudflare).
+// Import is replacement-first: existing history is cleared before import.
 //
 // PURPOSE:
 //   Keeps 24 hours of 15-minute averages in RAM ring buffers for fast
@@ -20,7 +18,7 @@
 //   - 24h RAM retention (96 points per series)
 //   - Hourly persistence to the dedicated history NVS partition
 //   - Worst-case power-loss exposure of about one hour
-//   - Dashboard endpoints: reboot + delete history (Basic-auth protected with lockout); dashboard UI keeps centralized bindEvents() wiring and App.State write chokepoints while v7.3.4.2 adds serialized merged export, marker recolor sync, smaller 15-minute markers, and theme-change redraws
+//   - Dashboard endpoints: reboot + delete history (Basic-auth protected with lockout); dashboard UI keeps centralized bindEvents() wiring and App.State write chokepoints; v7.4.0 adds CSV import
 //
 // RETENTION MODEL:
 //   RAM: 24h rolling window, written every 15 minutes
@@ -35,6 +33,10 @@
 //   GET  /dashboard-download  -> embedded dashboard as attachment
 //   POST /api/reboot          -> reboot the ESP (requires Basic auth)
 //   POST /api/delete-data     -> erase persisted history and clear RAM (requires Basic auth)
+//   POST /api/import/begin    -> clear history and prepare for CSV import (requires Basic auth)
+//   POST /api/import/d/<data> -> add data points to current segment (requires Basic auth)
+//   POST /api/import/w/<data> -> add data points and write segment to NVS (requires Basic auth)
+//   POST /api/import/finish   -> finalize import metadata and restore RAM (requires Basic auth)
 //   GET  /api/storage-stats   -> partition sizes + live NVS usage + retained-history estimates (including retention_days from PERSIST_DAYS)
 //   GET  /api/status          -> version, uptime, sensor status, heap (no auth)
 //
@@ -56,7 +58,7 @@
 
 // ── Dashboard payload ────────────────────────────────────────────
 // DASHBOARD_HTML[] is defined in a separate dashboard header file
-// (e.g. dashboard-v7.3.4.2.h) which MUST be listed BEFORE this file
+// (e.g. dashboard.h) which MUST be listed BEFORE this file
 // in the YAML includes: block.  Keeping the dashboard as a separate
 // include avoids duplicate-symbol errors when the dashboard version
 // is bumped independently of the history backend.
@@ -823,6 +825,10 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (request->method() == HTTP_POST || request->method() == HTTP_OPTIONS) {
       if (strcmp(p, "/api/reboot") == 0) return true;
       if (strcmp(p, "/api/delete-data") == 0) return true;
+      if (strcmp(p, "/api/import/begin") == 0) return true;
+      if (strncmp(p, "/api/import/d/", 14) == 0) return true;
+      if (strncmp(p, "/api/import/w/", 14) == 0) return true;
+      if (strcmp(p, "/api/import/finish") == 0) return true;
       return false;
     }
 
@@ -846,6 +852,22 @@ class HistoryWebHandler : public AsyncWebHandler {
       }
       if (strcmp(p, "/api/delete-data") == 0) {
         handle_delete_data_(request);
+        return;
+      }
+      if (strcmp(p, "/api/import/begin") == 0) {
+        handle_import_begin_(request);
+        return;
+      }
+      if (strncmp(p, "/api/import/d/", 14) == 0) {
+        handle_import_data_(request, p + 14, false);
+        return;
+      }
+      if (strncmp(p, "/api/import/w/", 14) == 0) {
+        handle_import_data_(request, p + 14, true);
+        return;
+      }
+      if (strcmp(p, "/api/import/finish") == 0) {
+        handle_import_finish_(request);
         return;
       }
       request->send(404);
@@ -890,6 +912,12 @@ class HistoryWebHandler : public AsyncWebHandler {
   std::string firmware_version_;
   mutable uint8_t failed_auth_count_{0};
   mutable int64_t lockout_until_ms_{0};
+
+  // ── Import state ──────────────────────────────────────────────
+  mutable bool import_active_{false};
+  mutable uint16_t import_segments_written_{0};
+  mutable HistoryMeta import_meta_;
+  mutable SegmentSnapshot *import_snapshot_{nullptr};
 
   static int64_t now_ms_() {
     return esp_timer_get_time() / 1000;
@@ -1081,6 +1109,269 @@ class HistoryWebHandler : public AsyncWebHandler {
       resp->print("{\"ok\":false,\"message\":\"Failed to clear history\"}");
     }
     request->send(resp);
+  }
+
+
+  // ── Import v1 handlers ────────────────────────────────────────
+  //
+  //   POST /api/import/begin    — auth, clear history, allocate snapshot buffer
+  //   POST /api/import/d/<data> — add data points (no NVS write)
+  //   POST /api/import/w/<data> — add data points AND write snapshot to NVS
+  //   POST /api/import/finish   — finalize metadata, restore RAM, free buffer
+  //
+  //   Data is encoded in the URL path as semicolon-delimited lines:
+  //     sensor_id,series,epoch,value  (series is "temp" or "hum")
+  //   The URL path is always preserved by all proxies including Cloudflare.
+  //   /d/ adds data to the in-memory snapshot without writing.
+  //   /w/ adds data then commits the snapshot to NVS (use for last batch of each segment).
+
+  void handle_import_begin_(AsyncWebServerRequest *request) {
+    if (!authenticate_management_(request)) return;
+
+    // Clean up any leftover import state.
+    if (import_snapshot_ != nullptr) {
+      delete import_snapshot_;
+      import_snapshot_ = nullptr;
+    }
+
+    bool ok = clear_persisted_history_();
+    if (!ok) {
+      send_json_error_(request, 500, "Failed to clear history partition");
+      return;
+    }
+
+    import_snapshot_ = allocate_snapshot_();
+    if (import_snapshot_ == nullptr) {
+      send_json_error_(request, 500, "Failed to allocate import buffer");
+      return;
+    }
+    std::memset(import_snapshot_, 0, sizeof(SegmentSnapshot));
+
+    import_active_ = true;
+    import_segments_written_ = 0;
+    import_meta_ = default_history_meta_();
+
+    auto *resp = request->beginResponseStream("application/json");
+    add_common_headers_(resp);
+    resp->print("{\"ok\":true,\"message\":\"History cleared, ready for import\"}");
+    request->send(resp);
+    ESP_LOGI(TAG, "Import begun — history partition cleared");
+  }
+
+  void handle_import_data_(AsyncWebServerRequest *request,
+                           const char *path_data, bool do_write) {
+    if (!authenticate_management_(request)) return;
+
+    if (!import_active_ || import_snapshot_ == nullptr) {
+      send_json_error_(request, 409, "No import in progress. Call /api/import/begin first.");
+      return;
+    }
+
+    if (path_data == nullptr || path_data[0] == '\0') {
+      send_json_error_(request, 400, "No data in URL path");
+      return;
+    }
+
+    const char *d_param = path_data;
+
+    // Get current epoch for validation.
+    uint32_t now_epoch = 0;
+    {
+      time_t t = ::time(nullptr);
+      if (t > 1700000000) now_epoch = (uint32_t) t;
+    }
+
+    int accepted = 0;
+    int rejected = 0;
+
+    // Parse semicolon-delimited data lines from header.
+    // Each line: sensor_id,series,epoch,value
+    const char *pos = d_param;
+    while (pos != nullptr && *pos != '\0') {
+      // Extract one line (until ; or end).
+      char line[80] = {};
+      const char *sep = pos;
+      while (*sep != '\0' && *sep != ';') sep++;
+      size_t line_len = sep - pos;
+      if (line_len >= sizeof(line)) line_len = sizeof(line) - 1;
+      std::memcpy(line, pos, line_len);
+      line[line_len] = '\0';
+
+      // Advance past separator.
+      if (*sep == ';') pos = sep + 1;
+      else pos = sep;  // Stop at end.
+
+      // Skip empty lines.
+      if (line[0] == '\0') continue;
+
+      // Parse: sensor_id,series,epoch,value
+      char sid[32] = {};
+      char ser[8] = {};
+      unsigned int epoch = 0;
+      float value = 0.0f;
+      int parsed = sscanf(line, "%31[^,],%7[^,],%u,%f", sid, ser, &epoch, &value);
+
+      if (parsed < 3) { rejected++; continue; }
+
+      // Resolve sensor index.
+      int sensor_idx = -1;
+      for (int i = 0; i < NUM_SENSORS; i++) {
+        if (strcmp(sensors[i].id, sid) == 0) { sensor_idx = i; break; }
+      }
+      if (sensor_idx < 0) { rejected++; continue; }
+
+      // Validate epoch.
+      if (epoch == 0 || (now_epoch > 0 && epoch > now_epoch + 86400)) {
+        rejected++; continue;
+      }
+
+      // Determine series.
+      bool is_temp = (strcmp(ser, "temp") == 0);
+      bool is_hum = (strcmp(ser, "hum") == 0);
+      if (!is_temp && !is_hum) { rejected++; continue; }
+
+      // Validate value ranges.
+      if (parsed >= 4) {
+        if (is_temp && (value < -50.0f || value > 80.0f)) { rejected++; continue; }
+        if (is_hum && (value < 0.0f || value > 100.0f)) { rejected++; continue; }
+      }
+
+      // Place into snapshot.
+      float store_value = (parsed >= 4) ? value : NAN;
+      if (is_temp) {
+        int idx = import_snapshot_->temp_counts[sensor_idx];
+        if (idx < PERSIST_POINTS_PER_SEGMENT) {
+          import_snapshot_->temp[sensor_idx][idx] = {epoch, store_value};
+          import_snapshot_->temp_counts[sensor_idx]++;
+          accepted++;
+        } else { rejected++; }
+      } else {
+        int idx = import_snapshot_->hum_counts[sensor_idx];
+        if (idx < PERSIST_POINTS_PER_SEGMENT) {
+          import_snapshot_->hum[sensor_idx][idx] = {epoch, store_value};
+          import_snapshot_->hum_counts[sensor_idx]++;
+          accepted++;
+        } else { rejected++; }
+      }
+    }
+
+    // If write flag is set, commit this snapshot to NVS.
+    int slot_written = -1;
+    if (do_write && accepted > 0) {
+      // Finalize snapshot header.
+      uint32_t first_epoch = 0, last_epoch = 0;
+      for (int i = 0; i < NUM_SENSORS; i++) {
+        for (int n = 0; n < import_snapshot_->temp_counts[i]; n++) {
+          uint32_t e = import_snapshot_->temp[i][n].epoch;
+          if (e > 0 && (first_epoch == 0 || e < first_epoch)) first_epoch = e;
+          if (e > last_epoch) last_epoch = e;
+        }
+        for (int n = 0; n < import_snapshot_->hum_counts[i]; n++) {
+          uint32_t e = import_snapshot_->hum[i][n].epoch;
+          if (e > 0 && (first_epoch == 0 || e < first_epoch)) first_epoch = e;
+          if (e > last_epoch) last_epoch = e;
+        }
+      }
+      import_snapshot_->header.magic = HISTORY_META_MAGIC;
+      import_snapshot_->header.version = HISTORY_META_VERSION;
+      import_snapshot_->header.num_sensors = NUM_SENSORS;
+      import_snapshot_->header.points_per_series = HISTORY_POINTS_PER_SERIES;
+      import_snapshot_->header.points_per_segment = PERSIST_POINTS_PER_SEGMENT;
+      import_snapshot_->header.saved_at_epoch = now_epoch > 0 ? now_epoch : last_epoch;
+      import_snapshot_->header.first_epoch = first_epoch;
+      import_snapshot_->header.last_epoch = last_epoch;
+
+      // Write to NVS.
+      nvs_handle_t handle;
+      if (open_history_nvs_(&handle, NVS_READWRITE)) {
+        int slot = import_meta_.next_slot % PERSIST_SLOTS;
+        char key[12];
+        make_segment_key_(slot, key, sizeof(key));
+
+        esp_err_t err = nvs_set_blob(handle, key, import_snapshot_, sizeof(*import_snapshot_));
+        if (err == ESP_OK) {
+          nvs_commit(handle);
+          import_meta_.last_written_slot = slot;
+          import_meta_.next_slot = (slot + 1) % PERSIST_SLOTS;
+          if (import_meta_.valid_segments < PERSIST_SLOTS) import_meta_.valid_segments++;
+          import_meta_.last_persist_epoch = last_epoch;
+          import_segments_written_++;
+          slot_written = slot;
+        }
+        nvs_close(handle);
+      }
+
+      // Clear snapshot for next segment.
+      std::memset(import_snapshot_, 0, sizeof(SegmentSnapshot));
+    }
+
+    // Send response.
+    auto *resp = request->beginResponseStream("application/json");
+    add_common_headers_(resp);
+    char num[64];
+    resp->print("{\"ok\":true,");
+    snprintf(num, sizeof(num), "\"accepted\":%d,\"rejected\":%d", accepted, rejected);
+    resp->print(num);
+    if (slot_written >= 0) {
+      snprintf(num, sizeof(num), ",\"slot\":%d", slot_written);
+      resp->print(num);
+    }
+    resp->print("}");
+    request->send(resp);
+  }
+
+  void handle_import_finish_(AsyncWebServerRequest *request) {
+    if (!authenticate_management_(request)) return;
+
+    if (!import_active_) {
+      send_json_error_(request, 409, "No import in progress");
+      return;
+    }
+
+    import_active_ = false;
+
+    // Free the snapshot buffer.
+    if (import_snapshot_ != nullptr) {
+      delete import_snapshot_;
+      import_snapshot_ = nullptr;
+    }
+
+    if (import_segments_written_ == 0) {
+      auto *resp = request->beginResponseStream("application/json");
+      add_common_headers_(resp);
+      resp->print("{\"ok\":true,\"segments_written\":0,\"message\":\"Import finished with no segments\"}");
+      request->send(resp);
+      return;
+    }
+
+    // Save the accumulated metadata to NVS.
+    nvs_handle_t handle;
+    if (!open_history_nvs_(&handle, NVS_READWRITE)) {
+      send_json_error_(request, 500, "Failed to open NVS to finalize metadata");
+      return;
+    }
+    bool meta_ok = save_history_meta_(handle, import_meta_);
+    nvs_close(handle);
+
+    if (!meta_ok) {
+      send_json_error_(request, 500, "Failed to write import metadata");
+      return;
+    }
+
+    // Restore newest segments into RAM so charts work immediately.
+    restore_from_nvs();
+
+    auto *resp = request->beginResponseStream("application/json");
+    add_common_headers_(resp);
+    char num[64];
+    resp->print("{\"ok\":true,");
+    snprintf(num, sizeof(num), "\"segments_written\":%u,",
+             (unsigned) import_segments_written_);
+    resp->print(num);
+    resp->print("\"message\":\"Import complete, history restored to RAM\"}");
+    request->send(resp);
+    ESP_LOGI(TAG, "Import finished — %u segments written, RAM restored",
+             (unsigned) import_segments_written_);
   }
 
 
@@ -1348,6 +1639,7 @@ static void register_history_handler(
              i, sensors[i].name, sensors[i].id);
   }
   ESP_LOGI(TAG, "  management -> POST /api/reboot, POST /api/delete-data (Basic auth)");
+  ESP_LOGI(TAG, "  import     -> POST /api/import/{begin,segment,finish} (Basic auth)");
   ESP_LOGI(TAG, "  storage    -> GET /api/storage-stats");
   ESP_LOGI(TAG, "  status     -> GET /api/status");
   ESP_LOGI(TAG, "  storage -> dedicated NVS partition: %s / namespace: %s",
