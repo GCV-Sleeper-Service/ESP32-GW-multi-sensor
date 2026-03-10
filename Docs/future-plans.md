@@ -1,6 +1,6 @@
 # Future Plans & Feature Roadmap
 
-_Last updated: 2026-03-08_
+_Last updated: 2026-03-09_
 
 This document captures the feature roadmap, prioritization, and feasibility assessment for the ESP32-C3 Multi-Sensor BLE Gateway. The guiding philosophy: **high utility, minimum barrier, no unnecessary complexity.**
 
@@ -8,9 +8,9 @@ This document captures the feature roadmap, prioritization, and feasibility asse
 
 ## Near-Term (Next 3 releases)
 
-### 7.4.0 — Import with Validation
+### 7.4.0 — Import with Validation ✅
 
-**Priority: HIGH — Next immediate feature**
+**Status: IMPLEMENTED — pending merge of PR #2**
 
 Import CSV data into the history partition via `POST /api/import`.
 

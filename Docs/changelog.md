@@ -4,130 +4,101 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.4.0 — 2026-03-09 (pending merge)
+
+**Added:** CSV import feature
+
+- New import endpoints: `POST /api/import/begin`, `/api/import/d/<data>`, `/api/import/w/<data>`, `/api/import/finish`
+- Data transported via URL path (proxy-safe, works through Cloudflare)
+- Replacement-first model: existing history cleared before import
+- Browser-side validation: timestamp range, value ranges, sensor ID matching, deduplication
+- ESP-side validation: sensor lookup, epoch range, value bounds, segment slot overflow
+- Dashboard UI: "Import History" button in management card, file picker, progress display, auto-reload
+- Supports both single-sensor and merged multi-sensor CSV formats (auto-detected from column headers)
+- Sequential batch upload with configurable batch size (250 chars/batch)
+- Safe JSON response handling for non-JSON server errors
+
+**Fixed:** Dashboard description and storage text
+
+- Dashboard description shortened to 4 lines, updated to v7.4.0
+- History Storage card: verbose footer replaced with inline header note
+- Stale v7.3.4.2 references cleaned from YAML comments and C++ header
+
+**Transport evolution (development history):**
+This feature went through four transport iterations before reaching the final design:
+1. POST body via `handleBody()` — ESP-IDF does not call this (Arduino-only API)
+2. URL query parameters — `url_to()` strips query string
+3. Custom headers (X-Data/X-Write) — works on LAN, fails through Cloudflare (HTTP 431)
+4. URL path encoding — final design, proxy-safe
+
+---
+
 ## v7.3.5.0 — 2026-03-08
 
 **Added:** `/api/status` health endpoint
 
-- New `GET /api/status` endpoint returning JSON with version, uptime, sensor count, per-sensor health (id, name, last_seen, temp/hum validity), RAM history points, persist days, and free heap
+- New `GET /api/status` endpoint returning JSON with version, uptime, sensor count, per-sensor health, free heap
 - No authentication required (read-only health check)
 - First feature developed through the full GitHub PR workflow (PR #1)
 
 **Fixed:** JSON truncation bug in `/api/status`
 
-- Initial implementation packed three JSON fields into a single `snprintf` call targeting a 64-byte buffer. Formatted output was 72 bytes, causing silent truncation. Fix splits into three separate `snprintf` + `print` calls.
+- Three JSON fields packed into single `snprintf` targeting 64-byte buffer. Output was 72 bytes. Fix: split into separate print calls.
 
 **Infrastructure:**
 
-- Branch protection configured on `main` (requires PR + CI green)
-- Root README.md removed from Docs/ and relocated to repo root
-- `scripts/test-local.sh` added for one-command local validation
+- Branch protection configured on `main`
+- Root README.md with screenshots in Images/
+- Documentation reorganized: 13 overlapping files consolidated into purpose-driven structure
+- `scripts/test-local.sh` added
 - `Docs/device-test-report-template.md` added
+- Version bump applied across VERSION, YAML, dashboard.js, register_history_handler
 
 ---
 
 ## v7.3.4.2 — 2026-03-07
 
-**Fixed:** Four dashboard issues on top of the v7.3.4 structural work
+**Fixed:** Four dashboard issues
 
-- `Export All` failing with HTTP 502 — serialized retained-history fetches to reduce ESP/proxy request bursts
-- Chart point markers not following sensor recolor — updated all marker-related properties during recolor
-- 15-minute chart markers oversized — reduced to match real-time chart marker size
-- Theme toggle not forcing chart redraw — added `refreshChartsAfterVisualChange()` call on theme switch
+- `Export All` HTTP 502 — serialized fetches via `fetchAllSensorHistoryRowsSequentially()`
+- Chart point markers not following sensor recolor — updated all marker properties
+- 15-minute chart markers oversized — matched to real-time size
+- Theme toggle not forcing chart redraw — added `refreshChartsAfterVisualChange()`
 
 **Infrastructure:**
 
-- Repository normalized to canonical paths (no more versioned filenames in includes/scripts)
-- GitHub Actions CI pipeline established (preflight + compile)
-- Helper scripts added: `preflight.sh`, `generate-header.sh`, `deploy-to-esphome.sh`, `compile-with-log.sh`
-- `.gitignore` configured for secrets, build logs, and ESPHome build directories
-- `VERSION` file added to repo root
-- Secrets handling: example file committed, real secrets gitignored, CI uses temporary dummy secrets
+- Repository normalized to canonical paths
+- GitHub Actions CI pipeline established
+- Helper scripts: preflight, generate-header, deploy, compile-with-log, test-local
+- Secrets handling: example committed, real gitignored, CI uses dummy secrets
 
 ---
 
 ## v7.3.4.1 — 2026-03-06
 
-**Fixed:** Dashboard startup blocker
-
-- Dashboard stayed on "connecting..." due to event binding timing issue introduced in v7.3.4 structural changes
-- Repaired initialization ordering to ensure bindEvents() fires after DOM is ready
+**Fixed:** Dashboard startup blocker — initialization ordering for `bindEvents()`
 
 ---
 
 ## v7.3.4 — 2026-03-06
 
-**Changed:** Phase 1 structural enforcement
-
-- Introduced `App.State` write chokepoints to centralize state mutations
-- Centralized `bindEvents()` function replacing scattered inline handlers
-- Removed inline `onclick`/`onchange` handlers from HTML
-- Prepared codebase for safer incremental feature additions
+**Changed:** Phase 1 structural enforcement — `App.State` chokepoints, centralized `bindEvents()`, removed inline handlers
 
 ---
 
 ## v7.3.3 — 2026-03-05
 
-**Baseline:** Stabilization release
-
-- Addressed transport/CORS/date-axis regressions from earlier versions
-- App namespace and plugin hooks in place
-- Dashboard/history decoupled in YAML include order
-- Considered the stable baseline before Phase 1 structural work
+**Baseline:** Stabilization release. Transport/CORS/date-axis regressions addressed.
 
 ---
 
-## v7.2.5 and earlier — Pre-GitHub era
+## Earlier versions
 
-These versions were delivered as ZIP bundles before the GitHub-first workflow was established.
-
-### v7.x Series — Dedicated History Partition + Dashboard Evolution
-
-- Hourly persistence to a dedicated 512 KiB NVS history partition (replacing daily snapshots to default NVS)
-- 45-day retention (up from 30 days)
-- `/api/storage-stats` endpoint with partition info and retention estimates
-- Dashboard management section (reboot, delete data with Basic auth)
-- History storage statistics panel in dashboard
-- GPIO pinout diagram
-- Documentation cards
-- Comfort level estimate (ASHRAE-55-inspired proxy)
-- 24h/7d/30d/45d min/max selectors
-
-### v6.0 — Persistent History Release
-
-- Reduced live RAM retention from 72h to 24h
-- Added daily NVS snapshot persistence for up to 30 days
-- Boot-time restore of newest valid snapshot
-- Expanded min/max selectors to 24h/7d/30d
-- Excel-friendly CSV timestamps (YYYY-MM-DD HH:MM:SS)
-- `/history/*` endpoints stream persisted + live data merged
-
-### v5.0 — Dashboard Features
-
-- 24h/72h min/max toggle per sensor card
-- BLE RSSI signal bars with color-coded strength
-- Dew point calculation (Magnus formula, browser-side)
-- Dark/light mode toggle
-- Staleness indicator (yellow >2min, red >5min)
-- CSV history export (per-sensor and Export All)
-
-### v4.x — Embedded Dashboard
-
-- v4.6.2: Fixed dashboard serving runtime panic (`beginResponse(data, size)`)
-- v4.5: Pivoted to embedded dashboard in .h header with custom HTTP routes
-- v4.4: Attempted LittleFS dashboard hosting (validation failure — abandoned)
-
-### v3 — Per-Sensor Tracking
-
-- Per-sensor `last_seen` tracking
-- Explicit "NA" gap handling for stale data
-- Batched polling for Cloudflare compatibility
-
-### v2 — AsyncWebHandler Pattern
-
-- Fixed `AsyncWebHandler` pattern for ESPHome ESP-IDF compatibility
-
-### v1 (originally v11) — Multi-Sensor Architecture
-
-- `SensorSlot` struct replacing per-sensor globals
-- Streaming HTTP endpoints for efficient history delivery
-- Custom `AsyncWebHandler` registered via `WebServerBase::add_handler()`
+See previous changelog entries in git history. Key milestones:
+- v7.x: Dedicated history partition, 45-day retention, storage stats, management section
+- v6.0: Persistent history (daily NVS snapshots, 30 days)
+- v5.0: Dashboard features (min/max, RSSI, dew point, dark/light, CSV export)
+- v4.x: Embedded dashboard in firmware
+- v3: Per-sensor tracking, batched polling
+- v2: AsyncWebHandler pattern for ESP-IDF
+- v1: Multi-sensor SensorSlot architecture
