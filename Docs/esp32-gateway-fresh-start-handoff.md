@@ -2,8 +2,8 @@
 
 _Last updated: 2026-03-09_
 _Repo: `GCV-Sleeper-Service/ESP32-GW-multi-sensor`_
-_Current version: v7.4.0 (pending merge of PR #2)_
-_Active branch: `feature/import-v1`_
+_Current version: v7.4.0.2 (pending compile/test)_
+_Branch: `main`_
 
 This is the single-source continuity document for resuming development in a fresh session.
 
@@ -17,15 +17,16 @@ See [architecture.md](architecture.md) for the full technical design.
 
 ---
 
-## Current State
+## Current State (v7.4.0.2)
 
-### What is working (v7.4.0 on feature/import-v1)
+### What is working
 
 - 3-sensor BLE reception (Office, First Floor, Outside)
 - Live dashboard with real-time and 15-minute averaged charts
 - 45-day hourly persistence to dedicated 512 KiB history partition
-- CSV export (per-sensor and serialized Export All)
-- **CSV import via `POST /api/import/{begin,d/,w/,finish}`** — NEW in v7.4.0
+- CSV export (per-sensor with prefixed headers, and serialized Export All)
+- CSV import — multi-sensor (replacement-first) and single-sensor (non-destructive merge)
+- Import works over both LAN direct and Cloudflare tunnel
 - `/api/status` health endpoint
 - `/api/storage-stats` partition statistics
 - Management actions (reboot, delete data) with Basic auth + lockout
@@ -33,41 +34,36 @@ See [architecture.md](architecture.md) for the full technical design.
 - GitHub Actions CI: preflight + compile on every push/PR
 - Branch protection on `main`
 
-### Import transport status
+### Import design summary
 
-Import uses a **URL-path-based** data transport:
-```
-POST /api/import/d/office,temp,1772528400,21.50;office,hum,...   (accumulate data)
-POST /api/import/w/office,temp,1772531100,20.70;...              (accumulate + write to NVS)
-```
+**Multi-sensor import** (`POST /api/import/begin`):
+- Erases all history before writing
+- Sequential batch upload via URL-path encoding
+- Full replacement of all sensor data
 
-This design was reached after three transport iterations that failed:
-1. POST body — ESPHome ESP-IDF never delivers body to handler
-2. URL query parameters — `url_to()` strips query string, returns path only
-3. Custom headers (X-Data) — works on LAN but Cloudflare adds headers that exceed ESP-IDF's 512-byte header buffer limit, causing HTTP 431
+**Single-sensor import** (`POST /api/import/begin/single/<sensor_id>`):
+- Does NOT erase history
+- Builds epoch-to-slot map by scanning existing NVS segments
+- Merges imported data into existing segments (overlays target sensor only)
+- Creates new segments for hours not found in existing data
+- Other sensors' data is preserved
 
-The URL path approach is the proven channel (already used by `/history/{id}/temp` through Cloudflare).
+**Transport**: Data encoded in URL path (`/api/import/d/<data>`, `/api/import/w/<data>`). This is the only proxy-safe channel on this platform.
 
-**Testing status as of session end:**
-- Multi-sensor import via LAN: **PASS** (135 segments, 2988 accepted)
-- Single-sensor import via LAN: **PASS** (with X-Data transport) / **UNTESTED** with path transport
-- Import via Cloudflare tunnel: **UNTESTED** with path transport — this is the key test for tomorrow
+**Stabilization**: Dashboard suspends background polling/SSE during import, adds pacing delays and retry/backoff for Cloudflare reliability.
 
-### Pending before merge
+### v7.4.0.2 status
 
-1. Flash the latest path-based transport build
-2. Test import via LAN (both multi-sensor and single-sensor CSV)
-3. Test import via Cloudflare tunnel
-4. If all pass: convert PR #2 to ready, merge, tag v7.4.0
+- Preflight: PASS (23 checks)
+- Compile: PENDING
+- Device test: PENDING
 
 ### Repository coordinates
 
 - **Repo:** `https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor`
-- **Main version:** v7.3.5.0 (after PR #1 merge)
-- **Feature branch:** `feature/import-v1` at v7.4.0
-- **PR #2:** Draft, CI should be green after latest push
+- **Branch:** `main` at v7.4.0.2
 
-### Resource usage
+### Resource usage (last measured at v7.4.0)
 
 | Metric | Value |
 |--------|-------|
@@ -88,44 +84,17 @@ The URL path approach is the proven channel (already used by `/history/{id}/temp
 
 ---
 
-## What Was Accomplished This Session
-
-### 1. Documentation reorganization (complete)
-
-Rewrote the entire Docs structure from 13 overlapping files to a clean purpose-driven set. Created root README with screenshots. Committed and pushed to main.
-
-### 2. Import v1 feature (in progress — PR #2)
-
-Full CSV import capability with browser-side parsing/validation and ESP-side NVS writes.
-
-**Transport evolution (critical context):**
-- Attempt 1: POST body via `handleBody()` → failed (ESP-IDF doesn't call it)
-- Attempt 2: URL query params → failed (`url_to()` strips query string)
-- Attempt 3: Custom headers (X-Data/X-Write) → works on LAN, fails through Cloudflare (431)
-- **Attempt 4: URL path encoding** → current approach, should work everywhere
-
-### 3. Version bump v7.3.5.0 (complete)
-
-Updated VERSION, YAML, dashboard.js, register_history_handler across all locations.
-
-### 4. Cosmetic fixes (complete)
-
-- Dashboard description shortened to 4 lines, updated to v7.4.0
-- History Storage card header includes context note, verbose footer removed
-- Stale v7.3.4.2 references cleaned from YAML and C++ header comments
-
----
-
 ## What Comes Next — Priority Order
 
-### Immediate: Validate path-based import transport
+### Immediate: Validate v7.4.0.2
 
-1. Flash latest build from `feature/import-v1`
-2. Test import via LAN direct (multi-sensor + single-sensor CSVs)
-3. Test import via Cloudflare tunnel (the critical test)
-4. If pass → merge PR #2, tag v7.4.0
+1. Compile firmware
+2. Flash and test single-sensor import (verify other sensors preserved)
+3. Test multi-sensor import (regression check)
+4. Test both via LAN and Cloudflare
+5. If pass: tag v7.4.0.2
 
-### After v7.4.0 merge
+### After v7.4.0.2 validation
 
 1. **Custom date range selector** — dashboard-only change
 2. **Playwright browser test automation** — mock backend, CI workflow
@@ -136,15 +105,18 @@ See [future-plans.md](future-plans.md) for the complete roadmap.
 
 ---
 
-## Key Lessons From This Session
+## Key Lessons — Always Carry Forward
 
-1. **ESPHome ESP-IDF does not deliver POST body** to custom handlers — `handleBody()` is Arduino-only
+1. **ESPHome ESP-IDF does not deliver POST body** to custom handlers
 2. **`url_to()` strips query parameters** — returns path only
-3. **Custom headers fail through Cloudflare** — CF adds its own headers, total exceeds ESP-IDF's 512-byte limit
-4. **`CONFIG_HTTPD_MAX_REQ_HDR_LEN: "2048"` crashes the dashboard** — too much RAM per connection on 320KB device
-5. **URL path is the universal reliable channel** — preserved by all proxies, already proven in this codebase
-6. **`time()` is ambiguous in ESPHome** — must use `::time()` to avoid conflict with `esphome::time` namespace
-7. **Import should not erase history before data is validated** — destructive-first is a design risk (partially addressed: begin still erases, but browser validates comprehensively before calling begin)
+3. **Custom headers fail through Cloudflare** — CF adds headers that exceed 512-byte limit
+4. **URL path is the universal reliable channel** — proven in this codebase
+5. **Export and import must share one canonical schema** — prefixed columns always
+6. **Silent fallback to default sensor is dangerous** — fail explicitly instead
+7. **Suspend dashboard traffic during long-running operations** — prevents 502s
+8. **When import data is a subset of storage structure, merge rather than replace** — epoch-to-slot map approach
+9. **Keep HTML/JS/.h synchronized** — any dashboard change must update all three
+10. **Check all version strings after every bump** — VERSION, YAML, JS, register_history_handler, HTML comments
 
 See [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) for the full record.
 
@@ -161,7 +133,7 @@ See [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) for the full reco
 | [build-history.md](build-history.md) | Curated build ledger |
 | [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) | Fixes, patterns, pitfalls |
 | [future-plans.md](future-plans.md) | Roadmap and feature assessment |
-| [v7.4.0-documentation.md](v7.4.0-documentation.md) | Per-version doc for import v1 |
+| [v7.4.0-documentation.md](v7.4.0-documentation.md) | Import v1 per-version doc |
 | [device-test-report-template.md](device-test-report-template.md) | Post-flash testing checklist |
 
 ---
@@ -171,13 +143,12 @@ See [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) for the full reco
 Provide the assistant with:
 
 1. This document or the repo URL
-2. Whether PR #2 has been merged or is still on the feature branch
-3. Import test results (LAN and Cloudflare)
+2. Current test results (compile, LAN, Cloudflare)
+3. What you want to work on next
 
 Example:
 
 > Continuing the ESP32 BLE gateway project.
 > Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
-> PR #2 merged / still on feature/import-v1.
-> Import via Cloudflare: PASS / FAIL with error: ...
-> Next step: [merge and tag / fix import / custom date range]
+> v7.4.0.2 validated — single-sensor merge works, multi-sensor regression clean.
+> Next step: custom date range selector

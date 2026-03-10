@@ -1,6 +1,6 @@
 # Development Pipeline
 
-_Last updated: 2026-03-08 — v7.3.5.0_
+_Last updated: 2026-03-09 — v7.4.0.2_
 
 This document defines how development works for the ESP32 Multi-Sensor BLE Gateway, from code changes through CI validation to device deployment.
 

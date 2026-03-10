@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-09 — v7.4.0_
+_Last updated: 2026-03-09 — v7.4.0.2_
 
 This document tracks significant bugs, root causes, fixes, and technical lessons. Updated with each version.
 
@@ -28,6 +28,54 @@ POST /api/import/w/first_floor,temp,...  (write flag)
 The URL path is preserved by all proxies and is already proven in this codebase (`/history/{id}/temp` works through Cloudflare).
 
 **Lesson:** On ESPHome ESP-IDF, the only reliable data channels from browser to custom handler are: (1) URL path, (2) request headers (limited to ~300 bytes available after browser/proxy overhead), (3) `get_header()` for small values. POST body and URL query parameters are NOT available to custom `AsyncWebHandler` subclasses.
+
+---
+
+### BUG-012: Single-sensor export schema mismatch (v7.4.0.1)
+
+**Symptom:** Importing a single-sensor CSV exported from the dashboard mapped all data into the Office sensor regardless of which sensor was exported.
+
+**Root cause:** Merged export used prefixed headers (`outside_temp_c`, `office_humidity_pct`), but single-sensor export used bare headers (`temp_c`, `humidity_pct`). The importer could not identify which sensor the bare-column data belonged to and fell back to the first configured sensor.
+
+**Fix:** Single-sensor export now uses the same prefixed header convention as merged export. Legacy bare-header files are supported only when the filename contains a recognizable sensor token. Ambiguous files are rejected with an explicit error instead of silently importing into the wrong sensor.
+
+**Lesson:** Export and import must share one canonical column naming scheme. Silent fallback to a default sensor is dangerous for destructive operations.
+
+---
+
+### BUG-013: Import over Cloudflare 502 Bad Gateway (v7.4.0.1)
+
+**Symptom:** After fixing the 431 error with URL-path transport, imports through Cloudflare tunnel started failing with 502 Bad Gateway during sustained batch uploads.
+
+**Root cause:** The ESP origin was overwhelmed by concurrent traffic: import batches plus background dashboard polling (SSE/REST), storage stats refreshes, and history reloads all competing for the same limited HTTP connection pool.
+
+**Fix:** Dashboard suspends all background network activity during import (SSE, polling, storage refreshes, history timers). Added pacing delays between batches and retry with exponential backoff for transient errors. Resumes cleanly after import completes.
+
+**Lesson:** Any long-running operation on a resource-constrained ESP origin must suppress non-essential dashboard traffic. A design that survives one request can still fail under sustained sequential requests if the dashboard keeps polling.
+
+---
+
+### BUG-014: Single-sensor import erases all flash data (v7.4.0.2)
+
+**Symptom:** Importing a single-sensor CSV erased all sensor data from flash, leaving only the imported sensor's data. Other sensors' history was lost.
+
+**Root cause:** `/api/import/begin` unconditionally called `clear_persisted_history_()` which does `nvs_flash_erase_partition()` — a full partition erase. Each NVS segment blob stores data for all sensors in a shared `SegmentSnapshot` structure, so there was no way to selectively erase one sensor.
+
+**Fix:** Added a new endpoint `POST /api/import/begin/single/<sensor_id>` that skips the partition erase and instead builds an epoch-to-slot map by scanning existing segments. During write, the firmware reads existing segments, overlays the target sensor's data, and writes the merged segment back. New hourly segments (not found in existing data) are written to the next available slot. Multi-sensor import retains the original erase-first behavior.
+
+**Lesson:** When import data is a subset of the storage structure (one sensor in a multi-sensor segment), the firmware must merge rather than replace. The epoch-to-slot map approach costs ~6.5KB temporary RAM but avoids destructive behavior.
+
+---
+
+### BUG-015: Single-sensor import "Unknown sensor ID" — off-by-one in URL path parsing (v7.4.0.2)
+
+**Symptom:** Single-sensor import failed with `HTTP 500: {"ok":false,"message":"Unknown sensor ID in import path","status":400}`. Multi-sensor import worked fine.
+
+**Root cause:** The URL path prefix `/api/import/begin/single/` is 25 characters, but `strncmp` and the pointer offset both used 24. So `p + 24` pointed to `"/outside"` (with leading slash) instead of `"outside"`. The `strcmp` against `sensors[i].id` failed because of the extra `/`.
+
+**Fix:** Changed both `strncmp(p, "/api/import/begin/single/", 24)` to 25, and `p + 24` to `p + 25` in both `canHandle` and `handleRequest`.
+
+**Lesson:** When computing string offsets for URL path extraction, always verify the prefix length. Use `sizeof("/api/import/begin/single/") - 1` or `strlen()` instead of manually counted literals. Off-by-one in path parsing is silent until the extracted value is compared against known identifiers.
 
 ---
 
@@ -163,6 +211,6 @@ Any dashboard modification should regression-test:
 
 During CSV export, `beginResponseStream()` allocates a large buffer. With 498 data points this is manageable (~44KB free heap remains). With 45 days of data (~4300 points per sensor), it could get tight. Future optimization: chunked streaming with smaller buffer.
 
-### ISSUE-002: Import erases history before data is written
+### ISSUE-002: Import erases history before data is written (partially resolved in v7.4.0.2)
 
-The `/api/import/begin` endpoint clears the history partition immediately. If the subsequent data upload fails (network error, browser crash), history is lost with nothing to replace it. The browser does validate comprehensively before calling begin, but the destructive-first pattern remains a risk. Future improvement: write to a staging area first, then swap.
+Multi-sensor `/api/import/begin` still clears the history partition before writing. If the upload fails, history is lost. Single-sensor import (`/api/import/begin/single/<id>`) avoids this by merging into existing segments without erasing. Future improvement for multi-sensor: write to a staging area, then swap.

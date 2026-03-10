@@ -15,7 +15,7 @@ No cloud. No database. No Home Assistant required. Just an ESP32, up to 4 BLE se
 - Computes 15-minute rolling averages aligned to wall-clock boundaries
 - Keeps 24h of history in RAM, persists up to 45 days of hourly history to a dedicated NVS partition
 - Serves an embedded HTML dashboard directly from the ESP32 — no external files needed
-- Dashboard supports dark/light mode, collapsible sections, CSV export, and 24h/7d/30d/45d min/max selectors
+- Dashboard supports dark/light mode, collapsible sections, CSV export/import, and 24h/7d/30d/45d min/max selectors
 - Accessible on LAN or over the internet via Cloudflare tunnel
 
 ![Sensor Cards](Images/dashboard-sensors.png)
@@ -89,6 +89,11 @@ ESP32-GW-multi-sensor/
 | `/api/storage-stats` | GET | No | Partition and retention statistics |
 | `/api/reboot` | POST | Basic | Reboot the ESP |
 | `/api/delete-data` | POST | Basic | Erase persisted history |
+| `/api/import/begin` | POST | Basic | Start multi-sensor import (erases history) |
+| `/api/import/begin/single/<id>` | POST | Basic | Start single-sensor merge import |
+| `/api/import/d/<data>` | POST | Basic | Add import data points |
+| `/api/import/w/<data>` | POST | Basic | Add data points + write segment |
+| `/api/import/finish` | POST | Basic | Finalize import, restore RAM |
 
 ## Development
 
@@ -103,7 +108,7 @@ See [Docs/development-pipeline.md](Docs/development-pipeline.md) for the full pr
 
 ## Current Version
 
-**v7.3.5.0** — See [Docs/changelog.md](Docs/changelog.md) for history.
+**v7.4.0.2** — See [Docs/changelog.md](Docs/changelog.md) for history.
 
 ## Documentation
 

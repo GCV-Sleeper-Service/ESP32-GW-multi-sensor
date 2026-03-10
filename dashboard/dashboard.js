@@ -35,7 +35,7 @@
 // The bulk of the logic still lives in existing functions so regression risk stays low.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.4.0';
+App.version = 'v7.4.0.2';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -987,7 +987,9 @@ function loadStorageStats(attempt) {
 var importState = {
   active: false,
   authHeader: '',
-  startedAt: 0
+  startedAt: 0,
+  mode: '',        // 'multi' or 'single'
+  targetSensor: '' // sensor ID for single mode
 };
 var pollingLiveIntervalId = null;
 var pollingDeviceIntervalId = null;
@@ -1271,19 +1273,31 @@ function processImportFile(csvText, fileName) {
   // Build segments from points.
   var batches = buildImportSegments(result.points);
 
-  // Show confirmation with summary.
+  // Determine import mode: single-sensor or multi-sensor.
   var sensorNames = {};
   result.points.forEach(function(p) { sensorNames[p.sensor] = true; });
+  var sensorIds = Object.keys(sensorNames);
+  var isSingle = (sensorIds.length === 1);
+  var targetSensorId = isSingle ? sensorIds[0] : '';
+
   var estimate = estimateImportDuration(batches.length);
   var msg = 'Import ' + result.points.length + ' data points (' + batches.length +
-    ' batches) for sensor(s): ' + Object.keys(sensorNames).join(', ') +
-    '.\nApproximate time: ~' + estimate.label + ' (' + estimate.mode + ').\n\nThis will REPLACE all existing history. Continue?';
+    ' batches) for sensor(s): ' + sensorIds.join(', ') +
+    '.\nApproximate time: ~' + estimate.label + ' (' + estimate.mode + ').\n\n';
+
+  if (isSingle) {
+    msg += 'This will replace history for ' + targetSensorId + ' only.\n' +
+      'Data from other sensors will be preserved.\nContinue?';
+  } else {
+    msg += 'This will REPLACE ALL existing history. Continue?';
+  }
+
   if (!confirm(msg)) {
     if (statusEl) statusEl.textContent = 'Import cancelled';
     return;
   }
 
-  executeImport(batches, statusEl);
+  executeImport(batches, statusEl, isSingle ? 'single' : 'multi', targetSensorId);
 }
 
 function parseImportCsv(csvText, fileName) {
@@ -1486,12 +1500,13 @@ function safeJsonResponse(r) {
   });
 }
 
-function executeImport(batches, statusEl) {
+function executeImport(batches, statusEl, importMode, targetSensorId) {
   if (isImportActive()) {
     if (statusEl) statusEl.textContent = 'Import already in progress...';
     return;
   }
 
+  var isSingle = (importMode === 'single');
   if (statusEl) statusEl.textContent = 'Authenticating...';
 
   requestManagementCredentials('history import').then(function(creds) {
@@ -1509,13 +1524,23 @@ function executeImport(batches, statusEl) {
     };
 
     importState.authHeader = authHeader;
+    importState.mode = importMode || 'multi';
+    importState.targetSensor = targetSensorId || '';
     suspendDashboardNetworkActivity(statusEl);
+
+    var beginUrl = ESP_HOST + '/api/import/begin';
+    if (isSingle && targetSensorId) {
+      beginUrl = ESP_HOST + '/api/import/begin/single/' + encodeURIComponent(targetSensorId);
+    }
+    var beginStatusText = isSingle
+      ? 'Preparing single-sensor import for ' + targetSensorId + '...'
+      : 'Clearing history for import...';
 
     return delay(pacing.pauseBeforeBeginMs)
       .then(function() {
-        if (statusEl) statusEl.textContent = 'Clearing history for import...';
+        if (statusEl) statusEl.textContent = beginStatusText;
         return importFetchJsonWithRetry(
-          ESP_HOST + '/api/import/begin',
+          beginUrl,
           {
             method: 'POST',
             cache: 'no-store',
@@ -1596,10 +1621,14 @@ function executeImport(batches, statusEl) {
       .then(function(result) {
         if (isImportActive()) resumeDashboardNetworkActivity();
         importState.authHeader = '';
+        importState.mode = '';
+        importState.targetSensor = '';
         return result;
       }, function(err) {
         if (isImportActive()) resumeDashboardNetworkActivity();
         importState.authHeader = '';
+        importState.mode = '';
+        importState.targetSensor = '';
         throw err;
       });
   }).catch(function(err) {

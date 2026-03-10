@@ -10,7 +10,7 @@ This document captures the feature roadmap, prioritization, and feasibility asse
 
 ### 7.4.0 — Import with Validation ✅
 
-**Status: IMPLEMENTED — pending merge of PR #2**
+**Status: COMPLETE — merged via PR #2, v7.4.0 on main**
 
 Import CSV data into the history partition via `POST /api/import`.
 
@@ -27,13 +27,11 @@ Import CSV data into the history partition via `POST /api/import`.
 
 ---
 
-### 7.4.1a — Sensor Selection for Import
+### 7.4.1a — Sensor Selection for Import ✅
 
-**Priority: MEDIUM**
+**Status: COMPLETE — v7.4.0.2 implements single-sensor non-destructive merge import**
 
-Allow selecting which sensor(s) to import data for, rather than requiring all-or-nothing.
-
-**Assessment:** Natural extension of 7.4.0. The import endpoint already needs to validate sensor IDs, so adding a selector in the UI is a small incremental step.
+Single-sensor CSV import now preserves other sensors' data. The firmware builds an epoch-to-slot map, merges imported data into existing segments, and creates new segments only for hours not already present. Dashboard auto-detects single vs multi mode from CSV columns.
 
 ---
 

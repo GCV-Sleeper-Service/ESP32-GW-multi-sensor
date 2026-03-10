@@ -4,7 +4,19 @@ Curated ledger of accepted builds. Raw build logs are in `build-logs/` (local) o
 
 ---
 
-## v7.4.0 — 2026-03-09 (pending merge)
+## v7.4.0.2 — 2026-03-09 (pending build/test)
+
+- **Change:** Single-sensor non-destructive import (firmware + dashboard)
+- **Preflight:** PASS (23 checks)
+- **Compile:** PENDING
+- **Device test (LAN):** PENDING — single-sensor import merge, multi-sensor import regression
+- **Device test (Cloudflare):** PENDING
+- **Workflow:** Built on top of v7.4.0 merged codebase
+- **Status:** Code complete, awaiting compile + device validation
+
+---
+
+## v7.4.0 — 2026-03-09 (merged via PR #2)
 
 - **Change:** Import v1 — CSV import via URL-path transport
 - **Preflight:** PASS (23 checks including 4 new import checks)
@@ -14,9 +26,9 @@ Curated ledger of accepted builds. Raw build logs are in `build-logs/` (local) o
 - **Build time:** ~16.5s (incremental), longer on sdkconfig changes
 - **CI:** PASS (GitHub Actions, PR #2)
 - **Device test (LAN):** PASS — multi-sensor import: 135 segments, 2988 accepted
-- **Device test (Cloudflare):** PENDING — path-based transport untested through tunnel
+- **Device test (Cloudflare):** PASS — import succeeded after stabilization (pacing/retry)
 - **Workflow:** Feature branch with multiple fix iterations (transport redesign)
-- **Status:** Pending final Cloudflare tunnel test before merge
+- **Status:** Merged to main via PR #2
 
 ---
 

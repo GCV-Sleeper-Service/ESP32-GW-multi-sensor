@@ -1,6 +1,6 @@
 # Architecture & Technical Reference
 
-_Last updated: 2026-03-08 — v7.3.5.0_
+_Last updated: 2026-03-09 — v7.4.0.2_
 
 This document covers the software architecture, data flows, retention model, configuration, and design decisions for the ESP32-C3 Multi-Sensor BLE Gateway.
 

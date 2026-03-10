@@ -4,7 +4,45 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
-## v7.4.0 — 2026-03-09 (pending merge)
+## v7.4.0.2 — 2026-03-09
+
+**Added:** Single-sensor non-destructive import
+
+- New endpoint: `POST /api/import/begin/single/<sensor_id>` for merge import
+- Single-sensor CSV import now preserves other sensors' data in flash
+- Firmware builds epoch-to-slot map to locate existing segments for merge
+- Existing segments are read, overlaid with imported sensor data, and written back
+- New segments created only for hours not already in flash
+- Dashboard auto-detects single vs multi sensor from CSV columns
+- Confirmation dialog adapts messaging: "replace all" vs "replace sensor X only"
+
+**Fixed:** Import mode selection
+
+- Multi-sensor CSV import still uses replacement-first model (unchanged behavior)
+- Single-sensor import no longer erases flash before writing
+
+---
+
+## v7.4.0.1 — 2026-03-09 (rolled into v7.4.0 codebase)
+
+**Fixed:** Single-sensor CSV export/import schema mismatch
+
+- Single-sensor CSV exports now use prefixed headers (`outside_temp_c`) matching merged export format
+- Legacy bare-header single-sensor CSVs handled safely via filename detection
+- Removed unsafe fallback that silently mapped ambiguous files to first sensor (Office)
+- Added import time estimate to confirmation dialog
+- Added remaining-time indicator during batch import progress
+
+**Fixed:** Import failures through Cloudflare tunnel
+
+- Dashboard suspends background polling/SSE during import to reduce origin pressure
+- Added pacing delays between batches (120ms data, 320ms write)
+- Added retry with exponential backoff for transient tunnel errors (502/503/504)
+- Eliminated HTTP 502 "Bad Gateway" during sustained import over Cloudflare
+
+---
+
+## v7.4.0 — 2026-03-09 (merged via PR #2)
 
 **Added:** CSV import feature
 
