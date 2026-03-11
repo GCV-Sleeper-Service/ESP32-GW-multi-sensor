@@ -1,277 +1,363 @@
 # Architecture & Technical Reference
 
-_Last updated: 2026-03-09 — v7.4.0.2_
+_Last updated: 2026-03-10 — v7.4.1.0_
 
-This document covers the software architecture, data flows, retention model, configuration, and design decisions for the ESP32-C3 Multi-Sensor BLE Gateway.
+This document describes the **current** architecture of the ESP32-C3 Multi-Sensor BLE Gateway on `main`.
+Where future capability differs from the current checked-in default, that is stated explicitly so the documentation does not over-claim beyond the present codebase.
 
 ---
 
-## Software Stack
+## 1. System Overview
 
-The project runs on [ESPHome](https://esphome.io/) using Espressif's native **ESP-IDF framework** (not Arduino) for better BLE + WiFi coexistence on the single-core ESP32-C3. ESPHome compiles the YAML configuration plus included C++ headers into a single firmware binary.
+The project is an **ESP32-C3 SuperMini** gateway that listens for ThermoPro TP357 BLE broadcasts and serves a self-contained dashboard directly from the device.
 
-### Key Components
+Current baseline on `main`:
+
+- **3 sensors configured by default**
+- **24h** of 15-minute history kept in RAM
+- **up to 45 days** of hourly history persisted to a dedicated 512 KiB history partition
+- Dashboard embedded in firmware through `dashboard.h`
+- Management actions protected with Basic auth
+- CSV export and import supported
+- Import supports both destructive multi-sensor replacement and non-destructive single-sensor merge
+- Dashboard payload is minified before regeneration of `dashboard.h`
+
+The architecture is already structurally compatible with variable sensor count, but the repo's documented, fully normalized out-of-the-box baseline is still **3 sensors** until the configurable 1–4 sensor work is completed in a later 7.4.x release.
+
+---
+
+## 2. Software Stack
+
+The firmware runs on **ESPHome** using Espressif's native **ESP-IDF** framework rather than Arduino. That choice is deliberate for BLE + WiFi coexistence, memory discipline, and web server behavior on the single-core ESP32-C3.
+
+### Key components
 
 | Component | Purpose |
 |-----------|---------|
 | `esp32_ble_tracker` | Passive BLE scanning for sensor advertisements |
 | `thermopro_ble` | Decodes ThermoPro TP357 BLE packet format |
-| `ble_rssi` | Tracks per-sensor BLE signal strength |
-| `web_server` (v3) | Built-in HTTP server with SSE and REST API |
-| `sntp` | NTP time sync for wall-clock aligned averaging |
-| `sensor_history_multi.h` | SensorSlot structs, RAM history, NVS persistence, HTTP endpoints |
-| `dashboard.h` | Embedded HTML dashboard payload (generated from dashboard.html) |
-| `api` | Kept for boot stability (required by ESPHome init sequence) |
-
-### SensorSlot Architecture
-
-Each physical sensor is encapsulated in a `SensorSlot` struct:
-
-```
-SensorSlot {
-  identity:     id, name, mac
-  accumulators: temp_sum, temp_count, hum_sum, hum_count
-  battery:      batt_last, batt_str
-  timing:       last_seen_epoch
-  history:      temp_history (HistoryBuffer), hum_history (HistoryBuffer)
-  output:       temp_avg_str, hum_avg_str, temp_valid, hum_valid
-}
-```
-
-A static array of `SensorSlot[NUM_SENSORS]` replaces all per-sensor globals. Adding a sensor means one array entry and one YAML sensor block.
+| `ble_rssi` | Tracks per-sensor RSSI |
+| `web_server` (v3) | Built-in HTTP server, SSE, custom endpoints |
+| `sntp` | Time synchronization for wall-clock aligned averaging |
+| `dashboard/sensor_history_multi.h` | Sensor structs, RAM history, flash persistence, HTTP endpoints |
+| `dashboard/dashboard.html` | Human-readable dashboard source of truth |
+| `dashboard/dashboard.js` | Dashboard JavaScript logic mirrored into HTML build flow |
+| `dashboard/dashboard.h` | Generated embedded dashboard payload committed to the repo |
+| `api` | Retained for ESPHome boot/init stability |
 
 ---
 
-## Data Flow
+## 3. Sensor Architecture
 
-### Live Readings (Real-Time Charts)
+Each physical sensor is represented by a `SensorSlot` structure in `sensor_history_multi.h`.
+That structure encapsulates sensor identity, rolling accumulators, latest battery/RSSI data, last-seen timing, and both temperature and humidity history buffers.
 
-```
-BLE broadcast → on_value lambda → NaN/range check → SensorSlot.add_temp/add_hum
-                                        │
-                                        ▼
-                                publish to text_sensor
-                                        │
-                            ┌───────────┴───────────┐
-                            ▼                       ▼
-                     SSE "state" event       REST GET /text_sensor/...
-                     (hosted/LAN mode)       (polling mode, every 15s)
-                            │                       │
-                            ▼                       ▼
-                     handleState() ◄────────────────┘
-                            │
-                            ▼
-                     pushPoint() → Chart.js update
-                     updateDewPoint() → dew point recalc
-                     updateRSSI() → signal bar update
-```
+### Current state
 
-### Averaged Readings (History Charts)
+- `NUM_SENSORS` is currently set to **3** on `main`
+- The `sensors[]` array currently contains **3 configured sensor entries**
+- The YAML contains **matching BLE/tracker/text sensor blocks** for those configured sensors
+- The dashboard frontend is already dynamic enough to render what the manifest reports
 
-```
-Every 15 min (cron) → SensorSlot.compute_and_format(epoch)
-                            │
-                    ┌───────┴───────┐
-                    ▼               ▼
-             HistoryBuffer    publish to text_sensor
-             .add(epoch,avg)  (SSE/REST → live avg chart points)
-                    │               │
-                    ▼               ▼
-          /history/{id}/temp  updateMinMax() recalculates from chart data
-          /history/{id}/hum   (merged persisted history + current RAM day)
-```
+### Important distinction
 
-### History Loading (Page Load)
+- **Current default:** 3 configured sensors
+- **Planned configurable range:** 1–4 sensors (v7.4.4.x)
+
+Until the configurable-sensor work is completed, documentation should describe the checked-in default as **3 sensors**, while noting that the architecture and roadmap are being prepared for a configurable **1–4 sensor** range.
+
+### Sensor-count change implications
+
+Changing sensor count affects more than presentation:
+
+- `NUM_SENSORS` in C++ must match the `sensors[]` array
+- YAML BLE/tracker/text-sensor blocks must match the same count
+- `SegmentSnapshot` sizing changes with sensor count
+- Persisted history compatibility is affected, because the segment structure encodes multi-sensor data layout
+
+Sensor-count changes are not "cosmetic configuration."
+They are **storage-structure-affecting changes** and should be treated as a controlled feature with documentation, preflight validation, and explicit history-reset guidance.
+
+---
+
+## 4. Data Flow
+
+### Live readings / real-time charts
 
 ```
-Browser opens /dashboard.html
-  → 2s delay
-  → fetch /sensors.json (or use built-in defaults)
-  → for each sensor (sequential):
-      fetch /history/{id}/temp → parseCompactHistory → tempAvgChart dataset
-      fetch /history/{id}/hum  → parseCompactHistory → humAvgChart dataset
-      updateMinMax() for 24h/7d/30d/45d min/max cards
-  → charts updated, badge shows total loaded points
+BLE broadcast
+  → YAML on_value lambda
+  → range / validity checks
+  → SensorSlot state update
+  → publish_state to ESPHome entities
+  → dashboard receives updates via SSE or polling
+  → browser updates cards, charts, dew point, comfort, RSSI presentation
+```
+
+### 15-minute averaging
+
+```
+15-minute boundary
+  → compute averaged values per sensor
+  → append 15-minute point to RAM ring buffers
+  → publish average strings/sensors
+  → browser charts update
+```
+
+### Hourly persistence
+
+```
+hourly persistence checkpoint
+  → latest RAM-derived segment serialized
+  → dedicated history partition updated
+  → retention window maintained as circular hourly storage
+```
+
+### Dashboard history loading
+
+```
+browser opens /dashboard.html
+  → load sensor manifest
+  → fetch temperature + humidity history endpoints per sensor
+  → merge persisted history + current RAM layer
+  → render charts and min/max ranges
 ```
 
 ---
 
-## Retention Model
+## 5. Retention Model
 
-The gateway uses a two-tier retention model:
+The gateway uses a two-tier history model.
 
-**RAM layer** — The newest 24 hours of 15-minute averages are stored in fixed ring buffers (96 entries per series). Zero heap fragmentation, static BSS allocation.
+**RAM layer**
 
-**NVS persistence layer** — Every hour (at minute :10 by default), the gateway saves a 1-hour segment into a dedicated 512 KiB history partition. Up to 45 days of circular hourly segments are retained.
+- Fixed-size ring buffers
+- 15-minute points
+- 24 hours of newest history
+- Static allocation, no heap fragmentation risk for the retained chart data itself
 
-**Restore on boot** — On startup, the newest valid segments are loaded back into RAM so charts are immediately populated.
+**Persisted layer**
 
-**Delivery** — `/history/*` endpoints stream persisted segments first and the current RAM day last, giving the dashboard one continuous history feed.
+- Dedicated 512 KiB NVS partition
+- Hourly segments
+- Circular retention
+- Target retention: up to 45 days with the current 3-sensor baseline
 
-### Partition Layout
+**Restore-on-boot behavior**
 
-```
-nvs         16 KiB    System NVS
-otadata      8 KiB    OTA state
-phy_init     4 KiB    PHY calibration
-ota_0        1.69 MiB Application slot 0
-ota_1        1.69 MiB Application slot 1
-history    512 KiB    Dedicated history NVS partition
-coredump    64 KiB    Core dump storage
-```
-
-### Memory Budget
-
-All ring buffer storage uses static BSS allocation — no heap, no `malloc`, no fragmentation.
-
-| Item | Size | Notes |
-|------|------|-------|
-| Ring buffer per series | 768 B | 96 entries × 8 bytes (epoch + float) |
-| Per sensor (2 series) | 1,536 B | temp + humidity |
-| 3 sensors total | 4,608 B | Live history RAM |
-| SensorSlot overhead | ~240 B | Accumulators, format buffers |
-| Measured free heap | ~84 KiB | Typical runtime value |
-| RAM usage | ~15.8% | Of available 327 KiB |
-| Flash usage | ~87.5% | Of available 1.69 MiB per OTA slot |
+On boot, the firmware restores the newest valid persisted segments back into RAM so the dashboard is not empty after restart.
 
 ---
 
-## Configuration
+## 6. Partition Layout
 
-### Sensor MAC Addresses
+| Partition | Approx. size | Purpose |
+|-----------|-------------|---------|
+| `nvs` | 16 KiB | System NVS |
+| `otadata` | 8 KiB | OTA state |
+| `phy_init` | 4 KiB | PHY calibration |
+| `ota_0` | ~1.69 MiB | Application slot A |
+| `ota_1` | ~1.69 MiB | Application slot B |
+| `history` | 512 KiB | Dedicated persisted history |
+| `coredump` | 64 KiB | Crash dump storage |
 
-Edit the sensor definitions in `dashboard/sensor_history_multi.h`:
+---
 
-```cpp
-static SensorSlot sensors[NUM_SENSORS] = {
-  { .id = "office",       .name = "Office",       .mac = "XX:XX:XX:XX:XX:XX" },
-  { .id = "first_floor",  .name = "First Floor",  .mac = "YY:YY:YY:YY:YY:YY" },
-  { .id = "outside",      .name = "Outside",      .mac = "ZZ:ZZ:ZZ:ZZ:ZZ:ZZ" },
-};
+## 7. Resource Profile
+
+The values below are the current baseline guidance for v7.4.1.0 and should be treated as approximate operating numbers, not immutable constants.
+
+| Metric | Approx. value | Notes |
+|--------|--------------|-------|
+| RAM usage | ~15.8% of 327 KiB | Typical baseline |
+| Free heap | ~78–84 KiB | Typical runtime range |
+| Flash usage | ~86.1% of OTA slot | After dashboard minification |
+| History partition | 512 KiB | Dedicated NVS storage |
+
+The dashboard minification pipeline reduced flash pressure versus the earlier v7.4.0.2 state and created more headroom for the next dashboard-heavy features.
+
+---
+
+## 8. Dashboard Architecture
+
+### Source-of-truth model
+
+The canonical dashboard editing flow is:
+
+```
+dashboard.html  →  minify-dashboard.sh  →  dashboard.min.html (artifact only)
+                →  generate-header.sh   →  dashboard.h (committed)
 ```
 
-Also update the corresponding `mac_address` entries in the YAML under `thermopro_ble` and `ble_rssi`.
+Key rules:
 
-### Finding Your Sensor MACs
+- `dashboard.html` remains the human-readable source of truth
+- `dashboard.min.html` is a build artifact and stays gitignored
+- `dashboard.h` is derived but committed so tagged builds remain self-contained
+- `dashboard.js` and the JS embedded into `dashboard.html` must stay in sync
 
-Flash a temporary config with just the BLE tracker:
+### Current dashboard feature set
 
-```yaml
-esp32_ble_tracker:
-  on_ble_advertise:
-    then:
-      - lambda: |-
-          ESP_LOGI("ble", "Found: %s (name: %s)",
-                   x.address_str().c_str(),
-                   x.get_name().c_str());
-```
+- Dark/light mode
+- Collapsible cards
+- Real-time temperature/humidity charts
+- 15-minute average charts
+- Range selectors: 24h / 7d / 30d / 45d
+- Min/max summaries derived from loaded chart data
+- CSV export per sensor and Export All
+- CSV import UI
+- ESP management actions
+- Documentation / status / storage panels
 
-Look for devices named `TP357` or similar in the logs.
+### Not current yet
+
+The following is planned, not current:
+
+- Custom user-selected date range dialog
+- Automated Playwright browser regression suite
+- Fully normalized 1–4 configurable sensor-count workflow
+
+Those belong to the next 7.4.x phases and should not be described as currently shipped behavior.
+
+---
+
+## 9. Import / Export Model
+
+### Export
+
+The dashboard can export:
+
+- Single-sensor CSV
+- Merged all-sensor CSV
+
+Export All is serialized to avoid overloading the ESP's constrained socket pool.
+
+### Import
+
+There are two import models:
+
+**Multi-sensor import**
+
+- Begins with `POST /api/import/begin`
+- Replacement-first model
+- Clears persisted history before writing new imported data
+
+**Single-sensor import**
+
+- Begins with `POST /api/import/begin/single/<id>`
+- Merge-first model
+- Preserves other sensors' existing data
+- Overlays incoming data only for the target sensor
+
+### Transport constraint
+
+For custom handlers on this stack, the reliable transport is the URL path, not POST body or query parameters.
+That constraint is now a core architectural rule and is documented in the lessons-learned file.
+
+---
+
+## 10. Access Modes
+
+The dashboard is intended to work both:
+
+- Directly on LAN via `http://<esp-ip>/dashboard.html`
+- Through a Cloudflare tunnel / public hostname path
+
+The codebase already includes logic to handle different transport/runtime conditions between direct access and proxied access.
+Operationally, Cloudflare remains part of the supported deployment story, but browser- and path-specific behavior should continue to be regression-tested as dashboard complexity grows.
+
+---
+
+## 11. Configuration Guidance
 
 ### Secrets
 
-Create `secrets/secrets.yaml` from the example:
+Use:
 
-```yaml
-wifi_ssid: "YourNetworkName"
-wifi_password: "YourPassword"
-gateway_mgmt_username: "ESPadmin"
-gateway_mgmt_password: "StrongPasswordHere"
-```
+- `secrets/secrets-example.yaml` as committed template
+- `secrets/secrets.yaml` as local real-secrets file
+- `firmware/secrets.yaml` as local symlink
 
-For local compile, symlink into the firmware directory:
+### Sensor MAC addresses
+
+Sensor identity is configured in both:
+
+- `dashboard/sensor_history_multi.h`
+- `firmware/esp32-c3-multi-sensor.yaml`
+
+Those definitions must stay aligned.
+
+### Script permissions
+
+After a fresh clone or after pulling newly created scripts, run:
 
 ```bash
-ln -s ../secrets/secrets.yaml firmware/secrets.yaml
+chmod +x scripts/*.sh
 ```
 
-### Changing Sensor Count
-
-The current default is 3 sensors. To add a 4th or reduce to fewer:
-
-1. Update `NUM_SENSORS` and the `sensors[]` array in `sensor_history_multi.h`
-2. Add/remove the corresponding YAML sensor blocks (thermopro_ble, ble_rssi, text_sensor entries)
-3. Regenerate the dashboard header: `./scripts/generate-header.sh`
+This is now part of the standard local setup guidance because execute permissions may be lost in some repository update paths.
 
 ---
 
-## Remote Access via Cloudflare
+## 12. Design Decisions
 
-The dashboard can be accessed over the internet through Cloudflare.
+### Why embedded dashboard instead of separate hosted file
 
-### Transport Behavior
+The embedded dashboard avoids external file drift, avoids needing a separately hosted HTML file, and keeps the release artifact self-contained.
 
-| Access Path | Mode | Transport | Latency |
-|-------------|------|-----------|---------|
-| `http://<esp-ip>/dashboard.html` | HOSTED | SSE | ~100ms |
-| `https://public-fqdn/dashboard.html` (tunnel) | HOSTED | SSE | ~100ms |
-| Local file with HTTP fallback | SSE | SSE | ~100ms |
-| Local file with HTTPS fallback | POLLING | REST 15s | Up to 15s |
+### Why ESP-IDF instead of Arduino
 
-**Note:** Cloudflare's SSE buffering can interfere with real-time updates. A separate REST-polling dashboard variant works around this. When accessed via HTTPS through Cloudflare, the dashboard automatically detects the need for polling mode.
+The project prioritizes BLE/WiFi coexistence, lower-level control, and predictable behavior on the constrained ESP32-C3 platform.
 
-### Cloudflared Tunnel Setup
+### Why fixed RAM ring buffers
 
-The recommended approach uses a `cloudflared` tunnel, which requires no router configuration:
+This avoids heap fragmentation and keeps history retention predictable.
 
-1. Install `cloudflared` on a machine with LAN access to the ESP
-2. Create a tunnel: `cloudflared tunnel create esp-gateway`
-3. Configure the tunnel to route traffic to `http://<esp-ip>:80`
-4. Add a DNS CNAME record in Cloudflare pointing to the tunnel
+### Why some older version comments stay in code
 
----
+Some version references in comments are deliberate historical breadcrumbs, especially where they explain architectural carry-forward decisions. Examples that remain intentional include:
 
-## Dashboard Features
+- Preserved `histv631` namespace for storage continuity
+- References to the v7.3 structural-enforcement phase
+- Notes about retaining stable v7.2/v7.3 transport/init behavior
 
-The embedded dashboard (`/dashboard.html`) provides:
-
-- Dark/light mode toggle with full chart redraw on switch
-- Collapsible sections for all cards
-- Device info card with ESP32 specs and GPIO pinout diagram
-- Per-sensor cards: live temp (°C/°F), humidity, 15m averages, dew point, comfort estimate, battery bar, RSSI signal bars, and 24h/7d/30d/45d min/max selectors
-- Telemetry chart: free heap (left axis) and WiFi signal dBm (right axis)
-- Real-time temperature and humidity charts (at BLE broadcast rate)
-- 15-minute average charts with up to 45 days of merged history
-- Dual-axis temperature: left °C, right °F, blue 0°C/32°F freezing reference
-- CSV export per sensor and "Export All" (serialized to avoid request bursts)
-- History badge with loaded point count and refresh button
-- ESP management section: reboot and delete data (Basic auth protected)
-- Documentation links section
-- History storage statistics panel
-- Debug event log (collapsible)
-
-### Browser-Side Computations
-
-Dew point, min/max calculations, comfort estimates, and CSV assembly are all computed in JavaScript. This is deliberate — zero cost on the ESP32, and the browser has plenty of capacity.
+Those should stay.
+Only comments that misstate the current repo version without historical purpose should be normalized.
 
 ---
 
-## Design Decisions & Limitations
+## 13. Troubleshooting Notes
 
-**Why SensorSlot structs instead of globals** — The single-sensor version used 30+ separate global variables. With multiple sensors, `SensorSlot` encapsulates everything and the YAML lambdas just index into the array.
+### Dashboard stuck on connecting
 
-**Why embedded dashboard** — Earlier versions required managing a separate HTML file and configuring `ESP_HOST`. The embedded approach means one flash carries both logic and UI. The HTML lives in flash/rodata (not heap).
+Check reachability first, then browser console/network behavior, then whether access mode is LAN direct vs proxied.
 
-**Why ESP-IDF instead of Arduino** — Better BLE + WiFi coexistence and lower memory overhead on the single-core C3.
+### Sensor cards show blanks
 
-**Why 13 LWIP sockets** — Required by ESPHome's init sequence for WiFi + BLE/NimBLE + mDNS + SNTP + web server + API + OTA simultaneously.
+Common causes:
 
-**Why the API component is required** — Even without Home Assistant, removing `api:` causes boot failures. The ESPHome init sequence depends on it.
+- Wrong MAC address
+- Sensor out of range
+- Sensor battery issue
+- No recent BLE packets seen
 
-**Limited concurrent sessions** — The ESP32-C3 web server has limited sockets. Recommended maximum is 3 concurrent dashboard sessions.
+### Export/import instability
 
-**Why snprintf was split for /api/status** — A 64-byte buffer truncated the JSON output. The fix splits formatting into multiple print calls. This pattern should be followed for any future endpoint additions.
+On this platform, concurrency matters.
+Long-running operations should suspend or reduce non-essential background traffic where possible.
+
+### After changing storage-structure-related settings
+
+If you change sensor count or otherwise alter persisted data layout assumptions, treat old persisted history as incompatible unless the specific feature design says otherwise.
 
 ---
 
-## Troubleshooting
+## 14. Documentation Discipline
 
-**Dashboard shows "connecting..." but never connects** — Verify the ESP is powered and reachable (ping its IP). Check for firewall blocks on port 80. If using Cloudflare, verify the tunnel is running.
+To keep docs and code in line:
 
-**Sensor cards show "—"** — Sensor may be out of range (typical: 5–10m through walls). Verify MAC address matches. Check battery. Look at RSSI bars.
-
-**Charts are empty** — History charts need at least one 15-minute averaging cycle. Check the debug log panel for errors. Verify `/sensors.json` returns valid JSON.
-
-**Min/Max shows "no data"** — Normal shortly after boot. Needs at least one 15-minute average point to populate.
-
-**Export All fails** — Ensure you're on v7.3.4.2+ which serializes export requests to avoid overwhelming the ESP.
+- `README.md` must describe current shipped behavior, not roadmap behavior
+- `architecture.md` must describe current architecture and explicitly label planned capability as planned
+- `future-plans.md` and `implementation-plan-next-features-7.4.1.x.md` are where planned features belong
+- Session logs and the fresh-start handoff must be updated whenever a development session materially changes state, workflow, or next steps
+- When a version bump happens, all six version-bearing locations must be updated together

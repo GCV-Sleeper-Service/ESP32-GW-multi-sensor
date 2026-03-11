@@ -1,243 +1,252 @@
 # Development Pipeline
 
-_Last updated: 2026-03-10 — v7.4.1.0_
+_Last updated: 2026-03-10 — v7.4.1.0 normalized workflow_
 
-This document defines how development works for the ESP32 Multi-Sensor BLE Gateway, from code changes through CI validation to device deployment.
-
----
-
-## Operating Model
-
-**GitHub is the canonical source of truth.** All code, documentation, scripts, and CI configuration live in the repository. ZIP bundles are no longer used for delivery or continuity.
-
-### Role Summary
-
-| Role | Who | What |
-|------|-----|------|
-| Code author | Claude (assistant) | Provides complete replacement files |
-| Commit gateway | You | Applies files, commits, pushes |
-| CI validation | GitHub Actions | Automatic on push/PR |
-| Device testing | You | Flash, curl, browser check |
-| Bug diagnosis | Claude (assistant) | From your reported output/logs |
-| Release tagging | You | After merge + device confirmation |
+This document defines how development proceeds for the ESP32 Multi-Sensor BLE Gateway, from repo edit through CI validation and device testing.
 
 ---
 
-## Development Workflow
+## 1. Operating Model
+
+**GitHub is the canonical source of truth.**
+
+All code, documentation, scripts, and CI configuration belong in the repository.
+ZIP bundles may still be used as a delivery convenience during collaboration, but the repo is the durable record.
+
+### Role summary
+
+| Role | Who | Responsibility |
+|------|-----|----------------|
+| Design / implementation support | Assistant | Provides complete replacement files, plans, and normalization guidance |
+| Repo operator | You | Applies files, commits, pushes, merges, tags |
+| CI validation | GitHub Actions | Runs preflight + compile on push/PR |
+| Device validation | You | Flashes and tests on the real ESP |
+| Release control | You | Decides when a validated state is accepted and tagged |
+
+---
+
+## 2. Standard Workflow
 
 ### For each feature or fix
 
+```bash
+# 1. Create a branch
+git checkout -b feature/<name>
+
+# 2. Apply changes (code, docs, scripts)
+
+# 3. Ensure scripts are executable (important after fresh clone / some API-created files)
+chmod +x scripts/*.sh
+
+# 4. Run quick validation
+./scripts/test-local.sh --quick
+
+# 5. Run full preflight if the quick pass is clean
+./scripts/preflight.sh
+
+# 6. Compile locally
+esphome compile firmware/esp32-c3-multi-sensor.yaml
+
+# 7. Commit and push
+git add .
+git commit -m "<message>"
+git push origin feature/<name>
+
+# 8. Open PR / review CI
+
+# 9. If CI is green, flash and test on real device
+esphome run firmware/esp32-c3-multi-sensor.yaml
 ```
-1.  Create feature branch
-      git checkout -b feature/<name>
 
-2.  Apply code changes (complete replacement files from assistant)
+### If device validation fails
 
-3.  Quick local validation
-      ./scripts/test-local.sh --quick
-
-4.  Local compile (if quick test passes)
-      esphome compile firmware/esp32-c3-multi-sensor.yaml
-
-5.  Commit and push
-      git add <changed files>
-      git commit -m "<description>"
-      git push origin feature/<name>
-
-6.  Open draft PR on GitHub
-
-7.  CI runs automatically — check Actions tab
-
-8.  If CI green: flash to ESP and test on real device
-      esphome run firmware/esp32-c3-multi-sensor.yaml
-
-9.  Device validation
-      - curl endpoints
-      - browser dashboard check
-      - fill in test report if significant change
-
-10. If device test fails:
-      - report the failure (curl output, browser console, ESPHome logs)
-      - assistant provides fixed replacement files
-      - repeat from step 2 on same branch
-
-11. When everything passes:
-      - convert draft PR to ready
-      - merge PR
-      - pull main locally
-      - delete feature branch
-      - tag if milestone version
-```
+- Keep the same feature branch
+- Capture browser console output, curl output, compile log, and ESPHome log
+- Fix with complete replacement files
+- Rerun validation from preflight onward
 
 ### After merge
 
 ```bash
-cd ~/config/ESP32-GW-multi-sensor
 git checkout main
 git pull --ff-only
 git branch -d feature/<name>
 
-# If milestone version:
-git tag v<x.y.z>
+# Tag only when the build is actually accepted
+git tag v<version>
 git push origin --tags
 ```
 
 ---
 
-## CI Pipeline
+## 3. CI Pipeline
 
-GitHub Actions runs on every push to `main`, every PR targeting `main`, and manual `workflow_dispatch`.
+GitHub Actions runs on:
 
-> **Note:** Documentation-only commits also trigger CI (~4.5 min compile). Batch all doc-only changes into a single commit to minimize CI runs.
+- Pushes to `main`
+- Pull requests targeting `main`
+- Manual `workflow_dispatch`
 
 ### What CI validates
 
-1. Preflight checks (file existence, cross-reference integrity, JS syntax + runtime smoke)
-2. ESPHome firmware compile
-3. Build summary output
-4. Firmware artifact staging and upload
+- Helper/script existence and integrity
+- Dashboard/source cross-reference checks
+- JavaScript syntax/runtime smoke checks
+- Dashboard minification + regeneration path
+- ESPHome compile
+- Artifact staging / build summary
 
-### What CI does NOT cover (manual)
+### What CI does not validate
 
-- Flashing firmware to the real device
-- BLE sensor validation
-- Browser testing against the live gateway
-- Cloudflare/internet path validation
+- Real BLE sensor reception
+- Real-device boot health after flash
+- Cloudflare path behavior
+- Browser behavior against the live gateway
+- Battery / RSSI / physical-environment edge cases
 
-### Branch protection on `main`
+### Practical note
 
-- Requires pull request before merging
-- Requires the `preflight-and-compile` status check to pass
-- No direct pushes to `main`
-
-> **Exception:** Documentation-only normalization commits may be pushed directly to `main` by the repository owner when no code changes are involved and CI is expected to pass without review.
+Documentation-only commits still trigger compile CI.
+Batch doc-only normalization work into a single commit when possible to avoid unnecessary runs.
 
 ---
 
-## Versioning
+## 4. Versioning
 
 ### Scheme
 
-The project uses a four-part version: `major.minor.patch.hotfix`
+The project uses a four-part version scheme:
 
-- **Major** (7.x) — Significant architecture changes
-- **Minor** (7.4.x) — New features
-- **Patch** (7.3.5.x) — Bug fixes, small additions
-- **Hotfix** (7.3.4.2) — Targeted fixes within a patch
+```
+major.minor.patch.hotfix
+```
 
-### Version locations (must stay synchronized)
+Examples:
 
-- `VERSION` file (root)
-- YAML header comment (`firmware/esp32-c3-multi-sensor.yaml`)
-- `App.version` in `dashboard/dashboard.js`
-- `register_history_handler()` call in YAML lambda
-- HTML header comment in `dashboard/dashboard.html`
+- `7.4.0.0` — feature baseline
+- `7.4.0.2` — hotfix within the same feature track
+- `7.4.1.0` — next feature in the 7.4 line
 
-### Tags
+### Version-bearing locations (must stay synchronized)
 
-Tag every accepted build with `v` prefix: `v7.3.5.0`, `v7.4.0`, etc.
+There are **six** version-bearing locations that must be kept aligned:
+
+1. Root `VERSION` file
+2. YAML header comment in `firmware/esp32-c3-multi-sensor.yaml`
+3. `register_history_handler()` version string in YAML/C++ lambda path
+4. `dashboard_link` publish_state version text in YAML
+5. `App.version` in `dashboard/dashboard.js`
+6. Version comment/header text in `dashboard/dashboard.html`
+
+If one moves, all six must move.
+
+### Additional normalization note
+
+Other files may also contain historical version references in comments or documentation.
+Those do not all need to match the current version if they are explicitly documenting past behavior.
+Only current-state version locations and misleading stale headers must be synchronized.
 
 ---
 
-## Scripts Reference
+## 5. Dashboard Build Discipline
 
-| Script | Purpose | Usage |
-|--------|---------|-------|
-| `scripts/test-local.sh` | Full local validation | `./scripts/test-local.sh` or `--quick` |
-| `scripts/preflight.sh` | Cross-reference and syntax checks | `./scripts/preflight.sh` |
-| `scripts/compile-with-log.sh` | Compile with timestamped log | `./scripts/compile-with-log.sh` |
-| `scripts/generate-header.sh` | Regenerate dashboard.h from HTML | `./scripts/generate-header.sh` |
-| `scripts/minify-dashboard.sh` | Minify dashboard.html → dashboard.min.html | `./scripts/minify-dashboard.sh` |
-| `scripts/deploy-to-esphome.sh` | Checkout version + preflight + compile | `./scripts/deploy-to-esphome.sh v7.3.5.0` |
-
----
-
-## File Delivery Model
-
-The assistant delivers complete replacement files, not patches or diffs. This means:
-
-- Every modified file is delivered as a full, ready-to-copy replacement
-- You copy the file into the repo, overwriting the existing version
-- No manual merging is required
-- The preflight script validates cross-references after replacement
-
-When HTML changes, `dashboard.h` must be regenerated via the full pipeline:
+The dashboard pipeline is:
 
 ```bash
 ./scripts/minify-dashboard.sh
 ./scripts/generate-header.sh
+./scripts/preflight.sh
+esphome compile firmware/esp32-c3-multi-sensor.yaml
 ```
 
----
+### Source-of-truth rules
 
-## Documentation Updates Per Build
-
-For each accepted build, update:
-
-- `VERSION` file
-- `Docs/changelog.md` (add entry)
-- `Docs/build-history.md` (add entry)
-- `Docs/esp32-gateway-fresh-start-handoff.md` (update current state)
-- `Docs/bugs-and-lessons-learned.md` (if applicable)
-- Add a session log: `Docs/session-log-<date>-v<version>.md`
-
-The assistant will prepare these updates alongside the code changes.
+- `dashboard.html` is the editable source of truth
+- `dashboard.js` must stay synchronized with the JS embedded in `dashboard.html`
+- `dashboard.min.html` is build output only and remains gitignored
+- `dashboard.h` is generated but committed
+- After any HTML or embedded-JS change, regenerate `dashboard.h`
 
 ---
 
-## Generated Files Policy
+## 6. Script Permissions
 
-Generated files are committed to Git:
+A recurring operational issue is execute-bit loss on shell scripts.
+This can happen after fresh clone, after some API-created file writes, or after certain replacement-file workflows.
 
-- `dashboard.h` (generated from dashboard.html via minification pipeline)
-- Documentation and notes
+Always run:
 
-This ensures every tagged version is self-contained and buildable without running generation steps first.
+```bash
+chmod +x scripts/*.sh
+```
+
+at least once after clone, and again after any session that introduced new script files.
+
+This requirement should be reflected in:
+
+- `README.md`
+- Fresh-start handoff
+- Local setup instructions
 
 ---
 
-## Secrets Handling
+## 7. Documentation Update Rules
 
-Real secrets never enter Git.
+For every accepted build, update as applicable:
 
-- `secrets/secrets-example.yaml` — committed, public template
-- `secrets/secrets.yaml` — local only, gitignored
-- `firmware/secrets.yaml` — symlink to `../secrets/secrets.yaml`, gitignored
-- CI generates temporary compile-only dummy secrets per run
+- `VERSION`
+- `Docs/changelog.md`
+- `Docs/build-history.md`
+- `Docs/esp32-gateway-fresh-start-handoff.md`
+- `Docs/bugs-and-lessons-learned.md`
+- Relevant planning docs
+- A session log in `Docs/session-log-<date>-<version>-<topic>.md`
+
+### Documentation/code alignment rules
+
+To keep the repo coherent:
+
+- `README.md` must describe current checked-in behavior only
+- `architecture.md` must describe the current design and explicitly mark planned capability as planned
+- `future-plans.md` and the implementation-plan docs hold the roadmap
+- If a session changes next steps, delivery process, or constraints, update both the session log and the fresh-start handoff
+- If a doc makes a concrete claim about behavior, that claim should be traceable to either code, build output, or a validated operational result
 
 ---
 
-## Local Build Environment
+## 8. Local Environment Baseline
 
 ### Prerequisites
 
 - ESPHome 2025.11.0 or later
-- Node.js + `html-minifier-terser` (for dashboard pipeline: `npm install -g html-minifier-terser`)
+- Node.js tooling needed for dashboard minification
 - Git
 
-### LXC Container Setup (one-time)
+### Initial local setup
 
 ```bash
 cd /root/config
 git clone https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor.git
 cd ESP32-GW-multi-sensor
 cp secrets/secrets-example.yaml secrets/secrets.yaml
-# Edit secrets/secrets.yaml with real credentials
+# edit secrets/secrets.yaml
 ln -s ../secrets/secrets.yaml firmware/secrets.yaml
+chmod +x scripts/*.sh
 ```
 
-### Building a specific tagged version
+### Build a specific tagged version
 
 ```bash
 cd /root/config/ESP32-GW-multi-sensor
 git fetch --all --tags
-git checkout v7.3.5.0
+git checkout v7.4.1.0
+chmod +x scripts/*.sh
 esphome compile firmware/esp32-c3-multi-sensor.yaml
 ```
 
 ---
 
-## Gitignore Rules
+## 9. Gitignore Baseline
 
 ```
 firmware/secrets.yaml
@@ -252,4 +261,17 @@ dashboard/dashboard.min.html
 node_modules/
 ```
 
-Raw build logs go in `build-logs/` (gitignored). Curated documentation goes in `Docs/` (committed).
+---
+
+## 10. Release-Readiness Checklist
+
+Before tagging a build:
+
+- [ ] Preflight passes
+- [ ] Compile passes
+- [ ] Dashboard regeneration path used if dashboard changed
+- [ ] Version synchronized in all six locations
+- [ ] Docs updated
+- [ ] Device test performed
+- [ ] Session log written
+- [ ] Handoff updated

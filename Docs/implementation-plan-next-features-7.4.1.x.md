@@ -1,115 +1,269 @@
-# Implementation Plan — Next Features (as of v7.4.1.x)
+# Implementation Plan — Next Features (post-v7.4.1.0 baseline)
 
 _Snapshot date: 2026-03-10_
-_Current version: v7.4.1.0 (validated)_
-_Branch: `main`_
+_Current repo version: v7.4.1.0_
+_Branch baseline: `main`_
 
-> This file is the versioned snapshot of the feature implementation plan that was active during the v7.4.1.x cycle. The original `implementation-plan-next-features.md` was renamed to this file after v7.4.1.0 was validated.
->
-> For the current active plan, see this file — it is the canonical implementation plan as of v7.4.1.0.
-
----
-
-## Feature Priority Order
-
-| # | Version | Feature | Status |
-|---|---------|---------|--------|
-| 1 | v7.4.1.x | Dashboard Minification pipeline | ✅ DONE (v7.4.1.0 validated 2026-03-10) |
-| 2 | v7.4.2.x | Custom Date Range selector | 🔜 Next |
-| 3 | v7.4.3.x | Playwright browser test automation | Planned |
-| 4 | v7.4.4.x | Configurable sensor count | Planned |
+This is the canonical detailed implementation plan after the completion of **v7.4.1.0 dashboard minification**.
+It supersedes older wording that still treated minification as upcoming work.
 
 ---
 
-## Feature 1: Dashboard Minification ✅ COMPLETE
+## 1. Planning Baseline
 
-**Goal:** Reduce flash usage by minifying `dashboard.html` before embedding into `dashboard.h`.
+The original next-features plan included four roadmap items:
 
-**Result:**
-- Flash: 88.2% → 86.1% (−48,611 bytes, −31% of dashboard payload)
-- Tool: `html-minifier-terser` + `terser` inline JS compression
-- Pipeline: `minify-dashboard.sh` → `generate-header.sh` → `preflight.sh` → `esphome compile`
-- CI: Full automated pipeline on every push
-- `dashboard.min.html` is gitignored (build artifact)
-- `dashboard.h` is committed (embedded payload)
+1. Custom date range
+2. Playwright browser tests
+3. Configurable sensor count
+4. Dashboard minification
 
-**Key lesson learned:** `html-minifier-terser` CLI uses positional arg + `--output`, not `--input-path`/`--output-path`.
+That fourth item is now complete in **v7.4.1.0**.
+So the active plan from this point forward is:
 
----
-
-## Feature 2: Custom Date Range Selector (v7.4.2.x)
-
-**Goal:** Allow the user to select a custom start/end date range for the dashboard charts, beyond the fixed 24h/7d/30d/45d presets.
-
-### UX Design
-
-- Add a "Custom" option to the existing time-range selector buttons
-- On click: open a date-range picker dialog (HA-style, two calendar months side by side)
-- Date range is applied to all charts simultaneously
-- Preset buttons remain fully functional
-- Mobile-friendly: dialog stacks to single-month view on narrow screens
-
-### Implementation Approach
-
-**No external library.** The date picker is implemented in vanilla JS within `dashboard.js` / `dashboard.html` to keep the firmware self-contained and avoid adding npm dependencies to the embedded payload.
-
-**Data source:** The existing `/history/{sensor_id}/{series}` endpoints already return all available data. The date range filter is applied client-side by slicing the returned arrays by timestamp.
-
-**State:** The selected range is stored in `App.State.customDateRange = { from: epoch, to: epoch }`. It is cleared when the user clicks a preset button.
-
-### Files Changed
-- `dashboard/dashboard.html` — add date picker dialog markup and CSS
-- `dashboard/dashboard.js` — add picker logic, range state, chart filter
-- `dashboard/dashboard.h` — regenerated (run pipeline after dashboard changes)
-- `firmware/esp32-c3-multi-sensor.yaml` — version bump
-- `VERSION` — bump to `7.4.2.0`
-- `Docs/` — session log, handoff update, changelog, build history
-
-### No firmware changes required
-All filtering is client-side. No new endpoints. No changes to `sensor_history_multi.h`.
-
-### Acceptance Criteria
-1. "Custom" button opens the date picker dialog
-2. User selects a start and end date; dialog closes on confirm
-3. All charts update to show only the selected range
-4. Preset buttons (24h, 7d, 30d, 45d) clear the custom range and work as before
-5. Custom range survives a page refresh (stored in `localStorage`)
-6. Works on mobile (single-column layout)
-7. Preflight 23/23 PASS
-8. Flash remains below 90%
+1. **v7.4.2.x — Custom Date Range Selector**
+2. **v7.4.3.x — Playwright Browser Test Automation**
+3. **v7.4.4.x — Configurable Sensor Count (1–4)**
 
 ---
 
-## Feature 3: Playwright Browser Test Automation (v7.4.3.x)
+## 2. Completed Reference Item — Dashboard Minification
 
-**Goal:** Automated end-to-end browser tests for the dashboard using Playwright, runnable in CI with a mock backend.
+### Status
 
-### Approach
+**Complete in v7.4.1.0**
 
-- Mock backend: a small Node.js or Python HTTP server that serves static fixture data from `/history/*`, `/sensors.json`, `/api/status`, and `/api/storage-stats`
-- Tests cover: dashboard load, chart render, time-range switching, export, import, theme toggle, custom date range
-- CI: Playwright tests run after compile step on every PR
-- Local: `npm test` or `npx playwright test`
+### Outcome
 
-### Files Added
-- `tests/` — Playwright test files
-- `tests/mock-server/` — mock backend
-- `tests/fixtures/` — static history data
-- `package.json` — Playwright dependency
-- `.github/workflows/ci.yml` — Playwright step
+- `dashboard.html` remains source of truth
+- `dashboard.min.html` is produced as a gitignored intermediate
+- `generate-header.sh` regenerates `dashboard.h`
+- CI runs the pipeline automatically
+- Flash pressure was reduced enough to create safer headroom for the next features
+
+### Why it matters to future work
+
+All upcoming dashboard work must preserve this pipeline.
+No feature should reintroduce direct editing of generated files.
 
 ---
 
-## Feature 4: Configurable Sensor Count (v7.4.4.x)
+## 3. Feature 1 — v7.4.2.x Custom Date Range Selector
 
-**Goal:** Make the number of sensors (currently hardcoded to 3) configurable without modifying core firmware logic.
+### Goal
 
-### Approach
+Add a **Custom** range option alongside the existing fixed range buttons so the user can choose an arbitrary start and end time bounded by the actual data available in storage.
 
-- Define `SENSOR_COUNT` as a compile-time constant
-- All loops, arrays, and YAML sensor blocks are parameterized
-- Preflight validates that the YAML sensor count matches `SENSOR_COUNT`
-- Documentation: add a "how to add a 4th sensor" guide
+### Current architecture this feature must respect
 
-### Constraint
-This is a docs + preflight change primarily. The firmware C++ already uses `sensors[0..2]` loops that can be refactored to use a `SENSOR_COUNT` constant with minimal risk.
+- History endpoints already deliver all available history data per sensor
+- Dashboard currently filters chart windows using the fixed presets: **24h / 7d / 30d / 45d**
+- `/api/storage-stats` already exposes retention bounds that can inform the UI
+- The dashboard is embedded and must remain dependency-light
+
+### Target user experience
+
+- Add a **Custom** button after the fixed preset buttons
+- Clicking it opens a date-range picker dialog
+- Available range is bounded by actual retained history
+- Applying the range updates all relevant history-based charts together
+- Clicking a preset should clear the custom-range state and return to the standard preset behavior
+
+### Recommended implementation style
+
+- **Vanilla JS only**
+- No external UI library
+- Keep the modal/dialog consistent with the existing dashboard theme
+- Mobile-safe layout
+
+### Recommended internal state
+
+```javascript
+App.State.customDateRange = {
+  fromEpoch: null,
+  toEpoch: null,
+  active: false
+};
+```
+
+### Recommended implementation steps
+
+1. Add Custom buttons in both relevant range-selector groups
+2. Fetch available date bounds from `/api/storage-stats`
+3. Add modal markup and CSS in `dashboard.html`
+4. Add dialog state + calendar/time handling in `dashboard.js`
+5. When custom range is active, filter loaded chart data client-side by epoch
+6. Ensure min/max summaries reflect the active custom window
+7. Ensure preset buttons clear custom state correctly
+8. Run dashboard regeneration pipeline and full validation
+
+### Files expected to change
+
+- `dashboard/dashboard.html`
+- `dashboard/dashboard.js`
+- `dashboard/dashboard.h` (regenerated)
+- `VERSION`
+- `firmware/esp32-c3-multi-sensor.yaml`
+- `Docs/changelog.md`
+- `Docs/build-history.md`
+- `Docs/esp32-gateway-fresh-start-handoff.md`
+- Session log for the implementation session
+
+### Key risks
+
+- Modal complexity and event-binding regressions
+- Range state fighting the preset state
+- Stale min/max values after range switch
+- Chart redraw edge cases between dark/light mode and custom ranges
+- Mobile usability
+
+### Validation focus
+
+- All existing preset buttons still work
+- Custom range updates all intended charts
+- Min/max values match the filtered data
+- Theme toggle still redraws properly
+- Chrome, Firefox, Edge, and at least one mobile browser
+- LAN and Cloudflare access path sanity
+
+---
+
+## 4. Feature 2 — v7.4.3.x Playwright Browser Test Automation
+
+### Goal
+
+Introduce browser-level regression testing for the dashboard so UI and interaction changes are caught before device testing.
+
+### Why this is next after custom range
+
+The custom date-range feature will materially increase frontend complexity.
+That is the right moment to add automated dashboard regression coverage.
+
+### Testing approach
+
+- Use a mock or fixture-driven backend
+- Avoid dependency on live ESP availability in CI
+- Focus on dashboard behavior rather than firmware behavior
+
+### Initial test scope
+
+- Dashboard loads
+- Sensor cards render
+- Theme toggle works
+- Range buttons work
+- Export buttons exist and basic flows initiate correctly
+- Custom-range modal opens/closes once that feature lands
+- No major console errors during startup flow
+
+### CI design
+
+Use a separate workflow from firmware compile so browser failures are easier to isolate.
+Store screenshots/traces on failure.
+
+### Files expected to change
+
+- `.github/workflows/` new browser workflow
+- Playwright config and test files
+- Possibly a mock-data fixture directory
+- `Docs/development-pipeline.md`
+- `Docs/bugs-and-lessons-learned.md` if new testing lessons emerge
+
+### Key risks
+
+- Brittle tests that overfit UI details
+- Too much coupling to generated/minified dashboard output
+- False negatives from asynchronous chart rendering
+
+### Validation focus
+
+- Stable CI execution
+- Useful screenshots/traces
+- Tests assert behavior, not fragile pixel-perfect layout
+
+---
+
+## 5. Feature 3 — v7.4.4.x Configurable Sensor Count (1–4)
+
+### Goal
+
+Normalize the project so sensor count can be configured from 1 to 4 in a disciplined, documented, and validated way.
+
+### Current reality
+
+- Current repo default is 3 sensors
+- Dashboard frontend is already dynamic enough to support variable sensor manifests
+- Persistence and YAML/C++ alignment are the critical constraints
+
+### What this feature must accomplish
+
+- Document the change procedure clearly
+- Add preflight checks that validate sensor-count alignment
+- Make the README and architecture docs truthful once the feature is actually complete
+- Explicitly handle retained-history compatibility expectations
+- Test 1, 2, 3, and 4-sensor configurations
+
+### Recommended preflight checks
+
+At minimum validate:
+
+- `NUM_SENSORS` matches the number of configured C++ sensor slots
+- YAML blocks and generated/public-facing manifest align with that count as far as practical
+- Any configuration doc examples use a supported count and consistent naming
+
+### Important storage warning
+
+Changing sensor count changes multi-sensor segment sizing assumptions.
+Treat persisted history as incompatible unless the final implementation includes a deliberate migration strategy.
+The safe operational guidance is to erase/reset history after a sensor-count change.
+
+### Recommended documentation deliverables for this feature
+
+- Updated `README.md`
+- Updated `Docs/architecture.md`
+- Updated `Docs/future-plans.md`
+- Possibly a dedicated `Docs/configuring-sensors.md`
+- Updated handoff + session log
+
+### Key risks
+
+- Silent mismatch between C++ and YAML definitions
+- Retained-history corruption or misleading partial compatibility
+- Docs claiming configurability before the workflow is actually validated end-to-end
+
+### Validation focus
+
+- Compile success for 1/2/3/4 sensor variants
+- Dashboard renders correct number of cards
+- History endpoints behave correctly
+- Export/import sanity after sensor-count changes
+- Clear user guidance that history reset is expected
+
+---
+
+## 6. Recommended Order and Rationale
+
+Active recommended order:
+
+1. Custom Date Range
+2. Playwright Automation
+3. Configurable Sensor Count (1–4)
+
+Why this order still makes sense:
+
+- Custom range gives immediate user-visible value
+- Playwright then protects the growing dashboard surface
+- Sensor-count configurability comes after stronger frontend regression coverage exists
+
+---
+
+## 7. Rules That Apply to All Upcoming Features
+
+- `dashboard.html` remains the editable dashboard source of truth
+- `dashboard.js` and the embedded JS path must stay synchronized
+- After dashboard changes, run the full regenerate pipeline
+- Run preflight before every commit
+- Keep the six version-bearing locations synchronized on any version bump
+- Test in Firefox, not only Chromium
+- Test the Cloudflare/public path for user-facing changes that could be affected by transport/runtime differences
+- Document meaningful sessions with both a session log and handoff update
+- Keep docs honest: current behavior in README/architecture, future behavior in roadmap/plan docs

@@ -1,101 +1,165 @@
 # Future Plans & Feature Roadmap
 
-_Last updated: 2026-03-09_
+_Last updated: 2026-03-10 — aligned to v7.4.1.0_
 
-This document captures the feature roadmap, prioritization, and feasibility assessment for the ESP32-C3 Multi-Sensor BLE Gateway. The guiding philosophy: **high utility, minimum barrier, no unnecessary complexity.**
+This document is the high-level roadmap.
+For the detailed implementation-level plans, see:
 
----
+- `Docs/implementation-plan-next-features-7.4.1.x.md`
+- `Docs/planning-v7.4.2.0-custom-date-range.md`
 
-## Near-Term (Next 3 releases)
+The guiding philosophy remains the same:
 
-### 7.4.0 — Import with Validation ✅
-
-**Status: COMPLETE — merged via PR #2, v7.4.0 on main**
-
-Import CSV data into the history partition via `POST /api/import`.
-
-**Scope:**
-- Replacement-first model (imported data replaces existing for overlapping timestamps)
-- Strong validation: sensor ID, timestamp ordering, value ranges, duplicates, storage impact
-- JSON report: accepted/rejected rows with reasons
-- Basic auth protected
-- Dashboard UI: import button, file picker, validation report display
-
-**Assessment:** Straightforward extension of the existing `/api/delete-data` and `/history/*` patterns. The validation logic is the bulk of the work. Flash writes use the same NVS segment model. Risk is low because it touches a well-understood code path.
-
-**Estimated complexity:** Medium. ~2-3 sessions for endpoint + dashboard UI + testing.
+- Solve real problems
+- Preserve stability
+- Keep deployment simple
+- Avoid over-engineering on a constrained ESP32-C3 target
 
 ---
 
-### 7.4.1a — Sensor Selection for Import ✅
+## Roadmap Summary
 
-**Status: COMPLETE — v7.4.0.2 implements single-sensor non-destructive merge import**
-
-Single-sensor CSV import now preserves other sensors' data. The firmware builds an epoch-to-slot map, merges imported data into existing segments, and creates new segments only for hours not already present. Dashboard auto-detects single vs multi mode from CSV columns.
-
----
-
-### 7.4.1b — Custom Date Range Display
-
-**Priority: MEDIUM**
-
-Add a "Custom Range" button after the existing 24h/7d/30d/45d selectors. Date picker should be based on dates actually present in stored history.
-
-**Assessment:** Dashboard-only change, no backend modifications needed. The `/api/storage-stats` endpoint already exposes retention information. The browser can query available date range and present a picker. Low risk.
+| Release / Phase | Feature | Status | Notes |
+|---|---|---|---|
+| v7.4.0 | CSV import with validation | Complete | Shipped |
+| v7.4.0.2 | Single-sensor merge import | Complete | Shipped |
+| v7.4.1.0 | Dashboard minification pipeline | Complete | Shipped |
+| v7.4.2.x | Custom date range selector | Next | Dashboard-first feature |
+| v7.4.3.x | Playwright browser automation | Planned | Regression control |
+| v7.4.4.x | Configurable sensor count (1–4) | Planned | Documentation + validation + compatibility handling |
+| v7.5.x | Secrets/settings persistence review | Deferred | Reassess after notification/settings needs are clearer |
+| v7.6.x | Encrypted secrets partition | Low priority / likely skip | Probably more complexity than value |
 
 ---
 
-## Mid-Term (Testing & Infrastructure)
+## 1. v7.4.2.x — Custom Date Range Selector
 
-### Playwright Browser Test Automation
+**Priority:** High
 
-**Priority: HIGH — Should happen alongside or immediately after 7.4.x**
+### Goal
 
-Automated browser testing with a mock backend, running as a second CI workflow.
+Add a user-selectable custom start/end time range in addition to the existing fixed presets:
 
-**Scope:**
-- Mock backend serving dashboard HTML with synthetic data
-- Tests: dashboard loads, theme toggle, export button, sensor cards render, import UI works
-- Second workflow: `browser-tests.yml`
-- Failure produces screenshots and traces
+- 24h
+- 7d
+- 30d
+- 45d
 
-**Assessment:** This is important for regression prevention. The dashboard has accumulated enough complexity (chart redraw, theme switching, export serialization, event binding) that manual testing is no longer sufficient. The mock approach avoids coupling tests to live device availability.
+### Why this matters
 
----
+The current fixed ranges are good for common cases, but they are limiting when the user wants to inspect:
 
-### Configurable Sensor Count
+- One weather event
+- One day across a longer retention window
+- One imported historical slice
+- A partial-period trend that does not align with the preset buckets
 
-**Priority: MEDIUM**
+### Scope assessment
 
-Document and implement a comment-based configuration for changing the number of active sensors (1–4) without breaking anything.
+- Primarily dashboard work
+- Uses existing history endpoints
+- Uses existing storage-stats metadata for bounds
+- Should not require a backend protocol redesign
 
-**Assessment:** Mostly documentation and testing work. The `SensorSlot` array already supports this; the task is ensuring YAML blocks, the C++ array, and the dashboard all stay synchronized when sensors are added or removed. Should include a preflight check.
+### Risk
 
----
-
-## Longer-Term Features
-
-### 7.5 — Secrets Partition (10 KiB)
-
-**Priority: LOW-MEDIUM**
-
-A small dedicated partition for storing management credentials and notification settings in flash, separate from the history partition.
-
-**Assessment:** Feasible. The partition table has room. The question is whether this is worth the complexity compared to just keeping secrets in the YAML/secrets file. The real value emerges only when notifications (8.x) are implemented, because notification settings need to survive firmware updates.
-
-**Recommendation:** Defer until notifications are designed. Then decide if a secrets partition is actually needed or if NVS in the default partition is sufficient for the small amount of settings data.
+Low-to-medium.
+The main risk is UI complexity and making sure the range state does not break existing preset behavior, min/max summaries, or chart redraw logic.
 
 ---
 
-### 7.6 — Encrypted Secrets Partition
+## 2. v7.4.3.x — Playwright Browser Test Automation
 
-**Priority: LOW**
+**Priority:** High
 
-Encrypt the secrets partition contents.
+### Goal
 
-**Assessment:** ESP-IDF supports NVS encryption, but it adds significant complexity (key management, secure boot considerations). For a LAN device with Basic auth, this is probably over-engineering. The physical attack vector (someone extracting the flash chip) is not a realistic threat for a home sensor gateway.
+Add automated browser regression coverage so dashboard changes stop relying only on manual checks.
 
-**Recommendation:** Skip unless there's a specific requirement. Cloudflare Access (external to the device) is a better security investment.
+### Why this matters
+
+The dashboard now has enough moving parts that regressions are easy to introduce:
+
+- Event binding
+- Transport mode differences
+- Theme redraw behavior
+- Import/export UI
+- Future custom date range behavior
+
+### Scope assessment
+
+- Mock backend or fixture-driven approach
+- Dedicated CI workflow separate from ESPHome compile
+- Screenshots / traces on failure
+- Coverage for Chrome/Chromium first, with room to extend later
+
+### Risk
+
+Medium.
+The challenge is building a test harness that is useful without becoming fragile.
+The value is high because the next planned work is dashboard-heavy.
+
+---
+
+## 3. v7.4.4.x — Configurable Sensor Count (1–4)
+
+**Priority:** Medium
+
+### Goal
+
+Normalize the project so the supported sensor-count range is clearly documented and safely configurable from **1 to 4 sensors**.
+
+### Why this matters
+
+The repo currently overstates its out-of-the-box sensor count in some documentation.
+The code structure is already designed around indexed sensor slots, but the full workflow still needs to be normalized:
+
+- C++ config
+- YAML config
+- Preflight checks
+- Persistence compatibility guidance
+- Clear instructions for changing sensor count
+
+### Scope assessment
+
+This is not just a README tweak.
+It needs:
+
+- Documentation
+- Preflight validation
+- Explicit history compatibility rules
+- Test coverage for 1, 2, 3, and 4-sensor configurations
+
+### Risk
+
+Medium.
+The frontend is already flexible, but the persistence structure changes with sensor count.
+That means the feature has to be treated carefully to avoid silent history corruption or user confusion.
+
+---
+
+## 4. Secrets / Settings Persistence Review (v7.5.x)
+
+**Priority:** Low-to-medium
+
+A later phase may introduce a small persistent settings model for management credentials and related options.
+This should be revisited only when there is a concrete feature need, such as notifications or user-editable runtime settings.
+
+The default recommendation remains:
+
+- Do not add complexity before it solves a real problem
+- Avoid partition churn without a strong reason
+
+---
+
+## 5. Encrypted Secrets Partition (v7.6.x)
+
+**Priority:** Low
+
+This remains technically feasible, but still looks like a weak value tradeoff for the project's real deployment model.
+For a home-lab or hobby deployment, improving ingress protection and browser/session controls is usually higher value than at-rest flash encryption for a tiny settings partition.
+
+Current recommendation: **do not prioritize this** unless the security model changes materially.
 
 ---
 
@@ -292,3 +356,31 @@ Based on value, risk, and dependencies:
 8. **Cloud upload** (InfluxDB Cloud as first target)
 9. **Dynamic sizing** (responsive layout)
 10. **Everything else** (multi-language, AI analytics, etc.)
+
+---
+
+
+## Release Strategy Guidance
+
+Recommended order from the current baseline:
+
+1. **v7.4.2.x — Custom date range**
+2. **v7.4.3.x — Playwright automation**
+3. **v7.4.4.x — Configurable 1–4 sensor count**
+
+This order is intentional:
+
+- Custom date range delivers visible user value quickly
+- Playwright then hardens the dashboard before more UI/configuration complexity lands
+- Configurable sensor count comes after the dashboard test baseline is stronger
+
+---
+
+## Documentation Discipline for Future Releases
+
+To prevent roadmap drift:
+
+- `README.md` should never advertise a future capability as already shipped
+- `future-plans.md` should summarize, not replace, detailed implementation design
+- `implementation-plan-next-features-7.4.1.x.md` should stay the detailed active plan until superseded
+- Feature-specific planning docs should complement, not contradict, the master implementation plan
