@@ -17,6 +17,7 @@ No cloud. No database. No Home Assistant required. Just an ESP32, up to 4 BLE se
 - Serves an embedded HTML dashboard directly from the ESP32 — no external files needed
 - Dashboard supports dark/light mode, collapsible sections, CSV export/import, and 24h/7d/30d/45d min/max selectors
 - Accessible on LAN or over the internet via Cloudflare tunnel
+- Dashboard HTML/JS minified before embedding (~40KB flash savings via html-minifier-terser)
 
 ![Sensor Cards](Images/dashboard-sensors.png)
 
@@ -70,7 +71,7 @@ ESP32-GW-multi-sensor/
     esp32-c3-multi-sensor.yaml  ESPHome firmware configuration
   partitions/
     esp32-c3-multi-partitions.csv   Custom partition table (512 KiB history)
-  scripts/                      Helper scripts (preflight, compile, deploy)
+  scripts/                      Helper scripts (preflight, minify, compile, deploy)
   secrets/                      secrets-example.yaml (real secrets gitignored)
   Images/                       Dashboard screenshots
   Docs/                         Project documentation
@@ -108,7 +109,7 @@ See [Docs/development-pipeline.md](Docs/development-pipeline.md) for the full pr
 
 ## Current Version
 
-**v7.4.0.2** — See [Docs/changelog.md](Docs/changelog.md) for history.
+**v7.4.1.0** — Dashboard minification pipeline (html-minifier-terser, ~40KB flash savings). See [Docs/changelog.md](Docs/changelog.md) for history.
 
 ## Documentation
 
