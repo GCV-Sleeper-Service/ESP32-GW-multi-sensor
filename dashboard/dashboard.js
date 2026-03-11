@@ -35,7 +35,7 @@
 // The bulk of the logic still lives in existing functions so regression risk stays low.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.4.1.0';
+App.version = 'v7.4.2.0';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -116,7 +116,9 @@ try {
 // ── Chart data cap ──────────────────────────────────────────────
 var MAX_POINTS = 720;
 var HISTORY_RANGE_HOURS = 24;
-var MAX_HISTORY_RANGE_HOURS = 720;
+var MAX_HISTORY_RANGE_HOURS = 1080;  // 45 days — must match max range button
+var CUSTOM_RANGE_START = 0;  // epoch (seconds), 0 = not in use
+var CUSTOM_RANGE_END   = 0;  // epoch (seconds), 0 = not in use
 var avgHistoryStore = {};
 var chartsReady = false;
 
@@ -531,9 +533,20 @@ function formatEpochLocal(epoch) {
   return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ' ' +
          d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
 }
-function filterPointsForRange(points, hours) {
-  var cutoff = Date.now() - hours * 3600000;
-  return (points || []).filter(function(pt) { return pt.x && pt.x.getTime() >= cutoff; });
+// Returns {start, end} in epoch milliseconds — the active view window.
+// Custom range (set by the date picker) takes priority over the preset hours.
+function getEffectiveTimeRange() {
+  if (CUSTOM_RANGE_START > 0 && CUSTOM_RANGE_END > 0) {
+    return { start: CUSTOM_RANGE_START * 1000, end: CUSTOM_RANGE_END * 1000 };
+  }
+  var end = Date.now();
+  return { start: end - (App.State.getHistoryRangeHours() * 3600000), end: end };
+}
+function filterPointsForRange(points) {
+  var range = getEffectiveTimeRange();
+  return (points || []).filter(function(pt) {
+    return pt.x && pt.x.getTime() >= range.start && pt.x.getTime() <= range.end;
+  });
 }
 function ensureHistoryStore(sensorId) {
   return App.State.ensureHistoryStore(sensorId);
@@ -567,23 +580,30 @@ function applyHistoryAxisFormatting(chart, hours) {
   if (chart.options.scales.x.title) chart.options.scales.x.title.text = fmt.axisTitle;
 }
 function setHistoryRange(hours) {
+  // Clear custom range — preset buttons always override it
+  CUSTOM_RANGE_START = 0;
+  CUSTOM_RANGE_END   = 0;
   App.State.setHistoryRangeHours(hours);
   try { App.Features.emit('onRangeChange', hours); } catch(e) { logNonFatal('range-change hook emit', e); }
   [24, 168, 720, 1080].forEach(function(v) {
     var btn = document.getElementById('histRange-' + v);
     if (btn) btn.classList.toggle('active', v === hours);
   });
+  var custBtn = document.getElementById('histRange-custom');
+  if (custBtn) custBtn.classList.remove('active');
   applyHistoryRange();
 }
 function applyHistoryRange() {
   if (!chartsReady) return;
   var tempVisible = 0, humVisible = 0;
-  applyHistoryAxisFormatting(tempAvgChart, HISTORY_RANGE_HOURS);
-  applyHistoryAxisFormatting(humAvgChart, HISTORY_RANGE_HOURS);
+  var effRange = getEffectiveTimeRange();
+  var effHours = Math.round((effRange.end - effRange.start) / 3600000);
+  applyHistoryAxisFormatting(tempAvgChart, effHours);
+  applyHistoryAxisFormatting(humAvgChart, effHours);
   SENSORS.forEach(function(s, idx) {
     var store = ensureHistoryStore(s.id);
-    var tempPts = filterPointsForRange(store.temp, HISTORY_RANGE_HOURS);
-    var humPts = filterPointsForRange(store.hum, HISTORY_RANGE_HOURS);
+    var tempPts = filterPointsForRange(store.temp);
+    var humPts = filterPointsForRange(store.hum);
     tempAvgChart.data.datasets[idx].data = tempPts;
     humAvgChart.data.datasets[idx].data = humPts;
     tempVisible += tempPts.length;
@@ -685,13 +705,23 @@ function bindEvents() {
 
     var historyRangeBtn = event.target.closest('[data-history-range]');
     if (historyRangeBtn) {
-      setHistoryRange(parseInt(historyRangeBtn.getAttribute('data-history-range'), 10));
+      var rangeVal = historyRangeBtn.getAttribute('data-history-range');
+      if (rangeVal === 'custom') {
+        CustomRange.open();
+      } else {
+        setHistoryRange(parseInt(rangeVal, 10));
+      }
       return;
     }
 
     var minMaxBtn = event.target.closest('[data-minmax-hours]');
     if (minMaxBtn) {
-      setMinMaxPeriod(minMaxBtn.getAttribute('data-minmax-sensor'), parseInt(minMaxBtn.getAttribute('data-minmax-hours'), 10));
+      var mmVal = minMaxBtn.getAttribute('data-minmax-hours');
+      if (mmVal === 'custom') {
+        CustomRange.open();
+      } else {
+        setMinMaxPeriod(minMaxBtn.getAttribute('data-minmax-sensor'), parseInt(mmVal, 10));
+      }
       return;
     }
 
@@ -826,17 +856,355 @@ function updateComfortLevel(sensorId) {
 var minmaxPeriod = {};
 
 function setMinMaxPeriod(sensorId, hours) {
+  // Clear custom range — preset min/max selection overrides it
+  CUSTOM_RANGE_START = 0;
+  CUSTOM_RANGE_END   = 0;
   minmaxPeriod[sensorId] = hours;
   ['', 'm'].forEach(function(suffix) {
     [24, 168, 720, 1080].forEach(function(v) {
       var btn = document.getElementById('mmtog-' + v + suffix + '-' + sensorId);
       if (btn) btn.classList.toggle('active', v === hours);
     });
+    var custBtn = document.getElementById('mmtog-custom' + suffix + '-' + sensorId);
+    if (custBtn) custBtn.classList.remove('active');
   });
   var store = ensureHistoryStore(sensorId);
   updateMinMax(store.temp, sensorId, true);
   updateMinMax(store.hum, sensorId, false);
 }
+
+// ╔════════════════════════════════════════════════════════════════╗
+// ║  Custom Date Range Selector — v7.4.2.0                        ║
+// ║  Vanilla JS modal with calendar, presets, time selectors.     ║
+// ║  Uses /api/storage-stats for available-range bounds.          ║
+// ╚════════════════════════════════════════════════════════════════╝
+var CustomRange = (function() {
+  'use strict';
+  var _availOldest = 0, _availNewest = 0;
+  var _selStart = null, _selEnd = null;  // Date objects
+  var _viewYear = 0, _viewMonth = 0;    // currently displayed calendar month
+  var _pickingStart = true;             // two-click selection state
+
+  function _pad(n) { return String(n).padStart(2, '0'); }
+  function _fmtDate(d) {
+    if (!d) return '';
+    return d.getFullYear() + '-' + _pad(d.getMonth() + 1) + '-' + _pad(d.getDate());
+  }
+  function _epochToDate(ep) { return new Date(ep * 1000); }
+  function _dateToEpoch(d)  { return Math.floor(d.getTime() / 1000); }
+
+  function _getModal()   { return document.getElementById('customRangeModal'); }
+  function _getEl(id)    { return document.getElementById(id); }
+
+  // ── Show / hide ─────────────────────────────────────────────────────────────
+  function open() {
+    var modal = _getModal();
+    if (!modal) return;
+    // Fetch fresh bounds then show
+    fetch(ESP_HOST + '/api/storage-stats')
+      .then(safeJsonResponse)
+      .then(function(data) {
+        _availOldest = data.retention_oldest_epoch || 0;
+        _availNewest = data.retention_newest_epoch || Math.floor(Date.now() / 1000);
+        _initSelection();
+        _renderAvailability();
+        _renderCalendar();
+        _updateTimeFields();
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+      })
+      .catch(function() {
+        // Fall back: no bounds — still open with today
+        _availOldest = 0;
+        _availNewest = Math.floor(Date.now() / 1000);
+        _initSelection();
+        _renderAvailability();
+        _renderCalendar();
+        _updateTimeFields();
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+      });
+  }
+
+  function close() {
+    var modal = _getModal();
+    if (modal) { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+  }
+
+  // ── Initialise selection state ───────────────────────────────────────────────
+  function _initSelection() {
+    var now = new Date();
+    // Default: mirror the current active range
+    if (CUSTOM_RANGE_START > 0 && CUSTOM_RANGE_END > 0) {
+      _selStart = _epochToDate(CUSTOM_RANGE_START);
+      _selEnd   = _epochToDate(CUSTOM_RANGE_END);
+    } else {
+      var hours = App.State.getHistoryRangeHours();
+      _selEnd   = new Date(now);
+      _selStart = new Date(now.getTime() - hours * 3600000);
+    }
+    _viewYear  = _selEnd.getFullYear();
+    _viewMonth = _selEnd.getMonth();
+    _pickingStart = false;
+  }
+
+  // ── Availability footer ──────────────────────────────────────────────────────
+  function _renderAvailability() {
+    var el = _getEl('customRangeAvail');
+    if (!el) return;
+    if (_availOldest && _availNewest) {
+      var o = _epochToDate(_availOldest), n = _epochToDate(_availNewest);
+      el.textContent = 'Data available: ' + _fmtDate(o) + ' – ' + _fmtDate(n);
+    } else {
+      el.textContent = 'Data available: unknown';
+    }
+  }
+
+  // ── Calendar ─────────────────────────────────────────────────────────────────
+  function _prevMonth() {
+    _viewMonth--;
+    if (_viewMonth < 0) { _viewMonth = 11; _viewYear--; }
+    _renderCalendar();
+  }
+  function _nextMonth() {
+    _viewMonth++;
+    if (_viewMonth > 11) { _viewMonth = 0; _viewYear++; }
+    _renderCalendar();
+  }
+
+  var _MONTH_NAMES = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
+  var _DAY_NAMES   = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  function _renderCalendar() {
+    var hdr = _getEl('crCalHeader');
+    if (hdr) hdr.textContent = _MONTH_NAMES[_viewMonth] + ' ' + _viewYear;
+
+    var grid = _getEl('crCalGrid');
+    if (!grid) return;
+
+    var todayD = new Date();
+    todayD.setHours(0,0,0,0);
+
+    var firstDay = new Date(_viewYear, _viewMonth, 1).getDay();
+    var daysInMonth = new Date(_viewYear, _viewMonth + 1, 0).getDate();
+
+    var cells = '';
+    // Day-of-week headers
+    for (var h = 0; h < 7; h++) {
+      cells += '<span class="cr-cal-dow">' + _DAY_NAMES[h] + '</span>';
+    }
+    // Leading blanks
+    for (var b = 0; b < firstDay; b++) {
+      cells += '<span class="cr-cal-cell cr-cal-blank"></span>';
+    }
+    // Days
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dayD = new Date(_viewYear, _viewMonth, d);
+      var dayEp = _dateToEpoch(dayD);
+      var cls = 'cr-cal-cell';
+      var unavail = (_availOldest > 0 && dayEp + 86399 < _availOldest) ||
+                    (_availNewest > 0 && dayEp > _availNewest);
+      if (unavail) cls += ' cr-unavail';
+
+      // Selection highlighting
+      var selStartD = _selStart ? new Date(_selStart.getFullYear(), _selStart.getMonth(), _selStart.getDate()) : null;
+      var selEndD   = _selEnd   ? new Date(_selEnd.getFullYear(),   _selEnd.getMonth(),   _selEnd.getDate())   : null;
+      if (selStartD && selEndD) {
+        var t = dayD.getTime();
+        if (t >= selStartD.getTime() && t <= selEndD.getTime()) cls += ' cr-in-range';
+        if (t === selStartD.getTime()) cls += ' cr-range-start';
+        if (t === selEndD.getTime())   cls += ' cr-range-end';
+      } else if (selStartD && dayD.getTime() === selStartD.getTime()) {
+        cls += ' cr-in-range cr-range-start cr-range-end';
+      }
+      if (dayD.getTime() === todayD.getTime()) cls += ' cr-today';
+
+      var disabled = unavail ? ' data-unavail="1"' : '';
+      cells += '<span class="' + cls + '" data-cr-day="' + dayEp + '"' + disabled + '>' + d + '</span>';
+    }
+    grid.innerHTML = cells;
+
+    // Attach day-click listener
+    grid.onclick = function(e) {
+      var cell = e.target.closest('[data-cr-day]');
+      if (!cell || cell.hasAttribute('data-unavail')) return;
+      _onDayClick(parseInt(cell.getAttribute('data-cr-day'), 10));
+    };
+
+    // Update picking-hint label
+    var hint = _getEl('crPickHint');
+    if (hint) hint.textContent = _pickingStart ? 'Click a start date' : 'Click an end date';
+  }
+
+  function _onDayClick(dayEpoch) {
+    var d = _epochToDate(dayEpoch);
+    if (_pickingStart) {
+      _selStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(),
+                           _selStart ? _selStart.getHours() : 0, 0, 0, 0);
+      // Reset end if it's now before start
+      if (_selEnd && _selEnd < _selStart) _selEnd = null;
+      _pickingStart = false;
+    } else {
+      if (_selStart && d < new Date(_selStart.getFullYear(), _selStart.getMonth(), _selStart.getDate())) {
+        // Clicked before start — swap to start mode
+        _selStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+        _selEnd   = null;
+        _pickingStart = false;
+      } else {
+        _selEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(),
+                           _selEnd ? _selEnd.getHours() : 23, 59, 59, 0);
+        _pickingStart = false;
+      }
+    }
+    _renderCalendar();
+    _updateTimeFields();
+  }
+
+  // ── Time fields ──────────────────────────────────────────────────────────────
+  function _updateTimeFields() {
+    var startDate = _getEl('crStartDate');
+    var startHour = _getEl('crStartHour');
+    var startAmpm = _getEl('crStartAmpm');
+    var endDate   = _getEl('crEndDate');
+    var endHour   = _getEl('crEndHour');
+    var endAmpm   = _getEl('crEndAmpm');
+    if (!startDate) return;
+
+    if (_selStart) {
+      startDate.value = _fmtDate(_selStart);
+      var sh = _selStart.getHours();
+      startHour.value = String(sh % 12 || 12);
+      startAmpm.value = sh < 12 ? 'AM' : 'PM';
+    }
+    if (_selEnd) {
+      endDate.value = _fmtDate(_selEnd);
+      var eh = _selEnd.getHours();
+      endHour.value = String(eh % 12 || 12);
+      endAmpm.value = eh < 12 ? 'AM' : 'PM';
+    }
+  }
+
+  function _readTimeFields() {
+    var startDate = _getEl('crStartDate');
+    var startHour = parseInt(_getEl('crStartHour').value, 10);
+    var startAmpm = _getEl('crStartAmpm').value;
+    var endDate   = _getEl('crEndDate');
+    var endHour   = parseInt(_getEl('crEndHour').value, 10);
+    var endAmpm   = _getEl('crEndAmpm').value;
+    if (!startDate || !endDate) return;
+
+    var startH24 = (startAmpm === 'PM' ? (startHour === 12 ? 12 : startHour + 12) : (startHour === 12 ? 0 : startHour));
+    var endH24   = (endAmpm   === 'PM' ? (endHour   === 12 ? 12 : endHour   + 12) : (endHour   === 12 ? 0 : endHour));
+    var sd = new Date(startDate.value + 'T' + _pad(startH24) + ':00:00');
+    var ed = new Date(endDate.value   + 'T' + _pad(endH24)   + ':59:59');
+    if (!isNaN(sd.getTime())) _selStart = sd;
+    if (!isNaN(ed.getTime())) _selEnd   = ed;
+  }
+
+  // ── Presets ──────────────────────────────────────────────────────────────────
+  function _onPreset(name) {
+    var now = new Date();
+    var start, end;
+    end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    if (name === 'today') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    } else if (name === 'yesterday') {
+      var y = new Date(now); y.setDate(y.getDate() - 1);
+      start = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 0, 0, 0);
+      end   = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59);
+    } else if (name === '24h') {
+      start = new Date(now.getTime() - 24 * 3600000);
+      end   = new Date(now);
+    } else if (name === '7d') {
+      start = new Date(now.getTime() - 7 * 86400000);
+      end   = new Date(now);
+    } else if (name === '30d') {
+      start = new Date(now.getTime() - 30 * 86400000);
+      end   = new Date(now);
+    } else if (name === '45d') {
+      start = new Date(now.getTime() - 45 * 86400000);
+      end   = new Date(now);
+    }
+    if (start && end) {
+      _selStart = start;
+      _selEnd   = end;
+      _applyAndClose();
+    }
+  }
+
+  // ── Apply / commit ────────────────────────────────────────────────────────────
+  function apply() {
+    _readTimeFields();
+    if (!_selStart || !_selEnd) return;
+    if (_selEnd <= _selStart) {
+      var errEl = _getEl('crError');
+      if (errEl) { errEl.textContent = 'End must be after start.'; return; }
+      return;
+    }
+    _applyAndClose();
+  }
+
+  function _applyAndClose() {
+    CUSTOM_RANGE_START = _dateToEpoch(_selStart);
+    CUSTOM_RANGE_END   = _dateToEpoch(_selEnd);
+    // Mark the Custom buttons active, deactivate presets
+    [24, 168, 720, 1080].forEach(function(v) {
+      var btn = document.getElementById('histRange-' + v);
+      if (btn) btn.classList.remove('active');
+    });
+    var custBtn = document.getElementById('histRange-custom');
+    if (custBtn) custBtn.classList.add('active');
+    // Update minmax custom buttons for all sensors
+    if (typeof SENSORS !== 'undefined') {
+      SENSORS.forEach(function(s) {
+        ['', 'm'].forEach(function(suffix) {
+          [24, 168, 720, 1080].forEach(function(v) {
+            var b = document.getElementById('mmtog-' + v + suffix + '-' + s.id);
+            if (b) b.classList.remove('active');
+          });
+          var cb = document.getElementById('mmtog-custom' + suffix + '-' + s.id);
+          if (cb) cb.classList.add('active');
+        });
+      });
+    }
+    close();
+    applyHistoryRange();
+  }
+
+  // ── Wire up modal internal events (called once on DOMContentLoaded) ──────────
+  function bindModalEvents() {
+    var modal = _getModal();
+    if (!modal) return;
+
+    _getEl('customRangeClose')  && _getEl('customRangeClose').addEventListener('click', close);
+    _getEl('customRangeCancel') && _getEl('customRangeCancel').addEventListener('click', close);
+    _getEl('customRangeApply')  && _getEl('customRangeApply').addEventListener('click', apply);
+    _getEl('crPrev') && _getEl('crPrev').addEventListener('click', _prevMonth);
+    _getEl('crNext') && _getEl('crNext').addEventListener('click', _nextMonth);
+
+    // Preset buttons
+    modal.addEventListener('click', function(e) {
+      var preset = e.target.closest('[data-cr-preset]');
+      if (preset) _onPreset(preset.getAttribute('data-cr-preset'));
+    });
+
+    // Close on backdrop click
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) close();
+    });
+
+    // Keyboard Escape
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        var m = _getModal();
+        if (m && !m.classList.contains('hidden')) close();
+      }
+    });
+  }
+
+  return { open: open, close: close, apply: apply, bindModalEvents: bindModalEvents };
+})();
 
 // CSV export
 function exportSensorCSV(sensorId, sensorName) {
@@ -1732,6 +2100,7 @@ function buildSensorCards() {
                 '<button id="mmtog-168-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="168">7d</button>' +
                 '<button id="mmtog-720-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="720">30d</button>' +
                 '<button id="mmtog-1080-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="1080">45d</button>' +
+                '<button id="mmtog-custom-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="custom">Custom</button>' +
               '</span>' +
             '</div>' +
             '<div class="minmax-line" id="minmax-temp-min-' + s.id + '"><span class="waiting" style="font-size:.78rem">temp: calculating...</span></div>' +
@@ -1744,6 +2113,7 @@ function buildSensorCards() {
                 '<button id="mmtog-168m-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="168">7d</button>' +
                 '<button id="mmtog-720m-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="720">30d</button>' +
                 '<button id="mmtog-1080m-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="1080">45d</button>' +
+                '<button id="mmtog-customm-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="custom">Custom</button>' +
               '</span>' +
             '</div>' +
             '<div class="minmax-line" id="minmax-temp-max-' + s.id + '"><span class="waiting" style="font-size:.78rem">temp: calculating...</span></div>' +
@@ -1788,13 +2158,21 @@ function updateMinMax(pts, sensorId, isTemp) {
   var minEl = document.getElementById('minmax-' + (isTemp ? 'temp' : 'hum') + '-min-' + sensorId);
   var maxEl = document.getElementById('minmax-' + (isTemp ? 'temp' : 'hum') + '-max-' + sensorId);
   if (!minEl || !maxEl) return;
-  // Use selected period (24h / 7d / 30d / 45d)
-  var hours = minmaxPeriod[sensorId] || 24;
-  var windowMs = hours * 3600000;
-  var now = Date.now(), minVal = Infinity, maxVal = -Infinity, minT, maxT, count = 0;
+  var hours, startMs, endMs;
+  if (CUSTOM_RANGE_START > 0 && CUSTOM_RANGE_END > 0) {
+    startMs = CUSTOM_RANGE_START * 1000;
+    endMs   = CUSTOM_RANGE_END * 1000;
+    hours = Math.round((endMs - startMs) / 3600000);
+  } else {
+    hours = minmaxPeriod[sensorId] || 24;
+    endMs = Date.now();
+    startMs = endMs - hours * 3600000;
+  }
+  var minVal = Infinity, maxVal = -Infinity, minT, maxT, count = 0;
   for (var i = 0; i < pts.length; i++) {
     var pt = pts[i];
-    if (pt.y !== null && !isNaN(pt.y) && (now - pt.x.getTime() <= windowMs)) {
+    var t = pt.x && pt.x.getTime();
+    if (pt.y !== null && !isNaN(pt.y) && t >= startMs && t <= endMs) {
       count++;
       if (pt.y < minVal) { minVal = pt.y; minT = pt.x; }
       if (pt.y > maxVal) { maxVal = pt.y; maxT = pt.x; }
@@ -2355,6 +2733,7 @@ App.Boot.start = function() {
 
 document.addEventListener('DOMContentLoaded', function() {
   bindEvents();
+  CustomRange.bindModalEvents();
   try { App.Features.emit('onBoot'); } catch(e) { logNonFatal('boot hook emit', e); }
   App.Boot.start();
 });
