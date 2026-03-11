@@ -1,9 +1,9 @@
 # ESP32 Gateway — Fresh Start Handoff
 
-_Last updated: 2026-03-10_
+_Last updated: 2026-03-10 (repo normalization)_
 _Repo: `GCV-Sleeper-Service/ESP32-GW-multi-sensor`_
-_Current version: v7.4.1.0 (pending local steps + compile/test)_
-_Branch: `feature/custom-date-range`_
+_Current version: v7.4.1.0 — VALIDATED AND MERGED_
+_Branch: `main`_
 
 This is the single-source continuity document for resuming development in a fresh session.
 
@@ -17,7 +17,7 @@ See [architecture.md](architecture.md) for the full technical design.
 
 ---
 
-## Current State (v7.4.1.0)
+## Current State (v7.4.1.0 — COMPLETE)
 
 ### What is working
 
@@ -67,25 +67,28 @@ dashboard.html → minify-dashboard.sh → dashboard.min.html (gitignored)
 
 ### v7.4.1.0 status
 
-- Remote commit: DONE (VERSION, YAML, scripts, CI, .gitignore, docs)
-- Local sed steps: PENDING (dashboard.js, dashboard.html version strings)
-- Minification run: PENDING
-- Regenerate dashboard.h: PENDING
-- Preflight: PENDING
-- Compile: PENDING
-- Device test: PENDING
+- Remote commit: ✅ DONE
+- Local sed steps (dashboard.js, dashboard.html version strings): ✅ DONE
+- Minification run: ✅ DONE
+- Regenerate dashboard.h: ✅ DONE
+- Preflight: ✅ PASS (23/23)
+- Compile: ✅ PASS
+- Device test: ✅ PASS
+- Merged to main: ✅ DONE
+- Tagged v7.4.1.0: ✅ DONE
 
 ### Repository coordinates
 
 - **Repo:** `https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor`
-- **Branch:** `feature/custom-date-range` at v7.4.1.0
+- **Branch:** `main` (v7.4.1.0 merged and tagged)
+- **Feature branches:** None (all stale branches deleted after normalization)
 
-### Resource usage (last measured at v7.4.0)
+### Resource usage (measured at v7.4.1.0)
 
 | Metric | Value |
 |--------|-------|
 | RAM | ~15.8% of 327 KiB |
-| Flash | ~88.2% of 1.69 MiB (expected ~86% after minification) |
+| Flash | ~86.1% of 1.69 MiB (after minification, down from ~88.2% at v7.4.0.2) |
 | Free heap | ~78-84 KiB typical |
 | History partition | 512 KiB dedicated |
 
@@ -103,26 +106,37 @@ dashboard.html → minify-dashboard.sh → dashboard.min.html (gitignored)
 
 ## What Comes Next — Priority Order
 
-### Immediate: Complete v7.4.1.0 validation
+### Next Feature: v7.4.2.0 — Custom Date Range Selector
 
-1. Pull updated branch
-2. Apply sed version bumps (dashboard.js, dashboard.html)
-3. Install html-minifier-terser (if not already installed)
-4. Run: `./scripts/minify-dashboard.sh`
-5. Run: `./scripts/generate-header.sh`
-6. Run: `./scripts/preflight.sh` — must be 23/23 PASS
-7. Compile and flash
-8. Verify dashboard renders and flash usage is reduced
-9. Commit dashboard.js, dashboard.html, dashboard.h
-10. Tag v7.4.1.0, merge to main
+**Branch to create:** `feature/custom-date-range`
 
-### After v7.4.1.0 merge
+This is a **dashboard-only change** (no firmware or endpoint changes). A detailed design document and implementation plan is available in:
+- [planning-v7.4.2.0-custom-date-range.md](planning-v7.4.2.0-custom-date-range.md) — full UX spec, JS module design, acceptance criteria
+- [implementation-plan-next-features-7.4.1.x.md](implementation-plan-next-features-7.4.1.x.md) — Feature 2 section
 
-1. **Custom date range selector** (v7.4.2.x) — dashboard-only, HA-style calendar dialog
-2. **Playwright browser test automation** (v7.4.3.x) — mock backend + CI
-3. **Configurable sensor count** (v7.4.4.x) — docs + preflight validation
+**Summary:**
+- Add "Custom" button after 45d in min/max and chart panes
+- Date-range picker modal (vanilla JS, no external library)
+- `getEffectiveTimeRange()` centralises time-range logic
+- `CustomRange` IIFE module: calendar, presets, start/end selection
+- Standard range buttons clear custom range state
+- Fetches `/api/storage-stats` at dialog-open time for available date range
+- Mobile responsive
 
-See [future-plans.md](future-plans.md) and [implementation-plan-next-features.md](implementation-plan-next-features.md) for detail.
+**Steps to start:**
+1. Create branch: `git checkout -b feature/custom-date-range`
+2. Read the planning document above for full design details
+3. Implement dashboard.html and dashboard.js changes
+4. Run pipeline: `minify-dashboard.sh` → `generate-header.sh` → `preflight.sh`
+5. Compile, flash, test
+6. Commit, push, open PR
+
+### After v7.4.2.0
+
+1. **Playwright browser test automation** (v7.4.3.x) — mock backend + CI
+2. **Configurable sensor count** (v7.4.4.x) — docs + preflight validation
+
+See [future-plans.md](future-plans.md) and [implementation-plan-next-features-7.4.1.x.md](implementation-plan-next-features-7.4.1.x.md) for detail.
 
 ---
 
@@ -140,6 +154,7 @@ See [future-plans.md](future-plans.md) and [implementation-plan-next-features.md
 10. **Check all version strings after every bump** — VERSION, YAML, JS, register_history_handler, HTML comments
 11. **Large files (>100KB) require local sed for version bumps** — GitHub API has payload limits; use targeted sed -i for single-line changes in dashboard.js and dashboard.html
 12. **generate-header.sh auto-detects .min.html** — CI gets minified binary automatically; local without tools falls back gracefully
+13. **Doc-only commits still trigger CI** (~4.5 min compile); batch all doc changes into a single commit to minimise CI runs
 
 See [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) for the full record.
 
@@ -156,10 +171,13 @@ See [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) for the full reco
 | [build-history.md](build-history.md) | Curated build ledger |
 | [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) | Fixes, patterns, pitfalls |
 | [future-plans.md](future-plans.md) | Roadmap and feature assessment |
-| [implementation-plan-next-features.md](implementation-plan-next-features.md) | Detailed plans for next 4 features |
+| [implementation-plan-next-features-7.4.1.x.md](implementation-plan-next-features-7.4.1.x.md) | Detailed plans for next 4 features |
+| [planning-v7.4.2.0-custom-date-range.md](planning-v7.4.2.0-custom-date-range.md) | Design spec for v7.4.2.0 (next feature) |
 | [v7.4.0-documentation.md](v7.4.0-documentation.md) | Import v1 per-version doc |
 | [device-test-report-template.md](device-test-report-template.md) | Post-flash testing checklist |
-| [session-log-2026-03-10-v7.4.1.0.md](session-log-2026-03-10-v7.4.1.0.md) | This session's log |
+| [session-log-2026-03-09-v7.4.0.2.md](session-log-2026-03-09-v7.4.0.2.md) | v7.4.0.2 session log |
+| [session-log-2026-03-10-v7.4.1.0.md](session-log-2026-03-10-v7.4.1.0.md) | v7.4.1.0 session log |
+| [session-log-2026-03-10-v7.4.1.0-repo-normalization.md](session-log-2026-03-10-v7.4.1.0-repo-normalization.md) | Repo normalization session log |
 
 ---
 
@@ -171,9 +189,10 @@ Provide the assistant with:
 2. Current test results (compile, LAN, Cloudflare)
 3. What you want to work on next
 
-Example (after v7.4.1.0 validation):
+Example (starting v7.4.2.0):
 
 > Continuing the ESP32 BLE gateway project.
 > Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
-> v7.4.1.0 validated — minification working, flash at ~86%.
-> Next step: custom date range selector (v7.4.2.x)
+> v7.4.1.0 is complete and merged. Flash at ~86.1%.
+> Ready to start v7.4.2.0 — custom date range selector.
+> Please read the planning document and implement.

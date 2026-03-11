@@ -1,6 +1,6 @@
 # Development Pipeline
 
-_Last updated: 2026-03-09 — v7.4.0.2_
+_Last updated: 2026-03-10 — v7.4.1.0_
 
 This document defines how development works for the ESP32 Multi-Sensor BLE Gateway, from code changes through CI validation to device deployment.
 
@@ -88,6 +88,8 @@ git push origin --tags
 
 GitHub Actions runs on every push to `main`, every PR targeting `main`, and manual `workflow_dispatch`.
 
+> **Note:** Documentation-only commits also trigger CI (~4.5 min compile). Batch all doc-only changes into a single commit to minimize CI runs.
+
 ### What CI validates
 
 1. Preflight checks (file existence, cross-reference integrity, JS syntax + runtime smoke)
@@ -108,6 +110,8 @@ GitHub Actions runs on every push to `main`, every PR targeting `main`, and manu
 - Requires the `preflight-and-compile` status check to pass
 - No direct pushes to `main`
 
+> **Exception:** Documentation-only normalization commits may be pushed directly to `main` by the repository owner when no code changes are involved and CI is expected to pass without review.
+
 ---
 
 ## Versioning
@@ -127,6 +131,7 @@ The project uses a four-part version: `major.minor.patch.hotfix`
 - YAML header comment (`firmware/esp32-c3-multi-sensor.yaml`)
 - `App.version` in `dashboard/dashboard.js`
 - `register_history_handler()` call in YAML lambda
+- HTML header comment in `dashboard/dashboard.html`
 
 ### Tags
 
@@ -142,6 +147,7 @@ Tag every accepted build with `v` prefix: `v7.3.5.0`, `v7.4.0`, etc.
 | `scripts/preflight.sh` | Cross-reference and syntax checks | `./scripts/preflight.sh` |
 | `scripts/compile-with-log.sh` | Compile with timestamped log | `./scripts/compile-with-log.sh` |
 | `scripts/generate-header.sh` | Regenerate dashboard.h from HTML | `./scripts/generate-header.sh` |
+| `scripts/minify-dashboard.sh` | Minify dashboard.html → dashboard.min.html | `./scripts/minify-dashboard.sh` |
 | `scripts/deploy-to-esphome.sh` | Checkout version + preflight + compile | `./scripts/deploy-to-esphome.sh v7.3.5.0` |
 
 ---
@@ -155,9 +161,10 @@ The assistant delivers complete replacement files, not patches or diffs. This me
 - No manual merging is required
 - The preflight script validates cross-references after replacement
 
-When HTML changes, `dashboard.h` must be regenerated:
+When HTML changes, `dashboard.h` must be regenerated via the full pipeline:
 
 ```bash
+./scripts/minify-dashboard.sh
 ./scripts/generate-header.sh
 ```
 
@@ -172,6 +179,7 @@ For each accepted build, update:
 - `Docs/build-history.md` (add entry)
 - `Docs/esp32-gateway-fresh-start-handoff.md` (update current state)
 - `Docs/bugs-and-lessons-learned.md` (if applicable)
+- Add a session log: `Docs/session-log-<date>-v<version>.md`
 
 The assistant will prepare these updates alongside the code changes.
 
@@ -181,7 +189,7 @@ The assistant will prepare these updates alongside the code changes.
 
 Generated files are committed to Git:
 
-- `dashboard.h` (generated from dashboard.html)
+- `dashboard.h` (generated from dashboard.html via minification pipeline)
 - Documentation and notes
 
 This ensures every tagged version is self-contained and buildable without running generation steps first.
@@ -204,7 +212,7 @@ Real secrets never enter Git.
 ### Prerequisites
 
 - ESPHome 2025.11.0 or later
-- Node.js (for JS validation in preflight)
+- Node.js + `html-minifier-terser` (for dashboard pipeline: `npm install -g html-minifier-terser`)
 - Git
 
 ### LXC Container Setup (one-time)
@@ -240,6 +248,8 @@ secrets/*.yaml
 build-logs/
 artifacts/
 firmware/.esphome/
+dashboard/dashboard.min.html
+node_modules/
 ```
 
 Raw build logs go in `build-logs/` (gitignored). Curated documentation goes in `Docs/` (committed).

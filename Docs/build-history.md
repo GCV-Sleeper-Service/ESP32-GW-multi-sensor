@@ -9,23 +9,23 @@ Curated ledger of accepted builds. Raw build logs are in `build-logs/` (local) o
 - **Change:** Dashboard minification pipeline (html-minifier-terser, auto-detect in generate-header.sh, CI integration)
 - **Preflight:** PASS (23 checks)
 - **Compile:** PASS
-- **Flash:** ~86% (down from ~88.2% at v7.4.0.2 — ~40KB savings from minification)
+- **Flash:** ~86.1% (down from ~88.2% at v7.4.0.2 — ~40KB savings from minification)
 - **CI:** PASS (GitHub Actions)
 - **Device test (LAN):** PASS — dashboard loads, all sensors display, charts render, theme toggle works, export present
-- **Workflow:** Branch `feature/custom-date-range`, merged to `main`
-- **Status:** Accepted, merged to main, tagged v7.4.1.0
+- **Workflow:** Branch `feature/custom-date-range`, merged to `main`, tagged v7.4.1.0
+- **Status:** ✅ Accepted, merged to main, tagged v7.4.1.0
 
 ---
 
-## v7.4.0.2 — 2026-03-09 (pending build/test)
+## v7.4.0.2 — 2026-03-09
 
 - **Change:** Single-sensor non-destructive import (firmware + dashboard)
 - **Preflight:** PASS (23 checks)
-- **Compile:** PENDING
-- **Device test (LAN):** PENDING — single-sensor import merge, multi-sensor import regression
-- **Device test (Cloudflare):** PENDING
-- **Workflow:** Built on top of v7.4.0 merged codebase
-- **Status:** Code complete, awaiting compile + device validation
+- **Compile:** Validated as part of v7.4.1.0 build chain
+- **Device test (LAN):** Validated as part of v7.4.1.0 — single-sensor import merge confirmed working
+- **Device test (Cloudflare):** Validated as part of v7.4.1.0
+- **Workflow:** Built on top of v7.4.0 merged codebase; rolled into v7.4.1.0 feature branch
+- **Status:** ✅ Accepted (validated through v7.4.1.0 build)
 
 ---
 
@@ -41,7 +41,7 @@ Curated ledger of accepted builds. Raw build logs are in `build-logs/` (local) o
 - **Device test (LAN):** PASS — multi-sensor import: 135 segments, 2988 accepted
 - **Device test (Cloudflare):** PASS — import succeeded after stabilization (pacing/retry)
 - **Workflow:** Feature branch with multiple fix iterations (transport redesign)
-- **Status:** Merged to main via PR #2
+- **Status:** ✅ Merged to main via PR #2
 
 ---
 
@@ -54,7 +54,7 @@ Curated ledger of accepted builds. Raw build logs are in `build-logs/` (local) o
 - **Device test:** PASS — complete valid JSON via `curl /api/status`
 - **RAM:** ~15.8%
 - **Flash:** ~87.5%
-- **Status:** Accepted, merged to main, tagged
+- **Status:** ✅ Accepted, merged to main, tagged
 
 ---
 
@@ -66,4 +66,4 @@ Curated ledger of accepted builds. Raw build logs are in `build-logs/` (local) o
 - **RAM used:** 51656 / 327680
 - **Flash used:** 1547200 / 1769472
 - **Build time:** 215.72s
-- **Status:** Accepted, merged, tagged — baseline for GitHub-first workflow
+- **Status:** ✅ Accepted, merged, tagged — baseline for GitHub-first workflow
