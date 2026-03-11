@@ -4,6 +4,40 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.4.3.0 — 2026-03-11
+
+**Added:** Playwright browser regression test suite
+
+- `tests/mock-server/server.js` — lightweight Node.js HTTP mock of the ESP32 gateway API (no live device required)
+- `tests/fixtures/` — deterministic fixture data: sensor manifest, 72h history CSVs, storage-stats, api-status
+- `tests/browser/dashboard.spec.js` — 25 tests across 8 groups: boot/structure, sensor cards, transport/status, history/charts, custom date range modal, theme toggle, export controls, console error guard
+- `playwright.config.js` — Playwright configuration; webServer block auto-starts mock server before tests
+- `package.json` — project test runner (`npm run test:browser`)
+- `.github/workflows/browser-tests.yml` — separate CI workflow triggered on dashboard or test file changes
+- Version bump: VERSION + dashboard.js/html only (no firmware change, no device reflash required)
+
+**Not changed:** YAML firmware, sensor_history_multi.h, device flash (remains at v7.4.2.0 on device)
+
+---
+
+## v7.4.2.0 — 2026-03-11
+
+**Added:** Custom date range selector
+
+- "Custom" button added after 45d in both chart range toggle and per-sensor min/max toggles
+- Modal date-range picker: 6 quick-select presets, navigable calendar with two-click start→end selection, hour + AM/PM time selectors
+- `getEffectiveTimeRange()` centralises all time-range logic — charts and min/max both route through it
+- `CUSTOM_RANGE_START` / `CUSTOM_RANGE_END` module-level state; cleared when any standard preset is clicked
+- Data availability footer: "Data available: oldest–newest", "up to newest", or "No persisted history yet" (correct on fresh device)
+- Mobile responsive below 480px
+
+**Fixed:**
+- BUG-017: `MAX_HISTORY_RANGE_HOURS` was 720 (30d), silently truncating the 45d range — changed to 1080
+- BUG-018: Duplicate `<script>` tag in HTML caused `Unexpected token '<'` on boot — script sync corrected
+- BUG-019: "Data available: unknown" on freshly-flashed device — three-state availability display added
+
+---
+
 ## v7.4.1.0 — 2026-03-10
 
 **Added:** Dashboard minification pipeline

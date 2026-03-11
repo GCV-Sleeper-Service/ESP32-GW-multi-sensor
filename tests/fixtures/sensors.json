@@ -1,0 +1,14 @@
+[
+  {
+    "id": "office",
+    "name": "Office"
+  },
+  {
+    "id": "first_floor",
+    "name": "First Floor"
+  },
+  {
+    "id": "outside",
+    "name": "Outside"
+  }
+]

@@ -158,6 +158,65 @@ Because each persisted segment stores all sensors together, one-sensor replaceme
 
 ---
 
+### BUG-020: Browser test suite used wrong element IDs throughout — 14 of 25 tests failed (v7.4.3.0)
+
+**Symptom:** 14 CI browser test failures on first run. All failures traced to elements not found.
+
+**Root cause:** Tests were written against assumed element IDs without verifying the actual dashboard HTML. Six distinct mismatches:
+
+| Used in test | Actual ID in HTML |
+|---|---|
+| `#themeToggle` | `#themeBtn` |
+| `#crApply` | `#customRangeApply` |
+| `#crCancel` | `#customRangeCancel` |
+| `#crPrevMonth` | `#crPrev` |
+| `#crMonthLabel` | `#crCalHeader` |
+| `.card-title` | `.sensor-card-header` (name is a raw text node, no title class) |
+| `data-history-range="7d"` | `data-history-range="168"` (values are in hours, not labels) |
+| `button[hasText=Export]` count ≥ 4 | `[data-export-all]` + `[data-export-sensor]` separate attributes |
+
+**Fix:** Audited all element IDs against the actual HTML before writing tests. Replaced every selector.
+
+**Lesson:** Always `grep` the actual HTML for element IDs before writing selectors. Never assume IDs from variable names or context — verify them. See LESSON-OPS-022.
+
+---
+
+### BUG-021: `browser-tests.yml` committed to wrong branch — workflow never appeared in CI (v7.4.3.0)
+
+**Symptom:** GitHub Actions showed no "Browser Tests" workflow. The file existed on disk but `git show --name-only HEAD` returned nothing for it.
+
+**Root cause:** `browser-tests.yml` was committed on `feature/custom-date-range` (an earlier branch) rather than `feature/playwright-tests`. The rebase that followed picked up all other files but the workflow file was never in the HEAD commit of the feature branch.
+
+**Fix:** `git log --oneline --all -- .github/workflows/browser-tests.yml` identified the commit. `git checkout <sha> -- .github/workflows/browser-tests.yml` recovered the file and it was committed to the correct branch.
+
+**Additional factor:** GitHub does not register a new workflow file until it appears on the default branch (`main`). Even with the file correctly committed to a feature branch, the workflow tab won't show it until the PR is merged.
+
+**Lesson:** After committing a new workflow file, verify with `git show --name-only HEAD | grep workflow`. See LESSON-OPS-023.
+
+---
+
+### BUG-022: `package-lock.json` not committed — CI failed on `npm ci` (v7.4.3.0)
+
+**Symptom:** Browser CI job failed immediately: `Dependencies lock file is not found`.
+
+**Root cause:** `npm install` was run locally to generate `package.json` and install Playwright, but `package-lock.json` was never staged or committed. `npm ci` (used in CI) requires the lockfile — unlike `npm install`, it will not generate one.
+
+**Fix:** `npm install` on device, then `git add package-lock.json && git commit`.
+
+**Lesson:** Any time `package.json` is introduced, commit `package-lock.json` in the same commit. See LESSON-OPS-024.
+
+---
+
+### BUG-023: Output bundle file naming caused confusion about destination paths (v7.4.3.0)
+
+**Symptom:** `mock-server.js` in outputs needed to be placed as `tests/mock-server/server.js`. Three JSON fixture files needed to go into `tests/fixtures/`. The flat output bundle gave no indication of subdirectory placement.
+
+**Fix:** Files renamed and placed in correct locations after clarification.
+
+**Lesson:** When delivering files that go into subdirectories, prefix the output filename with the path (e.g. `tests--mock-server--server.js`) or document the copy list explicitly in the session notes. See LESSON-OPS-025.
+
+---
+
 ## Operational Lessons
 
 ### LESSON-OPS-001: File renames must update internal references
@@ -322,3 +381,65 @@ The current export path remains acceptable for the present dataset sizes, but it
 Single-sensor import is now safe/merge-based, but multi-sensor import still clears existing history before writing.
 A future staging/swap approach would be safer.
 
+
+### LESSON-OPS-022: Always verify element IDs against actual HTML before writing browser tests
+
+Before writing any Playwright selector, grep the dashboard HTML for the actual ID:
+```bash
+grep -n 'id="theme\|id="cr\|id="custom\|data-history-range\|data-export' dashboard/dashboard.html
+```
+Never assume an ID from a variable name, comment, or context. The cost of one grep is zero; the cost of 14 CI failures is not.
+
+Specific gotchas in this codebase:
+- Range button values are **hours**, not labels: 24, 168, 720, 1080, custom
+- Export buttons use `data-export-all` and `data-export-sensor` attributes, not text matching
+- Sensor names are raw text nodes inside `.sensor-card-header` — there is no `.card-title` class
+- Export and sensor card elements are built dynamically — use `waitForFunction` before asserting them
+
+### LESSON-OPS-023: Verify new workflow files are in the correct commit before pushing
+
+After adding a `.github/workflows/` file, confirm it is in the current HEAD commit:
+```bash
+git show --name-only HEAD | grep workflows
+```
+If it returns nothing, the file was either committed on a different branch or never staged.
+
+Also: GitHub will not show a new workflow in the Actions sidebar until the workflow file has been merged to the default branch (`main`). This is expected — do not try to trigger it from the feature branch UI before merging.
+
+### LESSON-OPS-024: Commit `package-lock.json` in the same commit as `package.json`
+
+`npm ci` (used in all CI environments) requires a lockfile and will not generate one. `npm install` generates the lockfile locally but does not commit it. Always stage and commit `package-lock.json` alongside `package.json`.
+
+```bash
+npm install
+git add package.json package-lock.json
+git commit -m "..."
+```
+
+### LESSON-OPS-025: Output bundle files must clearly indicate their destination path
+
+When delivering files that belong in subdirectories, document the full destination path explicitly in session notes or in the delivery message. A flat bundle with `mock-server.js` does not communicate that it should be placed at `tests/mock-server/server.js`.
+
+Preferred format in session handoff:
+```
+mock-server.js   →  tests/mock-server/server.js
+sensors.json     →  tests/fixtures/sensors.json
+```
+
+### LESSON-OPS-026: `data-history-range` button values are in hours, not human-readable labels
+
+The range toggle buttons use numeric hour values as their `data-history-range` attribute:
+
+| Label | Attribute value |
+|-------|----------------|
+| 24h | `24` |
+| 7d | `168` |
+| 30d | `720` |
+| 45d | `1080` |
+| Custom | `custom` |
+
+Any test, script, or documentation referencing these buttons must use the hour values, not the display labels.
+
+### LESSON-OPS-027: New GitHub Actions workflows only appear after merging to main
+
+GitHub registers workflow files from the default branch only. A new `.github/workflows/*.yml` file on a feature branch will not appear in the Actions sidebar and cannot be triggered manually until it is merged to `main`. This is not a bug — just push the PR and merge. The workflow will appear and run automatically on the next push to main.
