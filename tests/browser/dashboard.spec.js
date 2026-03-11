@@ -2,14 +2,17 @@
  * tests/browser/dashboard.spec.js
  * Browser regression suite for the ESP32 gateway dashboard.
  *
- * Element ID reference (actual dashboard HTML):
- *   Theme button:  #themeBtn
- *   Apply button:  #customRangeApply
- *   Cancel button: #customRangeCancel
- *   Prev month:    #crPrev  /  Month label: #crCalHeader
- *   Range values:  24, 168 (7d), 720 (30d), 1080 (45d), custom  — in hours
- *   Export all:    [data-export-all]  /  Per-sensor: [data-export-sensor]
- *   Card names:    text node inside .sensor-card-header (no dedicated title class)
+ * Element ID / DOM reference (verified against actual dashboard HTML):
+ *   Theme button:      #themeBtn  — class 'light' goes on <html> (documentElement), NOT <body>
+ *   Apply button:      #customRangeApply
+ *   Cancel button:     #customRangeCancel
+ *   Prev month:        #crPrev  /  Month label: #crCalHeader
+ *   Range values:      24, 168 (7d), 720 (30d), 1080 (45d), custom  — in hours
+ *   Export all:        [data-export-all]  /  Per-sensor: [data-export-sensor]
+ *   Card names:        text node inside .sensor-card-header (no dedicated title class)
+ *   Chart canvases:    inside .chart-card divs, NOT inside .sensor-card
+ *   Preset buttons:    [data-cr-preset] — clicking applies AND closes modal immediately
+ *                      (no separate Apply click needed after a preset)
  */
 
 'use strict';
@@ -49,7 +52,8 @@ test.describe('1. Boot and structure', () => {
 
   test('dark mode is the default theme', async ({ page }) => {
     await loadDashboard(page);
-    const cls = await page.locator('body').getAttribute('class') || '';
+    // Theme class is on <html> (documentElement), not <body>
+    const cls = await page.locator('html').getAttribute('class') || '';
     expect(cls).not.toContain('light');
   });
 
@@ -139,13 +143,17 @@ test.describe('4. History and charts', () => {
     expect(pageError).toBeNull();
   });
 
-  test('chart canvases are rendered inside sensor cards', async ({ page }) => {
+  test('chart canvases are rendered in chart sections', async ({ page }) => {
     await loadDashboard(page);
+    // Charts live in .chart-card divs, NOT inside .sensor-card
     await page.waitForFunction(() => {
       const el = document.getElementById('pointCount');
       return el && el.textContent.includes('data points');
     }, { timeout: 12000 });
-    expect(await page.locator('.sensor-card canvas').count()).toBeGreaterThan(0);
+    // Check the four named chart canvases exist and are attached
+    for (const id of ['tempChart', 'humChart', 'tempAvgChart', 'humAvgChart']) {
+      await expect(page.locator(`#${id}`)).toBeAttached();
+    }
   });
 
   test('history badge updates from loading state', async ({ page }) => {
@@ -203,14 +211,15 @@ test.describe('5. Custom date range', () => {
     expect(after).not.toBe(before);
   });
 
-  test('Apply with a preset selection does not crash', async ({ page }) => {
+  test('clicking a preset applies range and closes modal', async ({ page }) => {
+    // Preset buttons call _applyAndClose() directly — no separate Apply click needed
     let pageError = null;
     page.on('pageerror', err => { pageError = err; });
     await loadDashboard(page);
     await page.locator('[data-history-range="custom"]').first().click();
     await expect(page.locator('#customRangeModal')).toBeVisible();
+    // Clicking preset immediately applies and closes — do not click Apply afterwards
     await page.locator('[data-cr-preset="7d"]').click();
-    await page.locator('#customRangeApply').click();
     await expect(page.locator('#customRangeModal')).toBeHidden({ timeout: 3000 });
     expect(pageError).toBeNull();
   });
@@ -219,10 +228,11 @@ test.describe('5. Custom date range', () => {
     let pageError = null;
     page.on('pageerror', err => { pageError = err; });
     await loadDashboard(page);
+    // Activate custom range via preset (preset closes modal itself)
     await page.locator('[data-history-range="custom"]').first().click();
     await page.locator('[data-cr-preset="7d"]').click();
-    await page.locator('#customRangeApply').click();
     await expect(page.locator('#customRangeModal')).toBeHidden({ timeout: 3000 });
+    // Click standard range — should not crash
     await page.locator('[data-history-range="24"]').first().click();
     await page.waitForTimeout(300);
     expect(pageError).toBeNull();
@@ -234,16 +244,17 @@ test.describe('5. Custom date range', () => {
 test.describe('6. Theme toggle', () => {
   test('clicking theme toggle switches to light mode', async ({ page }) => {
     await loadDashboard(page);
-    await expect(page.locator('body')).not.toHaveClass(/light/);
+    // Theme class is toggled on <html> (documentElement), not <body>
+    await expect(page.locator('html')).not.toHaveClass(/light/);
     await page.locator('#themeBtn').click();
-    await expect(page.locator('body')).toHaveClass(/light/);
+    await expect(page.locator('html')).toHaveClass(/light/);
   });
 
   test('clicking theme toggle twice returns to dark mode', async ({ page }) => {
     await loadDashboard(page);
     await page.locator('#themeBtn').click();
     await page.locator('#themeBtn').click();
-    await expect(page.locator('body')).not.toHaveClass(/light/);
+    await expect(page.locator('html')).not.toHaveClass(/light/);
   });
 
   test('theme toggle does not crash the page', async ({ page }) => {
@@ -263,7 +274,6 @@ test.describe('6. Theme toggle', () => {
 test.describe('7. Export controls', () => {
   test('Export All button is visible', async ({ page }) => {
     await loadDashboard(page);
-    // Export buttons are built dynamically after sensor cards render
     await page.waitForFunction(() => !!document.querySelector('[data-export-all]'), { timeout: 10000 });
     await expect(page.locator('[data-export-all]')).toBeVisible();
   });
@@ -273,8 +283,7 @@ test.describe('7. Export controls', () => {
     await page.waitForFunction(() => {
       return document.querySelectorAll('[data-export-sensor]').length >= 3;
     }, { timeout: 10000 });
-    const count = await page.locator('[data-export-sensor]').count();
-    expect(count).toBeGreaterThanOrEqual(3);
+    expect(await page.locator('[data-export-sensor]').count()).toBeGreaterThanOrEqual(3);
   });
 
   test('clicking Export All does not crash', async ({ page }) => {
