@@ -9,6 +9,45 @@ It is also the place where project guardrails are recorded so they are not re-le
 
 ## Bug Fixes
 
+### BUG-019: "Data available: unknown" in custom range dialog on freshly-flashed device (v7.4.2.0)
+
+**Symptom:** Custom date range modal shows "Data available: unknown" immediately after flash.
+
+**Root cause:** `/api/storage-stats` returns `retention_oldest_epoch = 0` when no data has been persisted to NVS yet. The original dialog code treated any zero bound as "unknown". On a fresh device, the first persist happens at 2:10 AM — until then, oldest epoch is genuinely 0.
+
+**Fix:** Three-state availability display:
+- Both bounds non-zero → "Data available: [oldest] – [newest]"
+- Only newest non-zero → "Data available: up to [newest]"
+- Both zero → "No persisted history yet — range applies to RAM data only"
+
+**Lesson:** Distinguish between "API returned an error" and "API returned a valid zero value." Zero oldest epoch is a valid state, not a missing value.
+
+---
+
+### BUG-018: Duplicate `<script>` tag caused `Unexpected token '<'` dashboard failure (v7.4.2.0 deployment)
+
+**Symptom:** Dashboard stuck on "connecting" after flash. Browser console: `Uncaught SyntaxError: Unexpected token '<'`.
+
+**Root cause:** The script block sync command used `head -n 858` (inclusive of the `<script>` line), then echoed `<script>` again, producing two consecutive `<script>` tags. The browser's HTML parser closed the script block at the second `<script>`, then fed the remaining JavaScript as HTML, causing the syntax error.
+
+**Fix:** `sed -i '859d' dashboard/dashboard.html` — deleted the duplicate tag.
+
+**Prevention:** The sync command must use `head -n $((SCRIPT_LINE - 1))` (one line before the `<script>` tag), not `head -n $SCRIPT_LINE`. After every sync, verify with `grep -c '^<script>$' dashboard/dashboard.html` — must return exactly `1`. A minification savings of ~33% also confirms correct single-script-block sync; savings <10% indicate the block was doubled.
+
+---
+
+### BUG-017: `MAX_HISTORY_RANGE_HOURS` was 720, silently truncating 45d history display (v7.4.2.0)
+
+**Symptom:** Selecting the 45d range button displayed only 30 days of data.
+
+**Root cause:** `MAX_HISTORY_RANGE_HOURS` was set to `720` (30 days). The history store trim logic uses this constant to cap stored chart points: `store.temp.length > (MAX_HISTORY_RANGE_HOURS * 4 + 32)`. At 4 points/hour, 720 hours = 2912 points max, while 45d needs 4352 points. Data beyond 30 days was trimmed silently.
+
+**Fix:** `MAX_HISTORY_RANGE_HOURS = 1080`.
+
+**Lesson:** `MAX_HISTORY_RANGE_HOURS` must equal the highest `data-history-range` value in the HTML. A preflight check to validate this pairing would catch this class of bug automatically.
+
+---
+
 ### BUG-016: `html-minifier-terser` CLI flags wrong (v7.4.1.0)
 
 **Symptom:** `./scripts/minify-dashboard.sh` exited with `unknown option '--input-path'`.
@@ -228,6 +267,31 @@ That way a new session can restart cleanly without reconstructing history from c
 If a comment/header is clearly stale, normalize it during the same session that fixes the related documentation drift.
 This reduces "almost aligned" repo states.
 
+### LESSON-OPS-018: Script block sync must use N-1, not N, for `head` cut
+
+When syncing `dashboard.js` into the `<script>` block of `dashboard.html`, use:
+```bash
+SCRIPT_LINE=$(grep -n "^<script>$" dashboard/dashboard.html | head -1 | cut -d: -f1)
+head -n $((SCRIPT_LINE - 1)) dashboard/dashboard.html > /tmp/out.txt
+echo '<script>' >> /tmp/out.txt
+cat dashboard/dashboard.js >> /tmp/out.txt
+echo '</script>' >> /tmp/out.txt
+tail -n +$((END_LINE + 1)) dashboard/dashboard.html >> /tmp/out.txt
+```
+After every sync, verify: `grep -c '^<script>$' dashboard/dashboard.html` must return `1`.
+
+### LESSON-OPS-019: Minification savings are a correctness signal
+
+After running `minify-dashboard.sh`, expected savings are ~30–35% of source size. If savings are below 10%, the script block was almost certainly doubled (embedded twice). Use this as a fast sanity check before committing.
+
+### LESSON-OPS-020: "Data available: unknown" is expected on a freshly-flashed device
+
+The first NVS history persist runs at 2:10 AM. Until then, `retention_oldest_epoch` returns 0. The custom range dialog handles this gracefully as of v7.4.2.0 — it is not a bug or a fetch failure.
+
+### LESSON-OPS-021: Zero return values from API need explicit handling distinct from fetch errors
+
+Do not conflate a successful API response containing `0` with a missing/failed response. Use separate code paths for "API succeeded but returned zero" vs "API call failed."
+
 ---
 
 ## Regression Checklist
@@ -257,3 +321,4 @@ The current export path remains acceptable for the present dataset sizes, but it
 
 Single-sensor import is now safe/merge-based, but multi-sensor import still clears existing history before writing.
 A future staging/swap approach would be safer.
+

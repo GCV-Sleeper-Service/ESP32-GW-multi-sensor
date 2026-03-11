@@ -60,7 +60,7 @@ Session rules (carried from prior session):
 
 ## 4. Inconsistencies Found
 
-### BUG-016: `MAX_HISTORY_RANGE_HOURS` — Silent data truncation for 45d range
+### BUG-017: `MAX_HISTORY_RANGE_HOURS` — Silent data truncation for 45d range
 
 **File:** `dashboard/dashboard.js` line 119
 
@@ -203,7 +203,7 @@ Mobile responsive: `@media (max-width:480px)` stacks presets above calendar.
 
 | File | Change |
 |------|--------|
-| `dashboard/dashboard.js` | BUG-016 fix, new state vars, `getEffectiveTimeRange()`, updated `filterPointsForRange`/`updateMinMax`/`setHistoryRange`/`setMinMaxPeriod`/`bindEvents`/`applyHistoryRange`, `CustomRange` IIFE, DOMContentLoaded update, version bump, Custom buttons in dynamic minmax HTML |
+| `dashboard/dashboard.js` | BUG-017 fix, new state vars, `getEffectiveTimeRange()`, updated `filterPointsForRange`/`updateMinMax`/`setHistoryRange`/`setMinMaxPeriod`/`bindEvents`/`applyHistoryRange`, `CustomRange` IIFE, DOMContentLoaded update, version bump, Custom buttons in dynamic minmax HTML |
 | `dashboard/dashboard.html` | New CSS block, Custom button in static range toggle, modal HTML, script block synced from dashboard.js, version bumps |
 | `dashboard/dashboard.h` | Regenerated via minify → generate-header pipeline |
 | `firmware/esp32-c3-multi-sensor.yaml` | Version bump: 4 locations |
@@ -238,7 +238,7 @@ The full pipeline ran successfully: `minify-dashboard.sh` → `generate-header.s
 | Read `firmware/esp32-c3-multi-sensor.yaml` versions | ✅ |
 | Read `scripts/preflight.sh` | ✅ |
 | Read `.github/workflows/ci.yml` | ✅ |
-| Fixed BUG-016: `MAX_HISTORY_RANGE_HOURS` 720 → 1080 | ✅ |
+| Fixed BUG-017: `MAX_HISTORY_RANGE_HOURS` 720 → 1080 | ✅ |
 | Added `CUSTOM_RANGE_START/END` state vars | ✅ |
 | Added `getEffectiveTimeRange()` | ✅ |
 | Updated `filterPointsForRange()` (removed `hours` arg) | ✅ |
@@ -269,7 +269,7 @@ The full pipeline ran successfully: `minify-dashboard.sh` → `generate-header.s
 
 | ID | File | Description | Fix |
 |----|------|-------------|-----|
-| BUG-016 | `dashboard.js` | `MAX_HISTORY_RANGE_HOURS = 720` silently truncated 45d history to 30d | Changed to `1080` |
+| BUG-017 | `dashboard.js` | `MAX_HISTORY_RANGE_HOURS = 720` silently truncated 45d history to 30d | Changed to `1080` |
 | DOC-001 | `sensor_history_multi.h` | File header comment still referenced v7.4.0.2 | Updated to v7.4.2.0 |
 
 ---
@@ -318,7 +318,7 @@ The full pipeline ran successfully: `minify-dashboard.sh` → `generate-header.s
    ```bash
    git checkout -b feature/custom-date-range
    git add -A
-   git commit -m "feat: custom date range selector (v7.4.2.0) + BUG-016 fix"
+   git commit -m "feat: custom date range selector (v7.4.2.0) + BUG-017 fix"
    git push origin feature/custom-date-range
    ```
 
@@ -343,7 +343,7 @@ The full pipeline ran successfully: `minify-dashboard.sh` → `generate-header.s
 
 ### Preflight enhancement (backlog)
 
-Consider adding a preflight check that validates `MAX_HISTORY_RANGE_HOURS` matches the largest `data-history-range` attribute value in the source HTML. This would have caught BUG-016 automatically.
+Consider adding a preflight check that validates `MAX_HISTORY_RANGE_HOURS` matches the largest `data-history-range` attribute value in the source HTML. This would have caught BUG-017 automatically.
 
 ### After v7.4.2.0
 
@@ -362,3 +362,63 @@ Consider adding a preflight check that validates `MAX_HISTORY_RANGE_HOURS` match
 6. Clarify before acting when unclear
 7. `dashboard.html` and `dashboard.js` must stay in sync — always re-sync the script block after JS changes
 8. Six version locations: `VERSION`, `dashboard.js` (`App.version`), `dashboard.html` (header + description + App.version via script sync), `firmware/esp32-c3-multi-sensor.yaml` (4 locations), `sensor_history_multi.h` (file header comment)
+
+---
+
+## 12. Post-Deployment Bugs and Fixes (discovered during flash/test)
+
+### BUG-018: Duplicate `<script>` tag — dashboard stuck on "connecting"
+
+**Symptom:** After flash, dashboard showed "connecting" indefinitely. Browser console: `Uncaught SyntaxError: Unexpected token '<'`.
+
+**Root cause:** The script block sync command used `head -n 858` (inclusive of the `<script>` line at line 858), then appended `echo '<script>'`, producing two consecutive `<script>` tags on lines 858–859. The HTML parser closed the script block at the duplicate tag, leaving raw JavaScript where the browser expected HTML.
+
+**Fix applied:**
+```bash
+sed -i '859d' dashboard/dashboard.html
+```
+
+**Prevention going forward:** Always use `head -n $((SCRIPT_LINE - 1))` for the cut, never `head -n $SCRIPT_LINE`. After every sync, verify `grep -c '^<script>$' dashboard/dashboard.html` returns exactly `1`. Minification savings of ~33% also confirm a correct single script block — savings below 10% indicate the block was doubled.
+
+**Additional discovery:** With the correct sync, minification savings jumped from 6% (~11KB, broken sync) to 33% (~60KB, correct sync). The broken sync was embedding the JavaScript twice in the HTML, making the file artificially large and negating most of the minification benefit.
+
+---
+
+### BUG-019: "Data available: unknown" on freshly-flashed device
+
+**Symptom:** After flash, the Custom date range dialog showed "Data available: unknown" in the footer.
+
+**Root cause:** `/api/storage-stats` returns `retention_oldest_epoch = 0` until the first NVS persist cycle runs (2:10 AM daily). The original code treated any zero bound as "unknown."
+
+**Fix:** Three-state rendering in `_renderAvailability()`:
+- Both bounds non-zero → "Data available: [oldest] – [newest]"
+- Only newest non-zero → "Data available: up to [newest]"
+- Both zero → "No persisted history yet — range applies to RAM data only"
+
+**Status:** Fixed and included in final v7.4.2.0 delivery.
+
+---
+
+### Additional lesson: verify script sync with minification ratio
+
+If `minify-dashboard.sh` reports savings below ~15%, the script block is likely doubled. This is now a fast diagnostic before wasting a compile cycle.
+
+---
+
+## 13. Final Acceptance Criteria Status
+
+| # | Criterion | Status |
+|---|-----------|--------|
+| 1 | "Custom" button appears after 45d in both panes | ✅ PASS |
+| 2 | Clicking Custom opens the date-range dialog | ✅ PASS |
+| 3 | Calendar renders; available range footer correct | ✅ PASS (shows "No persisted history yet" on fresh flash — correct) |
+| 4 | Preset buttons work and close the dialog | ✅ PASS |
+| 5 | Calendar start/end selection with range highlighting | ✅ PASS |
+| 6 | Apply updates charts to the custom range | ✅ PASS |
+| 7 | Standard range buttons clear the custom range | ✅ PASS |
+| 8 | Cancel closes without changing current range | ✅ PASS |
+| 9 | Works on mobile viewport | ✅ PASS (CSS verified) |
+| 10 | Light theme displays correctly | ✅ PASS |
+| 11 | No JS console errors | ✅ PASS |
+| 12 | Preflight 23/23 PASS | ✅ PASS |
+| 13 | Flash remains below 90% | ✅ PASS (86.8%) |
