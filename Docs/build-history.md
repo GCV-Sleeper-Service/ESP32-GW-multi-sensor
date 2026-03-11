@@ -4,6 +4,19 @@ Curated ledger of accepted builds. Raw build logs are in `build-logs/` (local) o
 
 ---
 
+## v7.4.1.0 — 2026-03-10
+
+- **Change:** Dashboard minification pipeline (html-minifier-terser, auto-detect in generate-header.sh, CI integration)
+- **Preflight:** PASS (23 checks)
+- **Compile:** PASS
+- **Flash:** ~86% (down from ~88.2% at v7.4.0.2 — ~40KB savings from minification)
+- **CI:** PASS (GitHub Actions)
+- **Device test (LAN):** PASS — dashboard loads, all sensors display, charts render, theme toggle works, export present
+- **Workflow:** Branch `feature/custom-date-range`, merged to `main`
+- **Status:** Accepted, merged to main, tagged v7.4.1.0
+
+---
+
 ## v7.4.0.2 — 2026-03-09 (pending build/test)
 
 - **Change:** Single-sensor non-destructive import (firmware + dashboard)
