@@ -4,6 +4,29 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.4.1.0 — 2026-03-10
+
+**Added:** Dashboard minification pipeline
+
+- New script `scripts/minify-dashboard.sh` — runs `html-minifier-terser` on `dashboard.html` to produce `dashboard.min.html` (build artifact, gitignored)
+- `scripts/generate-header.sh` updated — auto-detects `dashboard.min.html` when present; falls back to `dashboard.html` if not (backwards-compatible)
+- CI workflow updated — installs `html-minifier-terser`, runs minify → generate-header → preflight → compile in sequence
+- `.gitignore` updated — adds `dashboard/dashboard.min.html` and `node_modules/`
+- Expected flash savings: ~40KB (~88% → ~86%)
+
+**Pipeline sequence (local):**
+```
+dashboard.html → minify-dashboard.sh → dashboard.min.html (gitignored)
+                                      → generate-header.sh → dashboard.h (committed)
+```
+
+**Key behaviours:**
+- `dashboard.min.html` is never committed — it is a build artifact
+- `generate-header.sh` picks up `.min.html` automatically when present (no argument needed)
+- CI always produces the minified binary; local builds without the tool fall back gracefully
+
+---
+
 ## v7.4.0.2 — 2026-03-09
 
 **Added:** Single-sensor non-destructive import
