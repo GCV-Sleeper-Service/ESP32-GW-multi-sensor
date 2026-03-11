@@ -66,6 +66,40 @@ check_not_contains "yaml_no_old_versioned_header_name" firmware/esp32-c3-multi-s
 check_not_contains "yaml_no_old_versioned_history_name" firmware/esp32-c3-multi-sensor.yaml "sensor_history_multi-v7.3.4.2.h"
 check_not_contains "yaml_no_old_versioned_partition_name" firmware/esp32-c3-multi-sensor.yaml "esp32-c3-multi-v7.3.4.2-partitions.csv"
 
+# ── BUG-018 prevention: exactly one <script> tag in dashboard.html ──
+SCRIPT_TAG_COUNT=$(grep -c '^<script>$' dashboard/dashboard.html || true)
+if [[ "$SCRIPT_TAG_COUNT" -eq 1 ]]; then
+  echo "single_script_tag: PASS"
+else
+  echo "single_script_tag: FAIL (found ${SCRIPT_TAG_COUNT}, expected 1 — script block was doubled during sync)"
+  exit 1
+fi
+
+# ── BUG-017 prevention: MAX_HISTORY_RANGE_HOURS must match highest data-history-range button ──
+MAX_RANGE_HOURS=$(grep -oP 'data-history-range="\K[0-9]+' dashboard/dashboard.html | sort -n | tail -1)
+MAX_CONST=$(grep -oP 'MAX_HISTORY_RANGE_HOURS\s*=\s*\K[0-9]+' dashboard/dashboard.js | head -1)
+if [[ "$MAX_RANGE_HOURS" == "$MAX_CONST" ]]; then
+  echo "max_history_range_consistent: PASS"
+else
+  echo "max_history_range_consistent: FAIL (highest button=${MAX_RANGE_HOURS}h, MAX_HISTORY_RANGE_HOURS=${MAX_CONST} — mismatch silently truncates history)"
+  exit 1
+fi
+
+# ── Test infrastructure existence ──
+TEST_FILES=(
+  "tests/browser/dashboard.spec.js"
+  "tests/mock-server/server.js"
+  "tests/fixtures/generate-fixtures.js"
+  "playwright.config.js"
+  "package.json"
+  "package-lock.json"
+)
+ALL_TEST_OK=true
+for tf in "${TEST_FILES[@]}"; do
+  [[ -f "$tf" ]] || { echo "test_infrastructure: FAIL (missing $tf)"; ALL_TEST_OK=false; exit 1; }
+done
+echo "test_infrastructure: PASS"
+
 node --check dashboard/dashboard.js
 echo "node_check: PASS"
 
