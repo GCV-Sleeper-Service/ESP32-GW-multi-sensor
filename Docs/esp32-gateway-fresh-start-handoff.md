@@ -1,8 +1,8 @@
 # ESP32 Gateway — Fresh Start Handoff
 
-_Last updated: 2026-03-11 — v7.4.3.0 (Playwright test suite)
+_Last updated: 2026-03-11 — v7.4.3.0 complete and merged_
 _Repo: `GCV-Sleeper-Service/ESP32-GW-multi-sensor`_
-_Current version: v7.4.3.0 — PENDING CI
+_Current version: v7.4.3.0 — SHIPPED_
 _Branch: `main`_
 
 This is the single-source continuity document for resuming development in a fresh session.
@@ -17,7 +17,7 @@ See [architecture.md](architecture.md) for the full technical design.
 
 ---
 
-## Current State (v7.4.2.0 — COMPLETE)
+## Current State (v7.4.3.0 — COMPLETE)
 
 ### What is working
 
@@ -33,8 +33,18 @@ See [architecture.md](architecture.md) for the full technical design.
 - Dark/light mode with chart redraw
 - GitHub Actions CI: preflight + compile on every push/PR
 - Branch protection on `main`
-- Dashboard minification pipeline (v7.4.1.0): html-minifier-terser, ~60KB flash savings
-- **Custom Date Range Selector (v7.4.2.0):** Custom button in both chart and min/max panes, modal calendar picker with presets, range applied to all charts simultaneously
+- Dashboard minification pipeline (v7.4.1.0): html-minifier-terser, ~40KB flash savings
+- Custom Date Range Selector (v7.4.2.0): modal calendar, 6 presets, live data-availability footer
+- **Playwright browser regression test suite (v7.4.3.0):** 28 tests across 8 groups, mock server, fixture data, separate CI workflow
+
+### Playwright test suite summary (v7.4.3.0)
+
+- `tests/mock-server/server.js` — zero-dependency Node.js mock of the full ESP32 API surface
+- `tests/fixtures/` — deterministic fixture data (72h history, 3 sensors, anchored epoch)
+- `tests/browser/dashboard.spec.js` — 28 tests across 8 groups (boot/structure, sensor cards, transport/status, history/charts, custom date range, theme toggle, export controls, console error guard)
+- `playwright.config.js` — webServer auto-starts mock server before tests
+- `.github/workflows/browser-tests.yml` — triggers on dashboard or test file changes only
+- **Final result:** 28/28 PASS in CI (required 2 fix iterations after initial implementation)
 
 ### Custom date range summary (v7.4.2.0)
 
@@ -43,53 +53,45 @@ See [architecture.md](architecture.md) for the full technical design.
 - `getEffectiveTimeRange()` centralises time-range logic — charts and min/max both route through it
 - Custom range state (`CUSTOM_RANGE_START/END`) cleared when any standard preset button is clicked
 - "Data available" footer shows full range when both bounds known; "up to [date]" when only newest known; "No persisted history yet" on a freshly-flashed device (first NVS persist happens at 2:10 AM)
-- Mobile responsive (sidebar stacks above calendar below 480px)
 
-### Minification pipeline summary
+### Minification pipeline summary (v7.4.1.0)
 
-**Local build sequence:**
 ```
 dashboard.html → minify-dashboard.sh → dashboard.min.html (gitignored)
                                       → generate-header.sh → dashboard.h (committed)
 ```
 
-**Key behaviours:**
-- `dashboard.min.html` is never committed — it is a build artifact
+- `dashboard.min.html` is never committed — build artifact only
 - `generate-header.sh` auto-detects `.min.html` when present (no argument needed)
 - CI installs `html-minifier-terser` and runs the full pipeline before preflight
 - Local builds without the tool installed still work (fallback to `.html`)
-- Typical savings: ~33% of source HTML (60KB) — confirms script block sync is correct
+- Typical savings: ~33% of source HTML (~40KB) — confirms script block sync is correct
 
 ### Import design summary (unchanged from v7.4.0.2)
 
-**Multi-sensor import** (`POST /api/import/begin`):
-- Erases all history before writing
-- Sequential batch upload via URL-path encoding
-- Full replacement of all sensor data
+**Multi-sensor import** (`POST /api/import/begin`): Erases all history before writing. Full replacement.
 
-**Single-sensor import** (`POST /api/import/begin/single/<sensor_id>`):
-- Does NOT erase history
-- Builds epoch-to-slot map by scanning existing NVS segments
-- Merges imported data into existing segments (overlays target sensor only)
-- Creates new segments for hours not found in existing data
-- Other sensors' data is preserved
+**Single-sensor import** (`POST /api/import/begin/single/<sensor_id>`): Does NOT erase history. Merges imported data into existing segments. Other sensors preserved.
 
-**Transport**: Data encoded in URL path. This is the only proxy-safe channel on this platform.
+**Transport:** Data encoded in URL path. Only proxy-safe channel on this platform.
 
 ### Repository coordinates
 
 - **Repo:** `https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor`
-- **Branch:** `main` (v7.4.2.0 merged and tagged)
+- **Branch:** `main` (v7.4.3.0 merged and tagged)
 - **Feature branches:** None open
+- **Next branch to create:** `feature/configurable-sensor-count`
 
-### Resource usage (measured at v7.4.2.0)
+### Resource usage (measured at v7.4.2.0, unchanged at v7.4.3.0)
 
 | Metric | Value |
 |--------|-------|
 | RAM | ~15.8% of 327 KiB |
-| Flash | ~86.8% of 1.69 MiB (unchanged — no reflash for v7.4.3.0) |
+| Flash | ~86.8% of 1.69 MiB |
 | Free heap | ~78–84 KiB typical |
 | History partition | 512 KiB dedicated |
+
+**Note:** v7.4.3.0 is test infrastructure only — no firmware change, no device reflash. Device still runs v7.4.2.0 firmware.
 
 ---
 
@@ -103,24 +105,26 @@ dashboard.html → minify-dashboard.sh → dashboard.min.html (gitignored)
 
 ---
 
-## What Comes Next — Priority Order
+## What Comes Next
 
 ### Next Feature: v7.4.4.x — Configurable Sensor Count (1–4)
 
-**Branch to create:** `feature/playwright-tests`
+**Branch to create:** `feature/configurable-sensor-count`
 
-Add automated browser regression coverage so dashboard changes stop relying only on manual checks. See [implementation-plan-next-features-7.4.1.x.md](implementation-plan-next-features-7.4.1.x.md) — Feature 2 section for full spec.
+Normalize the project so sensor count is clearly documented, safely configurable from 1 to 4, and validated by preflight.
 
-**Summary:**
-- Mock Express backend serving fixture data (no real ESP required)
-- Playwright test suite covering: page load, chart rendering, range buttons, custom date range dialog, import/export UI, theme toggle
-- Dedicated CI workflow (separate from ESPHome compile)
-- Screenshots/traces on failure
-- Chrome/Chromium first
+**Key scope points:**
+- Document the change procedure clearly (what to change, in what order)
+- Add preflight checks validating `NUM_SENSORS` alignment across C++, YAML, and manifest
+- Make architecture docs truthful for any supported count
+- Explicitly handle retained-history compatibility (sensor count change = history reset required)
+- Possibly a dedicated `Docs/configuring-sensors.md`
+- Playwright test coverage for card count variation
 
-### After v7.4.3.x
-
-1. **Configurable sensor count** (v7.4.4.x) — docs + preflight validation for 1–4 sensors
+**Key risks:**
+- Silent mismatch between C++ and YAML sensor definitions
+- Retained-history corruption or misleading partial compatibility on count change
+- Docs claiming configurability before the workflow is actually validated
 
 See [future-plans.md](future-plans.md) for the full roadmap.
 
@@ -135,13 +139,15 @@ See [future-plans.md](future-plans.md) for the full roadmap.
 5. **Suspend dashboard traffic during long-running operations** — prevents 502s
 6. **HTML/JS/.h must stay synchronized** — any dashboard change updates all three
 7. **Six version strings must all be bumped together** — see LESSON-OPS-009
-8. **Script block sync: use `head -n $((SCRIPT_LINE - 1))`** then append JS then `</script>` and tail — verify with `grep -c '^<script>$'` returns exactly 1 afterwards
-9. **Minification savings of ~33% confirm correct sync** — if savings are <10%, the script block was embedded twice
-10. **`</script>` inside JS strings breaks HTML parsing** — minification with `--minify-js` can be sensitive to this; validate with the smoke test after any minifier flag change
-11. **"Data available: unknown" in the custom range dialog = no persisted data yet** — first NVS persist at 2:10 AM; not a bug
-12. **`MAX_HISTORY_RANGE_HOURS` must match the largest range button** — mismatch silently truncates history display
-13. **Large files (>100KB) require local sed for version bumps** — GitHub API has payload limits
-14. **`generate-header.sh` auto-detects `.min.html`** — CI gets minified binary automatically
+8. **Script block sync: use `head -n $((SCRIPT_LINE - 1))`** — verify with `grep -c '^<script>$'` returns exactly 1 afterwards
+9. **Minification savings of ~33% confirm correct sync** — savings <10% = script block doubled
+10. **`MAX_HISTORY_RANGE_HOURS` must match the largest range button** — mismatch silently truncates history
+11. **"Data available: unknown" on fresh device = first NVS persist at 2:10 AM** — not a bug
+12. **`package-lock.json` must be committed alongside `package.json`** — `npm ci` will not generate it
+13. **New CI workflow files only appear in Actions sidebar after merging to main** — expected behavior
+14. **Verify element IDs AND DOM behavior before writing browser tests** — class targets, interaction side-effects, and container relationships all require reading the actual JS and HTML
+15. **`data-history-range` values are hours** — 168, 720, 1080; not "7d", "30d", "45d"
+16. **`toggleTheme()` applies `light` class to `<html>`, not `<body>`** — test `page.locator('html')` accordingly
 
 See [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) for the full record.
 
@@ -150,15 +156,15 @@ See [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) for the full reco
 ## Documentation Map
 
 | Document | Purpose |
-|----------|---------|
+|----------|---------| 
 | This file | Complete context for resuming development |
 | [architecture.md](architecture.md) | Software design, data flows, retention model |
 | [development-pipeline.md](development-pipeline.md) | Workflow, CI, process |
 | [changelog.md](changelog.md) | Version history |
 | [build-history.md](build-history.md) | Curated build ledger |
-| [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) | Fixes, patterns, pitfalls |
+| [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) | Fixes, patterns, pitfalls (reverse chronological) |
 | [future-plans.md](future-plans.md) | Roadmap and feature assessment |
-| [implementation-plan-next-features-7.4.1.x.md](implementation-plan-next-features-7.4.1.x.md) | Detailed plans for next features (Playwright, sensor count) |
+| [implementation-plan-next-features-7.4.1.x.md](implementation-plan-next-features-7.4.1.x.md) | Detailed plans for upcoming features |
 | [v7.4.0-documentation.md](v7.4.0-documentation.md) | Import v1 per-version reference |
 | [v7.3.5.0-documentation.md](v7.3.5.0-documentation.md) | /api/status per-version reference |
 | [device-test-report-template.md](device-test-report-template.md) | Post-flash testing checklist |
@@ -174,10 +180,11 @@ Provide the assistant with:
 2. Current test results (compile, LAN, Cloudflare)
 3. What you want to work on next
 
-Example (starting v7.4.3.x):
+Example (starting v7.4.4.x):
 
 > Continuing the ESP32 BLE gateway project.
 > Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
-> v7.4.2.0 is complete and merged. Flash at ~86.8%.
-> Ready to start v7.4.3.x — Playwright browser test automation.
-> Please clone the repo, read the implementation plan, and implement.
+> v7.4.3.0 is complete and merged. Device still running v7.4.2.0 firmware (no reflash needed for v7.4.3.0).
+> Flash at ~86.8%. Playwright browser tests: 28/28 PASS.
+> Ready to start v7.4.4.x — Configurable Sensor Count.
+> Please read the handoff doc, implementation plan Feature 3, and provide a detailed implementation plan.

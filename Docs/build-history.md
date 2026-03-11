@@ -2,6 +2,20 @@
 
 Curated ledger of accepted builds. Raw build logs are in `build-logs/` (local) or GitHub Actions artifacts (cloud).
 
+## v7.4.3.0 — 2026-03-11
+
+- **Change:** Playwright browser regression test suite (test infrastructure only — no firmware change)
+- **Preflight:** PASS (26/26 — 3 new checks added: `single_script_tag`, `max_history_range_consistent`, `test_infrastructure`)
+- **Compile:** Not required — no firmware or YAML changes
+- **Flash:** ~86.8% (unchanged — device still running v7.4.2.0)
+- **RAM:** ~15.8% (unchanged)
+- **Browser tests:** 28/28 PASS (required 2 CI fix iterations: element ID mismatches → DOM behavior mismatches)
+- **CI:** PASS (both `build.yml` and new `browser-tests.yml`)
+- **Workflow:** Branch `feature/playwright-tests`, merged to `main` via PR #5, tagged v7.4.3.0
+- **Status:** ✅ Accepted, merged to main, tagged v7.4.3.0
+
+---
+
 ## v7.4.2.0 — 2026-03-11
 
 - **Change:** Custom Date Range Selector (dashboard-only); BUG-017 fix (MAX_HISTORY_RANGE_HOURS 720→1080); BUG-018 fix (duplicate script tag); BUG-019 fix (availability display)

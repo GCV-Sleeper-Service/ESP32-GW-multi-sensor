@@ -1,6 +1,6 @@
 # Future Plans & Feature Roadmap
 
-_Last updated: 2026-03-11 — aligned to v7.4.2.0_
+_Last updated: 2026-03-11 — aligned to v7.4.3.0_
 
 This document is the high-level roadmap.
 For the detailed implementation-level plans, see:
@@ -25,8 +25,8 @@ The guiding philosophy remains the same:
 | v7.4.0.2 | Single-sensor merge import | Complete | Shipped |
 | v7.4.1.0 | Dashboard minification pipeline | Complete | Shipped |
 | v7.4.2.0 | Custom date range selector | Complete | Shipped |
-| v7.4.3.x | Playwright browser automation | Next | Regression control |
-| v7.4.4.x | Configurable sensor count (1–4) | Planned | Documentation + validation + compatibility handling |
+| v7.4.3.x | Playwright browser automation | Complete | 28/28 PASS |
+| v7.4.4.x | Configurable sensor count (1–4) | Next | Documentation + validation + compatibility handling |
 | v7.5.x | Secrets/settings persistence review | Deferred | Reassess after notification/settings needs are clearer |
 | v7.6.x | Encrypted secrets partition | Low priority / likely skip | Probably more complexity than value |
 
