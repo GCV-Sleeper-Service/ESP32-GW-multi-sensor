@@ -1,0 +1,75 @@
+name: Browser Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'dashboard/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dashboard/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Generate fixture data
+        run: node tests/fixtures/generate-fixtures.js
+
+      - name: Run browser tests
+        run: npx playwright test
+        env:
+          CI: true
+
+      - name: Upload test report and artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results-${{ github.run_number }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            tests/playwright-report/
+            tests/playwright-results/
+
+      - name: Write test summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Browser Tests — $(cat VERSION)"
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Ref | \`${GITHUB_REF_NAME}\` |"
+            echo "| Commit | \`${GITHUB_SHA::8}\` |"
+            echo "| Event | ${GITHUB_EVENT_NAME} |"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,8 +1,8 @@
 # ESP32 Gateway — Fresh Start Handoff
 
-_Last updated: 2026-03-11 — v7.4.2.0 validated and merged_
+_Last updated: 2026-03-11 — v7.4.3.0 (Playwright test suite)
 _Repo: `GCV-Sleeper-Service/ESP32-GW-multi-sensor`_
-_Current version: v7.4.2.0 — VALIDATED AND MERGED_
+_Current version: v7.4.3.0 — PENDING CI
 _Branch: `main`_
 
 This is the single-source continuity document for resuming development in a fresh session.
@@ -87,7 +87,7 @@ dashboard.html → minify-dashboard.sh → dashboard.min.html (gitignored)
 | Metric | Value |
 |--------|-------|
 | RAM | ~15.8% of 327 KiB |
-| Flash | ~86.8% of 1.69 MiB |
+| Flash | ~86.8% of 1.69 MiB (unchanged — no reflash for v7.4.3.0) |
 | Free heap | ~78–84 KiB typical |
 | History partition | 512 KiB dedicated |
 
@@ -105,7 +105,7 @@ dashboard.html → minify-dashboard.sh → dashboard.min.html (gitignored)
 
 ## What Comes Next — Priority Order
 
-### Next Feature: v7.4.3.x — Playwright Browser Test Automation
+### Next Feature: v7.4.4.x — Configurable Sensor Count (1–4)
 
 **Branch to create:** `feature/playwright-tests`
 

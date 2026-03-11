@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.4.2.0.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.4.3.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.

@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "partition": "sensor_history",
+  "total_bytes": 524288,
+  "used_bytes": 184320,
+  "free_bytes": 339968,
+  "retention_days": 45,
+  "retention_oldest_epoch": 1741435200,
+  "retention_newest_epoch": 1741694400,
+  "segment_count": 72
+}
