@@ -856,7 +856,6 @@
 
 
 <script>
-<script>
 // ╔════════════════════════════════════════════════════════════════╗
 // ║  Multi-Sensor Gateway Dashboard                               ║
 // ║                                                                ║
@@ -1764,7 +1763,7 @@ var CustomRange = (function() {
       .then(safeJsonResponse)
       .then(function(data) {
         _availOldest = data.retention_oldest_epoch || 0;
-        _availNewest = data.retention_newest_epoch || Math.floor(Date.now() / 1000);
+        _availNewest = data.retention_newest_epoch || 0;
         _initSelection();
         _renderAvailability();
         _renderCalendar();
@@ -1811,11 +1810,13 @@ var CustomRange = (function() {
   function _renderAvailability() {
     var el = _getEl('customRangeAvail');
     if (!el) return;
-    if (_availOldest && _availNewest) {
+    if (_availOldest > 0 && _availNewest > 0) {
       var o = _epochToDate(_availOldest), n = _epochToDate(_availNewest);
-      el.textContent = 'Data available: ' + _fmtDate(o) + ' – ' + _fmtDate(n);
+      el.textContent = 'Data available: ' + _fmtDate(o) + ' \u2013 ' + _fmtDate(n);
+    } else if (_availNewest > 0) {
+      el.textContent = 'Data available: up to ' + _fmtDate(_epochToDate(_availNewest));
     } else {
-      el.textContent = 'Data available: unknown';
+      el.textContent = 'No persisted history yet \u2014 range applies to RAM data only';
     }
   }
 

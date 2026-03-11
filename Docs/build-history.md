@@ -2,6 +2,18 @@
 
 Curated ledger of accepted builds. Raw build logs are in `build-logs/` (local) or GitHub Actions artifacts (cloud).
 
+## v7.4.2.0 — 2026-03-11
+
+- **Change:** Custom Date Range Selector (dashboard-only); BUG-017 fix (MAX_HISTORY_RANGE_HOURS 720→1080); BUG-018 fix (duplicate script tag); BUG-019 fix (availability display)
+- **Preflight:** PASS (23/23)
+- **Compile:** PASS
+- **Flash:** ~86.8% (up from 86.1% at v7.4.1.0 — new feature code net +0.7%)
+- **RAM:** ~15.8%
+- **CI:** PASS (GitHub Actions)
+- **Device test (LAN):** PASS — dashboard loads, Custom button opens dialog, presets apply correctly, calendar navigable, Apply updates charts
+- **Workflow:** Branch `feature/custom-date-range`, merged to `main`, tagged v7.4.2.0
+- **Status:** ✅ Accepted, merged to main, tagged v7.4.2.0
+
 ---
 
 ## v7.4.1.0 — 2026-03-10
@@ -67,3 +79,7 @@ Curated ledger of accepted builds. Raw build logs are in `build-logs/` (local) o
 - **Flash used:** 1547200 / 1769472
 - **Build time:** 215.72s
 - **Status:** ✅ Accepted, merged, tagged — baseline for GitHub-first workflow
+
+---
+
+

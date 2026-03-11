@@ -1,12 +1,12 @@
 # Future Plans & Feature Roadmap
 
-_Last updated: 2026-03-10 — aligned to v7.4.1.0_
+_Last updated: 2026-03-11 — aligned to v7.4.2.0_
 
 This document is the high-level roadmap.
 For the detailed implementation-level plans, see:
 
 - `Docs/implementation-plan-next-features-7.4.1.x.md`
-- `Docs/planning-v7.4.2.0-custom-date-range.md`
+- `Docs/session-log-2026-03-11-v7.4.2.0-implementation.md` (implementation record)
 
 The guiding philosophy remains the same:
 
@@ -24,15 +24,15 @@ The guiding philosophy remains the same:
 | v7.4.0 | CSV import with validation | Complete | Shipped |
 | v7.4.0.2 | Single-sensor merge import | Complete | Shipped |
 | v7.4.1.0 | Dashboard minification pipeline | Complete | Shipped |
-| v7.4.2.x | Custom date range selector | Next | Dashboard-first feature |
-| v7.4.3.x | Playwright browser automation | Planned | Regression control |
+| v7.4.2.0 | Custom date range selector | Complete | Shipped |
+| v7.4.3.x | Playwright browser automation | Next | Regression control |
 | v7.4.4.x | Configurable sensor count (1–4) | Planned | Documentation + validation + compatibility handling |
 | v7.5.x | Secrets/settings persistence review | Deferred | Reassess after notification/settings needs are clearer |
 | v7.6.x | Encrypted secrets partition | Low priority / likely skip | Probably more complexity than value |
 
 ---
 
-## 1. v7.4.2.x — Custom Date Range Selector
+## 1. v7.4.2.0 — Custom Date Range Selector (COMPLETE)
 
 **Priority:** High
 
@@ -138,34 +138,9 @@ That means the feature has to be treated carefully to avoid silent history corru
 
 ---
 
-## 4. Secrets / Settings Persistence Review (v7.5.x)
+### 4. v7.5 — Modular Architecture / Gateway Aggregation
 
-**Priority:** Low-to-medium
-
-A later phase may introduce a small persistent settings model for management credentials and related options.
-This should be revisited only when there is a concrete feature need, such as notifications or user-editable runtime settings.
-
-The default recommendation remains:
-
-- Do not add complexity before it solves a real problem
-- Avoid partition churn without a strong reason
-
----
-
-## 5. Encrypted Secrets Partition (v7.6.x)
-
-**Priority:** Low
-
-This remains technically feasible, but still looks like a weak value tradeoff for the project's real deployment model.
-For a home-lab or hobby deployment, improving ingress protection and browser/session controls is usually higher value than at-rest flash encryption for a tiny settings partition.
-
-Current recommendation: **do not prioritize this** unless the security model changes materially.
-
----
-
-### 7.7 — Modular Architecture / Gateway Aggregation
-
-**Priority: MEDIUM-HIGH (design phase), LOW (implementation)**
+**Priority: HIGH (design phase), LOW (implementation)**
 
 Enable multiple BLE gateways (e.g., one per building) to have their data aggregated by a central gateway's dashboard.
 
@@ -183,15 +158,40 @@ Design the data contract now (the `/api/status` endpoint is already a good start
 
 ---
 
-### 7.8 — Dashboard Pane Extensibility
+### 5. 7.6 — Dashboard Pane Extensibility
 
-**Priority: LOW**
+**Priority: MEDIUM**
 
 Add support for different sensor types (leak sensors, wind speed, etc.) as additional dashboard cards/panes.
 
 **Assessment:** This requires abstracting the current ThermoPro-specific `SensorSlot` into a more generic sensor model with type-specific rendering. It's a substantial refactor of both the C++ backend and the JavaScript dashboard.
 
-**Recommendation:** Design the abstraction when working on 7.7 (modular architecture), but implement it only when there's a concrete second sensor type to support. Don't build a generic framework speculatively.
+**Recommendation:** Design the abstraction when working on 7.5 (modular architecture), but implement it only when there's a concrete second sensor type to support. Don't build a generic framework speculatively.
+
+---
+
+## Secrets / Settings Persistence Review (v7.7.x) - DEFER
+
+**Priority:** Low-to-medium
+
+A later phase may introduce a small persistent settings model for management credentials and related options.
+This should be revisited only when there is a concrete feature need, such as notifications or user-editable runtime settings.
+
+The default recommendation remains:
+
+- Do not add complexity before it solves a real problem
+- Avoid partition churn without a strong reason
+
+---
+
+## Encrypted Secrets Partition (v7.8.x) - DEFER
+
+**Priority:** Low
+
+This remains technically feasible, but still looks like a weak value tradeoff for the project's real deployment model.
+For a home-lab or hobby deployment, improving ingress protection and browser/session controls is usually higher value than at-rest flash encryption for a tiny settings partition.
+
+Current recommendation: **do not prioritize this** unless the security model changes materially.
 
 ---
 
@@ -202,11 +202,11 @@ Add support for different sensor types (leak sensors, wind speed, etc.) as addit
 Configurable alerts when sensor readings cross thresholds.
 
 **Planned phases:**
-- 8.0: Notification UI — card for setting thresholds per sensor
-- 8.1: Email notifications (avoiding spam filters is non-trivial)
-- 8.2: Telegram bot notifications
-- 8.3: Push notifications (requires a relay app — ntfy.sh is free and open-source)
-- 8.4: Additional condition types
+- 8.0: Notification settings UI/conditions + storage
+- 8.1: Telegram notifications (easiest, most reliable)
+- 8.2: ntfy.sh push notifications
+- 8.3: Email via SMTP relay (document the spam risk)
+- 8.4: Additional notification conditions
 
 **Assessment:**
 
@@ -214,12 +214,6 @@ Configurable alerts when sensor readings cross thresholds.
 - **Email** from an ESP32 is unreliable without a proper SMTP relay. Gmail/Outlook spam filters will almost certainly catch messages from a residential IP. Needs an external relay service. Higher complexity than Telegram.
 - **Push via ntfy.sh** is excellent — free, open-source, self-hostable, works on Android/iOS without a dedicated app (can use the ntfy app for reliability). Second priority after Telegram.
 - **Phone push without an app** is not practical. The user will need ntfy or a similar app.
-
-**Revised recommendation for notification order:**
-1. 8.0: Notification settings UI + storage
-2. 8.1: Telegram notifications (easiest, most reliable)
-3. 8.2: ntfy.sh push notifications
-4. 8.3: Email via SMTP relay (document the spam risk)
 
 ---
 
@@ -237,10 +231,16 @@ Upload sensor data to cloud services for long-term storage or external dashboard
 | Cloudflare Pages | Low | Same as above | Same use case as GitHub Pages. |
 | InfluxDB Cloud | Medium | 30-day retention, 5 MB/5min | Best option for time-series. Natural fit for this data. |
 | Grafana Cloud | Medium | 10k metrics, 50 GB logs | Good for dashboards on top of InfluxDB. |
-| ThingSpeak | Low | 8 channels, 3-min interval | Simple but limited. 3-minute minimum interval is restrictive. |
 | Azure/GCP/AWS | High | Varies | Over-engineered for this project. Only if enterprise deployment is needed. |
 
 **Recommendation:** InfluxDB Cloud is the natural first target if cloud upload is desired. It speaks the right language (time-series), has a reasonable free tier, and can feed Grafana. But this entire feature set should wait until notifications are working — cloud upload without alerting is less useful than alerting without cloud upload.
+
+**Planned phases:**
+- 8.5: InfluxDB Cloud
+- 8.6: GitHub Pages + Cloudflare Pages
+- 8.7: Grafana Cloud
+- 8.8: Cloud storage upload - Azure/GCP/AWS
+- 8.9: Streaming to aggregator Gateway (?)
 
 ---
 
@@ -282,34 +282,6 @@ Use AI to analyze sensor data for trends, patterns, and outliers.
 
 ## Ideas Assessment
 
-### ESP-NOW
-
-**What it is:** Espressif peer-to-peer wireless protocol for battery-powered ESP32 nodes to transmit data without joining WiFi.
-
-**Use case:** If you wanted battery-powered remote sensor nodes that report to this gateway (instead of BLE ThermoPro sensors), ESP-NOW would be the transport.
-
-**Assessment:** Not useful for this project. The ThermoPro sensors already use BLE, and ESP-NOW would require custom sensor hardware (additional ESP32 boards). Only relevant if expanding beyond ThermoPro to custom-built sensors.
-
-**Recommendation:** Skip. Revisit only if building custom sensor nodes.
-
----
-
-### Snapshot Integrity Checks (CRC/Checksum)
-
-**Assessment:** Adding CRC per saved segment would increase flash wear slightly (each write would be marginally larger). The current NVS implementation already handles corruption at the partition level. The risk of silent data corruption in a home environment is very low.
-
-**Recommendation:** Not worth the added complexity. If data integrity becomes an actual problem, implement then.
-
----
-
-### Dashboard Minification
-
-**Assessment:** Running HTML through a minifier before generating the `.h` file could save ~20–25 KiB of flash. At 87.5% flash usage, this is meaningful headroom.
-
-**Recommendation:** Worth doing as a build step, especially before adding new features that increase code size. Add a `scripts/minify-dashboard.sh` step before `generate-header.sh`. Use a simple HTML/JS minifier (terser for JS, html-minifier for HTML).
-
----
-
 ### Heat Index Calculation
 
 **Assessment:** Browser-side calculation with no firmware cost. Useful for the "Outside" sensor in warm climates.
@@ -326,14 +298,6 @@ Use AI to analyze sensor data for trends, patterns, and outliers.
 
 ---
 
-### WebSocket Alternative to SSE
-
-**Assessment:** ESPHome doesn't natively support WebSocket on the web server. Custom implementation would be complex and fragile. The current SSE + polling fallback covers all practical access patterns.
-
-**Recommendation:** Not needed. The polling mode already handles the Cloudflare SSE buffering issue.
-
----
-
 ### Cloudflare Access (Zero Trust)
 
 **Assessment:** External to the device, requires Cloudflare configuration only. Provides authentication without any ESP32 changes.
@@ -346,12 +310,12 @@ Use AI to analyze sensor data for trends, patterns, and outliers.
 
 Based on value, risk, and dependencies:
 
-1. **7.4.0 — Import v1** (high value, well-scoped, next immediate)
-2. **Custom date range** (small, dashboard-only, can ship with or right after import)
-3. **Playwright automation** (investment in quality, prevents regressions for everything after)
-4. **Configurable sensor count** (documentation + testing, modest effort)
-5. **Dashboard minification** (build optimization, creates flash headroom for future features)
-6. **7.7 — Gateway aggregation design** (design only, not implementation)
+1. **7.4.0 — Import v1** (high value, well-scoped, next immediate) (Done)
+2. **Dashboard minification** (build optimization, creates flash headroom for future features) (Done)
+3. **Custom date range** (small, dashboard-only, can ship with or right after import) (Done)
+4. **Playwright automation** (investment in quality, prevents regressions for everything after)
+5. **Configurable sensor count** (documentation + testing, modest effort)
+6. **7.5-7.6 — Modular Architecture / Gateway Aggregation / Dashboard Pane Extensibility** (design only, not implementation)
 7. **8.0–8.2 — Notifications** (Telegram first, then ntfy.sh)
 8. **Cloud upload** (InfluxDB Cloud as first target)
 9. **Dynamic sizing** (responsive layout)
@@ -364,7 +328,7 @@ Based on value, risk, and dependencies:
 
 Recommended order from the current baseline:
 
-1. **v7.4.2.x — Custom date range**
+1. **v7.4.2.x — Custom date range** (Done)
 2. **v7.4.3.x — Playwright automation**
 3. **v7.4.4.x — Configurable 1–4 sensor count**
 

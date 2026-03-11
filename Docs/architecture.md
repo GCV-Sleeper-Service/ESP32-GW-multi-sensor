@@ -1,6 +1,6 @@
 # Architecture & Technical Reference
 
-_Last updated: 2026-03-10 — v7.4.1.0_
+_Last updated: 2026-03-11 — v7.4.2.0_
 
 This document describes the **current** architecture of the ESP32-C3 Multi-Sensor BLE Gateway on `main`.
 Where future capability differs from the current checked-in default, that is stated explicitly so the documentation does not over-claim beyond the present codebase.
@@ -165,16 +165,16 @@ On boot, the firmware restores the newest valid persisted segments back into RAM
 
 ## 7. Resource Profile
 
-The values below are the current baseline guidance for v7.4.1.0 and should be treated as approximate operating numbers, not immutable constants.
+The values below are the current baseline guidance for v7.4.2.0 and should be treated as approximate operating numbers, not immutable constants.
 
 | Metric | Approx. value | Notes |
 |--------|--------------|-------|
 | RAM usage | ~15.8% of 327 KiB | Typical baseline |
 | Free heap | ~78–84 KiB | Typical runtime range |
-| Flash usage | ~86.1% of OTA slot | After dashboard minification |
+| Flash usage | ~86.8% of OTA slot | After dashboard minification + custom date range feature |
 | History partition | 512 KiB | Dedicated NVS storage |
 
-The dashboard minification pipeline reduced flash pressure versus the earlier v7.4.0.2 state and created more headroom for the next dashboard-heavy features.
+The dashboard minification pipeline (v7.4.1.0) saves ~33% of source HTML. v7.4.2.0 adds the custom date range selector, bringing flash to ~86.8%.
 
 ---
 
@@ -202,8 +202,9 @@ Key rules:
 - Collapsible cards
 - Real-time temperature/humidity charts
 - 15-minute average charts
-- Range selectors: 24h / 7d / 30d / 45d
-- Min/max summaries derived from loaded chart data
+- Range selectors: 24h / 7d / 30d / 45d / Custom
+- Custom date range picker: calendar modal with presets, start/end selection, available-data bounds
+- Min/max summaries derived from loaded chart data (respects active range, including custom)
 - CSV export per sensor and Export All
 - CSV import UI
 - ESP management actions
@@ -213,7 +214,6 @@ Key rules:
 
 The following is planned, not current:
 
-- Custom user-selected date range dialog
 - Automated Playwright browser regression suite
 - Fully normalized 1–4 configurable sensor-count workflow
 
