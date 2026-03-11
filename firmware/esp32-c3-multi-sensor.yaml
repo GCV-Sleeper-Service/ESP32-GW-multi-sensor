@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.4.2.0
+# ESP32-C3 Multi-Sensor Gateway - v7.4.3.0
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -49,9 +49,9 @@ esphome:
     priority: -100
     then:
       - lambda: |-
-          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.4.2.0");
+          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.4.3.0");
           id(dashboard_link).publish_state(
-            "Open /dashboard or /dashboard.html for the live dashboard. v7.4.2.0: multi-sensor BLE gateway with 45-day history, CSV export/import, dark/light mode, real-time and averaged charts, and ESP management. /dashboard-download provides a standalone copy. "
+            "Open /dashboard or /dashboard.html for the live dashboard. v7.4.3.0: multi-sensor BLE gateway with 45-day history, CSV export/import, dark/light mode, real-time and averaged charts, and ESP management. /dashboard-download provides a standalone copy. "
             "The ESPHome v3 built-in web page shows text sensor states as plain text, so clickable HTML links are not rendered here.");
 
 # ─── Chip and framework ─────────────────────────────────────────
@@ -84,7 +84,7 @@ ota:
 # ─── Embedded dashboard approach ─────────────────────────────────
 # The dashboard is compiled into ../dashboard/dashboard.h and served by
 # the custom history handler through /dashboard, /dashboard.html, and
-# /dashboard-download. v7.4.2.0 adds the minification build pipeline:
+# /dashboard-download. v7.4.3.0 adds the minification build pipeline:
 # dashboard.html is minified via html-minifier-terser + terser before
 # generate-header.sh embeds it, saving ~40KB of flash.
 # Phase 1 structural enforcement for the dashboard event/state layer, and
