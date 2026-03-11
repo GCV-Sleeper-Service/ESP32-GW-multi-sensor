@@ -1,12 +1,31 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-09 — v7.4.0.2_
+_Last updated: 2026-03-10 — v7.4.1.0_
 
 This document tracks significant bugs, root causes, fixes, and technical lessons. Updated with each version.
 
 ---
 
 ## Bug Fixes
+
+### BUG-016: html-minifier-terser CLI flags wrong (v7.4.1.0)
+
+**Symptom:** `./scripts/minify-dashboard.sh` exited immediately with `error: unknown option '--input-path'`.
+
+**Root cause:** `html-minifier-terser` CLI does not accept `--input-path` or `--output-path` flags. The correct invocation uses the input file as a **positional argument** and `--output <file>` for the output path.
+
+**Fix:** Changed the call from:
+```bash
+html-minifier-terser ... --input-path "$INPUT" --output-path "$OUTPUT"
+```
+to:
+```bash
+html-minifier-terser ... --output "$OUTPUT" "$INPUT"
+```
+
+**Lesson:** Always verify CLI flag syntax against `html-minifier-terser --help` before scripting. The tool's README and npm page show the positional argument convention clearly. When writing wrapper scripts for npm tools, prefer testing the exact invocation in a shell before embedding it in a script.
+
+---
 
 ### BUG-009: Import POST body never delivered (v7.4.0)
 
@@ -182,11 +201,23 @@ POST body: NOT available to custom handlers. URL query params: stripped by `url_
 ### LESSON-OPS-008: CONFIG_HTTPD_MAX_REQ_HDR_LEN is a RAM multiplier
 Each concurrent connection allocates this buffer. Setting it to 2048 on a 320KB device causes dashboard failures. The default 512 is a practical ceiling for this platform.
 
-### LESSON-OPS-009: Version strings live in four places
-VERSION file, YAML header comment, `App.version` in dashboard.js, `register_history_handler()` lambda. All four must match. The preflight script validates `App.version` against VERSION; extend to cover the other two.
+### LESSON-OPS-009: Version strings live in six places
+VERSION file, YAML header comment, `register_history_handler()` lambda, `dashboard_link` publish_state text, `App.version` in `dashboard.js`, and version comment in `dashboard.html`. All six must match on every version bump. The preflight script validates `App.version` against VERSION. Large files (dashboard.js ~102KB, dashboard.html ~153KB) cannot be pushed via GitHub API — use targeted `sed -i` commands locally.
 
 ### LESSON-OPS-010: Cached builds may not reflect header changes
 ESPHome's `build_time_str` is set during YAML→C++ generation, not during compilation. Changing `.h` files triggers recompilation but the timestamp in the binary stays old. Use `esphome compile --clean` when in doubt.
+
+### LESSON-OPS-011: html-minifier-terser uses positional arg + --output flag
+`html-minifier-terser [options] --output <outfile> <infile>` — there are no `--input-path` or `--output-path` flags. Always verify npm tool CLI syntax with `--help` before scripting. Test the exact invocation in a shell before embedding it in a script.
+
+### LESSON-OPS-012: Script execute permissions are not preserved through GitHub API push
+Files pushed via the GitHub API are created without execute permission (`-rw-r--r--`). Always run `chmod +x scripts/*.sh` after a fresh clone or after pulling new scripts. Consider adding a `chmod` step to the local setup instructions in the handoff doc.
+
+### LESSON-OPS-013: git pull fails with local changes from a previous (broken) pull
+If a file was partially pulled before a merge abort, `git pull` will refuse with "Your local changes would be overwritten." Fix with `git checkout -- <file>` to discard the local copy, then retry `git pull`.
+
+### LESSON-OPS-014: dashboard.h size reduction confirms minification is active
+After regenerating `dashboard.h` from `dashboard.min.html`, the file should be noticeably smaller than the unminified version. A 3,059-line reduction in the commit diff is the expected signal. If `git diff --stat` shows only a few lines changed in `dashboard.h`, the minified source was NOT used — check that `dashboard.min.html` exists and that `generate-header.sh` reports "Using minified source".
 
 ---
 
@@ -214,3 +245,7 @@ During CSV export, `beginResponseStream()` allocates a large buffer. With 498 da
 ### ISSUE-002: Import erases history before data is written (partially resolved in v7.4.0.2)
 
 Multi-sensor `/api/import/begin` still clears the history partition before writing. If the upload fails, history is lost. Single-sensor import (`/api/import/begin/single/<id>`) avoids this by merging into existing segments without erasing. Future improvement for multi-sensor: write to a staging area, then swap.
+
+### ISSUE-003: httpd_accept_conn error 23 (ENFILE) at boot — cosmetic
+
+After OTA flash, the ESPHome log shows several `httpd_accept_conn: error in accept (23)` lines during the first ~90 seconds. ENFILE = system file table full (socket exhaustion). This is caused by the browser/dashboard making multiple simultaneous connections at boot while `CONFIG_LWIP_MAX_SOCKETS: "13"` is already tuned to its practical maximum for this platform. The errors are transient, self-resolve, and do not affect dashboard operation. Not a blocker. Future mitigation: stagger dashboard connection attempts on load.
