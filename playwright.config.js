@@ -2,8 +2,21 @@
 // Configuration for the ESP32 gateway dashboard browser regression suite.
 //
 // The mock server is started automatically by webServer before any test runs.
-// Tests use Chromium only as the primary target; Firefox is available via
-// the 'firefox' project if needed.
+//
+// Browser coverage:
+//   Chromium is the primary (and only required) target. Firefox and WebKit are
+//   intentionally excluded — the dashboard targets modern browsers and Chromium
+//   headless is the practical validation target for CI and containers.
+//   Adding Firefox/WebKit is straightforward but out of scope until Chromium
+//   coverage is stable across all fixture variants.
+//
+// Container / Linux sandbox note:
+//   Chromium's default sandbox requires kernel features (user namespaces) that
+//   are not available in most Docker / container environments including the
+//   ESPHome container. The '--no-sandbox' arg in launchOptions below is required
+//   for tests to run in those environments. It is safe for a local test runner —
+//   the risk model only applies when running untrusted web content (we are not;
+//   the mock server serves our own fixture HTML only).
 
 'use strict';
 
@@ -35,6 +48,11 @@ module.exports = defineConfig({
     headless: true,
     // Console messages and page errors are collected by tests
     ignoreHTTPSErrors: true,
+    // Required in container / Docker / ESPHome environments where the kernel
+    // does not support Chromium's user-namespace sandbox.
+    launchOptions: {
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    },
   },
 
   // Start mock server before tests, shut it down after

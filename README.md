@@ -5,7 +5,7 @@ A standalone BLE-to-WiFi gateway built on the **ESP32-C3 SuperMini**. It passive
 No cloud. No database. No Home Assistant required. Just an ESP32, the gateway firmware, and a browser.
 
 > **Current default configuration on `main`: 3 BLE sensors.**
-> The architecture already scales with sensor count, and the **planned v7.4.4.x work** is to make the supported range **1–4 sensors** fully documented and preflight-validated. Until that lands, the repo should not claim 4-sensor support as a current out-of-the-box default.
+> As of v7.4.4.0, the gateway supports **1–4 sensors** (compile-time configurable). See [Docs/configuring-sensors.md](Docs/configuring-sensors.md) for the change procedure.
 
 **Total hardware cost: ~$35 USD.**
 
@@ -56,7 +56,7 @@ ln -s ../secrets/secrets.yaml firmware/secrets.yaml
 chmod +x scripts/*.sh
 
 # 5. Edit the configured sensor MAC addresses
-# See Docs/architecture.md for the current 3-sensor default and configuration notes
+# See Docs/configuring-sensors.md — supported range is 1–4, default 3 (compile-time configurable)
 
 # 6. Compile and flash
 esphome compile firmware/esp32-c3-multi-sensor.yaml

@@ -1,8 +1,8 @@
 # ESP32 Gateway — Fresh Start Handoff
 
-_Last updated: 2026-03-11 — v7.4.3.0 complete and merged_
+_Last updated: 2026-03-12 — v7.4.4.0 complete (pending PR merge)_
 _Repo: `GCV-Sleeper-Service/ESP32-GW-multi-sensor`_
-_Current version: v7.4.3.0 — SHIPPED_
+_Current version: v7.4.4.0 — feature branch ready for PR_
 _Branch: `main`_
 
 This is the single-source continuity document for resuming development in a fresh session.
@@ -17,7 +17,7 @@ See [architecture.md](architecture.md) for the full technical design.
 
 ---
 
-## Current State (v7.4.3.0 — COMPLETE)
+## Current State (v7.4.4.0 — Feature Branch Ready)
 
 ### What is working
 
@@ -35,6 +35,7 @@ See [architecture.md](architecture.md) for the full technical design.
 - Branch protection on `main`
 - Dashboard minification pipeline (v7.4.1.0): html-minifier-terser, ~40KB flash savings
 - Custom Date Range Selector (v7.4.2.0): modal calendar, 6 presets, live data-availability footer
+- **Configurable sensor count (v7.4.4.0):** 1–4 sensors (compile-time); preflight validates C++/YAML/fixture alignment; multi-variant Playwright smoke tests; Docs/configuring-sensors.md procedure
 - **Playwright browser regression test suite (v7.4.3.0):** 28 tests across 8 groups, mock server, fixture data, separate CI workflow
 
 ### Playwright test suite summary (v7.4.3.0)
@@ -148,6 +149,8 @@ See [future-plans.md](future-plans.md) for the full roadmap.
 14. **Verify element IDs AND DOM behavior before writing browser tests** — class targets, interaction side-effects, and container relationships all require reading the actual JS and HTML
 15. **`data-history-range` values are hours** — 168, 720, 1080; not "7d", "30d", "45d"
 16. **`toggleTheme()` applies `light` class to `<html>`, not `<body>`** — test `page.locator('html')` accordingly
+
+16. **Fixture CSVs must use epoch seconds** — dashboard multiplies by 1000 expecting seconds; `Date.UTC()` returns milliseconds (LESSON-OPS-029)
 
 See [bugs-and-lessons-learned.md](bugs-and-lessons-learned.md) for the full record.
 

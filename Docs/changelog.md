@@ -4,6 +4,28 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.4.4.0 — 2026-03-12
+
+**Added:** Configurable sensor count (1–4) with preflight validation and multi-variant test coverage
+
+- `Docs/configuring-sensors.md` — new authoritative step-by-step change procedure including 1/2/3/4-sensor templates, YAML alignment guide, history reset requirement, and browser test validation commands
+- `scripts/preflight.sh` — ~12 new sensor-count checks: NUM_SENSORS range (1–4), C++ initializer count, YAML thermopro_ble/ble_rssi/text-sensor ID counts, baseline fixture manifest count, DEFAULT_SENSOR_META fallback count in dashboard.js
+- `tests/fixtures/generate-fixtures.js` — rewritten to generate 1/2/3/4-sensor fixture variants under `tests/fixtures/variants/<N>sensor/` (run once, all variants; or `--count N [--overwrite-baseline]`)
+- `tests/mock-server/server.js` — FIXTURE_SET env var support; variant-first fixture resolution with root fallback
+- `tests/browser/sensor-count.spec.js` — new 7-test fixture-driven smoke suite; works for any FIXTURE_SET without hardcoded counts
+- `.github/workflows/browser-tests.yml` — matrix strategy across 3sensor/1sensor/2sensor/4sensor; baseline suite for 3sensor, smoke suite for others
+- `dashboard/sensor_history_multi.h` — added sensor configuration guide comment with 1/2/4-sensor copy-paste templates
+- `Docs/architecture.md` and `README.md` — updated to reflect 1–4 sensor support as implemented (removed "planned" language)
+
+**Fixed:**
+- Fixture epoch bug: generate-fixtures.js was using milliseconds (Date.UTC()) for CSV timestamps; dashboard multiplies by 1000 expecting seconds — would silently render empty charts. Now uses epoch seconds throughout. (LESSON-OPS-029)
+
+**Not changed:** YAML firmware sensor blocks (still 3-sensor default); sensor_history_multi.h sensor definitions (still 3-sensor default). Changing the active count requires following Docs/configuring-sensors.md — preflight now enforces this.
+
+**Device flash:** Not required — no firmware logic changes. Device continues running v7.4.2.0 firmware (or whatever was last flashed).
+
+---
+
 ## v7.4.3.0 — 2026-03-11
 
 **Added:** Playwright browser regression test suite

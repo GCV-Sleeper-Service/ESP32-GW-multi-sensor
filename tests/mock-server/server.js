@@ -1,7 +1,16 @@
 /**
- * mock-server/server.js
- * Lightweight Express mock of the ESP32 gateway HTTP API.
- * Serves static fixture data so Playwright tests run without a live device.
+ * tests/mock-server/server.js
+ * Fixture-aware mock of the ESP32 gateway HTTP API.
+ *
+ * Default fixture set: 3sensor
+ * Override via environment variable before starting:
+ *   FIXTURE_SET=1sensor node tests/mock-server/server.js
+ *   FIXTURE_SET=2sensor node tests/mock-server/server.js
+ *   FIXTURE_SET=4sensor node tests/mock-server/server.js
+ *
+ * Fixture resolution order:
+ *   1. tests/fixtures/variants/<FIXTURE_SET>/<filename>
+ *   2. tests/fixtures/<filename>  (root fallback for shared files)
  *
  * Endpoints served:
  *   GET /sensors.json
@@ -9,10 +18,10 @@
  *   GET /history/:id/hum
  *   GET /api/storage-stats
  *   GET /api/status
- *   GET /text_sensor/:name     → { id, value } JSON (polling shim)
- *   GET /sensor/:name          → { id, value } JSON (polling shim)
- *   GET /events                → minimal SSE stream (ping every 2s)
- *   GET /                      → serves dashboard.html
+ *   GET /text_sensor/:name    → { id, value } JSON (polling shim)
+ *   GET /sensor/:name         → { id, value } JSON (polling shim)
+ *   GET /events               → minimal SSE stream (ping every 2s)
+ *   GET /                     → serves dashboard.html
  *
  * Usage:
  *   node tests/mock-server/server.js [--port 3737]
@@ -26,196 +35,182 @@ const path = require('path');
 const url  = require('url');
 
 // ── Paths ─────────────────────────────────────────────────────────
-const ROOT     = path.join(__dirname, '..', '..');
-const FIXTURES = path.join(__dirname, '..', 'fixtures');
+const ROOT          = path.join(__dirname, '..', '..');
+const FIXTURES_ROOT = path.join(__dirname, '..', 'fixtures');
+const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const DASHBOARD_HTML = path.join(ROOT, 'dashboard', 'dashboard.html');
 
 // ── CLI args ──────────────────────────────────────────────────────
-const args = process.argv.slice(2);
+const args    = process.argv.slice(2);
 const portIdx = args.indexOf('--port');
-const PORT = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 3737;
+const PORT    = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 3737;
 
-// ── Fixture loader ────────────────────────────────────────────────
-function loadFixture(filename) {
-  const filepath = path.join(FIXTURES, filename);
-  if (!fs.existsSync(filepath)) return null;
-  return fs.readFileSync(filepath, 'utf8');
+// ── Active fixture set (from env, default 3sensor) ────────────────
+const FIXTURE_SET  = (process.env.FIXTURE_SET || '3sensor').trim();
+const VARIANT_DIR  = path.join(VARIANTS_ROOT, FIXTURE_SET);
+
+// ── Fixture loader: variant-first, root fallback ──────────────────
+function fixturePath(filename) {
+  const variantPath = path.join(VARIANT_DIR, filename);
+  if (fs.existsSync(variantPath)) return variantPath;
+  const rootPath = path.join(FIXTURES_ROOT, filename);
+  if (fs.existsSync(rootPath)) return rootPath;
+  return null;
 }
-
+function loadFixture(filename) {
+  const p = fixturePath(filename);
+  return p ? fs.readFileSync(p, 'utf8') : null;
+}
 function loadFixtureJson(filename) {
   const raw = loadFixture(filename);
   return raw ? JSON.parse(raw) : null;
 }
 
-// ── Polling shim responses ────────────────────────────────────────
-// The dashboard polls ESPHome REST endpoints like /text_sensor/Office%20Temperature
-// which return { id: "...", value: "..." }.  We return plausible static values.
-const SENSOR_META = [
-  { id: 'office',      name: 'Office',      temp: '21.5 °C / 70.7 °F', hum: '45 %', avg_temp: '21.4 °C / 70.5 °F', avg_hum: '45 %', battery: '100 %', last_seen: '30s ago', rssi: -62 },
-  { id: 'first_floor', name: 'First Floor', temp: '19.2 °C / 66.6 °F', hum: '52 %', avg_temp: '19.1 °C / 66.4 °F', avg_hum: '52 %', battery: '87 %',  last_seen: '45s ago', rssi: -71 },
-  { id: 'outside',     name: 'Outside',     temp: '8.3 °C / 46.9 °F',  hum: '68 %', avg_temp: '8.1 °C / 46.6 °F',  avg_hum: '68 %', battery: '92 %',  last_seen: '1m ago',  rssi: -78 },
-];
+// ── Sensor manifest from active fixture set ───────────────────────
+const SENSOR_META = loadFixtureJson('sensors.json') || [];
 
-// Build a lookup: decoded path segment → { id, value }
+// Build polling response map (case-insensitive sensor name matching)
 const POLL_RESPONSES = {};
-SENSOR_META.forEach(function(s) {
-  function reg(name, value) {
-    POLL_RESPONSES[name.toLowerCase()] = { id: name.toLowerCase().replace(/\s+/g, '_'), value: String(value) };
+SENSOR_META.forEach(function(s, idx) {
+  function reg(displayName, value) {
+    POLL_RESPONSES[displayName.toLowerCase()] = {
+      id:    displayName.toLowerCase().replace(/[^\w]+/g, '_'),
+      value: String(value)
+    };
   }
-  reg(s.name + ' Temperature',      s.temp);
-  reg(s.name + ' Humidity',         s.hum);
-  reg(s.name + ' Temp (15m avg)',   s.avg_temp);
-  reg(s.name + ' Humidity (15m avg)', s.avg_hum);
-  reg(s.name + ' Battery',          s.battery);
-  reg(s.name + ' Last Seen',        s.last_seen);
+  // Plausible mock values derived from sensor position
+  const tempC   = (21.5 - idx * 1.5).toFixed(1);
+  const tempF   = ((21.5 - idx * 1.5) * 9 / 5 + 32).toFixed(1);
+  const hum     = String(45 + idx * 6);
+  const avgTmpC = (21.3 - idx * 1.5).toFixed(1);
+  const avgTmpF = ((21.3 - idx * 1.5) * 9 / 5 + 32).toFixed(1);
+  const avgHum  = String(45 + idx * 6);
+  const batt    = String(100 - idx * 7);
+  const seen    = `${30 + idx * 15}s ago`;
+  const rssi    = String(-62 - idx * 8);
+
+  reg(`${s.name} Temperature`,      `${tempC} °C / ${tempF} °F`);
+  reg(`${s.name} Humidity`,         `${hum} %`);
+  reg(`${s.name} Temp (15m avg)`,   `${avgTmpC} °C / ${avgTmpF} °F`);
+  reg(`${s.name} Humidity (15m avg)`, `${avgHum} %`);
+  reg(`${s.name} Battery`,          `${batt} %`);
+  reg(`${s.name} Last Seen`,        seen);
+  reg(`${s.name} RSSI`,             rssi);
 });
 
-// Shared text sensors
+// Shared device / chip sensors (not per-sensor)
 const SHARED_TEXT = {
-  'current time':       '2026-03-11 12:00:00',
-  'chip':               'ESP32-C3',
-  'features':           'WiFi/BT',
-  'cores':              '1',
-  'revision':           '3',
-  'cpu frequency':      '160 MHz',
-  'framework':          'ESP-IDF v5.1',
-  'esphome version':    '2024.12.0',
-  'ip address':         '192.168.120.189',
-  'mac address':        'AA:BB:CC:DD:EE:FF',
-  'reset reason':       'Power on',
+  'current time':   '2026-03-12 12:00:00',
+  'chip':           'ESP32-C3',
+  'features':       'WiFi/BT',
+  'cores':          '1',
+  'revision':       '3',
+  'cpu frequency':  '160 MHz',
+  'framework':      'ESP-IDF v5.1',
+  'esphome version': '2026.2.1',
+  'ip address':     '192.168.120.189',
+  'mac address':    'AA:BB:CC:DD:EE:FF',
 };
-
-const SHARED_SENSOR = {
-  'free heap':          81920,
-  'uptime':             86400,
-  'wifi signal':        -58,
-  'loop time':          12,
-};
-
-function makePollResponse(name, value) {
-  return JSON.stringify({ id: name.toLowerCase().replace(/[\s()]+/g, '_'), value: String(value) });
-}
 
 // ── Response helpers ──────────────────────────────────────────────
 function json(res, data, status) {
-  const body = typeof data === 'string' ? data : JSON.stringify(data);
-  res.writeHead(status || 200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+  const body = JSON.stringify(data);
+  res.writeHead(status || 200, {
+    'Content-Type':  'application/json',
+    'Content-Length': Buffer.byteLength(body),
+    'Access-Control-Allow-Origin': '*',
+  });
   res.end(body);
 }
-
-function text(res, data, contentType, status) {
-  res.writeHead(status || 200, { 'Content-Type': contentType || 'text/plain', 'Access-Control-Allow-Origin': '*' });
-  res.end(data || '');
+function text(res, data, contentType) {
+  const ct = contentType || 'text/plain';
+  res.writeHead(200, {
+    'Content-Type':  ct,
+    'Content-Length': Buffer.byteLength(data),
+    'Access-Control-Allow-Origin': '*',
+  });
+  res.end(data);
 }
-
 function notFound(res, msg) {
-  res.writeHead(404, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
+  res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end(msg || 'Not found');
 }
 
 // ── Request router ────────────────────────────────────────────────
-const server = http.createServer(function(req, res) {
-  const parsed   = url.parse(req.url, true);
+function onRequest(req, res) {
+  const parsed   = url.parse(req.url);
   const pathname = decodeURIComponent(parsed.pathname);
 
-  // ── Dashboard HTML ──
-  if (pathname === '/' || pathname === '/index.html') {
+  // Root: serve dashboard HTML
+  if (pathname === '/' || pathname === '/dashboard' || pathname === '/dashboard.html') {
     const html = fs.readFileSync(DASHBOARD_HTML, 'utf8');
-    // Inject ESP_HOST so the dashboard targets our mock server
-    const patched = html.replace(
-      /var ESP_HOST\s*=\s*'[^']*';/,
-      `var ESP_HOST = 'http://localhost:${PORT}';`
-    );
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(patched);
-    return;
+    return text(res, html, 'text/html; charset=utf-8');
   }
 
-  // ── Sensor manifest ──
+  // sensors.json manifest
   if (pathname === '/sensors.json') {
-    const data = loadFixtureJson('sensors.json');
-    return json(res, data || []);
+    const data = loadFixture('sensors.json');
+    if (!data) return notFound(res, 'sensors.json not found');
+    return text(res, data, 'application/json');
   }
 
-  // ── History CSV ──
+  // History CSVs
   const histMatch = pathname.match(/^\/history\/([^/]+)\/(temp|hum)$/);
   if (histMatch) {
     const sensorId = histMatch[1];
     const series   = histMatch[2];
     const data = loadFixture(`history-${sensorId}-${series}.csv`);
-    if (data === null) return notFound(res, `No fixture for ${sensorId}/${series}`);
+    if (!data) return notFound(res, `No fixture for ${sensorId}/${series}`);
     return text(res, data, 'text/plain');
   }
 
-  // ── API: storage-stats ──
+  // /api/storage-stats
   if (pathname === '/api/storage-stats') {
-    return json(res, loadFixtureJson('storage-stats.json') || { ok: false });
+    const data = loadFixtureJson('storage-stats.json');
+    return json(res, data || { ok: false, error: 'fixture not found' });
   }
 
-  // ── API: status ──
+  // /api/status
   if (pathname === '/api/status') {
-    return json(res, loadFixtureJson('api-status.json') || { ok: false });
+    const data = loadFixtureJson('api-status.json');
+    return json(res, data || { ok: false, error: 'fixture not found' });
   }
 
-  // ── API: management stubs (reboot / delete-data) ──
-  if (pathname === '/api/reboot' || pathname === '/api/delete-data') {
-    return json(res, { ok: true, stub: true });
-  }
-
-  // ── SSE /events — sends a ping then keeps connection open ──
+  // SSE events stream (ping every 2s)
   if (pathname === '/events') {
     res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
+      'Content-Type':  'text/event-stream',
       'Cache-Control': 'no-cache',
+      'Connection':    'keep-alive',
       'Access-Control-Allow-Origin': '*',
-      'Connection': 'keep-alive',
     });
-    res.write('event: ping\ndata: {}\n\n');
-    const interval = setInterval(function() {
-      if (res.writableEnded) { clearInterval(interval); return; }
-      res.write('event: ping\ndata: {}\n\n');
+    res.write('retry: 2000\n\n');
+    const iv = setInterval(function() {
+      res.write(':ping\n\n');
     }, 2000);
-    req.on('close', function() { clearInterval(interval); });
+    req.on('close', function() { clearInterval(iv); });
     return;
   }
 
-  // ── ESPHome text_sensor polling ──
-  if (pathname.startsWith('/text_sensor/')) {
-    const key = pathname.replace('/text_sensor/', '').toLowerCase().replace(/_/g, ' ');
-    // Sensor-specific text sensors
-    if (POLL_RESPONSES[key]) return json(res, POLL_RESPONSES[key]);
-    // Shared text sensors
-    if (SHARED_TEXT[key] !== undefined) return json(res, makePollResponse(key, SHARED_TEXT[key]));
-    // Default fallback
-    return json(res, { id: key.replace(/\s+/g, '_'), value: 'mock' });
+  // Management endpoints (mock — always OK)
+  if (pathname === '/api/delete-data' || pathname === '/api/reboot') {
+    return json(res, { ok: true, mock: true });
   }
 
-  // ── ESPHome sensor polling (numeric) ──
-  if (pathname.startsWith('/sensor/')) {
-    const key = pathname.replace('/sensor/', '').toLowerCase().replace(/_/g, ' ');
-    // Per-sensor RSSI
-    const rssiMatch = key.match(/^(.+) rssi$/);
-    if (rssiMatch) {
-      const sensorName = rssiMatch[1];
-      const meta = SENSOR_META.find(s => s.name.toLowerCase() === sensorName);
-      return json(res, { id: key.replace(/\s+/g, '_'), value: meta ? meta.rssi : -70 });
-    }
-    if (SHARED_SENSOR[key] !== undefined) return json(res, { id: key.replace(/\s+/g, '_'), value: SHARED_SENSOR[key] });
-    return json(res, { id: key.replace(/\s+/g, '_'), value: 0 });
+  // Polling shim: /text_sensor/<name> and /sensor/<name>
+  if (pathname.startsWith('/text_sensor/') || pathname.startsWith('/sensor/')) {
+    const raw  = pathname.replace(/^\/(text_sensor|sensor)\//, '');
+    const name = raw.toLowerCase();
+    if (POLL_RESPONSES[name]) return json(res, POLL_RESPONSES[name]);
+    if (SHARED_TEXT[name])    return json(res, { id: name.replace(/\s+/g, '_'), value: SHARED_TEXT[name] });
+    return json(res, { id: name.replace(/\s+/g, '_'), value: '—' });
   }
 
-  // ── Import stubs (basic shape so UI flow can be exercised) ──
-  if (pathname.startsWith('/api/import/')) {
-    return json(res, { ok: true, stub: true });
-  }
+  notFound(res, `${pathname} not found`);
+}
 
-  notFound(res, pathname);
-});
-
+// ── Start server ──────────────────────────────────────────────────
+const server = http.createServer(onRequest);
 server.listen(PORT, '127.0.0.1', function() {
-  console.log(`Mock ESP32 gateway server listening on http://127.0.0.1:${PORT}`);
-  console.log('  Dashboard: http://127.0.0.1:' + PORT + '/');
-  console.log('  Press Ctrl-C to stop.');
+  process.stderr.write(`mock-server: FIXTURE_SET=${FIXTURE_SET} listening on http://127.0.0.1:${PORT}\n`);
 });
-
-module.exports = server;

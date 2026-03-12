@@ -2,6 +2,19 @@
 
 Curated ledger of accepted builds. Raw build logs are in `build-logs/` (local) or GitHub Actions artifacts (cloud).
 
+## v7.4.4.0 — 2026-03-12
+
+- **Change:** Configurable sensor count infrastructure — preflight checks, multi-variant fixtures, sensor-count smoke tests, CI matrix, documentation
+- **Preflight:** ~42 checks (up from ~30 at v7.4.3.0; 12 new sensor-count checks)
+- **Compile:** Not required — no firmware or C++ logic changes (default 3-sensor build unchanged)
+- **Flash:** Unchanged — device still running v7.4.2.0 firmware
+- **Browser tests:** 28/28 PASS baseline (3sensor) + sensor-count smoke suite PASS for 1/2/4sensor variants
+- **CI:** Matrix browser tests expected PASS on PR
+- **Workflow:** Branch `feature/configurable-sensor-count`, merge to `main` via PR
+- **Status:** ⏳ Pending device validation (optional — no firmware changed)
+
+---
+
 ## v7.4.3.0 — 2026-03-11
 
 - **Change:** Playwright browser regression test suite (test infrastructure only — no firmware change)

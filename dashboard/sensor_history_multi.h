@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.4.3.0.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.4.4.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -312,7 +312,46 @@ static SensorSlot sensors[NUM_SENSORS] = {
   },
 };
 
-
+// ═══════════════════════════════════════════════════════════════════
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.4.4.0) ──
+//
+// Supported compile-time counts: 1, 2, 3 (default), 4
+//
+// To change count:
+//   1. Update NUM_SENSORS and the sensors[] initializer list below.
+//   2. Update the matching YAML blocks in firmware/esp32-c3-multi-sensor.yaml
+//      (one thermopro_ble block, one ble_rssi block, and six text-sensor IDs
+//       per sensor: cur_temp_, cur_hum_, avg_temp_, avg_hum_, battery_, last_seen_).
+//   3. Update DEFAULT_SENSOR_META in dashboard/dashboard.js.
+//   4. Update tests/fixtures/sensors.json to match the new count.
+//   5. Run: node tests/fixtures/generate-fixtures.js
+//   6. Run: bash ./scripts/preflight.sh  (will catch any mismatch before compile)
+//   7. Compile, flash, and DELETE RETAINED HISTORY (layout is count-dependent).
+//
+// See Docs/configuring-sensors.md for the full procedure with copy-paste templates.
+//
+// ── 1-sensor template ────────────────────────────────────────────
+// static constexpr int NUM_SENSORS = 1;
+// static SensorSlot sensors[NUM_SENSORS] = {
+//   { .id = "office", .name = "Office", .mac = "DB:06:2C:58:8A:59" },
+// };
+//
+// ── 2-sensor template ────────────────────────────────────────────
+// static constexpr int NUM_SENSORS = 2;
+// static SensorSlot sensors[NUM_SENSORS] = {
+//   { .id = "office",      .name = "Office",      .mac = "DB:06:2C:58:8A:59" },
+//   { .id = "first_floor", .name = "First Floor", .mac = "D5:D8:4C:25:06:49" },
+// };
+//
+// ── 4-sensor template ────────────────────────────────────────────
+// static constexpr int NUM_SENSORS = 4;
+// static SensorSlot sensors[NUM_SENSORS] = {
+//   { .id = "office",      .name = "Office",      .mac = "DB:06:2C:58:8A:59" },
+//   { .id = "first_floor", .name = "First Floor", .mac = "D5:D8:4C:25:06:49" },
+//   { .id = "outside",     .name = "Outside",     .mac = "DF:EB:DE:19:11:6C" },
+//   { .id = "garage",      .name = "Garage",      .mac = "XX:XX:XX:XX:XX:XX" },
+// };
+// ═══════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════
 // Hourly NVS segment model

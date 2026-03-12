@@ -1,11 +1,99 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-11 — v7.4.3.0 complete (Playwright test suite, CI validated)_
+_Last updated: 2026-03-12 — v7.4.4.0 (LESSON-OPS-029–032, BUG-025 added)
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
 
 Both sections are in **reverse chronological order** — most recent entry first.
+
+---
+
+## Bug Fixes
+
+### BUG-027: Chromium missing shared libraries in ESPHome container — libnspr4.so not found (v7.4.4.0)
+
+**Symptom:** All Playwright tests fail with `error while loading shared libraries: libnspr4.so: cannot open shared object file: No such file or directory`. The binary exists and `--no-sandbox` is in the launch args, but the process crashes at the dynamic linker stage before Chromium even starts.
+
+**Root cause:** `npx playwright install chromium` downloads the Chromium binary but does NOT install the required OS-level shared libraries (`libnspr4`, `libnss3`, `libatk`, `libgdk`, etc). These must be installed via the system package manager. The ESPHome Docker container does not include them by default.
+
+**Fix:** Use `--with-deps`:
+```bash
+npx playwright install --with-deps chromium
+```
+This installs both the binary and all required system packages via `apt`.
+
+**Preflight check improvement:** `playwright_browser_installed` now actually executes the binary with `--version` instead of just checking file existence. This catches the missing-library case and prints the actionable fix command.
+
+**Lesson:** See LESSON-OPS-034.
+
+---
+
+### BUG-026: Chromium crashes silently in ESPHome/Docker containers — sandbox kernel feature missing (v7.4.4.0)
+
+**Symptom:** All Playwright tests fail immediately with `browserType.launch: Target page, context or browser has been closed` — even after a successful `npx playwright install chromium`. The browser binary exists but the process crashes on startup.
+
+**Root cause:** Chromium's default sandbox uses Linux user namespaces, which are disabled in many container environments including the ESPHome Docker container. Without the sandbox, Chromium refuses to start unless explicitly told to skip it.
+
+**Fix:** Add `launchOptions: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }` to the `use` block in `playwright.config.js`. This is safe for our test runner — the risk model for the sandbox only applies to untrusted web content; our mock server serves only our own fixture HTML.
+
+**Lesson:** See LESSON-OPS-033.
+
+---
+
+### BUG-025: Fixture generate-fixtures.js used milliseconds for CSV timestamps (v7.4.4.0)
+
+**Symptom:** Sensor-count variant fixtures (1/2/4 sensor) would render completely empty charts in the dashboard when used via FIXTURE_SET. No error message — just no data points.
+
+**Root cause:** The original `generate-fixtures.js` used `Date.UTC()` to get "now" as a base for CSV timestamps. `Date.UTC()` returns epoch **milliseconds** (e.g., `1773173700000`). The dashboard's `parseHistoryMetricLines` stores the raw integer as an object key, then the chart renderer calls `new Date(epoch * 1000)` — interpreting it as seconds. So a millisecond timestamp gets multiplied by 1000, producing dates in year ~58000, which fall outside any time range filter and are silently dropped.
+
+**Fix:** Use epoch **seconds** throughout `generate-fixtures.js`. Anchor to `ANCHOR_EPOCH_SEC = 1741694400` (integer seconds) and step by `INTERVAL_SEC = 15 * 60` seconds per point.
+
+**Lesson:** See LESSON-OPS-029.
+
+---
+
+## Lessons Learned
+
+### LESSON-OPS-035: Preflight checks that depend on npm packages must skip when node_modules is absent (v7.4.4.0)
+
+The build CI (`ci.yml`) runs preflight before `npm ci` — `node_modules` does not exist at that point. Any preflight check that requires an npm package must guard with `[[ -d "node_modules/@playwright" ]]` (or equivalent) and emit `SKIP` rather than `FAIL` when the guard is not met. A hard FAIL breaks the build CI for a check that only applies in test environments. See `playwright_browser_installed` check in `scripts/preflight.sh`.
+
+---
+
+### LESSON-OPS-034: Always use --with-deps when installing Playwright in containers (v7.4.4.0)
+
+`npx playwright install chromium` downloads the binary only. `npx playwright install --with-deps chromium` also installs the required OS shared libraries via apt. In any container or fresh Linux environment, always use `--with-deps`. The symptom of the missing-only-binary install is `libnspr4.so: cannot open shared object file` — the binary exists and `--no-sandbox` is in the args, but the process dies at the dynamic linker stage. See BUG-027.
+
+---
+
+### LESSON-OPS-033: Playwright in Docker/ESPHome containers requires --no-sandbox (v7.4.4.0)
+
+Always add `launchOptions: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }` to `playwright.config.js` when running in a container. The error `Target page, context or browser has been closed` immediately after browser launch, without any further detail, is the signature of a sandbox crash. This is not a Playwright version issue — it is a kernel capability issue. See BUG-026.
+
+---
+
+### LESSON-OPS-032: NVS count-mismatch protection is already in place — no new C++ guard needed (v7.4.4.0)
+
+The `meta.num_sensors == NUM_SENSORS` check in the NVS restore path already rejects history segments from a different sensor count cleanly. Old data is not loaded, not corrupted, not silently misinterpreted. The correct response to a count change is: load nothing from the old segments, require an explicit history delete, and document the procedure. No additional C++ validation was needed.
+
+---
+
+### LESSON-OPS-031: DEFAULT_SENSOR_META in dashboard.js is a required consistency target (v7.4.4.0)
+
+The `DEFAULT_SENSOR_META` array in `dashboard.js` is a fallback used when `/sensors.json` fails to load. It must match `NUM_SENSORS` — if it has 3 entries but the firmware is configured for 1, the dashboard will render 3 cards (with the wrong sensors) when the manifest endpoint fails. Preflight now checks this explicitly.
+
+---
+
+### LESSON-OPS-030: Preflight sensor-count checks belong in Node.js, not bash regex (v7.4.4.0)
+
+Counting occurrences of patterns in YAML and C++ using bash `grep -c` and `sed` is fragile — quoting edge cases, multi-line block matching, and false positives from comments are all real risks. Inline Node.js scripting within the bash preflight is more readable, reliable, and straightforward to extend with new checks.
+
+---
+
+### LESSON-OPS-029: CSV fixture timestamps must be epoch seconds (v7.4.4.0)
+
+The dashboard's history chart pipeline uses `new Date(epoch * 1000)` — it expects epoch **seconds** as integers from CSV files. `Date.UTC()` and `Date.now()` in JavaScript return **milliseconds** and must not be used directly as CSV timestamp values. Always verify the unit when generating fixture data. See BUG-025.
 
 ---
 
