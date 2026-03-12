@@ -107,7 +107,12 @@ echo "test_infrastructure: PASS"
 # BUG-026/BUG-027 prevention:
 #   BUG-026: Binary missing → need: npx playwright install --with-deps chromium
 #   BUG-027: Binary present but shared libs missing (libnspr4.so etc) → same fix
-# The check below actually executes the binary so it catches both cases.
+# This check is skipped when node_modules is absent (e.g. build-only CI that
+# does not run npm ci). It only runs — and only matters — in environments where
+# npm ci has already been executed before preflight.
+if [[ ! -d "node_modules/@playwright" ]]; then
+  echo "playwright_browser_installed: SKIP (node_modules not present — run npm ci first to enable this check)"
+else
 node << 'NODE'
 const { execFileSync } = require('child_process');
 let exec;
@@ -125,7 +130,7 @@ if (!fs.existsSync(exec)) {
   console.error('Fix: npx playwright install --with-deps chromium');
   process.exit(1);
 }
-// Actually run the binary to catch missing shared libraries (libnspr4.so etc)
+// Actually execute the binary to catch missing shared libraries (libnspr4.so etc)
 try {
   execFileSync(exec, ['--version'], { timeout: 5000, stdio: ['ignore', 'pipe', 'pipe'] });
   console.log('playwright_browser_installed: PASS');
@@ -134,12 +139,14 @@ try {
   if (stderr.includes('shared libraries') || stderr.includes('cannot open shared object')) {
     console.error('playwright_browser_installed: FAIL — binary exists but system libs missing: ' + stderr.trim());
     console.error('Fix: npx playwright install --with-deps chromium');
+    process.exit(1);
   } else {
-    // Some Chromium builds exit non-zero for --version but still work; treat as pass
-    console.log('playwright_browser_installed: PASS (binary present, non-zero exit from --version is normal for headless-shell)');
+    // Some headless-shell builds exit non-zero for --version but still work fine
+    console.log('playwright_browser_installed: PASS (binary present)');
   }
 }
 NODE
+fi
 
 node --check dashboard/dashboard.js
 echo "node_check: PASS"

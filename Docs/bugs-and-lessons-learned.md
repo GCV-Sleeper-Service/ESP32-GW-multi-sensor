@@ -55,6 +55,12 @@ This installs both the binary and all required system packages via `apt`.
 
 ## Lessons Learned
 
+### LESSON-OPS-035: Preflight checks that depend on npm packages must skip when node_modules is absent (v7.4.4.0)
+
+The build CI (`ci.yml`) runs preflight before `npm ci` — `node_modules` does not exist at that point. Any preflight check that requires an npm package must guard with `[[ -d "node_modules/@playwright" ]]` (or equivalent) and emit `SKIP` rather than `FAIL` when the guard is not met. A hard FAIL breaks the build CI for a check that only applies in test environments. See `playwright_browser_installed` check in `scripts/preflight.sh`.
+
+---
+
 ### LESSON-OPS-034: Always use --with-deps when installing Playwright in containers (v7.4.4.0)
 
 `npx playwright install chromium` downloads the binary only. `npx playwright install --with-deps chromium` also installs the required OS shared libraries via apt. In any container or fresh Linux environment, always use `--with-deps`. The symptom of the missing-only-binary install is `libnspr4.so: cannot open shared object file` — the binary exists and `--no-sandbox` is in the args, but the process dies at the dynamic linker stage. See BUG-027.
