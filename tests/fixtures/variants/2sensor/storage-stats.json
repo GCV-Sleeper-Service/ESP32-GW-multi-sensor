@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "partition": "history",
+  "total_bytes": 524288,
+  "used_bytes": 122880,
+  "free_bytes": 401408,
+  "retention_days": 45,
+  "retention_oldest_epoch": 1741608000,
+  "retention_newest_epoch": 1741694400,
+  "segment_count": 96,
+  "mode": "mock"
+}

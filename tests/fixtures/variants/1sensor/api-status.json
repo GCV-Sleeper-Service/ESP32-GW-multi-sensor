@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "version": "v7.4.4.0",
+  "sensor_count": 1,
+  "sensors": [
+    {
+      "id": "office",
+      "name": "Office"
+    }
+  ],
+  "mode": "mock",
+  "connected": true
+}

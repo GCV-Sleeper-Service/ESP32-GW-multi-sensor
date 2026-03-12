@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "version": "v7.4.4.0",
+  "sensor_count": 2,
+  "sensors": [
+    {
+      "id": "office",
+      "name": "Office"
+    },
+    {
+      "id": "first_floor",
+      "name": "First Floor"
+    }
+  ],
+  "mode": "mock",
+  "connected": true
+}

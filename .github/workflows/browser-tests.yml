@@ -3,13 +3,14 @@ name: Browser Tests
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, 'feature/**', 'docs/**']
     paths:
       - 'dashboard/**'
       - 'tests/**'
       - 'playwright.config.js'
       - 'package.json'
       - 'package-lock.json'
+      - 'scripts/preflight.sh'
   pull_request:
     branches: [main]
     paths:
@@ -18,10 +19,15 @@ on:
       - 'playwright.config.js'
       - 'package.json'
       - 'package-lock.json'
+      - 'scripts/preflight.sh'
 
 jobs:
   browser-tests:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture_set: [3sensor, 1sensor, 2sensor, 4sensor]
 
     permissions:
       contents: read
@@ -39,22 +45,31 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Generate fixture variants
+        run: node tests/fixtures/generate-fixtures.js
+
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Generate fixture data
-        run: node tests/fixtures/generate-fixtures.js
-
-      - name: Run browser tests
-        run: npx playwright test
+      - name: Run baseline suite (3sensor — 28 tests)
+        if: matrix.fixture_set == '3sensor'
         env:
           CI: true
+          FIXTURE_SET: ${{ matrix.fixture_set }}
+        run: npx playwright test
 
-      - name: Upload test report and artifacts
+      - name: Run sensor-count smoke suite (${{ matrix.fixture_set }})
+        if: matrix.fixture_set != '3sensor'
+        env:
+          CI: true
+          FIXTURE_SET: ${{ matrix.fixture_set }}
+        run: npx playwright test tests/browser/sensor-count.spec.js
+
+      - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-results-${{ github.run_number }}
+          name: playwright-report-${{ matrix.fixture_set }}-${{ github.run_number }}
           retention-days: 14
           if-no-files-found: warn
           path: |
@@ -66,10 +81,11 @@ jobs:
         shell: bash
         run: |
           {
-            echo "## Browser Tests — $(cat VERSION)"
+            echo "## Browser Tests — $(cat VERSION) — fixture_set=${{ matrix.fixture_set }}"
             echo "| Field | Value |"
             echo "|-------|-------|"
             echo "| Ref | \`${GITHUB_REF_NAME}\` |"
             echo "| Commit | \`${GITHUB_SHA::8}\` |"
             echo "| Event | ${GITHUB_EVENT_NAME} |"
+            echo "| Fixture set | ${{ matrix.fixture_set }} |"
           } >> "$GITHUB_STEP_SUMMARY"
