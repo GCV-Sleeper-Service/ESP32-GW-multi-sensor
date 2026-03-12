@@ -1,6 +1,6 @@
 # Future Plans & Feature Roadmap
 
-_Last updated: 2026-03-11 — aligned to v7.4.3.0_
+_Last updated: 2026-03-12 — aligned to v7.4.4.0_
 
 This document is the high-level roadmap.
 For the detailed implementation-level plans, see:
@@ -26,9 +26,9 @@ The guiding philosophy remains the same:
 | v7.4.1.0 | Dashboard minification pipeline | Complete | Shipped |
 | v7.4.2.0 | Custom date range selector | Complete | Shipped |
 | v7.4.3.x | Playwright browser automation | Complete | 28/28 PASS |
-| v7.4.4.x | Configurable sensor count (1–4) | Complete | Documentation + validation + compatibility handling |
-| v7.5.x | Modular Architecture / Gateway Aggregation | Next | Enable multiple BLE gateways |
-| v7.6.x | Dashboard Pane Extensibility | Next | Add support for different sensor types |
+| v7.4.4.x | Configurable sensor count (1–4) | Next | Documentation + validation + compatibility handling |
+| v7.5.x | Secrets/settings persistence review | Deferred | Reassess after notification/settings needs are clearer |
+| v7.6.x | Encrypted secrets partition | Low priority / likely skip | Probably more complexity than value |
 
 ---
 
@@ -68,7 +68,7 @@ The main risk is UI complexity and making sure the range state does not break ex
 
 ---
 
-## 2. v7.4.3.x — Playwright Browser Test Automation (COMPLETE)
+## 2. v7.4.3.x — Playwright Browser Test Automation
 
 **Priority:** High
 
@@ -101,7 +101,7 @@ The value is high because the next planned work is dashboard-heavy.
 
 ---
 
-## 3. v7.4.4.x — Configurable Sensor Count (1–4) (COMPLETE)
+## 3. v7.4.4.x — Configurable Sensor Count (1–4)
 
 **Priority:** Medium
 
@@ -138,7 +138,7 @@ That means the feature has to be treated carefully to avoid silent history corru
 
 ---
 
-### 4. v7.5 — Modular Architecture / Gateway Aggregation (NEXT)
+### 4. v7.5 — Modular Architecture / Gateway Aggregation
 
 **Priority: HIGH (design phase), LOW (implementation)**
 
@@ -158,9 +158,9 @@ Design the data contract now (the `/api/status` endpoint is already a good start
 
 ---
 
-### 5. 7.6 — Dashboard Pane Extensibility  (NEXT)
+### 5. 7.6 — Dashboard Pane Extensibility
 
-**Priority: HIGH**
+**Priority: MEDIUM**
 
 Add support for different sensor types (leak sensors, wind speed, etc.) as additional dashboard cards/panes.
 
