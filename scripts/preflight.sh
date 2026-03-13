@@ -21,6 +21,10 @@ FILES=(
   "tests/mock-server/server.js"
   "tests/browser/sensor-count.spec.js"
   "Docs/configuring-sensors.md"
+  "config/sensors.json"
+  "scripts/render_sensor_config.py"
+  "scripts/change_sensor_number.py"
+  "scripts/history_backup.py"
 )
 
 for f in "${FILES[@]}"; do
@@ -68,6 +72,12 @@ check_contains "import_finish_present" dashboard/sensor_history_multi.h "handle_
 check_not_contains "yaml_no_old_versioned_header_name" firmware/esp32-c3-multi-sensor.yaml "dashboard-v7.3.4.2.h"
 check_not_contains "yaml_no_old_versioned_history_name" firmware/esp32-c3-multi-sensor.yaml "sensor_history_multi-v7.3.4.2.h"
 check_not_contains "yaml_no_old_versioned_partition_name" firmware/esp32-c3-multi-sensor.yaml "esp32-c3-multi-v7.3.4.2-partitions.csv"
+
+
+check_contains "sensor_manifest_present" config/sensors.json '"sensors"'
+python3 scripts/render_sensor_config.py --check
+node tests/fixtures/generate-fixtures.js --manifest config/sensors.json --overwrite-baseline >/dev/null
+check_contains "fixture_baseline_manifest_regenerated" tests/fixtures/sensors.json '"id"'
 
 # ── BUG-018 prevention: exactly one <script> tag in dashboard.html ──
 SCRIPT_TAG_COUNT=$(grep -c '^<script>$' dashboard/dashboard.html || true)
@@ -299,5 +309,14 @@ if (fallbackMatch) {
 }
 
 NODE
+
+
+# ── Active sensor-config browser smoke (optional when node_modules exists) ──
+if [[ -d "node_modules/@playwright" ]]; then
+  FIXTURE_SET= npx playwright test tests/browser/sensor-count.spec.js --project=chromium >/dev/null
+  echo "sensor_count_browser_smoke: PASS"
+else
+  echo "sensor_count_browser_smoke: SKIP (node_modules not present — run npm ci first to enable this check)"
+fi
 
 echo "preflight: PASS"

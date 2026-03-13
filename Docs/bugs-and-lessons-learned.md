@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-12 — v7.4.4.0 (LESSON-OPS-029–032, BUG-025 added)
+_Last updated: 2026-03-12 — v7.4.5.0 (LESSON-OPS-036–037, BUG-028–029 added)
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -10,6 +10,32 @@ Both sections are in **reverse chronological order** — most recent entry first
 ---
 
 ## Bug Fixes
+
+### BUG-028: Sensor-count changes depended on four-file manual edits, creating configuration drift risk (v7.4.5.0)
+
+**Symptom:** Changing sensor count or replacing a sensor required hand-editing `sensor_history_multi.h`, the firmware YAML, `dashboard.js`, and `tests/fixtures/sensors.json`. It was easy to update three files and miss the fourth, which produced confusing preflight failures or worse — a compile-valid repo whose dashboard fallback / test fixtures no longer matched the active firmware configuration.
+
+**Root cause:** The repo had no canonical source of truth for configured sensors. The same facts (sensor id, display name, MAC, count) were duplicated in multiple files.
+
+**Fix:** Introduced a canonical manifest (`config/sensors.json`) plus a generator (`scripts/render_sensor_config.py`) and an interactive manager (`scripts/change_sensor_number.py`). The renderer now drives generated sections in the header, firmware YAML, dashboard fallback metadata, and baseline fixture manifest.
+
+**Guardrail:** `scripts/preflight.sh` now runs `python3 scripts/render_sensor_config.py --check` so generated-file drift is caught before compile.
+
+**Lesson:** See LESSON-OPS-037.
+
+---
+
+### BUG-029: Session-level import design details were not propagated into the durable docs (v7.4.5.0)
+
+**Symptom:** The repo behavior for single-sensor merge import existed in firmware and dashboard logic, but the high-value explanation — epoch-to-slot mapping, overlay of one sensor into an existing segment, reuse of the same slot when possible, and ~7 KB temporary overhead — was not consistently carried into changelog and handoff documentation. That made fresh-start sessions vulnerable to losing key implementation context.
+
+**Root cause:** Documentation captured the user-visible feature but not enough of the internal design rationale.
+
+**Fix:** Expanded changelog, `Docs/configuring-sensors.md`, and the per-session handoff to explicitly describe the merge-first single-sensor import model and how it differs from full multi-sensor replacement.
+
+**Lesson:** See LESSON-OPS-036.
+
+---
 
 ### BUG-027: Chromium missing shared libraries in ESPHome container — libnspr4.so not found (v7.4.4.0)
 
@@ -54,6 +80,28 @@ This installs both the binary and all required system packages via `apt`.
 ---
 
 ## Lessons Learned
+
+### LESSON-OPS-037: Design-level behavior needs to be documented, not just shipped (v7.4.5.0)
+
+When a feature has a non-obvious internal model, preserve that model in durable documentation. The single-sensor import path is a good example: the useful fact is not only that it is “non-destructive,” but *how* it works — epoch-to-slot scan, segment overlay, same-slot rewrite, new-slot allocation only for missing hours, and temporary memory overhead. Without that detail, future sessions have to rediscover the same architecture from code.
+
+**Carry forward:** When a feature changes retained-history semantics, endpoint contract, or state-management design, record the internal mechanism in the changelog and session handoff, not only the user-facing label.
+
+---
+
+### LESSON-OPS-036: Repeated configuration belongs in one canonical manifest (v7.4.5.0)
+
+If the same sensor facts appear in multiple repo files, manual editing will eventually drift. The right fix is not “be more careful”; it is to move those facts into one canonical manifest and generate the dependent files from it.
+
+For this repo, the repeated facts were:
+- sensor id
+- display name
+- MAC address
+- sensor count / ordering
+
+**Carry forward:** `config/sensors.json` is now the source of truth. Future sensor-related changes should flow through the manifest and renderer first, not through direct manual edits.
+
+---
 
 ### LESSON-OPS-035: Preflight checks that depend on npm packages must skip when node_modules is absent (v7.4.4.0)
 

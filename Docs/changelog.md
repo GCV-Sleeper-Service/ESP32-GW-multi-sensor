@@ -4,6 +4,34 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.4.5.0 — 2026-03-12
+
+**Added:** Canonical sensor-manifest workflow and history backup/restore CLI
+
+- `config/sensors.json` — new single source of truth for configured sensors (id, name, MAC)
+- `scripts/change_sensor_number.py` — interactive add/remove flow with count guardrails (1–4), name/MAC validation, confirmation prompts, manifest update, and generator invocation
+- `scripts/render_sensor_config.py` — manifest-driven renderer for `dashboard/sensor_history_multi.h`, `firmware/esp32-c3-multi-sensor.yaml`, `dashboard/dashboard.js`, and `tests/fixtures/sensors.json`
+- `scripts/history_backup.py` — command-line retained-history export/import helper built on existing `/sensors.json`, `/history/*`, and `/api/import/*` endpoints
+- Generated sensor-manifest markers in the header, YAML, and dashboard JS so future sensor changes are deterministic instead of four-file manual edits
+- `Docs/session-log-2026-03-12-sensor-config-automation.md` — session handoff with request, actions, design decisions, lessons, and next steps
+
+**Changed:** Validation and test plumbing are now manifest-aware
+
+- `scripts/preflight.sh` now validates the canonical manifest, runs `scripts/render_sensor_config.py --check`, regenerates root mock fixtures from the active manifest, and optionally runs the sensor-count browser smoke suite when Playwright dependencies are installed
+- `tests/fixtures/generate-fixtures.js` now supports `--manifest <path> --overwrite-baseline`, and baseline overwrite now refreshes the full root fixture set, not only `tests/fixtures/sensors.json`
+- `tests/mock-server/server.js` now builds polling responses from the active fixture manifest and supports `FIXTURE_SET` variant resolution with root fallback
+- `Docs/configuring-sensors.md` is now centered on the canonical manifest workflow, backup-before-delete requirement, and both browser and CLI restore paths
+- `README.md` now points users to the manifest-driven workflow instead of manual four-file edits
+
+**Expanded documentation:** Single-sensor merge-import design is now carried forward explicitly
+
+- Changelog/session docs now capture the merge-first behavior added in v7.4.0.2: the firmware builds an epoch-to-slot map, overlays only the target sensor into existing hourly segments, writes back to the same slot when possible, and allocates a new slot only for hours not already present
+- `Docs/configuring-sensors.md` now documents the above behavior as the preferred explanation for how single-sensor restore differs from full multi-sensor replacement
+
+**Device impact:** A reflash is required only if you want the repo version/string updates and generated YAML changes on the device. Runtime history logic itself is unchanged; this release primarily automates configuration and backup/restore workflows.
+
+---
+
 ## v7.4.4.0 — 2026-03-12
 
 **Added:** Configurable sensor count (1–4) with preflight validation and multi-variant test coverage

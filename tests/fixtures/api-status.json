@@ -1,32 +1,21 @@
 {
   "ok": true,
-  "version": "v7.4.4.0",
-  "uptime_seconds": 86400,
+  "version": "v7.4.5.0",
   "sensor_count": 3,
   "sensors": [
     {
       "id": "office",
-      "name": "Office",
-      "last_seen": 1741694370,
-      "temp_valid": true,
-      "hum_valid": true
+      "name": "Office"
     },
     {
       "id": "first_floor",
-      "name": "First Floor",
-      "last_seen": 1741694370,
-      "temp_valid": true,
-      "hum_valid": true
+      "name": "First Floor"
     },
     {
       "id": "outside",
-      "name": "Outside",
-      "last_seen": 1741694370,
-      "temp_valid": true,
-      "hum_valid": true
+      "name": "Outside"
     }
   ],
-  "ram_history_points_per_series": 96,
-  "persist_days": 45,
-  "free_heap": 81920
+  "mode": "active-manifest",
+  "connected": true
 }

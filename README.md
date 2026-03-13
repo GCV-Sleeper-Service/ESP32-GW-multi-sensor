@@ -5,7 +5,7 @@ A standalone BLE-to-WiFi gateway built on the **ESP32-C3 SuperMini**. It passive
 No cloud. No database. No Home Assistant required. Just an ESP32, the gateway firmware, and a browser.
 
 > **Current default configuration on `main`: 3 BLE sensors.**
-> As of v7.4.4.0, the gateway supports **1–4 sensors** (compile-time configurable). See [Docs/configuring-sensors.md](Docs/configuring-sensors.md) for the change procedure.
+> As of **v7.4.5.0**, the repo supports **1–4 sensors** through a canonical manifest plus generator workflow. See [Docs/configuring-sensors.md](Docs/configuring-sensors.md).
 
 **Total hardware cost: ~$35 USD.**
 
@@ -20,23 +20,9 @@ No cloud. No database. No Home Assistant required. Just an ESP32, the gateway fi
 - Keeps 24h of history in RAM and persists up to 45 days of hourly history to a dedicated NVS partition
 - Serves an embedded HTML dashboard directly from the ESP32 — no external hosted UI required
 - Dashboard supports dark/light mode, collapsible sections, CSV export/import, and **24h / 7d / 30d / 45d** history ranges
+- Supports browser or CLI backup/restore of retained history during sensor-count changes
 - Accessible on LAN or over the internet via Cloudflare tunnel
 - Dashboard HTML/JS is minified before embedding in `dashboard.h` to save flash space
-
-![Sensor Cards](Images/dashboard-sensors.png)
-
-![Charts and Export](Images/dashboard-charts.png)
-
-## Hardware
-
-| Item | Qty | ~Price | Notes |
-|------|-----|--------|-------|
-| ESP32-C3 SuperMini | 1 | $3–5 | Amazon, AliExpress |
-| ThermoPro TP357 | 1–3 currently configured | $9–10 each | BLE temperature/humidity |
-| USB-C cable + adapter | 1 | $3 | For initial flash only |
-
-No breadboard, no wiring, no soldering.
-Each TP357 runs on a single AAA battery lasting roughly 6–9 months.
 
 ## Quick Start
 
@@ -52,38 +38,78 @@ cp secrets/secrets-example.yaml secrets/secrets.yaml
 # 3. Symlink secrets for ESPHome (Linux/LXC)
 ln -s ../secrets/secrets.yaml firmware/secrets.yaml
 
-# 4. Make sure helper scripts are executable
-chmod +x scripts/*.sh
+# 4. Make helper scripts executable
+chmod +x scripts/*.sh scripts/*.py
 
-# 5. Edit the configured sensor MAC addresses
-# See Docs/configuring-sensors.md — supported range is 1–4, default 3 (compile-time configurable)
+# 5. Review / change configured sensors (canonical source: config/sensors.json)
+python3 scripts/change_sensor_number.py
 
-# 6. Compile and flash
+# 6. Validate generated files
+bash ./scripts/preflight.sh
+
+# 7. Compile and flash
 esphome compile firmware/esp32-c3-multi-sensor.yaml
 esphome run firmware/esp32-c3-multi-sensor.yaml
 ```
 
 Open `http://<esp-ip>/dashboard.html` in your browser.
 
+## Sensor Configuration Workflow
+
+The repo no longer expects you to edit four separate files by hand.
+
+Primary files and scripts:
+
+- `config/sensors.json` — canonical sensor manifest
+- `scripts/change_sensor_number.py` — interactive add/remove flow
+- `scripts/render_sensor_config.py` — regenerates generated sections from the manifest
+- `scripts/history_backup.py` — CLI backup/restore helper for retained history
+
+When sensor count changes, retained history layout changes too. Back up retained history first, then flash the new firmware, delete old retained history, and restore the backup.
+
+Backup example:
+
+```bash
+python3 scripts/history_backup.py export \
+  --host http://192.168.120.189 \
+  --output backup-before-sensor-change.csv
+```
+
+Restore example:
+
+```bash
+python3 scripts/history_backup.py import \
+  --host http://192.168.120.189 \
+  --input backup-before-sensor-change.csv \
+  --username <user> \
+  --password <pass>
+```
+
 ## Repository Layout
 
-```
+```text
 ESP32-GW-multi-sensor/
-  .github/workflows/ci.yml          CI: preflight + compile
+  config/
+    sensors.json                   Canonical sensor manifest
   dashboard/
-    dashboard.html                  Editable dashboard source
-    dashboard.js                    Dashboard JavaScript
-    dashboard.h                     Generated embedded payload (committed)
-    sensor_history_multi.h          Backend: history, persistence, API endpoints
+    dashboard.html                 Editable dashboard source
+    dashboard.js                   Dashboard JavaScript
+    dashboard.h                    Generated embedded payload (committed)
+    sensor_history_multi.h         Backend: history, persistence, API endpoints
   firmware/
-    esp32-c3-multi-sensor.yaml      ESPHome firmware configuration
+    esp32-c3-multi-sensor.yaml     ESPHome firmware configuration
   partitions/
-    esp32-c3-multi-partitions.csv   Custom partition table (512 KiB history)
-  scripts/                          Helper scripts (preflight, minify, compile, deploy)
-  secrets/                          secrets-example.yaml (real secrets gitignored)
-  Images/                           Dashboard screenshots
-  Docs/                             Project documentation
-  VERSION                           Current version number
+    esp32-c3-multi-partitions.csv  Custom partition table (512 KiB history)
+  scripts/
+    change_sensor_number.py        Interactive manifest editor
+    render_sensor_config.py        Generator for sensor-dependent files
+    history_backup.py              CLI export/import helper
+    preflight.sh                   Repo validation and smoke checks
+  tests/
+    fixtures/                      Mock API data and generated variants
+    mock-server/                   Local HTTP mock for Playwright
+  Docs/                            Project documentation
+  VERSION                          Current version number
 ```
 
 ## API Endpoints
@@ -104,38 +130,8 @@ ESP32-GW-multi-sensor/
 | `/api/import/w/<data>` | POST | Basic | Add data points + write segment |
 | `/api/import/finish` | POST | Basic | Finalize import, restore RAM |
 
-## Development
-
-The repo uses a GitHub-first workflow with branch protection on `main`:
-
-1. Create a feature branch and make changes
-2. Run `./scripts/test-local.sh` or `./scripts/preflight.sh`
-3. Push and open a PR so CI validates preflight + compile automatically
-4. Flash and test on the real device
-5. Merge after CI green and device validation
-
-See [Docs/development-pipeline.md](Docs/development-pipeline.md) for the full process.
-
 ## Current Version
 
-**v7.4.1.0** — Dashboard minification pipeline and repo-normalized documentation baseline.
+**v7.4.5.0** — canonical sensor manifest, interactive sensor-count automation, CLI history backup/restore, and manifest-aware preflight.
+
 See [Docs/changelog.md](Docs/changelog.md) for released history.
-
-## Documentation
-
-| Document | Purpose |
-|----------|---------|
-| [Fresh Start Handoff](Docs/esp32-gateway-fresh-start-handoff.md) | Complete project context for resuming development |
-| [Development Pipeline](Docs/development-pipeline.md) | Workflow, CI, versioning, and local process |
-| [Architecture](Docs/architecture.md) | Software design, data flow, retention model, configuration |
-| [Implementation Plan](Docs/implementation-plan-next-features-7.4.1.x.md) | Detailed next-feature implementation plan after v7.4.1.0 |
-| [Custom Date Range Planning](Docs/planning-v7.4.2.0-custom-date-range.md) | Feature-specific planning supplement for the next release |
-| [Changelog](Docs/changelog.md) | Version history with what changed and why |
-| [Build History](Docs/build-history.md) | Curated ledger of accepted builds |
-| [Bugs & Lessons Learned](Docs/bugs-and-lessons-learned.md) | Accumulated fixes and technical lessons |
-| [Future Plans](Docs/future-plans.md) | Roadmap and release prioritization |
-| [Device Test Report Template](Docs/device-test-report-template.md) | Post-flash testing checklist |
-
-## License
-
-MIT
