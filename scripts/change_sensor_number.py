@@ -10,6 +10,7 @@ from sensor_manifest_lib import (
     MAX_SENSORS,
     MIN_SENSORS,
     ManifestError,
+    canonicalize_sensors,
     load_manifest,
     normalize_mac,
     save_manifest,
@@ -41,7 +42,16 @@ def run_renderer() -> None:
     subprocess.run([sys.executable, str(RENDERER), '--write'], check=True, cwd=ROOT)
 
 
+def print_history_warning() -> None:
+    print('\nIMPORTANT: sensor-count changes still invalidate retained history on the device.')
+    print('Before flashing the new firmware, export/backup retained history from the current device.')
+    print('Recommended CLI backup command:')
+    print('  python3 scripts/history_backup.py export --host http://<esp-ip> --output backup-before-sensor-change.csv')
+    print('You can also use the dashboard Export All button.')
+
+
 def remove_sensor_flow(sensors):
+    print_history_warning()
     print_sensors(sensors)
     choice = int(ask_choice('\nSelect sensor number to remove: ', range(1, len(sensors) + 1))) - 1
     target = sensors[choice]
@@ -57,6 +67,7 @@ def remove_sensor_flow(sensors):
 
 
 def add_sensor_flow(sensors):
+    print_history_warning()
     print_sensors(sensors)
     while True:
         name = input('\nEnter new sensor name (1-15 chars): ').strip()
@@ -80,6 +91,8 @@ def add_sensor_flow(sensors):
         try:
             candidate = sensors + [{'id': new_id, 'name': name, 'mac': mac}]
             validate_sensors(candidate)
+            candidate = canonicalize_sensors(candidate)
+            mac = candidate[-1]['mac']
             break
         except ManifestError as exc:
             print(exc)
@@ -92,13 +105,13 @@ def add_sensor_flow(sensors):
     if confirm != 'ADD':
         print('Aborted.')
         return None
-    return sensors + [{'id': new_id, 'name': name, 'mac': mac}]
+    return canonicalize_sensors(sensors + [{'id': new_id, 'name': name, 'mac': mac}])
 
 
 def print_next_steps(new_count):
     print('\nConfiguration updated successfully.')
     print(f'New sensor count: {new_count}')
-    print('\nBefore flashing the new firmware, back up retained history from the current device.')
+    print('\nBefore flashing the new firmware, back up retained history from the current device if you have not already done so.')
     print('Recommended backup command:')
     print('  python3 scripts/history_backup.py export --host http://<esp-ip> --output backup-before-sensor-change.csv')
     print('\nThen validate and flash:')
@@ -150,20 +163,49 @@ def main() -> int:
 
     backup_path = MANIFEST_PATH.with_suffix('.json.bak')
     shutil.copy2(MANIFEST_PATH, backup_path)
+    success = False
     try:
         save_manifest(MANIFEST_PATH, new_sensors)
         run_renderer()
+        success = True
     except Exception as exc:
-        shutil.copy2(backup_path, MANIFEST_PATH)
-        subprocess.run([sys.executable, str(RENDERER), '--write'], cwd=ROOT, check=False)
-        print(f'Change failed; previous manifest restored. Error: {exc}', file=sys.stderr)
+        restore_ok = False
+        rerender_ok = False
+        restore_error = None
+        rerender_error = None
+        try:
+            shutil.copy2(backup_path, MANIFEST_PATH)
+            restore_ok = True
+        except Exception as restore_exc:
+            restore_error = restore_exc
+        if restore_ok:
+            try:
+                subprocess.run([sys.executable, str(RENDERER), '--write'], cwd=ROOT, check=True)
+                rerender_ok = True
+            except Exception as rerender_exc:
+                rerender_error = rerender_exc
+
+        print(f'Change failed. Original error: {exc}', file=sys.stderr)
+        if restore_ok and rerender_ok:
+            print(f'Previous manifest restored and generated files re-rendered. Backup kept at {backup_path}.', file=sys.stderr)
+        else:
+            print('Automatic rollback may be incomplete.', file=sys.stderr)
+            if restore_error:
+                print(f'  Restore error: {restore_error}', file=sys.stderr)
+            if rerender_error:
+                print(f'  Re-render error: {rerender_error}', file=sys.stderr)
+            print(f'  Recovery backup preserved at: {backup_path}', file=sys.stderr)
+            print('  Recommended manual recovery:', file=sys.stderr)
+            print(f'    cp {backup_path} {MANIFEST_PATH}', file=sys.stderr)
+            print(f'    {sys.executable} {RENDERER} --write', file=sys.stderr)
+            print('  Or discard repo changes with git checkout / git restore as appropriate.', file=sys.stderr)
         return 1
-    finally:
+
+    if success:
         try:
             backup_path.unlink()
         except FileNotFoundError:
             pass
-
     print_next_steps(len(new_sensors))
     return 0
 

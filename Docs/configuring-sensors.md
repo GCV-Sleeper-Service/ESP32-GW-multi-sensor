@@ -1,10 +1,10 @@
 # Configuring Sensor Count (1–4)
 
-_Last updated: 2026-03-12 — v7.4.5.0_
+_Last updated: 2026-03-12 — v7.4.5.1_
 
 This document is the authoritative procedure for changing the ESP32 gateway between **1, 2, 3, or 4 configured sensors**.
 
-As of **v7.4.5.0**, the recommended workflow is no longer “edit four files by hand.”
+As of **v7.4.5.1**, the recommended workflow is no longer “edit four files by hand.”
 The repo now uses a **canonical sensor manifest** plus a renderer:
 
 - `config/sensors.json` — single source of truth
@@ -49,7 +49,7 @@ There is no dedicated “download full backup” firmware endpoint today. Export
 - `GET /history/<sensor_id>/temp`
 - `GET /history/<sensor_id>/hum`
 
-To make that practical from the command line, use the new helper:
+To make that practical from the command line, use the helper. It now defaults to a 60-second HTTP timeout and also accepts `--timeout <seconds>` for slower links:
 
 ```bash
 python3 scripts/history_backup.py export \
@@ -75,6 +75,19 @@ python3 scripts/history_backup.py import \
   --password <pass>
 ```
 
+For multi-sensor CSV restores, the CLI now pauses for an explicit erase-first confirmation unless you pass `--yes`.
+
+If you want to restore just one sensor from a merged CSV, use:
+
+```bash
+python3 scripts/history_backup.py import \
+  --host http://192.168.120.189 \
+  --input backup-before-sensor-change.csv \
+  --single-sensor outside \
+  --username <user> \
+  --password <pass>
+```
+
 ---
 
 ## Recommended workflow
@@ -89,20 +102,21 @@ python3 scripts/change_sensor_number.py
 
 The script will:
 
-1. Read the current configuration from `config/sensors.json`
-2. Show the current sensor count and configured sensors
-3. Offer only valid actions
+1. Warn you before add/remove confirmation that retained history must be backed up before the eventual flash
+2. Read the current configuration from `config/sensors.json`
+3. Show the current sensor count and configured sensors
+4. Offer only valid actions
    - if count is 1: add only
    - if count is 4: remove only
    - otherwise: add or remove
-4. Validate new sensor name and MAC address
-5. Update the canonical manifest
-6. Re-render the dependent files:
+5. Validate new sensor name and MAC address
+6. Update the canonical manifest
+7. Re-render the dependent files:
    - `dashboard/sensor_history_multi.h`
    - `firmware/esp32-c3-multi-sensor.yaml`
    - `dashboard/dashboard.js`
    - `tests/fixtures/sensors.json`
-7. Print the exact next commands to run
+8. Print the exact next commands to run
 
 ### Option B — direct manifest edit + render
 
@@ -168,6 +182,10 @@ curl -u "<user>:<pass>" -X POST http://192.168.120.189/api/delete-data
 ### 6. Restore the backup
 
 CLI restore:
+
+- merged CSV: expect an erase-first confirmation prompt unless `--yes` is supplied
+- one sensor from a merged CSV: add `--single-sensor <id>` to route through the merge path intentionally
+
 
 ```bash
 python3 scripts/history_backup.py import \

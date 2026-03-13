@@ -1,8 +1,8 @@
 # ESP32 Gateway — Fresh Start Handoff
 
-_Last updated: 2026-03-12 — v7.4.5.0 complete (ready for review and device validation)_
+_Last updated: 2026-03-12 — v7.4.5.1 complete (reviewed and patch-hardened)_
 _Repo: `GCV-Sleeper-Service/ESP32-GW-multi-sensor`_
-_Current version: v7.4.5.0 — canonical sensor-manifest workflow added_
+_Current version: v7.4.5.1 — canonical sensor-manifest workflow hardened after peer review_
 _Branch: `main`_
 
 This is the single-source continuity document for resuming development in a fresh session.
@@ -17,7 +17,7 @@ See [architecture.md](architecture.md) for the full technical design.
 
 ---
 
-## Current State (v7.4.5.0 — Manifest-Driven Sensor Configuration Added)
+## Current State (v7.4.5.1 — Manifest-Driven Sensor Configuration Hardened)
 
 ### What is working
 
@@ -37,11 +37,11 @@ See [architecture.md](architecture.md) for the full technical design.
 - Custom date range selector (v7.4.2.0)
 - Playwright browser regression suite (v7.4.3.0)
 - Configurable sensor count 1–4 (v7.4.4.0)
-- **Canonical manifest workflow (v7.4.5.0):**
+- **Canonical manifest workflow (v7.4.5.1):**
   - `config/sensors.json` is now the single source of truth
   - `scripts/change_sensor_number.py` provides an interactive add/remove workflow
   - `scripts/render_sensor_config.py` regenerates the header, firmware YAML, dashboard fallback metadata, and baseline fixture manifest
-  - `scripts/history_backup.py` provides CLI export/import for retained history backup and restore during sensor-count changes
+  - `scripts/history_backup.py` provides CLI export/import for retained history backup and restore during sensor-count changes, now with erase-first confirmation, `--single-sensor`, and configurable timeouts
   - `scripts/preflight.sh` now validates manifest drift and regenerates root fixtures from the active manifest before optional browser smoke checks
 
 ### Important retained-history rule
@@ -71,12 +71,9 @@ That behavior should be preserved in future documentation and code discussions.
 
 ### Immediate next validation work
 
-1. Run the new manifest workflow in the real repo clone:
-   - `python3 scripts/change_sensor_number.py`
-   - `bash ./scripts/preflight.sh`
-2. Device-validate at least one real sensor-count change path (for example 3 → 2 or 3 → 4)
-3. Confirm the CLI backup/restore helper against the real ESP endpoints
-4. Update CI or workflow docs further only if device validation exposes gaps
+1. Device-validate the patched CLI restore safety flow on the real ESP endpoint
+2. Confirm one export on a fuller retained-history dataset using the new timeout defaults
+3. Keep future improvements focused on behavior changes that reduce accidental data loss or drift
 
 ---
 
@@ -92,26 +89,11 @@ That behavior should be preserved in future documentation and code discussions.
 
 ## What Comes Next
 
-### Next Feature: v7.4.4.x — Configurable Sensor Count (1–4)
+### Near-term focus
 
-**Branch to create:** `feature/configurable-sensor-count`
-
-Normalize the project so sensor count is clearly documented, safely configurable from 1 to 4, and validated by preflight.
-
-**Key scope points:**
-- Document the change procedure clearly (what to change, in what order)
-- Add preflight checks validating `NUM_SENSORS` alignment across C++, YAML, and manifest
-- Make architecture docs truthful for any supported count
-- Explicitly handle retained-history compatibility (sensor count change = history reset required)
-- Possibly a dedicated `Docs/configuring-sensors.md`
-- Playwright test coverage for card count variation
-
-**Key risks:**
-- Silent mismatch between C++ and YAML sensor definitions
-- Retained-history corruption or misleading partial compatibility on count change
-- Docs claiming configurability before the workflow is actually validated
-
-See [future-plans.md](future-plans.md) for the full roadmap.
+- Real-device validation of the v7.4.5.1 hardening changes
+- Any remaining review-driven polish only if it meaningfully improves safety or recovery guidance
+- Defer broader architecture changes until the manifest workflow and CLI backup/restore path have seen at least one successful real sensor-count migration
 
 ---
 
@@ -167,11 +149,9 @@ Provide the assistant with:
 2. Current test results (compile, LAN, Cloudflare)
 3. What you want to work on next
 
-Example (starting v7.4.4.x):
+Example (starting the next iteration):
 
 > Continuing the ESP32 BLE gateway project.
 > Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
-> v7.4.3.0 is complete and merged. Device still running v7.4.2.0 firmware (no reflash needed for v7.4.3.0).
-> Flash at ~86.8%. Playwright browser tests: 28/28 PASS.
-> Ready to start v7.4.4.x — Configurable Sensor Count.
-> Please read the handoff doc, implementation plan Feature 3, and provide a detailed implementation plan.
+> v7.4.5.1 is complete and merged. Manifest-driven sensor configuration and CLI backup/restore are in place.
+> Please read the fresh-start handoff plus the latest session logs and help me plan the next validated improvement.

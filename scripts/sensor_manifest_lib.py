@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Shared helpers for canonical sensor manifest handling."""
+"""Shared helpers for canonical sensor manifest handling.
+
+Validation is intentionally side-effect free. Use ``canonicalize_sensors()`` when you
+want normalized ``id``/``name``/``mac`` output suitable for saving or rendering.
+"""
 from __future__ import annotations
 
 import json
@@ -29,28 +33,7 @@ def normalize_mac(mac: str) -> str:
     return mac
 
 
-def load_manifest(path: str | Path) -> List[Dict[str, str]]:
-    payload = json.loads(Path(path).read_text(encoding='utf-8'))
-    if isinstance(payload, dict):
-        sensors = payload.get('sensors', [])
-    elif isinstance(payload, list):
-        sensors = payload
-    else:
-        raise ManifestError('Manifest must be a JSON object with a sensors array or a top-level array.')
-    validate_sensors(sensors)
-    return sensors
-
-
-def save_manifest(path: str | Path, sensors: List[Dict[str, str]]) -> None:
-    validate_sensors(sensors)
-    payload = {
-        'schema_version': 1,
-        'sensors': sensors,
-    }
-    Path(path).write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
-
-
-def validate_sensors(sensors: List[Dict[str, str]]) -> None:
+def canonicalize_sensors(sensors: List[Dict[str, str]]) -> List[Dict[str, str]]:
     if not isinstance(sensors, list):
         raise ManifestError('Manifest sensors field must be a list.')
     count = len(sensors)
@@ -60,6 +43,7 @@ def validate_sensors(sensors: List[Dict[str, str]]) -> None:
     seen_ids = set()
     seen_macs = set()
     seen_names = set()
+    normalized: List[Dict[str, str]] = []
     for idx, sensor in enumerate(sensors):
         if not isinstance(sensor, dict):
             raise ManifestError(f'Sensor #{idx + 1} must be an object.')
@@ -88,8 +72,33 @@ def validate_sensors(sensors: List[Dict[str, str]]) -> None:
         seen_ids.add(sid)
         seen_macs.add(mac)
         seen_names.add(name.lower())
-        sensor['mac'] = mac
+        normalized.append({'id': sid, 'name': name, 'mac': mac})
+    return normalized
+
+
+def load_manifest(path: str | Path) -> List[Dict[str, str]]:
+    payload = json.loads(Path(path).read_text(encoding='utf-8'))
+    if isinstance(payload, dict):
+        sensors = payload.get('sensors', [])
+    elif isinstance(payload, list):
+        sensors = payload
+    else:
+        raise ManifestError('Manifest must be a JSON object with a sensors array or a top-level array.')
+    return canonicalize_sensors(sensors)
+
+
+def save_manifest(path: str | Path, sensors: List[Dict[str, str]]) -> None:
+    payload = {
+        'schema_version': 1,
+        'sensors': canonicalize_sensors(sensors),
+    }
+    Path(path).write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
+
+
+def validate_sensors(sensors: List[Dict[str, str]]) -> None:
+    canonicalize_sensors(sensors)
 
 
 def fixture_manifest(sensors: List[Dict[str, str]]) -> str:
+    sensors = canonicalize_sensors(sensors)
     return json.dumps([{'id': s['id'], 'name': s['name']} for s in sensors], indent=2) + '\n'

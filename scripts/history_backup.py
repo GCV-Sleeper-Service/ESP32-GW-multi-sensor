@@ -6,6 +6,7 @@ import base64
 import csv
 import json
 import math
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -17,19 +18,20 @@ from typing import Dict, Iterable, List, Tuple
 
 EXPORT_SHARED_COLUMNS = ['gateway_host', 'gateway_ip', 'timestamp', 'datetime_utc']
 EXPORT_SENSOR_SUFFIXES = ['temp_c', 'temp_f', 'humidity_pct', 'dewpoint_c']
+DEFAULT_TIMEOUT = 60
 
 
 def sensor_slug(value: str) -> str:
     return ''.join(c if c.isalnum() else '_' for c in (value or '').strip().lower()).strip('_')
 
 
-def request(method: str, url: str, *, auth: Tuple[str, str] | None = None) -> bytes:
+def request(method: str, url: str, *, auth: Tuple[str, str] | None = None, timeout: int = DEFAULT_TIMEOUT) -> bytes:
     req = urllib.request.Request(url, method=method)
     if auth:
         token = base64.b64encode(f'{auth[0]}:{auth[1]}'.encode('utf-8')).decode('ascii')
         req.add_header('Authorization', f'Basic {token}')
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.read()
     except urllib.error.HTTPError as exc:
         body = exc.read().decode('utf-8', 'replace')
@@ -38,12 +40,12 @@ def request(method: str, url: str, *, auth: Tuple[str, str] | None = None) -> by
         raise RuntimeError(f'Network error for {url}: {exc.reason}') from exc
 
 
-def fetch_json(url: str, auth=None):
-    return json.loads(request('GET', url, auth=auth).decode('utf-8'))
+def fetch_json(url: str, auth=None, timeout: int = DEFAULT_TIMEOUT):
+    return json.loads(request('GET', url, auth=auth, timeout=timeout).decode('utf-8'))
 
 
-def fetch_text(url: str, auth=None):
-    return request('GET', url, auth=auth).decode('utf-8')
+def fetch_text(url: str, auth=None, timeout: int = DEFAULT_TIMEOUT):
+    return request('GET', url, auth=auth, timeout=timeout).decode('utf-8')
 
 
 def parse_history_metric_lines(text: str) -> Dict[int, float | None]:
@@ -173,14 +175,35 @@ def detect_import_columns(header: List[str], sensors: List[Dict[str, str]], file
     return results
 
 
+def legacy_name_phrases(file_name: str) -> set[str]:
+    stem = Path(file_name).stem.lower()
+    tokens = [tok for tok in re.split(r'[^a-z0-9]+', stem) if tok]
+    phrases = set(tokens)
+    for start in range(len(tokens)):
+        for end in range(start + 2, len(tokens) + 1):
+            phrases.add('_'.join(tokens[start:end]))
+    phrases.add(sensor_slug(stem))
+    return phrases
+
+
 def detect_sensor_id_from_file_name(file_name: str, sensors: List[Dict[str, str]]) -> str:
-    normalized = sensor_slug(Path(file_name).stem)
-    candidates = []
+    phrases = legacy_name_phrases(file_name)
+    matches: List[tuple[int, str]] = []
     for sensor in sensors:
-        checks = {sensor_slug(sensor.get('id', '')), sensor_slug(sensor.get('name', '')), sensor_slug(get_export_sensor_prefix(sensor))}
-        if any(token and token in normalized for token in checks):
-            candidates.append(sensor['id'])
-    return candidates[0] if len(candidates) == 1 else ''
+        checks = {
+            sensor_slug(sensor.get('id', '')),
+            sensor_slug(sensor.get('name', '')),
+            sensor_slug(get_export_sensor_prefix(sensor)),
+        }
+        for token in checks:
+            if token and token in phrases:
+                matches.append((len(token), sensor['id']))
+                break
+    if not matches:
+        return ''
+    max_len = max(length for length, _sid in matches)
+    winners = sorted({_sid for length, _sid in matches if length == max_len})
+    return winners[0] if len(winners) == 1 else ''
 
 
 def parse_import_csv(path: Path, sensors: List[Dict[str, str]]) -> List[Dict[str, str | int | float]]:
@@ -254,17 +277,29 @@ def build_import_batches(points: Iterable[Dict[str, str | int | float]]) -> List
     return batches
 
 
+def confirm_erase_first_import(path: str, sensor_ids: List[str], assume_yes: bool) -> None:
+    if assume_yes:
+        return
+    print('WARNING: this CSV contains data for multiple sensors and will use the erase-first import path.')
+    print('Existing retained history on the device will be cleared before the import is rebuilt from the CSV.')
+    print(f'Input file: {path}')
+    print(f'Sensors in import: {", ".join(sensor_ids)}')
+    response = input('Type ERASE-IMPORT to continue: ').strip()
+    if response != 'ERASE-IMPORT':
+        raise RuntimeError('Import aborted by user.')
+
+
 def do_export(args) -> int:
     host = args.host.rstrip('/')
-    sensors = fetch_json(host + '/sensors.json')
+    sensors = fetch_json(host + '/sensors.json', timeout=args.timeout)
     if args.sensor:
         sensors = [s for s in sensors if s['id'] == args.sensor]
         if not sensors:
             raise RuntimeError(f'Sensor id not found on device: {args.sensor}')
     rows_per_sensor = []
     for sensor in sensors:
-        temp = fetch_text(f"{host}/history/{sensor['id']}/temp")
-        hum = fetch_text(f"{host}/history/{sensor['id']}/hum")
+        temp = fetch_text(f"{host}/history/{sensor['id']}/temp", timeout=args.timeout)
+        hum = fetch_text(f"{host}/history/{sensor['id']}/hum", timeout=args.timeout)
         rows_per_sensor.append(build_normalized_rows(temp, hum))
     parsed = urllib.parse.urlparse(host)
     meta = {'gateway_host': parsed.hostname or host, 'gateway_ip': parsed.hostname or host}
@@ -280,16 +315,22 @@ def do_export(args) -> int:
 def do_import(args) -> int:
     host = args.host.rstrip('/')
     auth = (args.username, args.password)
-    sensors = fetch_json(host + '/sensors.json')
+    sensors = fetch_json(host + '/sensors.json', timeout=args.timeout)
     points = parse_import_csv(Path(args.input), sensors)
+    if args.single_sensor:
+        points = [p for p in points if str(p['sensor']) == args.single_sensor]
+        if not points:
+            raise RuntimeError(f'No importable points found for requested sensor id: {args.single_sensor}')
     if not points:
         raise RuntimeError('No valid import points found in the CSV file.')
     sensor_ids = sorted({str(p['sensor']) for p in points})
     is_single = len(sensor_ids) == 1
+    if not is_single:
+        confirm_erase_first_import(args.input, sensor_ids, args.yes)
     begin = host + '/api/import/begin'
     if is_single:
         begin += '/single/' + urllib.parse.quote(sensor_ids[0], safe='')
-    begin_resp = json.loads(request('POST', begin, auth=auth).decode('utf-8'))
+    begin_resp = json.loads(request('POST', begin, auth=auth, timeout=args.timeout).decode('utf-8'))
     if not begin_resp.get('ok'):
         raise RuntimeError(f'Begin failed: {begin_resp}')
     batches = build_import_batches(points)
@@ -298,12 +339,12 @@ def do_import(args) -> int:
     for idx, batch in enumerate(batches, start=1):
         path_prefix = '/api/import/w/' if batch['isLast'] else '/api/import/d/'
         url = host + path_prefix + str(batch['data'])
-        resp = json.loads(request('POST', url, auth=auth).decode('utf-8'))
+        resp = json.loads(request('POST', url, auth=auth, timeout=args.timeout).decode('utf-8'))
         if not resp.get('ok'):
             raise RuntimeError(f'Batch {idx} failed: {resp}')
         total_accepted += int(resp.get('accepted', 0))
         total_rejected += int(resp.get('rejected', 0))
-    finish_resp = json.loads(request('POST', host + '/api/import/finish', auth=auth).decode('utf-8'))
+    finish_resp = json.loads(request('POST', host + '/api/import/finish', auth=auth, timeout=args.timeout).decode('utf-8'))
     if not finish_resp.get('ok'):
         raise RuntimeError(f'Finish failed: {finish_resp}')
     print(f"Import complete: {finish_resp.get('segments_written', 0)} segments, {total_accepted} accepted, {total_rejected} rejected")
@@ -318,12 +359,16 @@ def main() -> int:
     exp.add_argument('--host', required=True, help='ESP host, for example http://192.168.120.189')
     exp.add_argument('--output', required=True, help='Output CSV path')
     exp.add_argument('--sensor', help='Optional single sensor id to export')
+    exp.add_argument('--timeout', type=int, default=DEFAULT_TIMEOUT, help=f'HTTP timeout in seconds (default: {DEFAULT_TIMEOUT})')
 
     imp = sub.add_parser('import', help='Import retained history from CSV.')
     imp.add_argument('--host', required=True, help='ESP host, for example http://192.168.120.189')
     imp.add_argument('--input', required=True, help='Input CSV path')
     imp.add_argument('--username', required=True, help='Management API username')
     imp.add_argument('--password', required=True, help='Management API password')
+    imp.add_argument('--single-sensor', help='Import only one sensor id from the CSV and use the single-sensor merge route when possible')
+    imp.add_argument('--yes', action='store_true', help='Skip the erase-first confirmation prompt for multi-sensor imports')
+    imp.add_argument('--timeout', type=int, default=DEFAULT_TIMEOUT, help=f'HTTP timeout in seconds (default: {DEFAULT_TIMEOUT})')
 
     args = parser.parse_args()
     try:

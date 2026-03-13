@@ -4,6 +4,26 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.4.5.1 — 2026-03-12
+
+**Fixed:** Patch hardening for manifest automation and CLI history restore
+
+- `scripts/history_backup.py` now uses a 60-second default HTTP timeout and exposes `--timeout` for slower links or large retained-history exports
+- `scripts/history_backup.py import` now warns before erase-first multi-sensor import and requires explicit confirmation unless `--yes` is provided
+- `scripts/history_backup.py import` now supports `--single-sensor <id>` so a merged CSV can be routed through the single-sensor merge path intentionally
+- `scripts/change_sensor_number.py` now shows the history-backup reminder before add/remove confirmation, not only after the manifest has already been updated
+- `scripts/change_sensor_number.py` rollback handling is now more defensive: the backup file is preserved on failure, rollback problems are surfaced clearly, and manual recovery commands are printed if automatic recovery is incomplete
+- `scripts/sensor_manifest_lib.py` validation is now side-effect free; manifest canonicalization is explicit instead of silently mutating caller-provided dictionaries
+- `scripts/render_sensor_config.py --check` now tells the operator exactly which command to run to resync generated files
+- Legacy single-sensor filename detection in `scripts/history_backup.py` now prefers the longest exact phrase match, reducing false ambiguity for similar names
+
+**Documentation:**
+
+- `Docs/configuring-sensors.md` now documents the new `history_backup.py` safety controls (`--timeout`, multi-sensor confirmation, `--single-sensor`)
+- `README.md`, `Docs/bugs-and-lessons-learned.md`, and the fresh-start handoff were updated to reflect the patch release and the reviewer-driven hardening work
+
+---
+
 ## v7.4.5.0 — 2026-03-12
 
 **Added:** Canonical sensor-manifest workflow and history backup/restore CLI

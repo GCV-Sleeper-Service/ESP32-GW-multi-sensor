@@ -78,7 +78,7 @@ function writeFixtureSet(targetDir, sensors, tag) {
   fs.writeFileSync(path.join(targetDir, 'sensors.json'), JSON.stringify(manifest, null, 2) + '\n');
   fs.writeFileSync(path.join(targetDir, 'api-status.json'), JSON.stringify({
     ok: true,
-    version: 'v7.4.5.0',
+    version: 'v7.4.5.1',
     sensor_count: sensors.length,
     sensors: manifest,
     mode: tag || 'mock',

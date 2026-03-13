@@ -11,7 +11,7 @@ from typing import Callable, List, Dict
 
 from sensor_manifest_lib import load_manifest, fixture_manifest, ManifestError
 
-VERSION = '7.4.5.0'
+VERSION = '7.4.5.1'
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / 'config' / 'sensors.json'
 HEADER_PATH = ROOT / 'dashboard' / 'sensor_history_multi.h'
@@ -438,7 +438,7 @@ def main() -> int:
 
     if mode_check:
         if drift:
-            print('render_sensor_config: FAIL — generated files are out of sync with config/sensors.json', file=sys.stderr)
+            print('render_sensor_config: FAIL — generated files are out of sync with config/sensors.json. Run: python3 scripts/render_sensor_config.py --write', file=sys.stderr)
             for path, old_text, new_text in drift:
                 print(diff_message(path, old_text, new_text), file=sys.stderr)
             return 1

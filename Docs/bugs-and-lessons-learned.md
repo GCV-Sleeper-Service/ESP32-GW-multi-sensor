@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-12 — v7.4.5.0 (LESSON-OPS-036–037, BUG-028–029 added)
+_Last updated: 2026-03-12 — v7.4.5.1 (LESSON-OPS-038, BUG-030–032 added)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -10,6 +10,29 @@ Both sections are in **reverse chronological order** — most recent entry first
 ---
 
 ## Bug Fixes
+
+
+### BUG-032: Multi-sensor CLI restore could erase retained history without an explicit confirmation prompt (v7.4.5.1)
+
+The first v7.4.5.0 CLI backup/restore helper correctly routed merged CSVs through the existing erase-first `/api/import/begin` path, but it did so without an explicit operator confirmation. That made the happy path fast, but it also left too much room for a destructive mistake.
+
+**Fix:** `scripts/history_backup.py import` now prompts before erase-first multi-sensor import unless `--yes` is provided, and it also supports `--single-sensor <id>` to intentionally force the merge route from a merged CSV.
+
+### BUG-031: `change_sensor_number.py` rollback messaging was too optimistic for structural renderer failures (v7.4.5.1)
+
+The initial rollback path restored `config/sensors.json` and attempted a best-effort re-render, but it could still leave the operator uncertain if recovery was incomplete.
+
+**Fix:** rollback now preserves the backup file on failure, prints manual recovery commands, and surfaces restore/re-render errors explicitly instead of assuming a clean rollback.
+
+### BUG-030: Manifest validation normalized MACs by mutating caller data in place (v7.4.5.1)
+
+The original validation helper silently normalized MAC addresses inside the caller-provided list. That was harmless in the main workflow, but it was a latent correctness trap for future callers.
+
+**Fix:** manifest validation is now side-effect free. Canonicalization is explicit through `canonicalize_sensors()`, and save/load/render flows use normalized copies rather than mutating input objects.
+
+### LESSON-OPS-038: Safety prompts belong on destructive CLI paths, not only in prose documentation (v7.4.5.1)
+
+Documenting that a path is destructive is not enough. If a CLI command can erase retained state, the operator should have to acknowledge that at runtime or opt into bypassing the prompt deliberately.
 
 ### BUG-028: Sensor-count changes depended on four-file manual edits, creating configuration drift risk (v7.4.5.0)
 
