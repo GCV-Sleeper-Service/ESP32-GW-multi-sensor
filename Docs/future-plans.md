@@ -26,9 +26,9 @@ The guiding philosophy remains the same:
 | v7.4.1.0 | Dashboard minification pipeline | Complete | Shipped |
 | v7.4.2.0 | Custom date range selector | Complete | Shipped |
 | v7.4.3.x | Playwright browser automation | Complete | 28/28 PASS |
-| v7.4.4.x | Configurable sensor count (1–4) | Next | Documentation + validation + compatibility handling |
-| v7.5.x | Secrets/settings persistence review | Deferred | Reassess after notification/settings needs are clearer |
-| v7.6.x | Encrypted secrets partition | Low priority / likely skip | Probably more complexity than value |
+| v7.4.4.x | Configurable sensor count (1–4) | Complete | Documentation + validation + compatibility handling |
+| v7.5.x | Modular Architecture / Gateway Aggregation | Next | Enable multiple BLE gateways |
+| v7.6.x | Dashboard Pane Extensibility | Low priority / Next | Probably more complexity than value |
 
 ---
 
@@ -101,7 +101,7 @@ The value is high because the next planned work is dashboard-heavy.
 
 ---
 
-## 3. v7.4.4.x — Configurable Sensor Count (1–4)
+## 3. v7.4.4.x — Configurable Sensor Count (1–4) (COMPLETE)
 
 **Priority:** Medium
 
