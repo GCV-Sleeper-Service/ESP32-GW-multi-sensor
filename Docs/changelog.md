@@ -21,6 +21,9 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 - `Docs/configuring-sensors.md` now documents the new `history_backup.py` safety controls (`--timeout`, multi-sensor confirmation, `--single-sensor`)
 - `README.md`, `Docs/bugs-and-lessons-learned.md`, and the fresh-start handoff were updated to reflect the patch release and the reviewer-driven hardening work
+- `Docs/architecture.md` and `Docs/future-plans.md` were aligned to the v7.4.5.1 baseline.  `future‑plans.md` now includes a **v7.5–v7.6 platform evolution** note pointing to the architecture plan, clarifying that modular architecture and dashboard pane extensibility are conceptual design phases rather than scheduled releases.
+- Added `Docs/session-log-2026-03-13-v7.4.5.1-docupdate.md` — session handoff capturing the Phase 0 request, actions performed, lessons learned, and next steps.
+- This changelog entry now explicitly records the single‑sensor merge‑import algorithm: during single‑sensor imports the firmware builds an epoch‑to‑slot map by scanning existing NVS segments, overlays only the target sensor's temperature/humidity arrays onto any overlapping hourly segments, and writes the merged segment back to the same slot. New hours (no existing segment) allocate the next available slot. The dashboard auto‑detects single vs multi imports from CSV columns and adapts its confirmation messaging accordingly.
 
 ---
 
