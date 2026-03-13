@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.4.4.0.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.4.5.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -292,6 +292,7 @@ struct SensorSlot {
 // Global sensor array — CONFIGURE SENSORS HERE
 // ═══════════════════════════════════════════════════════════════════
 
+// <<< SENSOR_MANIFEST:HEADER_BEGIN >>>
 static constexpr int NUM_SENSORS = 3;
 
 static SensorSlot sensors[NUM_SENSORS] = {
@@ -311,24 +312,24 @@ static SensorSlot sensors[NUM_SENSORS] = {
     .mac  = "DF:EB:DE:19:11:6C"
   },
 };
+// <<< SENSOR_MANIFEST:HEADER_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.4.4.0) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.4.5.0) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //
-// To change count:
-//   1. Update NUM_SENSORS and the sensors[] initializer list below.
-//   2. Update the matching YAML blocks in firmware/esp32-c3-multi-sensor.yaml
-//      (one thermopro_ble block, one ble_rssi block, and six text-sensor IDs
-//       per sensor: cur_temp_, cur_hum_, avg_temp_, avg_hum_, battery_, last_seen_).
-//   3. Update DEFAULT_SENSOR_META in dashboard/dashboard.js.
-//   4. Update tests/fixtures/sensors.json to match the new count.
-//   5. Run: node tests/fixtures/generate-fixtures.js
-//   6. Run: bash ./scripts/preflight.sh  (will catch any mismatch before compile)
-//   7. Compile, flash, and DELETE RETAINED HISTORY (layout is count-dependent).
+// To change count (recommended workflow):
+//   1. Edit config/sensors.json OR run: python3 scripts/change_sensor_number.py
+//   2. Run: python3 scripts/render_sensor_config.py --write
+//   3. Back up retained history before flashing:
+//      python3 scripts/history_backup.py export --host http://<esp-ip> --output backup.csv
+//   4. Run: bash ./scripts/preflight.sh
+//   5. Compile + flash the new firmware.
+//   6. DELETE RETAINED HISTORY (layout is count-dependent).
+//   7. Re-import the backup through the dashboard or history_backup.py.
 //
-// See Docs/configuring-sensors.md for the full procedure with copy-paste templates.
+// See Docs/configuring-sensors.md for the full procedure and manual fallback.
 //
 // ── 1-sensor template ────────────────────────────────────────────
 // static constexpr int NUM_SENSORS = 1;

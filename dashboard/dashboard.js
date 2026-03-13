@@ -35,7 +35,7 @@
 // The bulk of the logic still lives in existing functions so regression risk stays low.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.4.4.0';
+App.version = 'v7.4.5.0';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -184,11 +184,13 @@ var SENSORS = [];
 // ── Sensor definitions ──────────────────────────────────────────
 var SENSOR_COLORS = ['#fbbf24', '#f87171', '#34d399', '#60a5fa'];
 
+// <<< SENSOR_MANIFEST:DEFAULT_SENSOR_META_BEGIN >>>
 var DEFAULT_SENSOR_META = [
   { id: 'office', name: 'Office' },
   { id: 'first_floor', name: 'First Floor' },
-  { id: 'outside', name: 'Outside' }
+  { id: 'outside', name: 'Outside' },
 ];
+// <<< SENSOR_MANIFEST:DEFAULT_SENSOR_META_END >>>
 
 var GATEWAY_EXPORT_HOSTNAME_FALLBACK = 'esp32-c3-multi';
 var EXPORT_SHARED_COLUMNS = ['gateway_host', 'gateway_ip', 'timestamp', 'datetime_utc'];

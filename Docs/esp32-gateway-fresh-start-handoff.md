@@ -1,8 +1,8 @@
 # ESP32 Gateway — Fresh Start Handoff
 
-_Last updated: 2026-03-12 — v7.4.4.0 complete (pending PR merge)_
+_Last updated: 2026-03-12 — v7.4.5.0 complete (ready for review and device validation)_
 _Repo: `GCV-Sleeper-Service/ESP32-GW-multi-sensor`_
-_Current version: v7.4.4.0 — feature branch ready for PR_
+_Current version: v7.4.5.0 — canonical sensor-manifest workflow added_
 _Branch: `main`_
 
 This is the single-source continuity document for resuming development in a fresh session.
@@ -17,7 +17,7 @@ See [architecture.md](architecture.md) for the full technical design.
 
 ---
 
-## Current State (v7.4.4.0 — Feature Branch Ready)
+## Current State (v7.4.5.0 — Manifest-Driven Sensor Configuration Added)
 
 ### What is working
 
@@ -25,7 +25,7 @@ See [architecture.md](architecture.md) for the full technical design.
 - Live dashboard with real-time and 15-minute averaged charts
 - 45-day hourly persistence to dedicated 512 KiB history partition
 - CSV export (per-sensor with prefixed headers, and serialized Export All)
-- CSV import — multi-sensor (replacement-first) and single-sensor (non-destructive merge)
+- CSV import — multi-sensor (replacement-first) and single-sensor (merge-first)
 - Import works over both LAN direct and Cloudflare tunnel
 - `/api/status` health endpoint
 - `/api/storage-stats` partition statistics
@@ -34,65 +34,49 @@ See [architecture.md](architecture.md) for the full technical design.
 - GitHub Actions CI: preflight + compile on every push/PR
 - Branch protection on `main`
 - Dashboard minification pipeline (v7.4.1.0): html-minifier-terser, ~40KB flash savings
-- Custom Date Range Selector (v7.4.2.0): modal calendar, 6 presets, live data-availability footer
-- **Configurable sensor count (v7.4.4.0):** 1–4 sensors (compile-time); preflight validates C++/YAML/fixture alignment; multi-variant Playwright smoke tests; Docs/configuring-sensors.md procedure
-- **Playwright browser regression test suite (v7.4.3.0):** 28 tests across 8 groups, mock server, fixture data, separate CI workflow
+- Custom date range selector (v7.4.2.0)
+- Playwright browser regression suite (v7.4.3.0)
+- Configurable sensor count 1–4 (v7.4.4.0)
+- **Canonical manifest workflow (v7.4.5.0):**
+  - `config/sensors.json` is now the single source of truth
+  - `scripts/change_sensor_number.py` provides an interactive add/remove workflow
+  - `scripts/render_sensor_config.py` regenerates the header, firmware YAML, dashboard fallback metadata, and baseline fixture manifest
+  - `scripts/history_backup.py` provides CLI export/import for retained history backup and restore during sensor-count changes
+  - `scripts/preflight.sh` now validates manifest drift and regenerates root fixtures from the active manifest before optional browser smoke checks
 
-### Playwright test suite summary (v7.4.3.0)
+### Important retained-history rule
 
-- `tests/mock-server/server.js` — zero-dependency Node.js mock of the full ESP32 API surface
-- `tests/fixtures/` — deterministic fixture data (72h history, 3 sensors, anchored epoch)
-- `tests/browser/dashboard.spec.js` — 28 tests across 8 groups (boot/structure, sensor cards, transport/status, history/charts, custom date range, theme toggle, export controls, console error guard)
-- `playwright.config.js` — webServer auto-starts mock server before tests
-- `.github/workflows/browser-tests.yml` — triggers on dashboard or test file changes only
-- **Final result:** 28/28 PASS in CI (required 2 fix iterations after initial implementation)
+Changing sensor count still changes the persisted history schema.
 
-### Custom date range summary (v7.4.2.0)
+The correct safe workflow is:
 
-- "Custom" button added after 45d in the chart range toggle and all per-sensor min/max toggles
-- Modal: 6 presets (Today / Yesterday / Last 24h / 7d / 30d / 45d), navigable calendar with two-click start→end selection, hour+AM/PM time selectors, data-availability footer from `/api/storage-stats`
-- `getEffectiveTimeRange()` centralises time-range logic — charts and min/max both route through it
-- Custom range state (`CUSTOM_RANGE_START/END`) cleared when any standard preset button is clicked
-- "Data available" footer shows full range when both bounds known; "up to [date]" when only newest known; "No persisted history yet" on a freshly-flashed device (first NVS persist happens at 2:10 AM)
+1. Export/backup retained history first
+2. Change sensor configuration
+3. Validate + flash new firmware
+4. Delete old retained history on the device
+5. Re-import the saved data
 
-### Minification pipeline summary (v7.4.1.0)
+### Single-sensor import design summary
 
-```
-dashboard.html → minify-dashboard.sh → dashboard.min.html (gitignored)
-                                      → generate-header.sh → dashboard.h (committed)
-```
+Single-sensor import is not just “non-destructive” in a vague sense.
 
-- `dashboard.min.html` is never committed — build artifact only
-- `generate-header.sh` auto-detects `.min.html` when present (no argument needed)
-- CI installs `html-minifier-terser` and runs the full pipeline before preflight
-- Local builds without the tool installed still work (fallback to `.html`)
-- Typical savings: ~33% of source HTML (~40KB) — confirms script block sync is correct
+The important implementation detail is:
 
-### Import design summary (unchanged from v7.4.0.2)
+- the firmware scans existing NVS segments and builds an epoch-to-slot map during `/api/import/begin/single/<sensor_id>`
+- when an imported hour already exists, the firmware reads that segment, overlays only the target sensor’s temp/humidity arrays, and writes the merged segment back to the same slot
+- when the hour does not already exist, it allocates a new slot
+- temporary working memory during the merge path is about 7 KB
 
-**Multi-sensor import** (`POST /api/import/begin`): Erases all history before writing. Full replacement.
+That behavior should be preserved in future documentation and code discussions.
 
-**Single-sensor import** (`POST /api/import/begin/single/<sensor_id>`): Does NOT erase history. Merges imported data into existing segments. Other sensors preserved.
+### Immediate next validation work
 
-**Transport:** Data encoded in URL path. Only proxy-safe channel on this platform.
-
-### Repository coordinates
-
-- **Repo:** `https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor`
-- **Branch:** `main` (v7.4.3.0 merged and tagged)
-- **Feature branches:** None open
-- **Next branch to create:** `feature/configurable-sensor-count`
-
-### Resource usage (measured at v7.4.2.0, unchanged at v7.4.3.0)
-
-| Metric | Value |
-|--------|-------|
-| RAM | ~15.8% of 327 KiB |
-| Flash | ~86.8% of 1.69 MiB |
-| Free heap | ~78–84 KiB typical |
-| History partition | 512 KiB dedicated |
-
-**Note:** v7.4.3.0 is test infrastructure only — no firmware change, no device reflash. Device still runs v7.4.2.0 firmware.
+1. Run the new manifest workflow in the real repo clone:
+   - `python3 scripts/change_sensor_number.py`
+   - `bash ./scripts/preflight.sh`
+2. Device-validate at least one real sensor-count change path (for example 3 → 2 or 3 → 4)
+3. Confirm the CLI backup/restore helper against the real ESP endpoints
+4. Update CI or workflow docs further only if device validation exposes gaps
 
 ---
 

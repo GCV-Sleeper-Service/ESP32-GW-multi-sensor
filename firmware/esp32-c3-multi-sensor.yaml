@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.4.4.0
+# ESP32-C3 Multi-Sensor Gateway - v7.4.5.0
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -49,9 +49,9 @@ esphome:
     priority: -100
     then:
       - lambda: |-
-          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.4.4.0");
+          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.4.5.0");
           id(dashboard_link).publish_state(
-            "Open /dashboard or /dashboard.html for the live dashboard. v7.4.4.0: multi-sensor BLE gateway with 45-day history, CSV export/import, dark/light mode, real-time and averaged charts, and ESP management. /dashboard-download provides a standalone copy. "
+            "Open /dashboard or /dashboard.html for the live dashboard. v7.4.5.0: multi-sensor BLE gateway with 45-day history, CSV export/import, dark/light mode, real-time and averaged charts, and ESP management. /dashboard-download provides a standalone copy. "
             "The ESPHome v3 built-in web page shows text sensor states as plain text, so clickable HTML links are not rendered here.");
 
 # ─── Chip and framework ─────────────────────────────────────────
@@ -84,7 +84,7 @@ ota:
 # ─── Embedded dashboard approach ─────────────────────────────────
 # The dashboard is compiled into ../dashboard/dashboard.h and served by
 # the custom history handler through /dashboard, /dashboard.html, and
-# /dashboard-download. v7.4.4.0 adds the minification build pipeline:
+# /dashboard-download. v7.4.5.0 adds the minification build pipeline:
 # dashboard.html is minified via html-minifier-terser + terser before
 # generate-header.sh embeds it, saving ~40KB of flash.
 # Phase 1 structural enforcement for the dashboard event/state layer, and
@@ -131,7 +131,7 @@ time:
               auto now = id(sntp_time).now();
               if (!now.is_valid()) return;
               uint32_t epoch = now.timestamp;
-
+              // <<< SENSOR_MANIFEST:AVERAGING_BEGIN >>>
               // ── Office ─────────────────────────────────────
               sensors[0].compute_and_format(epoch);
               id(avg_temp_office).publish_state(sensors[0].temp_avg_str);
@@ -139,19 +139,20 @@ time:
               if (sensors[0].batt_last >= 0)
                 id(battery_office).publish_state(sensors[0].batt_str);
 
-              // ── First Floor ────────────────────────────────
+              // ── First Floor ─────────────────────────────────────
               sensors[1].compute_and_format(epoch);
               id(avg_temp_first_floor).publish_state(sensors[1].temp_avg_str);
               id(avg_hum_first_floor).publish_state(sensors[1].hum_avg_str);
               if (sensors[1].batt_last >= 0)
                 id(battery_first_floor).publish_state(sensors[1].batt_str);
 
-              // ── Outside ────────────────────────────────────
+              // ── Outside ─────────────────────────────────────
               sensors[2].compute_and_format(epoch);
               id(avg_temp_outside).publish_state(sensors[2].temp_avg_str);
               id(avg_hum_outside).publish_state(sensors[2].hum_avg_str);
               if (sensors[2].batt_last >= 0)
                 id(battery_outside).publish_state(sensors[2].batt_str);
+              // <<< SENSOR_MANIFEST:AVERAGING_END >>>
 
               // ── Shared clock update ────────────────────────
               char time_buf[20];
@@ -190,6 +191,7 @@ web_server:
     - id: group_dashboard
       name: "Dashboard Access"
       sorting_weight: 5
+    # <<< SENSOR_MANIFEST:SORTING_GROUPS_BEGIN >>>
     - id: group_office
       name: "Office"
       sorting_weight: 10
@@ -199,9 +201,11 @@ web_server:
     - id: group_outside
       name: "Outside"
       sorting_weight: 30
+    # <<< SENSOR_MANIFEST:SORTING_GROUPS_END >>>
+
     - id: group_diag
       name: "Diagnostics-Info"
-      sorting_weight: 40
+      sorting_weight: 90
 
 
 # ─── BLE tracker ─────────────────────────────────────────────────
@@ -219,6 +223,7 @@ esp32_ble_tracker:
 
 sensor:
 
+  # <<< SENSOR_MANIFEST:THERMOPRO_BEGIN >>>
   # ══════════════════════════════════════════════════════════════════
   # SENSOR 0: OFFICE — MAC DB:06:2C:58:8A:59
   # ══════════════════════════════════════════════════════════════════
@@ -428,26 +433,7 @@ sensor:
               }
               if (sensors[2].batt_last >= 0)
                 id(battery_outside).publish_state(sensors[2].batt_str);
-
-
-  # ── Diagnostic sensors ─────────────────────────────────────────
-  - platform: debug
-    free:
-      name: "Free Heap"
-      web_server:
-        sorting_group_id: group_diag
-        sorting_weight: 30
-    loop_time:
-      name: "Loop Time"
-      web_server:
-        sorting_group_id: group_diag
-        sorting_weight: 31
-
-  - platform: uptime
-    name: "Uptime"
-    web_server:
-      sorting_group_id: group_diag
-      sorting_weight: 32
+  # <<< SENSOR_MANIFEST:THERMOPRO_END >>>
 
   - platform: wifi_signal
     name: "WiFi Signal"
@@ -460,6 +446,7 @@ sensor:
   # ── BLE RSSI per sensor ────────────────────────────────────────
   # Uses ESPHome's built-in ble_rssi platform to track passive signal
   # strength from each ThermoPro BLE advertisement for dashboard bars.
+  # <<< SENSOR_MANIFEST:RSSI_BEGIN >>>
   - platform: ble_rssi
     mac_address: "DB:06:2C:58:8A:59"
     name: "Office RSSI"
@@ -501,7 +488,7 @@ sensor:
     web_server:
       sorting_group_id: group_outside
       sorting_weight: 16
-
+  # <<< SENSOR_MANIFEST:RSSI_END >>>
 
 # ╔══════════════════════════════════════════════════════════════════╗
 # ║  Text Sensors — per-sensor current readings + averages           ║
@@ -546,6 +533,8 @@ text_sensor:
       sorting_group_id: group_dashboard
       sorting_weight: 1
 
+
+  # <<< SENSOR_MANIFEST:TEXT_SENSORS_BEGIN >>>
   # ══════════════════════════════════════════════════════════════════
   # OFFICE — current readings + 15m averages + battery + last seen
   # ══════════════════════════════════════════════════════════════════
@@ -604,7 +593,7 @@ text_sensor:
       sorting_weight: 6
 
   # ══════════════════════════════════════════════════════════════════
-  # FIRST FLOOR
+  # FIRST FLOOR — current readings + 15m averages + battery + last seen
   # ══════════════════════════════════════════════════════════════════
   - platform: template
     name: "First Floor Temperature"
@@ -661,7 +650,7 @@ text_sensor:
       sorting_weight: 6
 
   # ══════════════════════════════════════════════════════════════════
-  # OUTSIDE
+  # OUTSIDE — current readings + 15m averages + battery + last seen
   # ══════════════════════════════════════════════════════════════════
   - platform: template
     name: "Outside Temperature"
@@ -716,6 +705,7 @@ text_sensor:
     web_server:
       sorting_group_id: group_outside
       sorting_weight: 6
+  # <<< SENSOR_MANIFEST:TEXT_SENSORS_END >>>
 
   # ── Device diagnostics / About section ─────────────────────────
   # Parses the raw debug device payload into individual template fields

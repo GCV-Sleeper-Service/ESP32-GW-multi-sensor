@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "sensors": [
+    {
+      "id": "office",
+      "name": "Office",
+      "mac": "DB:06:2C:58:8A:59"
+    },
+    {
+      "id": "first_floor",
+      "name": "First Floor",
+      "mac": "D5:D8:4C:25:06:49"
+    },
+    {
+      "id": "outside",
+      "name": "Outside",
+      "mac": "DF:EB:DE:19:11:6C"
+    }
+  ]
+}
