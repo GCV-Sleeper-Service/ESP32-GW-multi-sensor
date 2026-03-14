@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.4.5.1
+# ESP32-C3 Multi-Sensor Gateway - v7.5.0.1
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -49,9 +49,9 @@ esphome:
     priority: -100
     then:
       - lambda: |-
-          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.4.5.1");
+          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.0.1");
           id(dashboard_link).publish_state(
-            "Open /dashboard or /dashboard.html for the live dashboard. v7.4.5.1: multi-sensor BLE gateway with 45-day history, CSV export/import, dark/light mode, real-time and averaged charts, and ESP management. /dashboard-download provides a standalone copy. "
+            "Open /dashboard or /dashboard.html for the live dashboard. v7.5.0.1: multi-sensor BLE gateway with 45-day history, CSV export/import, dark/light mode, real-time and averaged charts, and ESP management. /dashboard-download provides a standalone copy. "
             "The ESPHome v3 built-in web page shows text sensor states as plain text, so clickable HTML links are not rendered here.");
 
 # ─── Chip and framework ─────────────────────────────────────────
@@ -84,7 +84,7 @@ ota:
 # ─── Embedded dashboard approach ─────────────────────────────────
 # The dashboard is compiled into ../dashboard/dashboard.h and served by
 # the custom history handler through /dashboard, /dashboard.html, and
-# /dashboard-download. v7.4.5.1 adds the minification build pipeline:
+# /dashboard-download. v7.5.0.1 adds the minification build pipeline:
 # dashboard.html is minified via html-minifier-terser + terser before
 # generate-header.sh embeds it, saving ~40KB of flash.
 # Phase 1 structural enforcement for the dashboard event/state layer, and
@@ -136,22 +136,19 @@ time:
               sensors[0].compute_and_format(epoch);
               id(avg_temp_office).publish_state(sensors[0].temp_avg_str);
               id(avg_hum_office).publish_state(sensors[0].hum_avg_str);
-              if (sensors[0].batt_last >= 0)
-                id(battery_office).publish_state(sensors[0].batt_str);
+              if (sensors[0].batt_last >= 0) id(battery_office).publish_state(sensors[0].batt_str);
 
               // ── First Floor ─────────────────────────────────────
               sensors[1].compute_and_format(epoch);
               id(avg_temp_first_floor).publish_state(sensors[1].temp_avg_str);
               id(avg_hum_first_floor).publish_state(sensors[1].hum_avg_str);
-              if (sensors[1].batt_last >= 0)
-                id(battery_first_floor).publish_state(sensors[1].batt_str);
+              if (sensors[1].batt_last >= 0) id(battery_first_floor).publish_state(sensors[1].batt_str);
 
               // ── Outside ─────────────────────────────────────
               sensors[2].compute_and_format(epoch);
               id(avg_temp_outside).publish_state(sensors[2].temp_avg_str);
               id(avg_hum_outside).publish_state(sensors[2].hum_avg_str);
-              if (sensors[2].batt_last >= 0)
-                id(battery_outside).publish_state(sensors[2].batt_str);
+              if (sensors[2].batt_last >= 0) id(battery_outside).publish_state(sensors[2].batt_str);
               // <<< SENSOR_MANIFEST:AVERAGING_END >>>
 
               // ── Shared clock update ────────────────────────
@@ -225,7 +222,7 @@ sensor:
 
   # <<< SENSOR_MANIFEST:THERMOPRO_BEGIN >>>
   # ══════════════════════════════════════════════════════════════════
-  # SENSOR 0: OFFICE — MAC DB:06:2C:58:8A:59
+  # SENSOR 1: OFFICE — MAC DB:06:2C:58:8A:59
   # ══════════════════════════════════════════════════════════════════
   - platform: thermopro_ble
     mac_address: "DB:06:2C:58:8A:59"
@@ -241,9 +238,7 @@ sensor:
               if (now.is_valid()) {
                 sensors[0].mark_seen(now.timestamp);
                 char seen_buf[20];
-                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
-                         now.hour, now.minute, now.second,
-                         now.month, now.day_of_month);
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_office).publish_state(seen_buf);
               }
               if (!isnan(x) && x > -50.0f && x < 80.0f) {
@@ -264,9 +259,7 @@ sensor:
               if (now.is_valid()) {
                 sensors[0].mark_seen(now.timestamp);
                 char seen_buf[20];
-                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
-                         now.hour, now.minute, now.second,
-                         now.month, now.day_of_month);
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_office).publish_state(seen_buf);
               }
               if (!isnan(x) && x >= 0.0f && x <= 100.0f) {
@@ -286,16 +279,13 @@ sensor:
               if (now.is_valid()) {
                 sensors[0].mark_seen(now.timestamp);
                 char seen_buf[20];
-                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
-                         now.hour, now.minute, now.second,
-                         now.month, now.day_of_month);
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_office).publish_state(seen_buf);
               }
-              if (sensors[0].batt_last >= 0)
-                id(battery_office).publish_state(sensors[0].batt_str);
+              if (sensors[0].batt_last >= 0) id(battery_office).publish_state(sensors[0].batt_str);
 
   # ══════════════════════════════════════════════════════════════════
-  # SENSOR 1: FIRST FLOOR — MAC D5:D8:4C:25:06:49
+  # SENSOR 2: FIRST FLOOR — MAC D5:D8:4C:25:06:49
   # ══════════════════════════════════════════════════════════════════
   - platform: thermopro_ble
     mac_address: "D5:D8:4C:25:06:49"
@@ -311,9 +301,7 @@ sensor:
               if (now.is_valid()) {
                 sensors[1].mark_seen(now.timestamp);
                 char seen_buf[20];
-                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
-                         now.hour, now.minute, now.second,
-                         now.month, now.day_of_month);
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_first_floor).publish_state(seen_buf);
               }
               if (!isnan(x) && x > -50.0f && x < 80.0f) {
@@ -334,9 +322,7 @@ sensor:
               if (now.is_valid()) {
                 sensors[1].mark_seen(now.timestamp);
                 char seen_buf[20];
-                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
-                         now.hour, now.minute, now.second,
-                         now.month, now.day_of_month);
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_first_floor).publish_state(seen_buf);
               }
               if (!isnan(x) && x >= 0.0f && x <= 100.0f) {
@@ -356,16 +342,13 @@ sensor:
               if (now.is_valid()) {
                 sensors[1].mark_seen(now.timestamp);
                 char seen_buf[20];
-                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
-                         now.hour, now.minute, now.second,
-                         now.month, now.day_of_month);
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_first_floor).publish_state(seen_buf);
               }
-              if (sensors[1].batt_last >= 0)
-                id(battery_first_floor).publish_state(sensors[1].batt_str);
+              if (sensors[1].batt_last >= 0) id(battery_first_floor).publish_state(sensors[1].batt_str);
 
   # ══════════════════════════════════════════════════════════════════
-  # SENSOR 2: OUTSIDE — MAC DF:EB:DE:19:11:6C
+  # SENSOR 3: OUTSIDE — MAC DF:EB:DE:19:11:6C
   # ══════════════════════════════════════════════════════════════════
   - platform: thermopro_ble
     mac_address: "DF:EB:DE:19:11:6C"
@@ -381,9 +364,7 @@ sensor:
               if (now.is_valid()) {
                 sensors[2].mark_seen(now.timestamp);
                 char seen_buf[20];
-                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
-                         now.hour, now.minute, now.second,
-                         now.month, now.day_of_month);
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_outside).publish_state(seen_buf);
               }
               if (!isnan(x) && x > -50.0f && x < 80.0f) {
@@ -404,9 +385,7 @@ sensor:
               if (now.is_valid()) {
                 sensors[2].mark_seen(now.timestamp);
                 char seen_buf[20];
-                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
-                         now.hour, now.minute, now.second,
-                         now.month, now.day_of_month);
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_outside).publish_state(seen_buf);
               }
               if (!isnan(x) && x >= 0.0f && x <= 100.0f) {
@@ -426,13 +405,10 @@ sensor:
               if (now.is_valid()) {
                 sensors[2].mark_seen(now.timestamp);
                 char seen_buf[20];
-                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d",
-                         now.hour, now.minute, now.second,
-                         now.month, now.day_of_month);
+                snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_outside).publish_state(seen_buf);
               }
-              if (sensors[2].batt_last >= 0)
-                id(battery_outside).publish_state(sensors[2].batt_str);
+              if (sensors[2].batt_last >= 0) id(battery_outside).publish_state(sensors[2].batt_str);
   # <<< SENSOR_MANIFEST:THERMOPRO_END >>>
 
   - platform: wifi_signal
@@ -442,6 +418,32 @@ sensor:
     web_server:
       sorting_group_id: group_diag
       sorting_weight: 33
+
+  - platform: debug
+    free:
+      name: "Free Heap"
+      id: free_heap
+      icon: "mdi:memory"
+      web_server:
+        sorting_group_id: group_diag
+        sorting_weight: 36
+    loop_time:
+      name: "Loop Time"
+      id: loop_time
+      icon: "mdi:timer-sand"
+      web_server:
+        sorting_group_id: group_diag
+        sorting_weight: 38
+
+  - platform: uptime
+    name: "Uptime"
+    id: uptime_sensor
+    type: seconds
+    update_interval: 30s
+    icon: "mdi:clock-outline"
+    web_server:
+      sorting_group_id: group_diag
+      sorting_weight: 37
 
   # ── BLE RSSI per sensor ────────────────────────────────────────
   # Uses ESPHome's built-in ble_rssi platform to track passive signal
@@ -546,7 +548,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_office
       sorting_weight: 1
-
   - platform: template
     name: "Office Humidity"
     id: cur_hum_office
@@ -555,7 +556,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_office
       sorting_weight: 2
-
   - platform: template
     name: "Office Temp (15m avg)"
     id: avg_temp_office
@@ -564,7 +564,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_office
       sorting_weight: 3
-
   - platform: template
     name: "Office Humidity (15m avg)"
     id: avg_hum_office
@@ -573,7 +572,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_office
       sorting_weight: 4
-
   - platform: template
     name: "Office Battery"
     id: battery_office
@@ -582,7 +580,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_office
       sorting_weight: 5
-
   - platform: template
     name: "Office Last Seen"
     id: last_seen_office
@@ -603,7 +600,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_first_floor
       sorting_weight: 1
-
   - platform: template
     name: "First Floor Humidity"
     id: cur_hum_first_floor
@@ -612,7 +608,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_first_floor
       sorting_weight: 2
-
   - platform: template
     name: "First Floor Temp (15m avg)"
     id: avg_temp_first_floor
@@ -621,7 +616,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_first_floor
       sorting_weight: 3
-
   - platform: template
     name: "First Floor Humidity (15m avg)"
     id: avg_hum_first_floor
@@ -630,7 +624,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_first_floor
       sorting_weight: 4
-
   - platform: template
     name: "First Floor Battery"
     id: battery_first_floor
@@ -639,7 +632,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_first_floor
       sorting_weight: 5
-
   - platform: template
     name: "First Floor Last Seen"
     id: last_seen_first_floor
@@ -660,7 +652,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_outside
       sorting_weight: 1
-
   - platform: template
     name: "Outside Humidity"
     id: cur_hum_outside
@@ -669,7 +660,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_outside
       sorting_weight: 2
-
   - platform: template
     name: "Outside Temp (15m avg)"
     id: avg_temp_outside
@@ -678,7 +668,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_outside
       sorting_weight: 3
-
   - platform: template
     name: "Outside Humidity (15m avg)"
     id: avg_hum_outside
@@ -687,7 +676,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_outside
       sorting_weight: 4
-
   - platform: template
     name: "Outside Battery"
     id: battery_outside
@@ -696,7 +684,6 @@ text_sensor:
     web_server:
       sorting_group_id: group_outside
       sorting_weight: 5
-
   - platform: template
     name: "Outside Last Seen"
     id: last_seen_outside

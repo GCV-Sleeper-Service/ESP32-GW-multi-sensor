@@ -3,19 +3,6 @@
  * generate-fixtures.js
  *
  * Generates deterministic JSON and CSV fixtures for the mock server.
- *
- * Usage:
- *   node tests/fixtures/generate-fixtures.js
- *     -> generates 1sensor/2sensor/3sensor/4sensor variants under tests/fixtures/variants/
- *
- *   node tests/fixtures/generate-fixtures.js --count 2
- *     -> generates only the 2sensor variant
- *
- *   node tests/fixtures/generate-fixtures.js --count 2 --overwrite-baseline
- *     -> generates the 2sensor variant and overwrites the root baseline fixtures
- *
- *   node tests/fixtures/generate-fixtures.js --manifest config/sensors.json --overwrite-baseline
- *     -> overwrites the root baseline fixtures using the active canonical sensor manifest
  */
 'use strict';
 
@@ -25,6 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
+const VERSION = 'v7.5.0.0';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },
@@ -72,15 +60,58 @@ function readManifestSensors(manifestPath) {
   return materializeSensors(sensors);
 }
 
+function fixtureManifestV1(sensors) {
+  return sensors.map(({ id, name }) => ({ id, name }));
+}
+
+function fixtureManifestV2(sensors, tag) {
+  return {
+    ok: true,
+    schema_version: 2,
+    source: tag || 'mock',
+    version: VERSION,
+    sensor_count: sensors.length,
+    metrics: [
+      {
+        key: 'temp',
+        name: 'Temperature',
+        unit: 'celsius',
+        unit_symbol: '°C',
+        bounds: { min: -50, max: 80 },
+        history_suffix: 'temp',
+      },
+      {
+        key: 'hum',
+        name: 'Humidity',
+        unit: 'percent',
+        unit_symbol: '%',
+        bounds: { min: 0, max: 100 },
+        history_suffix: 'hum',
+      },
+    ],
+    sensors: sensors.map(({ id, name }) => ({
+      id,
+      name,
+      metrics: [
+        { key: 'temp', history: `/history/${id}/temp` },
+        { key: 'hum', history: `/history/${id}/hum` },
+      ],
+    })),
+  };
+}
+
 function writeFixtureSet(targetDir, sensors, tag) {
   fs.mkdirSync(targetDir, { recursive: true });
-  const manifest = sensors.map(({ id, name }) => ({ id, name }));
-  fs.writeFileSync(path.join(targetDir, 'sensors.json'), JSON.stringify(manifest, null, 2) + '\n');
+  const legacyManifest = fixtureManifestV1(sensors);
+  const v2Manifest = fixtureManifestV2(sensors, tag || 'mock');
+
+  fs.writeFileSync(path.join(targetDir, 'sensors.json'), JSON.stringify(legacyManifest, null, 2) + '\n');
+  fs.writeFileSync(path.join(targetDir, 'manifest.json'), JSON.stringify(v2Manifest, null, 2) + '\n');
   fs.writeFileSync(path.join(targetDir, 'api-status.json'), JSON.stringify({
     ok: true,
-    version: 'v7.4.5.1',
+    version: VERSION,
     sensor_count: sensors.length,
-    sensors: manifest,
+    sensors: legacyManifest,
     mode: tag || 'mock',
     connected: true,
   }, null, 2) + '\n');
@@ -96,6 +127,7 @@ function writeFixtureSet(targetDir, sensors, tag) {
     segment_count: POINTS,
     mode: tag || 'mock',
   }, null, 2) + '\n');
+
   sensors.forEach((sensor, idx) => {
     fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-temp.csv`), buildCsvLines(idx, 'temp', sensor.tempBase));
     fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-hum.csv`), buildCsvLines(idx, 'hum', sensor.humBase));
