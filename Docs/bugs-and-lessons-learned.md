@@ -1,675 +1,133 @@
-# Bugs Fixed & Lessons Learned
+# Bugs and Lessons Learned
 
-_Last updated: 2026-03-12 — v7.4.5.1 (LESSON-OPS-038, BUG-030–032 added)_
+> Reverse chronological order. Latest first.
 
-This file tracks significant bugs, root causes, fixes, and operational lessons.
-It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
+## 2026-03-14 — YAML indentation bug in generated marker-managed sections
+### Symptom
+`esphome compile firmware/esp32-c3-multi-sensor.yaml` failed with:
+- `expected <block end>, but found '<scalar>'`
+- reported near line 135 after generator runs.
 
-Both sections are in **reverse chronological order** — most recent entry first.
+### Root cause
+The YAML generation path reinserted block content without preserving the indentation level of the marker location. The content was semantically correct but structurally invalid YAML inside:
+- lambda block scalar sections
+- `web_server.sorting_groups`
+- `sensor`
+- `text_sensor`
 
----
+### Fix
+- Restored an indentation-safe YAML generation path.
+- Recovered the generated YAML to a compile-clean state.
+- Revalidated idempotence with `python3 scripts/render_sensor_config.py --write`.
 
-## Bug Fixes
+### Lesson learned
+Generator correctness for YAML requires **both**:
+1. idempotent marker replacement
+2. indentation preservation relative to the marker line
 
-
-### BUG-032: Multi-sensor CLI restore could erase retained history without an explicit confirmation prompt (v7.4.5.1)
-
-The first v7.4.5.0 CLI backup/restore helper correctly routed merged CSVs through the existing erase-first `/api/import/begin` path, but it did so without an explicit operator confirmation. That made the happy path fast, but it also left too much room for a destructive mistake.
-
-**Fix:** `scripts/history_backup.py import` now prompts before erase-first multi-sensor import unless `--yes` is provided, and it also supports `--single-sensor <id>` to intentionally force the merge route from a merged CSV.
-
-### BUG-031: `change_sensor_number.py` rollback messaging was too optimistic for structural renderer failures (v7.4.5.1)
-
-The initial rollback path restored `config/sensors.json` and attempted a best-effort re-render, but it could still leave the operator uncertain if recovery was incomplete.
-
-**Fix:** rollback now preserves the backup file on failure, prints manual recovery commands, and surfaces restore/re-render errors explicitly instead of assuming a clean rollback.
-
-### BUG-030: Manifest validation normalized MACs by mutating caller data in place (v7.4.5.1)
-
-The original validation helper silently normalized MAC addresses inside the caller-provided list. That was harmless in the main workflow, but it was a latent correctness trap for future callers.
-
-**Fix:** manifest validation is now side-effect free. Canonicalization is explicit through `canonicalize_sensors()`, and save/load/render flows use normalized copies rather than mutating input objects.
-
-### LESSON-OPS-038: Safety prompts belong on destructive CLI paths, not only in prose documentation (v7.4.5.1)
-
-Documenting that a path is destructive is not enough. If a CLI command can erase retained state, the operator should have to acknowledge that at runtime or opt into bypassing the prompt deliberately.
-
-### BUG-028: Sensor-count changes depended on four-file manual edits, creating configuration drift risk (v7.4.5.0)
-
-**Symptom:** Changing sensor count or replacing a sensor required hand-editing `sensor_history_multi.h`, the firmware YAML, `dashboard.js`, and `tests/fixtures/sensors.json`. It was easy to update three files and miss the fourth, which produced confusing preflight failures or worse — a compile-valid repo whose dashboard fallback / test fixtures no longer matched the active firmware configuration.
-
-**Root cause:** The repo had no canonical source of truth for configured sensors. The same facts (sensor id, display name, MAC, count) were duplicated in multiple files.
-
-**Fix:** Introduced a canonical manifest (`config/sensors.json`) plus a generator (`scripts/render_sensor_config.py`) and an interactive manager (`scripts/change_sensor_number.py`). The renderer now drives generated sections in the header, firmware YAML, dashboard fallback metadata, and baseline fixture manifest.
-
-**Guardrail:** `scripts/preflight.sh` now runs `python3 scripts/render_sensor_config.py --check` so generated-file drift is caught before compile.
-
-**Lesson:** See LESSON-OPS-037.
+Content-only sync checks are not enough.
 
 ---
 
-### BUG-029: Session-level import design details were not propagated into the durable docs (v7.4.5.0)
+## 2026-03-14 — Preflight gap: generated files could be in sync yet YAML could still be invalid
+### Symptom
+Preflight passed, but ESPHome YAML parsing still failed.
 
-**Symptom:** The repo behavior for single-sensor merge import existed in firmware and dashboard logic, but the high-value explanation — epoch-to-slot mapping, overlay of one sensor into an existing segment, reuse of the same slot when possible, and ~7 KB temporary overhead — was not consistently carried into changelog and handoff documentation. That made fresh-start sessions vulnerable to losing key implementation context.
+### Root cause
+The existing preflight focused on:
+- version drift
+- generator drift
+- fixture drift
+- manifest route/fallback presence
 
-**Root cause:** Documentation captured the user-visible feature but not enough of the internal design rationale.
+It did **not** run an ESPHome/YAML parse gate.
 
-**Fix:** Expanded changelog, `Docs/configuring-sensors.md`, and the per-session handoff to explicitly describe the merge-first single-sensor import model and how it differs from full multi-sensor replacement.
+### Fix / Recommendation
+Add a supplemental preflight step that runs:
+- `esphome config firmware/esp32-c3-multi-sensor.yaml`
 
-**Lesson:** See LESSON-OPS-036.
+This should fail the pipeline before compile if YAML structure is broken.
 
----
-
-### BUG-027: Chromium missing shared libraries in ESPHome container — libnspr4.so not found (v7.4.4.0)
-
-**Symptom:** All Playwright tests fail with `error while loading shared libraries: libnspr4.so: cannot open shared object file: No such file or directory`. The binary exists and `--no-sandbox` is in the launch args, but the process crashes at the dynamic linker stage before Chromium even starts.
-
-**Root cause:** `npx playwright install chromium` downloads the Chromium binary but does NOT install the required OS-level shared libraries (`libnspr4`, `libnss3`, `libatk`, `libgdk`, etc). These must be installed via the system package manager. The ESPHome Docker container does not include them by default.
-
-**Fix:** Use `--with-deps`:
-```bash
-npx playwright install --with-deps chromium
-```
-This installs both the binary and all required system packages via `apt`.
-
-**Preflight check improvement:** `playwright_browser_installed` now actually executes the binary with `--version` instead of just checking file existence. This catches the missing-library case and prints the actionable fix command.
-
-**Lesson:** See LESSON-OPS-034.
+### Lesson learned
+For this repo, preflight should validate:
+- sync/idempotence
+- source/generated artifact alignment
+- ESPHome config parse
 
 ---
 
-### BUG-026: Chromium crashes silently in ESPHome/Docker containers — sandbox kernel feature missing (v7.4.4.0)
+## 2026-03-14 — Generator version stamping drift after version bump
+### Symptom
+After bumping to `v7.5.0.1`, preflight failed on `dashboard_js_version_matches`.
 
-**Symptom:** All Playwright tests fail immediately with `browserType.launch: Target page, context or browser has been closed` — even after a successful `npx playwright install chromium`. The browser binary exists but the process crashes on startup.
+### Root cause
+A version hotfix updated output files but did not update the generator script that rewrites `dashboard/dashboard.js`.
 
-**Root cause:** Chromium's default sandbox uses Linux user namespaces, which are disabled in many container environments including the ESPHome Docker container. Without the sandbox, Chromium refuses to start unless explicitly told to skip it.
+### Fix
+- Updated generator version constant to `v7.5.0.1`.
+- Re-ran generator and preflight.
 
-**Fix:** Add `launchOptions: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }` to the `use` block in `playwright.config.js`. This is safe for our test runner — the risk model for the sandbox only applies to untrusted web content; our mock server serves only our own fixture HTML.
-
-**Lesson:** See LESSON-OPS-033.
-
----
-
-### BUG-025: Fixture generate-fixtures.js used milliseconds for CSV timestamps (v7.4.4.0)
-
-**Symptom:** Sensor-count variant fixtures (1/2/4 sensor) would render completely empty charts in the dashboard when used via FIXTURE_SET. No error message — just no data points.
-
-**Root cause:** The original `generate-fixtures.js` used `Date.UTC()` to get "now" as a base for CSV timestamps. `Date.UTC()` returns epoch **milliseconds** (e.g., `1773173700000`). The dashboard's `parseHistoryMetricLines` stores the raw integer as an object key, then the chart renderer calls `new Date(epoch * 1000)` — interpreting it as seconds. So a millisecond timestamp gets multiplied by 1000, producing dates in year ~58000, which fall outside any time range filter and are silently dropped.
-
-**Fix:** Use epoch **seconds** throughout `generate-fixtures.js`. Anchor to `ANCHOR_EPOCH_SEC = 1741694400` (integer seconds) and step by `INTERVAL_SEC = 15 * 60` seconds per point.
-
-**Lesson:** See LESSON-OPS-029.
+### Lesson learned
+Any version bump in this repo must include **all generators** that stamp generated artifacts, not just the generated files themselves.
 
 ---
 
-## Lessons Learned
+## 2026-03-14 — Dashboard runtime regression despite successful manifest/status APIs
+### Symptom
+- `/api/manifest` worked
+- `/api/status` worked
+- `/sensors.json` worked
+- but dashboard temporarily lost Free Heap and Uptime
+- built-in ESPHome web page also lost Free Heap and Uptime
 
-### LESSON-OPS-037: Design-level behavior needs to be documented, not just shipped (v7.4.5.0)
+### Root cause
+This was actually two separate regressions:
+1. YAML had lost the diagnostics sensors needed for the built-in ESPHome web page.
+2. Dashboard artifacts were out of sync; source and generated assets did not reflect the same status-field handling.
 
-When a feature has a non-obvious internal model, preserve that model in durable documentation. The single-sensor import path is a good example: the useful fact is not only that it is “non-destructive,” but *how* it works — epoch-to-slot scan, segment overlay, same-slot rewrite, new-slot allocation only for missing hours, and temporary memory overhead. Without that detail, future sessions have to rediscover the same architecture from code.
+### Fix
+- Restored Free Heap, Uptime, and Loop Time in YAML.
+- Updated source dashboard logic to hydrate Free Heap and Uptime from `/api/status`.
+- Regenerated `dashboard.min.html` and `dashboard.h` from source.
+- Verified the values reappeared on both dashboard and built-in web page.
 
-**Carry forward:** When a feature changes retained-history semantics, endpoint contract, or state-management design, record the internal mechanism in the changelog and session handoff, not only the user-facing label.
-
----
-
-### LESSON-OPS-036: Repeated configuration belongs in one canonical manifest (v7.4.5.0)
-
-If the same sensor facts appear in multiple repo files, manual editing will eventually drift. The right fix is not “be more careful”; it is to move those facts into one canonical manifest and generate the dependent files from it.
-
-For this repo, the repeated facts were:
-- sensor id
-- display name
-- MAC address
-- sensor count / ordering
-
-**Carry forward:** `config/sensors.json` is now the source of truth. Future sensor-related changes should flow through the manifest and renderer first, not through direct manual edits.
-
----
-
-### LESSON-OPS-035: Preflight checks that depend on npm packages must skip when node_modules is absent (v7.4.4.0)
-
-The build CI (`ci.yml`) runs preflight before `npm ci` — `node_modules` does not exist at that point. Any preflight check that requires an npm package must guard with `[[ -d "node_modules/@playwright" ]]` (or equivalent) and emit `SKIP` rather than `FAIL` when the guard is not met. A hard FAIL breaks the build CI for a check that only applies in test environments. See `playwright_browser_installed` check in `scripts/preflight.sh`.
+### Lesson learned
+Never treat generated dashboard artifacts as primary source. Fix source first, then regenerate.
 
 ---
 
-### LESSON-OPS-034: Always use --with-deps when installing Playwright in containers (v7.4.4.0)
+## 2026-03-14 — Brittle local patch scripts against compacted source files
+### Symptom
+Multiple patch-script attempts failed when applied to local files even though the intended logic was correct.
 
-`npx playwright install chromium` downloads the binary only. `npx playwright install --with-deps chromium` also installs the required OS shared libraries via apt. In any container or fresh Linux environment, always use `--with-deps`. The symptom of the missing-only-binary install is `libnspr4.so: cannot open shared object file` — the binary exists and `--no-sandbox` is in the args, but the process dies at the dynamic linker stage. See BUG-027.
+### Root cause
+Several repo files are compacted or serialized in a way that makes exact-string patching fragile, especially:
+- `dashboard/sensor_history_multi.h`
+- generator-managed outputs
 
----
+### Fix
+- Switched to direct file recovery from uploaded local state.
+- Avoided continued blind patching once local drift was clear.
 
-### LESSON-OPS-033: Playwright in Docker/ESPHome containers requires --no-sandbox (v7.4.4.0)
-
-Always add `launchOptions: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }` to `playwright.config.js` when running in a container. The error `Target page, context or browser has been closed` immediately after browser launch, without any further detail, is the signature of a sandbox crash. This is not a Playwright version issue — it is a kernel capability issue. See BUG-026.
-
----
-
-### LESSON-OPS-032: NVS count-mismatch protection is already in place — no new C++ guard needed (v7.4.4.0)
-
-The `meta.num_sensors == NUM_SENSORS` check in the NVS restore path already rejects history segments from a different sensor count cleanly. Old data is not loaded, not corrupted, not silently misinterpreted. The correct response to a count change is: load nothing from the old segments, require an explicit history delete, and document the procedure. No additional C++ validation was needed.
-
----
-
-### LESSON-OPS-031: DEFAULT_SENSOR_META in dashboard.js is a required consistency target (v7.4.4.0)
-
-The `DEFAULT_SENSOR_META` array in `dashboard.js` is a fallback used when `/sensors.json` fails to load. It must match `NUM_SENSORS` — if it has 3 entries but the firmware is configured for 1, the dashboard will render 3 cards (with the wrong sensors) when the manifest endpoint fails. Preflight now checks this explicitly.
+### Lesson learned
+For this repo:
+- exact-text patching is fragile
+- function-anchor / regex / brace-aware patching is safer
+- when local drift becomes nontrivial, patch the real uploaded files instead of inferred repo state
 
 ---
 
-### LESSON-OPS-030: Preflight sensor-count checks belong in Node.js, not bash regex (v7.4.4.0)
-
-Counting occurrences of patterns in YAML and C++ using bash `grep -c` and `sed` is fragile — quoting edge cases, multi-line block matching, and false positives from comments are all real risks. Inline Node.js scripting within the bash preflight is more readable, reliable, and straightforward to extend with new checks.
-
----
-
-### LESSON-OPS-029: CSV fixture timestamps must be epoch seconds (v7.4.4.0)
-
-The dashboard's history chart pipeline uses `new Date(epoch * 1000)` — it expects epoch **seconds** as integers from CSV files. `Date.UTC()` and `Date.now()` in JavaScript return **milliseconds** and must not be used directly as CSV timestamp values. Always verify the unit when generating fixture data. See BUG-025.
-
----
-
-## Bug Fixes
-
-### BUG-024: Second round of browser test failures — DOM behavior mismatches (v7.4.3.0 CI)
-
-**Symptom:** 4 of 28 tests failed on second CI run after element ID fixes. Canvas count = 0, theme class not found, Apply button timed out.
-
-**Root causes — three distinct issues:**
-
-1. **Canvas selector wrong container.** Test asserted `.sensor-card canvas`. The four chart canvases (`#tempChart`, `#humChart`, `#tempAvgChart`, `#humAvgChart`) live inside `.chart-card` divs in a separate section of the page — not inside sensor cards, which only contain reading values.
-
-2. **Theme class on wrong element.** `toggleTheme()` applies `classList.toggle('light')` to `document.documentElement` (`<html>`), not to `document.body`. Tests asserting `page.locator('body').toHaveClass(/light/)` always received `""`.
-
-3. **Preset click closes modal immediately.** `_onPreset()` calls `_applyAndClose()` directly — there is no confirmation step. Tests that clicked a preset then clicked `#customRangeApply` were attempting to click a button on an already-dismissed modal, causing a 30-second timeout.
-
-**Fixes:**
-- Canvas: assert named IDs (`#tempChart` etc.) with `toBeAttached()` instead of container-relative canvas count
-- Theme: change all theme assertions to `page.locator('html')`
-- Preset flow: remove the Apply click after preset; preset alone is the complete action
-
-**Lesson:** Verifying element IDs is not enough — interaction flows and CSS class targets require runtime understanding. See LESSON-OPS-028.
-
----
-
-### BUG-023: Output bundle file naming caused confusion about destination paths (v7.4.3.0)
-
-**Symptom:** `mock-server.js` in outputs needed to be placed as `tests/mock-server/server.js`. Three JSON fixture files needed to go into `tests/fixtures/`. The flat output bundle gave no indication of subdirectory placement.
-
-**Fix:** Files renamed and placed in correct locations after clarification.
-
-**Lesson:** When delivering files that go into subdirectories, document the full destination path explicitly in session notes or in the delivery message. See LESSON-OPS-025.
-
----
-
-### BUG-022: `package-lock.json` not committed — CI failed on `npm ci` (v7.4.3.0)
-
-**Symptom:** Browser CI job failed immediately: `Dependencies lock file is not found`.
-
-**Root cause:** `npm install` was run locally to generate `package.json` and install Playwright, but `package-lock.json` was never staged or committed. `npm ci` (used in CI) requires the lockfile — unlike `npm install`, it will not generate one.
-
-**Fix:** `npm install` on device, then `git add package-lock.json && git commit`.
-
-**Lesson:** Any time `package.json` is introduced, commit `package-lock.json` in the same commit. See LESSON-OPS-024.
-
----
-
-### BUG-021: `browser-tests.yml` committed to wrong branch — workflow never appeared in CI (v7.4.3.0)
-
-**Symptom:** GitHub Actions showed no "Browser Tests" workflow. The file existed on disk but `git show --name-only HEAD` returned nothing for it.
-
-**Root cause:** `browser-tests.yml` was committed on `feature/custom-date-range` (an earlier branch) rather than `feature/playwright-tests`. The rebase that followed picked up all other files but the workflow file was never in the HEAD commit of the feature branch.
-
-**Fix:** `git log --oneline --all -- .github/workflows/browser-tests.yml` identified the commit. `git checkout <sha> -- .github/workflows/browser-tests.yml` recovered the file and it was committed to the correct branch.
-
-**Additional factor:** GitHub does not register a new workflow file until it appears on the default branch (`main`). Even with the file correctly committed to a feature branch, the workflow tab won't show it until the PR is merged.
-
-**Lesson:** After committing a new workflow file, verify with `git show --name-only HEAD | grep workflow`. See LESSON-OPS-023.
-
----
-
-### BUG-020: Browser test suite used wrong element IDs throughout — 14 of 28 tests failed (v7.4.3.0)
-
-**Symptom:** 14 CI browser test failures on first run. All failures traced to elements not found.
-
-**Root cause:** Tests were written against assumed element IDs without verifying the actual dashboard HTML. Six distinct mismatches:
-
-| Used in test | Actual ID in HTML |
-|---|---|
-| `#themeToggle` | `#themeBtn` |
-| `#crApply` | `#customRangeApply` |
-| `#crCancel` | `#customRangeCancel` |
-| `#crPrevMonth` | `#crPrev` |
-| `#crMonthLabel` | `#crCalHeader` |
-| `.card-title` | `.sensor-card-header` (name is a raw text node, no title class) |
-| `data-history-range="7d"` | `data-history-range="168"` (values are in hours, not labels) |
-| `button[hasText=Export]` count ≥ 4 | `[data-export-all]` + `[data-export-sensor]` separate attributes |
-
-**Fix:** Audited all element IDs against the actual HTML before writing tests. Replaced every selector.
-
-**Lesson:** Always `grep` the actual HTML for element IDs before writing selectors. See LESSON-OPS-022.
-
----
-
-### BUG-019: "Data available: unknown" in custom range dialog on freshly-flashed device (v7.4.2.0)
-
-**Symptom:** Custom date range modal shows "Data available: unknown" immediately after flash.
-
-**Root cause:** `/api/storage-stats` returns `retention_oldest_epoch = 0` when no data has been persisted to NVS yet. The original dialog code treated any zero bound as "unknown". On a fresh device, the first persist happens at 2:10 AM — until then, oldest epoch is genuinely 0.
-
-**Fix:** Three-state availability display:
-- Both bounds non-zero → "Data available: [oldest] – [newest]"
-- Only newest non-zero → "Data available: up to [newest]"
-- Both zero → "No persisted history yet — range applies to RAM data only"
-
-**Lesson:** Distinguish between "API returned an error" and "API returned a valid zero value." Zero oldest epoch is a valid state, not a missing value.
-
----
-
-### BUG-018: Duplicate `<script>` tag caused `Unexpected token '<'` dashboard failure (v7.4.2.0 deployment)
-
-**Symptom:** Dashboard stuck on "connecting" after flash. Browser console: `Uncaught SyntaxError: Unexpected token '<'`.
-
-**Root cause:** The script block sync command used `head -n 858` (inclusive of the `<script>` line), then echoed `<script>` again, producing two consecutive `<script>` tags. The browser's HTML parser closed the script block at the second `<script>`, then fed the remaining JavaScript as HTML, causing the syntax error.
-
-**Fix:** `sed -i '859d' dashboard/dashboard.html` — deleted the duplicate tag.
-
-**Prevention:** The sync command must use `head -n $((SCRIPT_LINE - 1))` (one line before the `<script>` tag), not `head -n $SCRIPT_LINE`. After every sync, verify with `grep -c '^<script>$' dashboard/dashboard.html` — must return exactly `1`. Minification savings of ~33% also confirms correct single-script-block sync; savings <10% indicate the block was doubled.
-
----
-
-### BUG-017: `MAX_HISTORY_RANGE_HOURS` was 720, silently truncating 45d history display (v7.4.2.0)
-
-**Symptom:** Selecting the 45d range button displayed only 30 days of data.
-
-**Root cause:** `MAX_HISTORY_RANGE_HOURS` was set to `720` (30 days). The history store trim logic uses this constant to cap stored chart points: `store.temp.length > (MAX_HISTORY_RANGE_HOURS * 4 + 32)`. At 4 points/hour, 720 hours = 2912 points max, while 45d needs 4352 points. Data beyond 30 days was trimmed silently.
-
-**Fix:** `MAX_HISTORY_RANGE_HOURS = 1080`.
-
-**Lesson:** `MAX_HISTORY_RANGE_HOURS` must equal the highest `data-history-range` value in the HTML. Preflight now validates this pairing automatically.
-
----
-
-### BUG-016: `html-minifier-terser` CLI flags wrong (v7.4.1.0)
-
-**Symptom:** `./scripts/minify-dashboard.sh` exited with `unknown option '--input-path'`.
-
-**Root cause:** `html-minifier-terser` CLI does not use `--input-path` / `--output-path`.
-
-**Fix:** Use positional input plus `--output`.
-
-**Lesson:** Verify npm CLI syntax with `--help` before embedding commands into wrapper scripts.
-
----
-
-### BUG-015: Single-sensor import "Unknown sensor ID" — off-by-one in URL path parsing (v7.4.0.2)
-
-**Symptom:** Single-sensor import failed even though the sensor ID looked correct.
-
-**Root cause:** The path prefix `/api/import/begin/single/` was counted incorrectly, leaving a leading slash on the extracted sensor ID.
-
-**Fix:** Corrected both the prefix length comparison and pointer offset.
-
-**Lesson:** Prefer `sizeof("literal") - 1` or `strlen()` over hand-counted path lengths.
-
----
-
-### BUG-014: Single-sensor import erased all flash data (v7.4.0.2)
-
-**Symptom:** Importing one sensor destroyed history for all sensors.
-
-**Root cause:** The original import path erased the whole history partition before writing. Because each persisted segment stores all sensors together, one-sensor replacement could not safely reuse the destructive path.
-
-**Fix:** Added `POST /api/import/begin/single/<id>` and merge-first behavior.
-
-**Lesson:** If storage blobs are multi-entity structures, partial import must merge, not replace.
-
----
-
-### BUG-013: Import over Cloudflare returned HTTP 502 (v7.4.0.1)
-
-**Symptom:** Import worked partially, then failed through the tunnel with 502.
-
-**Root cause:** Background dashboard traffic and sustained import requests contended for the same limited HTTP/socket resources.
-
-**Fix:** Suspend non-essential background activity during import and add pacing/backoff.
-
-**Lesson:** On a constrained ESP origin, long-running operations must reduce concurrent background traffic.
-
----
-
-### BUG-012: Single-sensor export schema mismatch (v7.4.0.1)
-
-**Symptom:** Single-sensor export/import could map data to the wrong sensor.
-
-**Root cause:** Single-sensor export used bare column names while merged export used sensor-prefixed columns.
-
-**Fix:** Standardized on prefixed headers.
-
-**Lesson:** Export and import must share one canonical schema.
-
----
-
-### BUG-011: Non-JSON server response crashed import error handling (v7.4.0)
-
-**Symptom:** Browser threw a JSON parse error instead of showing the real ESP/server error.
-
-**Root cause:** Fetch handlers assumed JSON unconditionally.
-
-**Fix:** Added safer text-first JSON response handling.
-
-**Lesson:** Anything talking to ESP-IDF httpd must tolerate non-JSON error responses.
-
----
-
-### BUG-010: `time()` ambiguous in ESPHome context (v7.4.0)
-
-**Symptom:** Compile failure due to namespace ambiguity.
-
-**Root cause:** ESPHome's `time` namespace collided with C standard library `time()`.
-
-**Fix:** Use `::time(nullptr)`.
-
-**Lesson:** Qualify standard-library calls when ESPHome namespaces can shadow them.
-
----
-
-### BUG-009: Import POST body never delivered (v7.4.0)
-
-**Symptom:** Import body appeared empty at the custom handler.
-
-**Root cause:** On this ESPHome / ESP-IDF path, custom handlers do not receive request bodies in the way the original design assumed.
-
-**Fix:** Moved import payload transport into the URL path.
-
-**Lesson:** On this stack, **URL path is the reliable data channel** for custom import operations.
-
----
-
-### Earlier important fixes
-
-- **BUG-008:** Switched dashboard serving away from `beginResponseStream()` panic path
-- **BUG-007:** Abandoned LittleFS-hosted dashboard in favor of embedded payload
-- **BUG-006:** Fixed dashboard startup / event-binding ordering issue
-- **BUG-005:** Theme switch now forces chart redraw
-- **BUG-004:** 15-minute markers normalized to the intended visual size
-- **BUG-003:** Chart markers now follow recolor changes
-- **BUG-002:** Export All serialized to avoid socket-pool overload
-- **BUG-001:** `/api/status` JSON truncation fixed by splitting output formatting
-
----
-
-## Operational Lessons
-
-### LESSON-OPS-028: Verify DOM behavior, not just element IDs
-
-Verifying element IDs with `grep` is necessary but not sufficient. Three categories require runtime understanding:
-
-1. **CSS class targets** — `toggleTheme()` applies `light` to `document.documentElement` (`<html>`), not `document.body`. The only way to know this is to read the JS.
-2. **Interaction side-effects** — `_onPreset()` calls `_applyAndClose()` immediately. A preset click closes the modal; there is no confirmation step. Tests must not click Apply after a preset.
-3. **Container relationships** — chart canvases are in `.chart-card` divs, not inside `.sensor-card`. Container assumptions must be verified in the HTML structure, not inferred from variable names.
-
-Rule: before writing any Playwright assertion, read both the HTML and the JS handler for that element.
-
----
-
-### LESSON-OPS-027: New GitHub Actions workflows only appear after merging to main
-
-GitHub registers workflow files from the default branch only. A new `.github/workflows/*.yml` file on a feature branch will not appear in the Actions sidebar and cannot be triggered manually until it is merged to `main`. This is not a bug — just push the PR and merge.
-
----
-
-### LESSON-OPS-026: `data-history-range` button values are in hours, not human-readable labels
-
-The range toggle buttons use numeric hour values as their `data-history-range` attribute:
-
-| Label | Attribute value |
-|-------|----------------|
-| 24h | `24` |
-| 7d | `168` |
-| 30d | `720` |
-| 45d | `1080` |
-| Custom | `custom` |
-
-Any test, script, or documentation referencing these buttons must use the hour values, not the display labels.
-
----
-
-### LESSON-OPS-025: Output bundle files must clearly indicate their destination path
-
-When delivering files that belong in subdirectories, document the full destination path explicitly in session notes or in the delivery message.
-
-Preferred format in session handoff:
-```
-mock-server.js   →  tests/mock-server/server.js
-sensors.json     →  tests/fixtures/sensors.json
-```
-
----
-
-### LESSON-OPS-024: Commit `package-lock.json` in the same commit as `package.json`
-
-`npm ci` (used in all CI environments) requires a lockfile and will not generate one. Always stage and commit `package-lock.json` alongside `package.json`.
-
-```bash
-npm install
-git add package.json package-lock.json
-git commit -m "..."
-```
-
----
-
-### LESSON-OPS-023: Verify new workflow files are in the correct commit before pushing
-
-After adding a `.github/workflows/` file, confirm it is in the current HEAD commit:
-```bash
-git show --name-only HEAD | grep workflows
-```
-If it returns nothing, the file was either committed on a different branch or never staged.
-
----
-
-### LESSON-OPS-022: Always verify element IDs against actual HTML before writing browser tests
-
-Before writing any Playwright selector, grep the dashboard HTML for the actual ID:
-```bash
-grep -n 'id="theme\|id="cr\|id="custom\|data-history-range\|data-export' dashboard/dashboard.html
-```
-Never assume an ID from a variable name, comment, or context.
-
-Specific gotchas in this codebase:
-- Range button values are **hours**, not labels: 24, 168, 720, 1080, custom
-- Export buttons use `data-export-all` and `data-export-sensor` attributes, not text matching
-- Sensor names are raw text nodes inside `.sensor-card-header` — there is no `.card-title` class
-- Export and sensor card elements are built dynamically — use `waitForFunction` before asserting them
-
----
-
-### LESSON-OPS-021: Zero return values from API need explicit handling distinct from fetch errors
-
-Do not conflate a successful API response containing `0` with a missing/failed response. Use separate code paths for "API succeeded but returned zero" vs "API call failed."
-
----
-
-### LESSON-OPS-020: "Data available: unknown" is expected on a freshly-flashed device
-
-The first NVS history persist runs at 2:10 AM. Until then, `retention_oldest_epoch` returns 0. The custom range dialog handles this gracefully as of v7.4.2.0 — it is not a bug or a fetch failure.
-
----
-
-### LESSON-OPS-019: Minification savings are a correctness signal
-
-After running `minify-dashboard.sh`, expected savings are ~30–35% of source size. If savings are below 10%, the script block was almost certainly doubled (embedded twice). Use this as a fast sanity check before committing.
-
----
-
-### LESSON-OPS-018: Script block sync must use N-1, not N, for `head` cut
-
-When syncing `dashboard.js` into the `<script>` block of `dashboard.html`, use:
-```bash
-SCRIPT_LINE=$(grep -n "^<script>$" dashboard/dashboard.html | head -1 | cut -d: -f1)
-head -n $((SCRIPT_LINE - 1)) dashboard/dashboard.html > /tmp/out.txt
-echo '<script>' >> /tmp/out.txt
-cat dashboard/dashboard.js >> /tmp/out.txt
-echo '</script>' >> /tmp/out.txt
-tail -n +$((END_LINE + 1)) dashboard/dashboard.html >> /tmp/out.txt
-```
-After every sync, verify: `grep -c '^<script>$' dashboard/dashboard.html` must return `1`.
-
----
-
-### LESSON-OPS-017: Code and docs should be normalized in the same pass when possible
-
-If a comment/header is clearly stale, normalize it during the same session that fixes the related documentation drift. This reduces "almost aligned" repo states.
-
----
-
-### LESSON-OPS-016: Every substantial development session should leave continuity breadcrumbs
-
-For meaningful sessions, update:
-- A session log
-- The fresh-start handoff
-- Any changed roadmap/implementation-plan docs
-
-That way a new session can restart cleanly without reconstructing history from chat logs.
-
----
-
-### LESSON-OPS-015: Documentation must distinguish current behavior from planned behavior
-
-- `README.md` = current shipped behavior only
-- `architecture.md` = current architecture only
-- `future-plans.md` / implementation plans = planned behavior
-
-Do not advertise a roadmap item as if it is already merged.
-
----
-
-### LESSON-OPS-014: `dashboard.h` shrinkage is the easiest signal that minification is active
-
-If the generated header barely changed, the minified intermediate may not have been used.
-
----
-
-### LESSON-OPS-013: `git pull` can fail after a broken or partial prior pull
-
-If Git says local changes would be overwritten and the changes are unwanted, reset the affected file(s) before retrying.
-
----
-
-### LESSON-OPS-012: Script execute permissions may be lost
-
-Files introduced or rewritten through some repo workflows can lose the execute bit. After a fresh clone or after pulling new scripts, run:
-
-```bash
-chmod +x scripts/*.sh
-```
-
----
-
-### LESSON-OPS-011: `html-minifier-terser` uses positional input plus `--output`
-
-Do not script imaginary flags. Test the exact command in a shell first.
-
----
-
-### LESSON-OPS-010: Cached builds may not reflect header-only changes clearly
-
-If behavior looks stale after header or generated-file changes, use `esphome compile --clean`.
-
----
-
-### LESSON-OPS-009: Version strings live in six places
-
-Those six synchronized locations are:
-
-1. `VERSION`
-2. YAML header comment
-3. `register_history_handler()` version string
-4. `dashboard_link` publish-state text
-5. `App.version` in `dashboard.js`
-6. Version comment/header in `dashboard.html`
-
-When a version bump happens, update all six together.
-
----
-
-### LESSON-OPS-008: `CONFIG_HTTPD_MAX_REQ_HDR_LEN` is a RAM multiplier
-
-Increasing it increases per-connection cost. On this device class, overly large header buffers can create new failures.
-
----
-
-### LESSON-OPS-007: ESPHome ESP-IDF data-channel constraints matter
-
-For custom handlers on this platform:
-
-- POST body: not reliable for this use case
-- Query params: not reliable in this path
-- Headers: too limited once proxies add overhead
-- **URL path: reliable**
-
----
-
-### LESSON-OPS-006: Prefer local CLI or editor-driven updates over ad hoc web editing
-
-This reduces accidental truncation, missing execute bits, and inconsistent file state.
-
----
-
-### LESSON-OPS-005: Raw logs and curated docs stay separate
-
-- Raw logs → `build-logs/` (gitignored)
-- Durable documentation → `Docs/`
-
----
-
-### LESSON-OPS-004: Hidden build directories break GitHub Actions artifact collection
-
-Stage artifacts explicitly into known output directories.
-
----
-
-### LESSON-OPS-003: Cloud CI and local compile need different secret handling
-
-Local uses the symlinked real secrets file. CI uses temporary dummy secrets.
-
----
-
-### LESSON-OPS-002: Comments in YAML do not affect ESPHome behavior
-
-Only actual configuration matters.
-
----
-
-### LESSON-OPS-001: File renames must update internal references
-
-Preflight should catch cross-reference drift, but docs should still be reviewed after any rename.
-
----
-
-## Regression Checklist
-
-Any significant dashboard or data-path modification should re-check:
-
-- Startup ordering
-- Event binding
-- Theme redraw
-- Chart marker/background/border consistency
-- History/min-max calculations
-- Export All concurrency behavior
-- SSE and polling behavior
-- Import over LAN
-- Import over Cloudflare
-- Browser compatibility across the major test targets
-
----
-
-## Known Open Issues
-
-### ISSUE-001: Export still causes a noticeable heap drop
-
-The current export path remains acceptable for the present dataset sizes, but it is still not the most memory-efficient design for worst-case full-retention exports.
-
-### ISSUE-002: Multi-sensor import remains erase-first
-
-Single-sensor import is now safe/merge-based, but multi-sensor import still clears existing history before writing. A future staging/swap approach would be safer.
+## 2026-03-13 — Python `re.sub()` replacement-string escape issue
+### Symptom
+`render_sensor_config.py --write` failed with:
+- `bad escape \x`
+
+### Root cause
+Generated text containing backslashes (for example `\xC2\xB0`) was passed as a raw replacement string into `re.sub()`, which interprets backslashes in replacement strings.
+
+### Fix
+Use lambda replacements:
+- `pattern.sub(lambda _m: replacement, text, count=1)`
+
+### Lesson learned
+For generator scripts in this repo, literal generated content should be inserted with lambda replacement functions, not raw regex replacement strings.

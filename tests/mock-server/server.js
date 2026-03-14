@@ -1,7 +1,7 @@
 /**
  * mock-server/server.js
  * Lightweight HTTP mock of the ESP32 gateway API.
- * Supports either the root baseline fixtures or tests/fixtures/variants/<FIXTURE_SET>/.
+ * Supports either the root baseline fixtures or tests/fixtures/variants/<set>/.
  */
 'use strict';
 
@@ -15,6 +15,7 @@ const FIXTURES_ROOT = path.join(__dirname, '..', 'fixtures');
 const FIXTURE_SET = process.env.FIXTURE_SET || '';
 const FIXTURES = FIXTURE_SET ? path.join(FIXTURES_ROOT, 'variants', FIXTURE_SET) : FIXTURES_ROOT;
 const DASHBOARD_HTML = path.join(ROOT, 'dashboard', 'dashboard.html');
+const DISABLE_API_MANIFEST = process.env.DISABLE_API_MANIFEST === '1';
 
 const args = process.argv.slice(2);
 const portIdx = args.indexOf('--port');
@@ -65,18 +66,19 @@ SENSOR_META.forEach(function(s) {
 });
 
 const SHARED_TEXT = {
-  'current time': '2026-03-12 12:00:00',
+  'current time': '2026-03-13 12:00:00',
   'chip': 'ESP32-C3',
   'features': 'WiFi/BT',
   'cores': '1',
   'revision': '3',
   'cpu frequency': '160 MHz',
   'framework': 'ESP-IDF v5.1',
-  'esphome version': '2025.11.0',
+  'esphome version': '2026.2.1',
   'ip address': '192.168.120.189',
   'mac address': 'AA:BB:CC:DD:EE:FF',
   'reset reason': 'Power on',
 };
+
 const SHARED_SENSOR = {
   'free heap': 81920,
   'uptime': 86400,
@@ -86,12 +88,20 @@ const SHARED_SENSOR = {
 
 function json(res, data, status) {
   const body = typeof data === 'string' ? data : JSON.stringify(data);
-  res.writeHead(status || 200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+  res.writeHead(status || 200, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-store',
+  });
   res.end(body);
 }
 
 function text(res, data, contentType, status) {
-  res.writeHead(status || 200, { 'Content-Type': contentType || 'text/plain', 'Access-Control-Allow-Origin': '*' });
+  res.writeHead(status || 200, {
+    'Content-Type': contentType || 'text/plain',
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-store',
+  });
   res.end(data || '');
 }
 
@@ -104,9 +114,9 @@ const server = http.createServer(function(req, res) {
   const parsed = url.parse(req.url, true);
   const pathname = decodeURIComponent(parsed.pathname);
 
-  if (pathname === '/' || pathname === '/index.html') {
+  if (pathname === '/' || pathname === '/index.html' || pathname === '/dashboard' || pathname === '/dashboard.html') {
     const html = fs.readFileSync(DASHBOARD_HTML, 'utf8');
-    const patched = html.replace(/var ESP_HOST\s*=\s*'[^']*';/, `var ESP_HOST = 'http://127.0.0.1:${PORT}';`);
+    const patched = html.replace(/var FILE_FALLBACK_HOST\s*=\s*'[^']*';/, `var FILE_FALLBACK_HOST = 'http://127.0.0.1:${PORT}';`);
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(patched);
     return;
@@ -114,6 +124,11 @@ const server = http.createServer(function(req, res) {
 
   if (pathname === '/sensors.json') {
     return json(res, loadFixtureJson('sensors.json', []));
+  }
+
+  if (pathname === '/api/manifest') {
+    if (DISABLE_API_MANIFEST) return json(res, { ok: false, message: 'disabled for fallback test' }, 404);
+    return json(res, loadFixtureJson('manifest.json', { ok: false }));
   }
 
   const histMatch = pathname.match(/^\/history\/([^/]+)\/(temp|hum)$/);
@@ -128,12 +143,15 @@ const server = http.createServer(function(req, res) {
   if (pathname === '/api/storage-stats') {
     return json(res, loadFixtureJson('storage-stats.json', { ok: false }));
   }
+
   if (pathname === '/api/status') {
     return json(res, loadFixtureJson('api-status.json', { ok: false }));
   }
+
   if (pathname === '/api/reboot' || pathname === '/api/delete-data') {
     return json(res, { ok: true, stub: true });
   }
+
   if (pathname === '/events') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -181,6 +199,7 @@ const server = http.createServer(function(req, res) {
 server.listen(PORT, '127.0.0.1', function() {
   console.log(`Mock ESP32 gateway server listening on http://127.0.0.1:${PORT}`);
   console.log(`Fixture set: ${FIXTURE_SET || 'root-baseline'}`);
+  console.log(`Manifest mode: ${DISABLE_API_MANIFEST ? 'legacy-fallback-only' : 'v2 + legacy'}`);
 });
 
 module.exports = server;

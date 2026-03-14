@@ -35,7 +35,7 @@
 // The bulk of the logic still lives in existing functions so regression risk stays low.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.4.5.1';
+App.version = 'v7.5.0.1';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -472,37 +472,100 @@ function makeSensorConfig(meta, idx) {
   };
 }
 
-function applySensorMeta(meta) {
+function normalizeManifestSensors(payload) { var sensors = []; if (Array.isArray(payload)) sensors = payload; else if (payload && Array.isArray(payload.sensors)) sensors = payload.sensors; return sensors.map(function(sensor) { return { id: String(sensor && sensor.id || '').trim(), name: String(sensor && sensor.name || '').trim(), metrics: Array.isArray(sensor && sensor.metrics) ? sensor.metrics : [] }; }).filter(function(sensor) { return sensor.id && sensor.name; }); } function applySensorMeta(meta) {
   if (!Array.isArray(meta) || !meta.length) meta = DEFAULT_SENSOR_META;
   App.State.setSensors(meta.map(makeSensorConfig));
   try { App.Features.emit('onManifest', App.State.getSensors()); } catch(e) { logNonFatal('manifest hook emit', e); }
 }
 
-function loadSensorManifest() {
-  return fetch(ESP_HOST + '/sensors.json', {cache:'no-store'})
-    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function(meta) {
-      if (!Array.isArray(meta) || !meta.length) throw new Error('empty manifest');
-      applySensorMeta(meta); dlog('Manifest loaded (' + SENSORS.length + ' sensors)', 'ok');
-    })
-    .catch(function(err) {
-      applySensorMeta(DEFAULT_SENSOR_META);
-      dlog('Manifest unavailable, using built-in (' + DEFAULT_SENSOR_META.length + ' sensors): ' + err.message, 'err');
-    });
+function normalizeManifestSensors(payload) {
+  var sensors = [];
+  if (Array.isArray(payload)) sensors = payload;
+  else if (payload && Array.isArray(payload.sensors)) sensors = payload.sensors;
+  return sensors.map(function(sensor) {
+    return {
+      id: String(sensor && sensor.id || '').trim(),
+      name: String(sensor && sensor.name || '').trim(),
+      metrics: Array.isArray(sensor && sensor.metrics) ? sensor.metrics : []
+    };
+  }).filter(function(sensor) { return sensor.id && sensor.name; });
 }
 
-// Device info + telemetry mapping
-var DEVICE_INFO_MAP = {
-  'text_sensor-chip': {el:'di-chip'}, 'text_sensor-features': {el:'di-features'},
-  'text_sensor-cores': {el:'di-cores'}, 'text_sensor-revision': {el:'di-revision'},
-  'text_sensor-cpu_frequency': {el:'di-cpu'}, 'text_sensor-framework': {el:'di-framework'},
-  'text_sensor-esphome_version': {el:'di-esphome'}, 'text_sensor-ip_address': {el:'di-ip'},
-  'text_sensor-mac_address': {el:'di-mac'}, 'text_sensor-reset_reason': {el:'di-reset'}
+function loadSensorManifest() {
+  return fetch(ESP_HOST + '/api/manifest', {cache:'no-store'})
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(payload) {
+      var meta = normalizeManifestSensors(payload);
+      if (!meta.length) throw new Error('empty manifest');
+      applySensorMeta(meta);
+      var schema = payload && payload.schema_version ? payload.schema_version : 'legacy';
+      dlog('Manifest loaded from /api/manifest (schema ' + schema + ', ' + SENSORS.length + ' sensors)', 'ok');
+    })
+    .catch(function(apiErr) {
+      return fetch(ESP_HOST + '/sensors.json', {cache:'no-store'})
+        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function(payload) {
+          var meta = normalizeManifestSensors(payload);
+          if (!meta.length) throw new Error('empty legacy manifest');
+          applySensorMeta(meta);
+          dlog('Manifest fallback loaded from /sensors.json (' + SENSORS.length + ' sensors); /api/manifest unavailable: ' + apiErr.message, 'err');
+        })
+        .catch(function(legacyErr) {
+          applySensorMeta(DEFAULT_SENSOR_META);
+          dlog('Manifest unavailable, using built-in (' + DEFAULT_SENSOR_META.length + ' sensors): api=' + apiErr.message + '; legacy=' + legacyErr.message, 'err');
+        });
+    });
 };
 var TELEMETRY_IDS = { heap:'sensor-free_heap', uptime:'sensor-uptime', wifi:'sensor-wifi_signal' };
 
-var POLL_SHARED = ['/text_sensor/Current%20Time', '/sensor/Free%20Heap', '/sensor/Uptime', '/sensor/WiFi%20Signal', '/sensor/Loop%20Time'];
+var POLL_SHARED = ['/text_sensor/Current%20Time', '/sensor/WiFi%20Signal'];
 var POLL_DEVICE = ['/text_sensor/Chip', '/text_sensor/Features', '/text_sensor/Cores', '/text_sensor/Revision', '/text_sensor/CPU%20Frequency', '/text_sensor/Framework', '/text_sensor/ESPHome%20Version', '/text_sensor/IP%20Address', '/text_sensor/MAC%20Address', '/text_sensor/Reset%20Reason'];
+
+
+function formatUptimeSeconds(value) {
+  var s = Math.floor(Number(value) || 0);
+  var hr = Math.floor(s / 3600);
+  var mn = Math.floor((s % 3600) / 60);
+  return hr + 'h ' + mn + 'm ' + (s % 60) + 's';
+}
+
+function applyStatusSnapshot(status) {
+  if (!status || typeof status !== 'object') return false;
+  var touched = false;
+
+  if (status.free_heap !== undefined && status.free_heap !== null) {
+    var heapVal = Number(status.free_heap);
+    if (isFinite(heapVal)) {
+      lastTelemetry.heap = heapVal;
+      var h = document.getElementById('di-heap');
+      if (h) { h.textContent = (heapVal / 1024).toFixed(1) + ' KB'; h.classList.remove('loading'); }
+      if (chartsReady) pushTelemetry();
+      touched = true;
+    }
+  }
+
+  if (status.uptime_seconds !== undefined && status.uptime_seconds !== null) {
+    var uptimeVal = Number(status.uptime_seconds);
+    if (isFinite(uptimeVal)) {
+      var u = document.getElementById('di-uptime');
+      if (u) { u.textContent = formatUptimeSeconds(uptimeVal); u.classList.remove('loading'); }
+      touched = true;
+    }
+  }
+
+  return touched;
+}
+
+function loadStatusSnapshot() {
+  if (isImportActive()) return Promise.resolve(false);
+  return fetch(ESP_HOST + '/api/status', {cache:'no-store'})
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(status) { return applyStatusSnapshot(status); })
+    .catch(function(err) {
+      dlog('Status snapshot failed: ' + err.message, 'err');
+      return false;
+    });
+}
 
 // ╔════════════════════════════════════════════════════════════════╗
 // ║  HELPERS                                                       ║
@@ -1366,6 +1429,7 @@ var importState = {
 var pollingLiveIntervalId = null;
 var pollingDeviceIntervalId = null;
 var storageStatsIntervalId = null;
+var statusSnapshotIntervalId = null;
 var historyBootstrapTimerId = null;
 
 function isImportActive() {
@@ -1390,11 +1454,19 @@ function stopStorageRefresh() {
   }
 }
 
+function stopStatusRefresh() {
+  if (statusSnapshotIntervalId) {
+    clearInterval(statusSnapshotIntervalId);
+    statusSnapshotIntervalId = null;
+  }
+}
+
 function suspendDashboardNetworkActivity(statusEl) {
   importState.active = true;
   importState.startedAt = Date.now();
   stopPolling();
   stopStorageRefresh();
+  stopStatusRefresh();
   if (historyBootstrapTimerId) {
     clearTimeout(historyBootstrapTimerId);
     historyBootstrapTimerId = null;
@@ -1418,6 +1490,12 @@ function resumeDashboardNetworkActivity() {
       if (isImportActive()) return;
       loadStorageStats().catch(function(){});
     }, 60000);
+  }
+  if (!statusSnapshotIntervalId) {
+    statusSnapshotIntervalId = setInterval(function() {
+      if (isImportActive()) return;
+      loadStatusSnapshot().catch(function(){});
+    }, 30000);
   }
 }
 
@@ -2437,7 +2515,7 @@ function updateTelemetry(eid, d) {
   if (eid === TELEMETRY_IDS.wifi) { lastTelemetry.wifi = v; pushTelemetry(); return true; }
   if (eid === TELEMETRY_IDS.uptime) {
     var u = document.getElementById('di-uptime');
-    if(u){var s=Math.floor(v),hr=Math.floor(s/3600),mn=Math.floor((s%3600)/60); u.textContent=hr+'h '+mn+'m '+(s%60)+'s'; u.classList.remove('loading');}
+    if(u){u.textContent = formatUptimeSeconds(v); u.classList.remove('loading');}
     return true;
   }
   return false;
@@ -2626,8 +2704,8 @@ function connectSSE() {
   dlog('SSE connecting to ' + (ESP_HOST || '(same-origin)') + '/events');
   evtSource = new EventSource(ESP_HOST + '/events');
   evtSource.addEventListener('state', function(e) { try { handleState(JSON.parse(e.data)); } catch(err) { dlog('SSE parse: ' + err.message, 'err'); } });
-  evtSource.addEventListener('ping', function() { document.getElementById('statusDot').classList.add('connected'); document.getElementById('statusText').textContent = 'connected (SSE)'; });
-  evtSource.onopen = function() { document.getElementById('statusDot').classList.add('connected'); document.getElementById('statusText').textContent = 'connected (SSE)'; dlog('SSE connected', 'ok'); };
+  evtSource.addEventListener('ping', function() { document.getElementById('statusDot').classList.add('connected'); document.getElementById('statusText').textContent = 'connected (SSE)'; loadStatusSnapshot().catch(function(){}); });
+  evtSource.onopen = function() { document.getElementById('statusDot').classList.add('connected'); document.getElementById('statusText').textContent = 'connected (SSE)'; dlog('SSE connected', 'ok'); loadStatusSnapshot().catch(function(){}); };
   evtSource.onerror = function() { document.getElementById('statusDot').classList.remove('connected'); document.getElementById('statusText').textContent = 'reconnecting...'; };
 }
 
@@ -2658,10 +2736,10 @@ function startPolling() {
   dlog('Starting REST polling (batched)...');
   var livePaths = POLL_SHARED.slice();
   SENSORS.forEach(function(s) { livePaths = livePaths.concat(s.restPaths); });
-  pollAll(POLL_DEVICE.concat(livePaths)).then(function() { dlog('Initial poll done', 'ok'); });
+  Promise.all([pollAll(POLL_DEVICE.concat(livePaths)), loadStatusSnapshot()]).then(function() { dlog('Initial poll done', 'ok'); });
   pollingLiveIntervalId = setInterval(function() {
     if (isImportActive()) return;
-    pollAll(livePaths);
+    Promise.all([pollAll(livePaths), loadStatusSnapshot()]).catch(function(){});
   }, 15000);
   pollingDeviceIntervalId = setInterval(function() {
     if (isImportActive()) return;
@@ -2721,6 +2799,7 @@ App.Boot.start = function() {
     dlog('init - ' + SENSORS.length + ' sensors, transport=' + TRANSPORT + ', host=' + (ESP_HOST || '(same-origin)'));
     buildSensorCards();
     try { initCharts(); setHistoryRange(24); } catch(e) { dlog('initCharts: ' + e.message, 'err'); showError('Chart init failed'); }
+    loadStatusSnapshot().catch(function(){});
     if (TRANSPORT === 'sse') { try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); } }
     else { try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); } }
     loadStorageStats().catch(function(){});
@@ -2728,6 +2807,10 @@ App.Boot.start = function() {
       if (isImportActive()) return;
       loadStorageStats().catch(function(){});
     }, 60000);
+    statusSnapshotIntervalId = setInterval(function() {
+      if (isImportActive()) return;
+      loadStatusSnapshot().catch(function(){});
+    }, 30000);
     historyBootstrapTimerId = setTimeout(function() {
       if (isImportActive()) return;
       loadHistory();
