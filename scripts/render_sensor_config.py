@@ -20,7 +20,7 @@ JS_PATH = ROOT / "dashboard" / "dashboard.js"
 FIXTURE_SENSORS_PATH = ROOT / "tests" / "fixtures" / "sensors.json"
 FIXTURE_MANIFEST_PATH = ROOT / "tests" / "fixtures" / "manifest.json"
 FIXTURE_STATUS_PATH = ROOT / "tests" / "fixtures" / "api-status.json"
-GATEWAY_MANIFEST_H_PATH = ROOT / "dashboard" / "gateway_manifest.h"
+GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 
 HEADER_BEGIN = "// <<< SENSOR_MANIFEST:HEADER_BEGIN >>>"
 HEADER_END = "// <<< SENSOR_MANIFEST:HEADER_END >>>"
