@@ -24,9 +24,9 @@ REQUIRED_FILES=(
   dashboard/dashboard.html
   dashboard/dashboard.js
   dashboard/dashboard.h
+  dashboard/gateway_manifest.h
   dashboard/sensor_history_multi.h
   firmware/esp32-c3-multi-sensor.yaml
-  scripts/apply_phase1_manifest_patch.py
   scripts/render_sensor_config.py
   scripts/sensor_manifest_lib.py
   scripts/generate-header.sh
@@ -48,18 +48,36 @@ check_contains "dashboard_js_version_matches" dashboard/dashboard.js "App.versio
 check_contains "firmware_version_matches" firmware/esp32-c3-multi-sensor.yaml "${VER_TAG}"
 check_contains "history_header_version_matches" dashboard/sensor_history_multi.h "sensor_history_multi-${VER_TAG}.h"
 check_contains "history_handler_has_api_manifest_route" dashboard/sensor_history_multi.h "/api/manifest"
+check_contains "gateway_manifest_header_exists" dashboard/gateway_manifest.h "GATEWAY_MANIFEST_JSON"
+check_contains "gateway_manifest_uses_include" dashboard/sensor_history_multi.h "gateway_manifest.h"
 check_contains "dashboard_prefers_api_manifest" dashboard/dashboard.js "fetch(ESP_HOST + '/api/manifest'"
 check_contains "dashboard_legacy_manifest_fallback" dashboard/dashboard.js "fetch(ESP_HOST + '/sensors.json'"
 check_contains "mock_server_serves_api_manifest" tests/mock-server/server.js "pathname === '/api/manifest'"
 check_contains "fixture_manifest_schema_v2" tests/fixtures/manifest.json '"schema_version": 2'
 check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"sensor_count": 3'
+check_contains "config_sensors_schema_v2" config/sensors.json '"schema_version": 2'
 check_contains "browser_spec_present" tests/browser/manifest.spec.js "dashboard falls back to /sensors.json"
 check_not_contains "no_old_dashboard_version" dashboard/dashboard.js "App.version = 'v7.4.5.1'"
 check_not_contains "no_old_firmware_version" firmware/esp32-c3-multi-sensor.yaml "v7.4.5.1"
 
+# Version anti-regression: VERSION file must match render_sensor_config.py VERSION constant
+PY_VER="$(python3 -c "import re; m = re.search(r'VERSION\s*=\s*\"([^\"]+)\"', open('scripts/render_sensor_config.py').read()); print(m.group(1) if m else '')")"
+[[ "$VER_RAW" == "$PY_VER" ]] && pass "version_anti_regression" || fail "version_anti_regression"
+
 python3 scripts/render_sensor_config.py --check
 node tests/fixtures/generate-fixtures.js --manifest config/sensors.json --overwrite-baseline >/dev/null
 check_contains "fixture_baseline_manifest_regenerated" tests/fixtures/manifest.json '"schema_version": 2'
+
+# ESPHome config parse check (inline — replaces preflight-esphome-parse.sh)
+if command -v esphome >/dev/null 2>&1; then
+  if esphome config firmware/esp32-c3-multi-sensor.yaml >/dev/null 2>&1; then
+    pass "esphome_config_parse"
+  else
+    fail "esphome_config_parse"
+  fi
+else
+  echo "esphome_config_parse: SKIP (esphome not installed)"
+fi
 
 if command -v node >/dev/null 2>&1; then
   if [[ -d node_modules/@playwright/test ]]; then

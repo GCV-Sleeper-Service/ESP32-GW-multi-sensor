@@ -12,7 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
-const VERSION = 'v7.5.0.1';
+const VERSION = 'v7.5.1';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },
@@ -71,22 +71,42 @@ function fixtureManifestV2(sensors, tag) {
     source: tag || 'mock',
     version: VERSION,
     sensor_count: sensors.length,
+    gateway: {
+      id: 'gw-main',
+      name: 'Main Gateway',
+      role: 'satellite',
+      hardware: 'ESP32-C3',
+    },
+    history: {
+      backend: 'nvs',
+      retention_hours: 1080,
+      ram_window_hours: 24,
+      sample_interval_seconds: 900,
+    },
     metrics: [
       {
         key: 'temp',
         name: 'Temperature',
+        class: 'analog_numeric',
+        data_type: 'float',
         unit: 'celsius',
         unit_symbol: '°C',
         bounds: { min: -50, max: 80 },
+        history: true,
         history_suffix: 'temp',
+        display: { precision: 1, chart: true },
       },
       {
         key: 'hum',
         name: 'Humidity',
+        class: 'analog_numeric',
+        data_type: 'float',
         unit: 'percent',
         unit_symbol: '%',
         bounds: { min: 0, max: 100 },
+        history: true,
         history_suffix: 'hum',
+        display: { precision: 1, chart: true },
       },
     ],
     sensors: sensors.map(({ id, name }) => ({

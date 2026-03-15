@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-14 — v7.5.0.1 (BUG-033–039, LESSON-OPS-039–045 added)_
+_Last updated: 2026-03-15 — v7.5.1 (BUG-040–042, LESSON-OPS-046–048 added)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -10,6 +10,42 @@ Both sections are in **reverse chronological order** — most recent entry first
 ---
 
 ## Bug Fixes
+
+### BUG-042: Python and JS fixture generators produced mismatched schemas — CI preflight failures (v7.5.1)
+
+**Symptom:** `scripts/preflight.sh` failed at `render_sensor_config.py --check` after `generate-fixtures.js --overwrite-baseline` had been run locally. The `manifest.json` fixture differed between the two generators: `source` field ("repo-fixture" vs "active-manifest"), `unit_symbol` encoding (`\u00b0C` vs `°C`), and `version` format.
+
+**Root cause:** The Python `manifest_v2()` in `sensor_manifest_lib.py` and the JS `fixtureManifestV2()` in `generate-fixtures.js` were developed independently and accumulated three byte-level mismatches. Neither generator had a single source of truth for the schema. Additionally, in v7.5.1, the v2 schema was extended (gateway, history, class, data_type, display fields) and the mismatch would have recurred without aligning both generators.
+
+**Fix:** Updated both `manifest_v2()` (Python) and `fixtureManifestV2()` (JS) to produce identical output for the same inputs: same field ordering, same source tag, same UTF-8 encoding, same version format. Validated that `render_sensor_config.py --check` passes immediately after `generate-fixtures.js --overwrite-baseline`.
+
+**Lesson:** See LESSON-OPS-048.
+
+---
+
+### BUG-041: Manifest v2 schema was partial — missing gateway, history, and measurement class fields (v7.5.1)
+
+**Symptom:** The `/api/manifest` endpoint and `tests/fixtures/manifest.json` returned a v2 response but were missing the `gateway` block, `history` block, and per-metric `class`, `data_type`, and `display` fields specified in the architecture plan.
+
+**Root cause:** Phase 1 implementation added the `schema_version: 2` wrapper but did not implement the full v2 contract. The `manifest_v2()` function in `sensor_manifest_lib.py` was partially implemented. The `config/sensors.json` was not upgraded from v1 schema.
+
+**Fix:** Upgraded `manifest_v2()` to include all v2 fields. Upgraded `config/sensors.json` to full v2 schema. Created `config/sensors.v2.example.json` as a reference. Extended `sensor_manifest_lib.py` with `to_manifest_v2()`, `validate_v2_schema()`, `load_manifest_v2()`, `save_manifest()`, and `validate_sensors()`.
+
+**Lesson:** See LESSON-OPS-047.
+
+---
+
+### BUG-040: Phase 1 manifest endpoint built inline instead of via generated header (v7.5.1)
+
+**Symptom:** The `handle_api_manifest_()` function in `sensor_history_multi.h` was implemented as a single compressed line of `resp->print()` calls, building JSON dynamically at runtime. The architecture plan specified a compile-time static C string from a generated `gateway_manifest.h` header.
+
+**Root cause:** Phase 1 implementation took a shortcut: patching the inline handler rather than following the architecture plan's generate-header-then-include pattern. The inline implementation also used `\\u00B0C` (ASCII-escaped) instead of UTF-8, and the `source` field said `"firmware"` instead of `"active-manifest"`.
+
+**Fix:** Extended `render_sensor_config.py` to generate `dashboard/gateway_manifest.h` containing the full v2 manifest as a C raw string literal. Replaced the inline handler with a clean 4-line implementation that includes `gateway_manifest.h` and calls `resp->print(GATEWAY_MANIFEST_JSON)`. Fixed canHandle and handleRequest formatting (compressed lines split into proper multi-line code).
+
+**Lesson:** See LESSON-OPS-046.
+
+---
 
 ### BUG-039: Dashboard source and generated artifacts drifted after Phase 1 work (v7.5.0.1)
 
@@ -325,6 +361,33 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-048: Fixture generators for the same file must be kept in sync — single canonical schema (v7.5.1)
+
+When two generators (Python and JS) write the same fixture file, any divergence causes CI failures. The root problem is dual ownership: neither generator is authoritative. The fix is to designate the Python generator (`render_sensor_config.py`) as the source of truth and ensure the JS generator (`generate-fixtures.js`) produces byte-identical output for shared fixtures.
+
+Guardrail: `render_sensor_config.py --check` must be run BEFORE `generate-fixtures.js --overwrite-baseline` in preflight. If they run in the opposite order, the JS output becomes the "expected" state and the Python check fails on next CI run.
+
+---
+
+### LESSON-OPS-047: Implement the full schema contract, not just the schema version wrapper (v7.5.1)
+
+Adding `schema_version: 2` to a response is not the same as implementing the v2 schema. The schema version field is only meaningful if all required v2 fields (gateway, history, measurement class/data_type/display) are present and correct. Always implement the full contract specified in the architecture plan, not just the version field.
+
+Concrete check: after implementing a schema version bump, verify the output against the full field list in the architecture plan — not just the `schema_version` field.
+
+---
+
+### LESSON-OPS-046: Always implement architecture plan patterns precisely — shortcuts create debt (v7.5.1)
+
+The architecture plan specified a generate-header-then-include pattern for the manifest endpoint: `render_sensor_config.py` generates `gateway_manifest.h`, the C++ code includes it and serves the static string. Phase 1 instead built an inline `resp->print()` chain that bypassed the generation step. This was a shortcut that created technical debt:
+1. The inline implementation was harder to verify (no --check coverage)
+2. The JSON content was not idempotent (runtime-generated vs compile-time static)
+3. The compressed one-liner was unreadable and untestable
+
+Always follow the architecture plan's implementation pattern, not a simpler shortcut that produces nominally correct output.
+
+---
 
 ### LESSON-OPS-045: Preflight must include a YAML/ESPHome parse gate, not just generated-file sync checks (v7.5.0.1)
 
