@@ -211,9 +211,20 @@ This prevents generator bugs (BUG-035: YAML indentation regression, BUG-036: YAM
 
 Related: ISSUE-004, LESSON-OPS-045
 
-### v7.5.1.3 — Test Fixture Alignment (planned)
+### v7.5.1.3 — Test Fixture Alignment & Version Sync (completed 2026-03-15)
 
-Align `tests/fixtures/manifest.json` to full v2 schema for Playwright tests.
+Aligned `tests/fixtures/manifest.json` to the full v2 schema, fixed version drift across all canonical sources, and hardened preflight to catch future drift.
+
+**Root cause fixed:** PR #20 had bumped `generate-fixtures.js` VERSION to `v7.5.1.3` independently from the canonical `VERSION` file and `render_sensor_config.py` VERSION constant. The CI preflight `render_sensor_config.py --check` regenerates expected fixtures from the Python side and compares against on-disk fixtures — the version mismatch caused the comparison to fail.
+
+**Changes in this release:**
+- VERSION file, `render_sensor_config.py`, `generate-fixtures.js`, `dashboard.js`, `dashboard.html`, YAML header, and `register_history_handler()` string all bumped atomically to `7.5.1.3`
+- `generate-fixtures.js` `--manifest` flag fixed: now accepts `--manifest` as a standalone flag (defaults to `config/sensors.json`) instead of requiring a positional path argument, preventing `--manifest --overwrite-baseline` from silently misparsing
+- `tests/browser/manifest.spec.js` extended to validate all v2 contract fields: `payload.ok`, `payload.gateway.role`, `payload.gateway.api_version`, `payload.history.backend`, `payload.history.retention_hours`, `firstMetric.class`, `firstMetric.data_type`, `firstMetric.display.chart`, `firstSensor.category`, `firstSensor.adapter`, `firstSensor.source.mac`, and `payload.sensors.length === payload.sensor_count`
+- Preflight `fixture_generator_version_sync` check added: extracts VERSION from `generate-fixtures.js` and compares against `VERSION` file; fails immediately if they differ
+- All generated artifacts regenerated: `src/gateway_manifest.h`, `tests/fixtures/manifest.json`, `tests/fixtures/api-status.json`, `dashboard/dashboard.js`, `dashboard/sensor_history_multi.h`, `firmware/esp32-c3-multi-sensor.yaml`
+
+Related: BUG-041, LESSON-OPS-047
 
 ---
 

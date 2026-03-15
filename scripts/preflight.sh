@@ -58,6 +58,15 @@ check_contains "browser_spec_present" tests/browser/manifest.spec.js "dashboard 
 check_not_contains "no_old_dashboard_version" dashboard/dashboard.js "App.version = 'v7.4.5.1'"
 check_not_contains "no_old_firmware_version" firmware/esp32-c3-multi-sensor.yaml "v7.4.5.1"
 
+echo "→ Checking fixture generator version sync..."
+FIXTURE_VERSION=$(grep -oP "const VERSION = 'v\K[^']+" tests/fixtures/generate-fixtures.js || true)
+if [[ "$VER_RAW" != "$FIXTURE_VERSION" ]]; then
+  echo "✗ Fixture generator VERSION (v${FIXTURE_VERSION}) does not match canonical VERSION (${VER_RAW})"
+  fail "fixture_generator_version_sync"
+else
+  pass "fixture_generator_version_sync"
+fi
+
 echo "→ Checking gateway_manifest.h exists and is included..."
 if ! grep -q '#include "gateway_manifest.h"' dashboard/sensor_history_multi.h; then
   echo "✗ sensor_history_multi.h missing #include \"gateway_manifest.h\""
