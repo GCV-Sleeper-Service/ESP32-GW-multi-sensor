@@ -206,7 +206,7 @@ def save_manifest(path, sensors, schema_version=2):
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def to_manifest_v2(sensors, version, gateway_meta=None, history_meta=None):
+def to_manifest_v2(sensors, version, gateway_meta=None, history_meta=None, source="firmware"):
     """Build a full v2 manifest dict from a sensor list."""
     gw = gateway_meta or dict(DEFAULT_GATEWAY)
     hist = history_meta or dict(DEFAULT_HISTORY)
@@ -224,7 +224,7 @@ def to_manifest_v2(sensors, version, gateway_meta=None, history_meta=None):
     return {
         "ok": True,
         "schema_version": 2,
-        "source": "firmware",
+        "source": source,
         "version": version,
         "gateway": gw,
         "history": hist,
