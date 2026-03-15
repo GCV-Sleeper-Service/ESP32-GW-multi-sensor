@@ -35,7 +35,7 @@
 // The bulk of the logic still lives in existing functions so regression risk stays low.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.1.0';
+App.version = 'v7.5.1.3';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};

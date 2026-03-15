@@ -4,6 +4,31 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.1.3 (2026-03-15)
+
+**Phase 1 Refinement — Test Fixture Alignment & Version Sync**
+
+Aligns test fixtures to the full v2 manifest schema and fixes version drift:
+
+- **FIX**: Synchronized version across all canonical sources (VERSION, render_sensor_config.py, generate-fixtures.js, dashboard.js, dashboard.html, YAML, gateway_manifest.h)
+- **TEST**: Extended Playwright manifest test to validate all v2 fields (gateway, history, metrics, sensors)
+- **TEST**: Fixed `--manifest` flag parsing in generate-fixtures.js (standalone flag now defaults to config/sensors.json)
+- **TEST**: Regenerated all fixtures with synchronized v7.5.1.3 version
+- **CI**: Added preflight `fixture_generator_version_sync` check to prevent future version drift
+- **DOCS**: Updated architecture plan — Phase 1 complete
+
+**Phase 1 Complete** ✅
+- v7.5.1.0 — Full manifest v2 implementation
+- v7.5.1.1 — Manifest schema validation
+- v7.5.1.2 — ESPHome YAML parse gate
+- v7.5.1.3 — Test fixture alignment + version sync
+
+**Next**: Phase 2 — Dashboard consumes `/api/manifest`
+
+Related: BUG-041, LESSON-OPS-047
+
+---
+
 ## v7.5.1.2 (2026-03-15)
 
 **Phase 1 Refinement — ESPHome YAML Parse Gate**
