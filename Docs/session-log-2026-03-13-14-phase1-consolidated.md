@@ -177,6 +177,38 @@ The following items were scoped out of Phase 1 and are required inputs for Phase
 
 ---
 
+## Phase 1 Refinements (v7.5.1.x)
+
+After the initial Phase 1 delivery (v7.5.0.1), three incremental refinements were identified to complete the Phase 1 baseline:
+
+### v7.5.1.0 — Full Manifest v2 Implementation (2026-03-15)
+
+Fixed three critical issues from initial Phase 1 delivery:
+- Generated `src/gateway_manifest.h` with full v2 manifest as static C string literal (was: inline `resp->print()` chain)
+- Extended manifest v2 schema with `gateway`, `history`, per-metric `class`/`data_type`/`display` fields (was: partial schema)
+- Fixed file generation path from `dashboard/` to `src/` for ESPHome build compatibility
+
+### v7.5.1.1 — Manifest Schema Validation (2026-03-15)
+
+Added automated preflight validation that verifies the generated manifest conforms to v2 schema specification:
+- Validates required top-level fields exist
+- Validates `gateway` block has all required fields
+- Validates `history` block has all required fields
+- Validates `metrics` array structure
+- Validates `schema_version` is exactly `2`
+
+This prevents malformed manifest JSON from reaching `main`.
+
+### v7.5.1.2 — ESPHome YAML Parse Gate (planned)
+
+Add `esphome config` validation to preflight (ISSUE-004, LESSON-OPS-045).
+
+### v7.5.1.3 — Test Fixture Alignment (planned)
+
+Align `tests/fixtures/manifest.json` to full v2 schema for Playwright tests.
+
+---
+
 ## Suggested Branch for Next Work
 
 ```bash
