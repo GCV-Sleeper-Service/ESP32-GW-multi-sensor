@@ -12,7 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
-const VERSION = 'v7.5.0.1';
+const VERSION = 'v7.5.1.0';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },
@@ -45,6 +45,7 @@ function materializeSensors(sensors) {
   return sensors.map((sensor, idx) => ({
     id: sensor.id,
     name: sensor.name,
+    mac: sensor.mac || null,
     tempBase: typeof sensor.tempBase === 'number' ? sensor.tempBase : (18.0 + idx * 2.1),
     humBase: typeof sensor.humBase === 'number' ? sensor.humBase : (42 + idx * 7),
   }));
@@ -65,37 +66,64 @@ function fixtureManifestV1(sensors) {
 }
 
 function fixtureManifestV2(sensors, tag) {
+  const metrics = [
+    {
+      key: 'temp',
+      name: 'Temperature',
+      unit: 'celsius',
+      unit_symbol: '°C',
+      class: 'analog_numeric',
+      data_type: 'float',
+      bounds: { min: -50, max: 80 },
+      history: true,
+      history_suffix: 'temp',
+      display: { precision: 1, chart: true },
+    },
+    {
+      key: 'hum',
+      name: 'Humidity',
+      unit: 'percent',
+      unit_symbol: '%',
+      class: 'analog_numeric',
+      data_type: 'float',
+      bounds: { min: 0, max: 100 },
+      history: true,
+      history_suffix: 'hum',
+      display: { precision: 1, chart: true },
+    },
+  ];
+  const source = tag || 'mock';
   return {
     ok: true,
     schema_version: 2,
-    source: tag || 'mock',
+    source: source,
     version: VERSION,
+    gateway: {
+      id: 'gw-main',
+      name: 'Main Gateway',
+      role: 'satellite',
+      hardware: 'ESP32-C3',
+      firmware_version: VERSION,
+      api_version: 'v2',
+    },
+    history: {
+      backend: 'nvs',
+      retention_hours: 1080,
+      ram_window_hours: 24,
+      sample_interval_seconds: 900,
+    },
     sensor_count: sensors.length,
-    metrics: [
-      {
-        key: 'temp',
-        name: 'Temperature',
-        unit: 'celsius',
-        unit_symbol: '°C',
-        bounds: { min: -50, max: 80 },
-        history_suffix: 'temp',
-      },
-      {
-        key: 'hum',
-        name: 'Humidity',
-        unit: 'percent',
-        unit_symbol: '%',
-        bounds: { min: 0, max: 100 },
-        history_suffix: 'hum',
-      },
-    ],
-    sensors: sensors.map(({ id, name }) => ({
+    metrics: metrics,
+    sensors: sensors.map(({ id, name, mac }) => ({
       id,
       name,
-      metrics: [
-        { key: 'temp', history: `/history/${id}/temp` },
-        { key: 'hum', history: `/history/${id}/hum` },
-      ],
+      category: 'environmental',
+      adapter: 'thermopro_ble',
+      source: { mac: mac || null },
+      measurements: metrics.map(m => ({
+        key: m.key,
+        history_url: `/history/${id}/${m.history_suffix}`,
+      })),
     })),
   };
 }

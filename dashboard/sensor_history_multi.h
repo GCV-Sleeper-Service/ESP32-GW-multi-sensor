@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.0.1.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.1.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -78,6 +78,7 @@
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include "gateway_manifest.h"
 
 static const char *const TAG = "history";
 
@@ -303,7 +304,7 @@ static SensorSlot sensors[NUM_SENSORS] = {
 // <<< SENSOR_MANIFEST:HEADER_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.0.1) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.1.0) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //
@@ -1137,7 +1138,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
     resp->print("]");
     request->send(resp);
-  } void handle_api_manifest_(AsyncWebServerRequest *request) const { auto *resp = request->beginResponseStream("application/json"); add_common_headers_(resp); char num[224]; resp->print("{\"ok\":true,\"schema_version\":2,\"source\":\"firmware\",\"version\":\""); resp->print(firmware_version_.c_str()); resp->print("\","); snprintf(num, sizeof(num), "\"sensor_count\":%d,", NUM_SENSORS); resp->print(num); resp->print("\"metrics\":[{\"key\":\"temp\",\"name\":\"Temperature\",\"unit\":\"celsius\",\"unit_symbol\":\"\\u00B0C\",\"bounds\":{\"min\":-50,\"max\":80},\"history_suffix\":\"temp\"},{\"key\":\"hum\",\"name\":\"Humidity\",\"unit\":\"percent\",\"unit_symbol\":\"%\",\"bounds\":{\"min\":0,\"max\":100},\"history_suffix\":\"hum\"}],\"sensors\":["); for (int i = 0; i < NUM_SENSORS; i++) { if (i > 0) resp->print(","); resp->print("{\"id\":\""); resp->print(sensors[i].id); resp->print("\",\"name\":\""); resp->print(sensors[i].name); snprintf(num, sizeof(num), "\",\"metrics\":[{\"key\":\"temp\",\"history\":\"/history/%s/temp\"},{\"key\":\"hum\",\"history\":\"/history/%s/hum\"}]}", sensors[i].id, sensors[i].id); resp->print(num); } resp->print("]}"); request->send(resp); }
+  } void handle_api_manifest_(AsyncWebServerRequest *request) const { auto *resp = request->beginResponseStream("application/json"); add_common_headers_(resp); resp->print(GATEWAY_MANIFEST_JSON); request->send(resp); }
 
   void handle_reboot_(AsyncWebServerRequest *request) const {
     if (!authenticate_management_(request)) return;
@@ -1919,6 +1920,7 @@ static void register_history_handler(
   ESP_LOGI(TAG, "  import     -> POST /api/import/{begin,segment,finish} (Basic auth)");
   ESP_LOGI(TAG, "  storage    -> GET /api/storage-stats");
   ESP_LOGI(TAG, "  status     -> GET /api/status");
+  ESP_LOGI(TAG, "  manifest -> GET /api/manifest (v2)");
   ESP_LOGI(TAG, "  storage -> dedicated NVS partition: %s / namespace: %s",
            HISTORY_PARTITION_LABEL, HISTORY_NAMESPACE);
 }

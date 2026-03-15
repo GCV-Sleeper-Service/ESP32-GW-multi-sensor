@@ -37,6 +37,7 @@ REQUIRED_FILES=(
   tests/browser/manifest.spec.js
   Docs/changelog.md
   Docs/bugs-and-lessons-learned.md
+  src/gateway_manifest.h
 )
 
 for f in "${REQUIRED_FILES[@]}"; do
@@ -56,6 +57,16 @@ check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"se
 check_contains "browser_spec_present" tests/browser/manifest.spec.js "dashboard falls back to /sensors.json"
 check_not_contains "no_old_dashboard_version" dashboard/dashboard.js "App.version = 'v7.4.5.1'"
 check_not_contains "no_old_firmware_version" firmware/esp32-c3-multi-sensor.yaml "v7.4.5.1"
+
+echo "→ Checking gateway_manifest.h exists and is included..."
+if ! grep -q '#include "gateway_manifest.h"' dashboard/sensor_history_multi.h; then
+  echo "✗ sensor_history_multi.h missing #include \"gateway_manifest.h\""
+  fail "gateway_manifest_h_included"
+else
+  pass "gateway_manifest_h_included"
+fi
+check_contains "gateway_manifest_json_used" dashboard/sensor_history_multi.h "GATEWAY_MANIFEST_JSON"
+check_contains "gateway_manifest_yaml_includes" firmware/esp32-c3-multi-sensor.yaml "../src/gateway_manifest.h"
 
 python3 scripts/render_sensor_config.py --check
 node tests/fixtures/generate-fixtures.js --manifest config/sensors.json --overwrite-baseline >/dev/null
