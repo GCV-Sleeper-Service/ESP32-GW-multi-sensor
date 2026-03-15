@@ -61,7 +61,7 @@ check_not_contains "no_old_dashboard_version" dashboard/dashboard.js "App.versio
 check_not_contains "no_old_firmware_version" firmware/esp32-c3-multi-sensor.yaml "v7.4.5.1"
 
 # Version anti-regression: VERSION file must match render_sensor_config.py VERSION constant
-PY_VER="$(python3 -c "import re; m = re.search(r'VERSION\s*=\s*\"([^\"]+)\"', open('scripts/render_sensor_config.py').read()); print(m.group(1) if m else '')")"
+PY_VER="$(grep -oP 'VERSION\s*=\s*"\K[^"]+' scripts/render_sensor_config.py | head -1)"
 [[ "$VER_RAW" == "$PY_VER" ]] && pass "version_anti_regression" || fail "version_anti_regression"
 
 python3 scripts/render_sensor_config.py --check

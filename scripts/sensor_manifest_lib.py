@@ -154,7 +154,7 @@ def save_manifest(path: Path, sensors: List[Dict[str, str]], schema_version: int
     if path.exists():
         try:
             existing = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except (json.JSONDecodeError, OSError):
             pass
 
     bare = [{"id": s["id"], "name": s["name"], "mac": s["mac"]} for s in sensors]
