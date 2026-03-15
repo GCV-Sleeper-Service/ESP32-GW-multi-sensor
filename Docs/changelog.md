@@ -4,6 +4,31 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.1 — 2026-03-15
+
+**Completed:** Phase 1 — Full v2 manifest schema, generated `gateway_manifest.h`, fixture dual-ownership resolution
+
+- Upgraded `config/sensors.json` from schema v1 to full v2, adding `gateway` block, `history` block, and per-sensor `category`, `adapter`, and `measurements` arrays
+- Added `config/sensors.v2.example.json` — reference v2 manifest with ThermoPro + placeholder network probe entries
+- Extended `sensor_manifest_lib.py` — added `save_manifest()`, `validate_sensors()`, `to_manifest_v2()`, `validate_v2_schema()`, `load_manifest_v2()`, and `THERMOPRO_MEASUREMENTS` / `DEFAULT_GATEWAY` / `DEFAULT_HISTORY` constants
+- Updated `manifest_v2()` to produce the full v2 schema (gateway + history + per-sensor measurements)
+- Updated `render_sensor_config.py` — VERSION bumped to 7.5.1, added `ensure_ascii=False` to all `json.dumps` calls, added `gateway_manifest.h` generation as a tracked generated file
+- Generated `dashboard/gateway_manifest.h` — compile-time C string literal `GATEWAY_MANIFEST_JSON` served by the `/api/manifest` endpoint
+- Replaced inline `resp->print()` chain in `handle_api_manifest_()` with `#include "gateway_manifest.h"` + `resp->print(GATEWAY_MANIFEST_JSON)` — zero-overhead static serving
+- Fixed fixture dual-ownership: JS generator (`generate-fixtures.js`) now produces byte-identical output to Python (same `source` field, same `°C` UTF-8 encoding, same full v2 schema); moved JS generation to *before* `render_sensor_config.py --check` in `preflight.sh`
+- Updated `preflight.sh` — removed `apply_phase1_manifest_patch.py` from REQUIRED_FILES, added `gateway_manifest_h_exists`, `fixture_manifest_has_gateway_block`, `fixture_manifest_has_history_block`, `fixture_manifest_has_measurements` checks; added idempotence check (`--write` then `--check`)
+- Version: `v7.5.1`
+
+**Validated:**
+- `python3 scripts/render_sensor_config.py --check` → PASS
+- `bash scripts/preflight.sh` → all checks PASS
+
+**Documentation:**
+- `Docs/bugs-and-lessons-learned.md` — BUG-040, LESSON-OPS-046 added
+- `Docs/session-log-2026-03-15-phase1-completion.md` — new session log
+
+---
+
 ## v7.5.0.1 — 2026-03-14
 
 **Completed:** Phase 1 — manifest endpoint, dashboard migration, and runtime fixes

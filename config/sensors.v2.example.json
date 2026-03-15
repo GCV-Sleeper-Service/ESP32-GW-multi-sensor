@@ -1,0 +1,83 @@
+{
+  "schema_version": 2,
+  "gateway": {
+    "id": "gw-main",
+    "name": "Main Gateway",
+    "role": "satellite",
+    "hardware": "ESP32-C3"
+  },
+  "history": {
+    "backend": "nvs",
+    "retention_hours": 1080,
+    "ram_window_hours": 24,
+    "sample_interval_seconds": 900
+  },
+  "sensors": [
+    {
+      "id": "living_room",
+      "name": "Living Room",
+      "mac": "AA:BB:CC:DD:EE:01",
+      "category": "environmental",
+      "adapter": "thermopro_ble",
+      "measurements": [
+        {
+          "key": "temp",
+          "name": "Temperature",
+          "class": "analog_numeric",
+          "data_type": "float",
+          "unit": "celsius",
+          "unit_symbol": "°C",
+          "bounds": {"min": -50, "max": 80},
+          "history": true,
+          "history_suffix": "temp",
+          "display": {"precision": 1, "chart": true}
+        },
+        {
+          "key": "hum",
+          "name": "Humidity",
+          "class": "analog_numeric",
+          "data_type": "float",
+          "unit": "percent",
+          "unit_symbol": "%",
+          "bounds": {"min": 0, "max": 100},
+          "history": true,
+          "history_suffix": "hum",
+          "display": {"precision": 1, "chart": true}
+        }
+      ]
+    },
+    {
+      "id": "wan_probe",
+      "name": "WAN Probe",
+      "mac": "AA:BB:CC:DD:EE:02",
+      "category": "network",
+      "adapter": "ping_probe",
+      "measurements": [
+        {
+          "key": "ping_ms",
+          "name": "Ping Latency",
+          "class": "analog_numeric",
+          "data_type": "float",
+          "unit": "milliseconds",
+          "unit_symbol": "ms",
+          "bounds": {"min": 0, "max": 5000},
+          "history": true,
+          "history_suffix": "ping",
+          "display": {"precision": 0, "chart": true}
+        },
+        {
+          "key": "reachable",
+          "name": "Reachable",
+          "class": "binary_state",
+          "data_type": "bool",
+          "unit": "state",
+          "unit_symbol": "",
+          "bounds": {},
+          "history": false,
+          "history_suffix": "",
+          "display": {"precision": 0, "chart": false}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+# Session Log — 2026-03-15 — Phase 1 Completion: Full v2 Manifest
+
+## Context
+
+**Starting point:** v7.5.0.1 on `main`. The previous PR #11 was merged with a CI-failing fixture mismatch.
+
+**Goal:** Fix the fixture dual-ownership CI failure, implement the full v2 manifest schema as specified in the architecture plan, and bump the version to 7.5.1.
+
+## Root Cause Analysis
+
+Two generators both wrote `tests/fixtures/manifest.json`:
+
+1. `scripts/render_sensor_config.py` (Python) — authoritative for all generated files; `--check` mode is the CI gate
+2. `tests/fixtures/generate-fixtures.js` (JavaScript) — also writes the same file when called with `--manifest --overwrite-baseline`
+
+The mismatch was three-fold:
+- **Source field:** Python produced `"source": "repo-fixture"`; JS produced `"source": "active-manifest"`
+- **Unicode encoding:** Python's `json.dumps` defaults to `ensure_ascii=True`, producing `\u00b0C`; JS's `JSON.stringify` outputs literal `°C`
+- **Schema drift:** the partially-complete v2 schema from one earlier branch attempt had been partially applied, causing further divergence
+
+The `preflight.sh` ordering ran `--check` *before* the JS generator, so CI passed on the first run but the JS generator then overwrote the fixture with its incompatible output. The next CI run (or any run on a branch where the JS had already been run) would fail.
+
+## Actions Taken
+
+### 1. `scripts/sensor_manifest_lib.py`
+- Added module-level constants: `DEFAULT_GATEWAY`, `DEFAULT_HISTORY`, `THERMOPRO_MEASUREMENTS`
+- Upgraded `manifest_v2()` to produce the full v2 schema (gateway, history, per-sensor category/adapter/measurements); signature extended with `source`, `gateway_meta`, `history_meta` optional parameters
+- Added `load_manifest_v2(path)` — returns `{sensors, sensors_v2, gateway, history}`
+- Added `to_manifest_v2(sensors, gateway_meta, history_meta)` — auto-promotes v1 sensors with ThermoPro defaults
+- Added `validate_sensors(sensors)` — alias for `canonicalize_sensors()` (required by `change_sensor_number.py`)
+- Added `validate_v2_schema(manifest)` — validates required v2 top-level keys
+- Added `save_manifest(path, sensors, schema_version=2)` — preserves existing gateway/history blocks, adds ThermoPro measurements (required by `change_sensor_number.py`)
+
+### 2. `config/sensors.json`
+- Upgraded from schema v1 to full v2: added `gateway`, `history`, and per-sensor `category`, `adapter`, `measurements` arrays
+
+### 3. `config/sensors.v2.example.json` (new)
+- Example v2 manifest with two device types: ThermoPro environmental sensor + placeholder network ping probe
+
+### 4. `scripts/render_sensor_config.py`
+- Bumped `VERSION` from `"7.5.0.1"` to `"7.5.1"`
+- Updated import to include `load_manifest_v2`
+- Added `GATEWAY_MANIFEST_PATH`
+- Added `render_gateway_manifest()` function — generates `dashboard/gateway_manifest.h`
+- Added `ensure_ascii=False` to all `json.dumps()` calls for generated fixtures
+- Updated `main()` to use `load_manifest_v2()`, pass `sensors_v2`/`gateway_meta`/`history_meta` to fixture generators, and include `GATEWAY_MANIFEST_PATH` in the tracked expected-files map
+
+### 5. `dashboard/gateway_manifest.h` (new, generated)
+- Auto-generated C header containing `GATEWAY_MANIFEST_JSON[]` — a raw C string literal with the full v2 manifest (source: "firmware")
+
+### 6. `dashboard/sensor_history_multi.h`
+- Added `#include "gateway_manifest.h"` after system includes
+- Replaced 10-chain `resp->print()` inline manifest handler with `resp->print(GATEWAY_MANIFEST_JSON)` (3 lines)
+- Version comment auto-updated to `sensor_history_multi-v7.5.1.h`
+
+### 7. `tests/fixtures/generate-fixtures.js`
+- Defined `VERSION_RAW = '7.5.1'` (no v-prefix, matches Python's `VERSION`) and `VERSION_TAG = 'v7.5.1'` (for api-status.json)
+- Added `DEFAULT_GATEWAY`, `DEFAULT_HISTORY`, `THERMOPRO_MEASUREMENTS` constants mirroring Python
+- Updated `fixtureManifestV2()` to produce the full v2 schema with gateway, history, per-sensor measurements
+- Fixed `source` field to always be `'repo-fixture'` for baseline fixtures
+- Updated `readManifestData()` to also extract gateway/history blocks from config
+- Verified byte-identical output against Python: JS generator runs, then `render_sensor_config.py --check` passes
+
+### 8. `scripts/preflight.sh`
+- Removed `scripts/apply_phase1_manifest_patch.py` from `REQUIRED_FILES`
+- Added `dashboard/gateway_manifest.h` to `REQUIRED_FILES`
+- Added checks: `gateway_manifest_h_exists`, `fixture_manifest_has_gateway_block`, `fixture_manifest_has_history_block`, `fixture_manifest_has_measurements`
+- Moved JS fixture regeneration to *before* `render_sensor_config.py --check` (critical fix for the dual-ownership problem)
+- Added idempotence check: `render_sensor_config.py --write` then `--check`
+
+### 9. Version bump
+- `VERSION` → `7.5.1`
+- `scripts/render_sensor_config.py` → `VERSION = "7.5.1"` (drives all other files)
+- `dashboard/dashboard.js` → `App.version = 'v7.5.1'` (regenerated by `--write`)
+- `dashboard/sensor_history_multi.h` → version comment (regenerated by `--write`)
+- `firmware/esp32-c3-multi-sensor.yaml` → version references (regenerated by `--write`)
+- `dashboard/dashboard.html` → version comment (manually updated)
+- `tests/fixtures/generate-fixtures.js` → `VERSION_RAW = '7.5.1'`
+
+### 10. Documentation
+- `Docs/changelog.md` — v7.5.1 entry added
+- `Docs/bugs-and-lessons-learned.md` — BUG-040 and LESSON-OPS-046 added
+
+## Deliverables
+
+| File | Status |
+|------|--------|
+| `scripts/sensor_manifest_lib.py` | Updated — full v2 functions added |
+| `config/sensors.json` | Updated — full v2 schema |
+| `config/sensors.v2.example.json` | New |
+| `scripts/render_sensor_config.py` | Updated — v2 support, gateway_manifest.h generation |
+| `dashboard/gateway_manifest.h` | New (generated) |
+| `dashboard/sensor_history_multi.h` | Updated — static manifest serving |
+| `tests/fixtures/generate-fixtures.js` | Updated — byte-identical to Python |
+| `tests/fixtures/manifest.json` | Regenerated — full v2 schema |
+| `tests/fixtures/api-status.json` | Regenerated — v7.5.1 |
+| `scripts/preflight.sh` | Updated — new checks, correct ordering |
+| `VERSION` | Updated — 7.5.1 |
+| `dashboard/dashboard.html` | Updated — version comment |
+
+## Validation
+
+```
+$ python3 scripts/render_sensor_config.py --check
+render_sensor_config: PASS
+
+$ bash scripts/preflight.sh
+version_file_present: PASS
+dashboard_js_version_matches: PASS
+firmware_version_matches: PASS
+history_header_version_matches: PASS
+history_handler_has_api_manifest_route: PASS
+gateway_manifest_h_exists: PASS
+dashboard_prefers_api_manifest: PASS
+dashboard_legacy_manifest_fallback: PASS
+mock_server_serves_api_manifest: PASS
+fixture_manifest_schema_v2: PASS
+fixture_manifest_sensor_count: PASS
+fixture_manifest_has_gateway_block: PASS
+fixture_manifest_has_history_block: PASS
+fixture_manifest_has_measurements: PASS
+browser_spec_present: PASS
+no_old_dashboard_version: PASS
+no_old_firmware_version: PASS
+fixture_baseline_regenerated: PASS
+render_sensor_config: PASS
+playwright_manifest_spec: SKIP (node_modules missing)
+```
+
+## Bugs Fixed
+
+- **BUG-040:** Fixture dual-ownership conflict between Python and JS generators
+- Implicit: `change_sensor_number.py` imported `save_manifest` and `validate_sensors` from `sensor_manifest_lib` but those functions did not exist — now added
+
+## Next Steps
+
+1. Run `bash scripts/minify-dashboard.sh && bash scripts/generate-header.sh` after any `dashboard.html` edits (cannot be run in sandboxed environment)
+2. Phase 2 — Dashboard consumes v2 manifest (see `Docs/v7.5-v7.6-architecture-plan.md` Section 11)
+3. Device validation: flash, verify `/api/manifest` returns full v2 JSON with gateway/history blocks

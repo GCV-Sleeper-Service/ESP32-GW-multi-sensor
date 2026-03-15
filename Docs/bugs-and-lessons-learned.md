@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-14 — v7.5.0.1 (BUG-033–039, LESSON-OPS-039–045 added)_
+_Last updated: 2026-03-15 — v7.5.1 (BUG-040, LESSON-OPS-046 added)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -10,6 +10,26 @@ Both sections are in **reverse chronological order** — most recent entry first
 ---
 
 ## Bug Fixes
+
+### BUG-040: Fixture dual-ownership conflict between Python and JS generators caused CI failures (v7.5.1)
+
+**Symptom:** `render_sensor_config.py --check` failed in CI with a diff showing `"source": "active-manifest"` (from the JS generator) where `"source": "repo-fixture"` was expected, and `"unit_symbol": "°C"` vs `"\u00b0C"` encoding mismatches.
+
+**Root cause:** Two tools claimed ownership of `tests/fixtures/manifest.json`:
+1. `scripts/render_sensor_config.py` — the validation gate for all generated files
+2. `tests/fixtures/generate-fixtures.js` — overwrites the same file when run with `--manifest --overwrite-baseline`
+
+`preflight.sh` ran `render_sensor_config.py --check` *before* the JS generator, so CI passed at that stage. But the JS generator then overwrote the file with `"source": "active-manifest"` and escaped `\u00b0C`. On the next CI run, `--check` compared against the JS-overwritten fixture and failed.
+
+**Fix:**
+1. Made Python use `ensure_ascii=False` so both generators produce literal `°C`.
+2. Fixed the JS generator to always use `"source": "repo-fixture"` for baseline fixtures.
+3. Aligned the JS `fixtureManifestV2()` schema with Python's full v2 schema (gateway, history, per-sensor measurements).
+4. Moved the JS generator call in `preflight.sh` to *before* `render_sensor_config.py --check`, so that `--check` validates both generators agree.
+
+**Lesson:** See LESSON-OPS-046.
+
+---
 
 ### BUG-039: Dashboard source and generated artifacts drifted after Phase 1 work (v7.5.0.1)
 
@@ -325,6 +345,16 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-046: When two tools generate the same file, one must be authoritative (v7.5.1)
+
+**Context:** `render_sensor_config.py` and `generate-fixtures.js` both wrote `tests/fixtures/manifest.json`. They produced semantically identical but byte-different JSON (different `source` field, different Unicode encoding for `°C`). The CI validation gate (`--check`) only compared against one generator's output.
+
+**Rule:** Pick one generator as authoritative. The other must either be eliminated or made to produce byte-identical output and be run before the validation gate.
+
+**Applied here:** Python (`render_sensor_config.py`) is the single authority for all generated files, including test fixtures. The JS generator is updated to produce byte-identical output (same source value, same Unicode encoding via `JSON.stringify` which matches Python's `ensure_ascii=False`) and is run in `preflight.sh` *before* `render_sensor_config.py --check` so CI catches any future drift.
+
+---
 
 ### LESSON-OPS-045: Preflight must include a YAML/ESPHome parse gate, not just generated-file sync checks (v7.5.0.1)
 

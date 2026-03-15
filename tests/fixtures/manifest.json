@@ -1,73 +1,151 @@
 {
   "ok": true,
   "schema_version": 2,
-  "source": "active-manifest",
-  "version": "v7.5.0.0",
+  "source": "repo-fixture",
+  "version": "7.5.1",
+  "gateway": {
+    "id": "gw-main",
+    "name": "Main Gateway",
+    "role": "satellite",
+    "hardware": "ESP32-C3"
+  },
+  "history": {
+    "backend": "nvs",
+    "retention_hours": 1080,
+    "ram_window_hours": 24,
+    "sample_interval_seconds": 900
+  },
   "sensor_count": 3,
-  "metrics": [
-    {
-      "key": "temp",
-      "name": "Temperature",
-      "unit": "celsius",
-      "unit_symbol": "°C",
-      "bounds": {
-        "min": -50,
-        "max": 80
-      },
-      "history_suffix": "temp"
-    },
-    {
-      "key": "hum",
-      "name": "Humidity",
-      "unit": "percent",
-      "unit_symbol": "%",
-      "bounds": {
-        "min": 0,
-        "max": 100
-      },
-      "history_suffix": "hum"
-    }
-  ],
   "sensors": [
     {
       "id": "office",
       "name": "Office",
-      "metrics": [
+      "category": "environmental",
+      "adapter": "thermopro_ble",
+      "measurements": [
         {
           "key": "temp",
-          "history": "/history/office/temp"
+          "name": "Temperature",
+          "class": "analog_numeric",
+          "data_type": "float",
+          "unit": "celsius",
+          "unit_symbol": "°C",
+          "bounds": {
+            "min": -50,
+            "max": 80
+          },
+          "history": true,
+          "history_suffix": "temp",
+          "display": {
+            "precision": 1,
+            "chart": true
+          }
         },
         {
           "key": "hum",
-          "history": "/history/office/hum"
+          "name": "Humidity",
+          "class": "analog_numeric",
+          "data_type": "float",
+          "unit": "percent",
+          "unit_symbol": "%",
+          "bounds": {
+            "min": 0,
+            "max": 100
+          },
+          "history": true,
+          "history_suffix": "hum",
+          "display": {
+            "precision": 1,
+            "chart": true
+          }
         }
       ]
     },
     {
       "id": "first_floor",
       "name": "First Floor",
-      "metrics": [
+      "category": "environmental",
+      "adapter": "thermopro_ble",
+      "measurements": [
         {
           "key": "temp",
-          "history": "/history/first_floor/temp"
+          "name": "Temperature",
+          "class": "analog_numeric",
+          "data_type": "float",
+          "unit": "celsius",
+          "unit_symbol": "°C",
+          "bounds": {
+            "min": -50,
+            "max": 80
+          },
+          "history": true,
+          "history_suffix": "temp",
+          "display": {
+            "precision": 1,
+            "chart": true
+          }
         },
         {
           "key": "hum",
-          "history": "/history/first_floor/hum"
+          "name": "Humidity",
+          "class": "analog_numeric",
+          "data_type": "float",
+          "unit": "percent",
+          "unit_symbol": "%",
+          "bounds": {
+            "min": 0,
+            "max": 100
+          },
+          "history": true,
+          "history_suffix": "hum",
+          "display": {
+            "precision": 1,
+            "chart": true
+          }
         }
       ]
     },
     {
       "id": "outside",
       "name": "Outside",
-      "metrics": [
+      "category": "environmental",
+      "adapter": "thermopro_ble",
+      "measurements": [
         {
           "key": "temp",
-          "history": "/history/outside/temp"
+          "name": "Temperature",
+          "class": "analog_numeric",
+          "data_type": "float",
+          "unit": "celsius",
+          "unit_symbol": "°C",
+          "bounds": {
+            "min": -50,
+            "max": 80
+          },
+          "history": true,
+          "history_suffix": "temp",
+          "display": {
+            "precision": 1,
+            "chart": true
+          }
         },
         {
           "key": "hum",
-          "history": "/history/outside/hum"
+          "name": "Humidity",
+          "class": "analog_numeric",
+          "data_type": "float",
+          "unit": "percent",
+          "unit_symbol": "%",
+          "bounds": {
+            "min": 0,
+            "max": 100
+          },
+          "history": true,
+          "history_suffix": "hum",
+          "display": {
+            "precision": 1,
+            "chart": true
+          }
         }
       ]
     }
