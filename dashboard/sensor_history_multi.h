@@ -80,6 +80,8 @@
 #include <freertos/task.h>
 #include "gateway_manifest.h"
 
+static const char *const TAG = "history";
+
 // ── Compile-time configuration ──────────────────────────────────
 #ifndef HISTORY_HOURS
 #define HISTORY_HOURS 24
