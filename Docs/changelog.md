@@ -4,6 +4,27 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.1.0 — 2026-03-15
+
+**Phase 1 Completion — Full Manifest v2 Implementation**
+
+Completes the Phase 1 manifest endpoint delivery with full v2 schema and compile-time generation:
+
+- **ARCH**: Generated `src/gateway_manifest.h` with full v2 manifest as static C string literal
+- **ARCH**: Extended manifest v2 schema with `gateway`, `history`, per-metric `class`/`data_type`/`display` fields
+- **FIX**: Replaced inline `resp->print()` manifest builder with static `GATEWAY_MANIFEST_JSON` constant
+- **FIX**: Manifest now includes gateway identity block (id, name, role, hardware, firmware_version, api_version)
+- **FIX**: Manifest now includes history policy block (backend, retention_hours, ram_window_hours, sample_interval_seconds)
+- **FIX**: Metrics array now includes `class` (analog_numeric), `data_type` (float), `bounds`, `display` hints
+- **FIX**: Sensor entries now include `category`, `adapter`, `source.mac`, and `measurements` with `history_url`
+- **TEST**: Preflight validates `src/gateway_manifest.h` existence, proper inclusion, and YAML include registration
+- **TEST**: `generate-fixtures.js` updated to produce byte-identical full v2 schema output
+- **DOCS**: Architecture plan Phase 1 issues resolved (ISSUE-003)
+
+Fixes issues identified in Phase 1 feedback (inline manifest, partial schema, missing gateway_manifest.h).
+
+---
+
 ## v7.5.0.1 — 2026-03-14
 
 **Completed:** Phase 1 — manifest endpoint, dashboard migration, and runtime fixes

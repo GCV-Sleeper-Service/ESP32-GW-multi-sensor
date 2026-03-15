@@ -115,41 +115,83 @@ def fixture_manifest(sensors: List[Dict[str, str]]) -> List[Dict[str, str]]:
     return [{"id": sensor["id"], "name": sensor["name"]} for sensor in sensors]
 
 
-def manifest_v2(sensors: List[Dict[str, str]], version: str) -> Dict[str, object]:
-    shared_metrics = [
+def manifest_v2(
+    sensors: List[Dict[str, str]],
+    version: str,
+    gateway_meta: Dict[str, str] | None = None,
+    history_meta: Dict[str, object] | None = None,
+) -> Dict[str, object]:
+    """Generate full v2 manifest response with gateway/history blocks."""
+
+    if gateway_meta is None:
+        gateway_meta = {
+            "id": "gw-main",
+            "name": "Main Gateway",
+            "role": "satellite",
+            "hardware": "ESP32-C3",
+        }
+
+    if history_meta is None:
+        history_meta = {
+            "backend": "nvs",
+            "retention_hours": 1080,  # 45 days
+            "ram_window_hours": 24,
+            "sample_interval_seconds": 900,  # 15 min
+        }
+
+    metrics = [
         {
             "key": "temp",
             "name": "Temperature",
             "unit": "celsius",
             "unit_symbol": "°C",
+            "class": "analog_numeric",
+            "data_type": "float",
             "bounds": {"min": -50, "max": 80},
+            "history": True,
             "history_suffix": "temp",
+            "display": {"precision": 1, "chart": True},
         },
         {
             "key": "hum",
             "name": "Humidity",
             "unit": "percent",
             "unit_symbol": "%",
+            "class": "analog_numeric",
+            "data_type": "float",
             "bounds": {"min": 0, "max": 100},
+            "history": True,
             "history_suffix": "hum",
+            "display": {"precision": 1, "chart": True},
         },
     ]
+
+    sensor_entries = []
+    for s in sensors:
+        sensor_entries.append({
+            "id": s["id"],
+            "name": s["name"],
+            "category": "environmental",
+            "adapter": "thermopro_ble",
+            "source": {"mac": s["mac"]},
+            "measurements": [
+                {"key": m["key"], "history_url": f"/history/{s['id']}/{m['history_suffix']}"}
+                for m in metrics
+            ],
+        })
+
     return {
         "ok": True,
         "schema_version": 2,
         "source": "active-manifest",
         "version": version,
+        "gateway": {
+            **gateway_meta,
+            "firmware_version": version,
+            "api_version": "v2",
+        },
+        "history": history_meta,
         "sensor_count": len(sensors),
-        "metrics": shared_metrics,
-        "sensors": [
-            {
-                "id": sensor["id"],
-                "name": sensor["name"],
-                "metrics": [
-                    {"key": "temp", "history": f"/history/{sensor['id']}/temp"},
-                    {"key": "hum", "history": f"/history/{sensor['id']}/hum"},
-                ],
-            }
-            for sensor in sensors
-        ],
+        "metrics": metrics,
+        "sensors": sensor_entries,
     }
