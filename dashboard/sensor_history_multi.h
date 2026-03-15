@@ -78,7 +78,7 @@
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include "gateway_manifest.h"
+#include "dashboard/gateway_manifest.h"
 
 static const char *const TAG = "history";
 
