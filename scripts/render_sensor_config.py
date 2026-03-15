@@ -390,7 +390,7 @@ def main() -> int:
     expected_yaml = render_yaml_file(YAML_PATH, sensors)
     expected_js = render_js_file(JS_PATH, sensors)
     expected_fixture_sensors = json.dumps(fixture_manifest(sensors), indent=2) + "\n"
-    expected_fixture_manifest = json.dumps(manifest_v2(sensors, VERSION), indent=2) + "\n"
+    expected_fixture_manifest = json.dumps(manifest_v2(sensors, f"v{VERSION}"), indent=2, ensure_ascii=False) + "\n"
     expected_fixture_status = json.dumps(
         {
             "ok": True,

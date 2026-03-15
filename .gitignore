@@ -10,3 +10,4 @@ firmware/.esphome/
 dashboard/dashboard.min.html
 # node_modules (Playwright / minification tools if installed locally)
 node_modules/
+scripts/__pycache__

@@ -137,7 +137,7 @@ def manifest_v2(sensors: List[Dict[str, str]], version: str) -> Dict[str, object
     return {
         "ok": True,
         "schema_version": 2,
-        "source": "repo-fixture",
+        "source": "active-manifest",
         "version": version,
         "sensor_count": len(sensors),
         "metrics": shared_metrics,
