@@ -104,7 +104,12 @@ def load_manifest(path: Path) -> List[Dict[str, str]]:
     if isinstance(payload, list):
         sensors = payload
     elif isinstance(payload, dict):
-        sensors = payload.get("sensors")
+        if payload.get("schema_version") == 2:
+            # v2: extract {id, name, mac} for backward compat
+            raw = payload.get("sensors", [])
+            sensors = [{"id": s["id"], "name": s["name"], "mac": s.get("mac", "")} for s in raw]
+        else:
+            sensors = payload.get("sensors")
     else:
         raise ManifestError("Manifest root must be an object or an array.")
 
@@ -115,41 +120,157 @@ def fixture_manifest(sensors: List[Dict[str, str]]) -> List[Dict[str, str]]:
     return [{"id": sensor["id"], "name": sensor["name"]} for sensor in sensors]
 
 
-def manifest_v2(sensors: List[Dict[str, str]], version: str) -> Dict[str, object]:
-    shared_metrics = [
-        {
-            "key": "temp",
-            "name": "Temperature",
-            "unit": "celsius",
-            "unit_symbol": "°C",
-            "bounds": {"min": -50, "max": 80},
-            "history_suffix": "temp",
-        },
-        {
-            "key": "hum",
-            "name": "Humidity",
-            "unit": "percent",
-            "unit_symbol": "%",
-            "bounds": {"min": 0, "max": 100},
-            "history_suffix": "hum",
-        },
-    ]
+THERMOPRO_MEASUREMENTS = [
+    {
+        "key": "temp",
+        "name": "Temperature",
+        "class": "analog_numeric",
+        "data_type": "float",
+        "unit": "celsius",
+        "unit_symbol": "\u00b0C",
+        "bounds": {"min": -50, "max": 80},
+        "history": True,
+        "history_suffix": "temp",
+        "display": {"precision": 1, "chart": True},
+    },
+    {
+        "key": "hum",
+        "name": "Humidity",
+        "class": "analog_numeric",
+        "data_type": "float",
+        "unit": "percent",
+        "unit_symbol": "%",
+        "bounds": {"min": 0, "max": 100},
+        "history": True,
+        "history_suffix": "hum",
+        "display": {"precision": 1, "chart": True},
+    },
+]
+
+DEFAULT_GATEWAY = {
+    "id": "gw-main",
+    "name": "Main Gateway",
+    "role": "satellite",
+    "hardware": "ESP32-C3",
+}
+
+DEFAULT_HISTORY = {
+    "backend": "nvs",
+    "retention_hours": 1080,
+    "ram_window_hours": 24,
+    "sample_interval_seconds": 900,
+}
+
+
+def validate_sensors(sensors):
+    """Validate a sensor list. Alias for canonicalize_sensors."""
+    return canonicalize_sensors(sensors)
+
+
+def save_manifest(path, sensors, schema_version=2):
+    """Write sensors to a manifest JSON file."""
+    if schema_version >= 2:
+        existing = {}
+        if path.exists():
+            try:
+                existing = json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, FileNotFoundError):
+                pass
+
+        gateway = existing.get("gateway", DEFAULT_GATEWAY)
+        history = existing.get("history", DEFAULT_HISTORY)
+
+        v2_sensors = []
+        for s in sensors:
+            v2_sensors.append({
+                "id": s["id"],
+                "name": s["name"],
+                "mac": s["mac"],
+                "category": "environmental",
+                "adapter": "thermopro_ble",
+                "measurements": THERMOPRO_MEASUREMENTS,
+            })
+
+        payload = {
+            "schema_version": 2,
+            "gateway": gateway,
+            "history": history,
+            "sensors": v2_sensors,
+        }
+    else:
+        payload = {
+            "schema_version": 1,
+            "sensors": [{"id": s["id"], "name": s["name"], "mac": s["mac"]} for s in sensors],
+        }
+
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def to_manifest_v2(sensors, version, gateway_meta=None, history_meta=None):
+    """Build a full v2 manifest dict from a sensor list."""
+    gw = gateway_meta or dict(DEFAULT_GATEWAY)
+    hist = history_meta or dict(DEFAULT_HISTORY)
+
+    v2_sensors = []
+    for s in sensors:
+        v2_sensors.append({
+            "id": s["id"],
+            "name": s["name"],
+            "category": "environmental",
+            "adapter": "thermopro_ble",
+            "measurements": THERMOPRO_MEASUREMENTS,
+        })
+
     return {
         "ok": True,
         "schema_version": 2,
-        "source": "repo-fixture",
+        "source": "firmware",
         "version": version,
+        "gateway": gw,
+        "history": hist,
         "sensor_count": len(sensors),
-        "metrics": shared_metrics,
-        "sensors": [
-            {
-                "id": sensor["id"],
-                "name": sensor["name"],
-                "metrics": [
-                    {"key": "temp", "history": f"/history/{sensor['id']}/temp"},
-                    {"key": "hum", "history": f"/history/{sensor['id']}/hum"},
-                ],
-            }
-            for sensor in sensors
-        ],
+        "sensors": v2_sensors,
     }
+
+
+def manifest_v2(sensors: List[Dict[str, str]], version: str) -> Dict[str, object]:
+    return to_manifest_v2(sensors, version)
+
+
+def validate_v2_schema(manifest):
+    """Validate that a manifest dict conforms to v2 schema requirements."""
+    errors = []
+    if not isinstance(manifest, dict):
+        raise ManifestError("Manifest must be a dict")
+    if manifest.get("schema_version") != 2:
+        errors.append("schema_version must be 2")
+    if "gateway" not in manifest or not isinstance(manifest.get("gateway"), dict):
+        errors.append("Missing or invalid 'gateway' block")
+    if "history" not in manifest or not isinstance(manifest.get("history"), dict):
+        errors.append("Missing or invalid 'history' block")
+    if "sensors" not in manifest or not isinstance(manifest.get("sensors"), list):
+        errors.append("Missing or invalid 'sensors' list")
+    else:
+        for i, s in enumerate(manifest["sensors"]):
+            if "measurements" not in s or not isinstance(s.get("measurements"), list):
+                errors.append(f"Sensor #{i+1} missing 'measurements' array")
+    if errors:
+        raise ManifestError("v2 schema validation failed: " + "; ".join(errors))
+    return True
+
+
+def load_manifest_v2(path):
+    """Load a manifest file and return the full v2 dict. Auto-promotes v1."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ManifestError(f"Manifest not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ManifestError(f"Manifest is not valid JSON: {exc}") from exc
+
+    if isinstance(payload, dict) and payload.get("schema_version") == 2:
+        return payload
+
+    # Auto-promote v1
+    sensors = load_manifest(path)
+    return to_manifest_v2(sensors, "0.0.0")

@@ -1,0 +1,71 @@
+{
+  "schema_version": 2,
+  "gateway": {
+    "id": "gw-main",
+    "name": "Main Gateway",
+    "role": "satellite",
+    "hardware": "ESP32-C3"
+  },
+  "history": {
+    "backend": "nvs",
+    "retention_hours": 1080,
+    "ram_window_hours": 24,
+    "sample_interval_seconds": 900
+  },
+  "sensors": [
+    {
+      "id": "office",
+      "name": "Office",
+      "mac": "DB:06:2C:58:8A:59",
+      "category": "environmental",
+      "adapter": "thermopro_ble",
+      "measurements": [
+        {
+          "key": "temp",
+          "name": "Temperature",
+          "class": "analog_numeric",
+          "data_type": "float",
+          "unit": "celsius",
+          "unit_symbol": "°C",
+          "bounds": {"min": -50, "max": 80},
+          "history": true,
+          "history_suffix": "temp",
+          "display": {"precision": 1, "chart": true}
+        },
+        {
+          "key": "hum",
+          "name": "Humidity",
+          "class": "analog_numeric",
+          "data_type": "float",
+          "unit": "percent",
+          "unit_symbol": "%",
+          "bounds": {"min": 0, "max": 100},
+          "history": true,
+          "history_suffix": "hum",
+          "display": {"precision": 1, "chart": true}
+        }
+      ]
+    },
+    {
+      "id": "net_probe",
+      "name": "Net Probe",
+      "mac": "AA:BB:CC:DD:EE:FF",
+      "category": "network",
+      "adapter": "generic_ble",
+      "measurements": [
+        {
+          "key": "rssi",
+          "name": "Signal Strength",
+          "class": "analog_numeric",
+          "data_type": "int",
+          "unit": "dBm",
+          "unit_symbol": "dBm",
+          "bounds": {"min": -100, "max": 0},
+          "history": false,
+          "history_suffix": null,
+          "display": {"precision": 0, "chart": false}
+        }
+      ]
+    }
+  ]
+}

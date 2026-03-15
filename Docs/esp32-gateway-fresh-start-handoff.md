@@ -1,6 +1,6 @@
 # ESP32 Gateway Fresh-Start Handoff
 
-_Last updated: 2026-03-14 — v7.5.0.1_
+_Last updated: 2026-03-15 — v7.5.1_
 
 This document is the durable restart point for future sessions. Read it first before touching any code.
 
@@ -9,9 +9,9 @@ This document is the durable restart point for future sessions. Read it first be
 ## 1. Project identity
 
 **Repo:** https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor  
-**Current version:** `v7.5.0.1`  
-**Current branch:** `main` (Phase 1 merged via PR #9)  
-**Suggested next branch:** `phase2-from-v7.5.0.1`  
+**Current version:** `v7.5.1`  
+**Current branch:** `main` (Phase 1 completion merged)  
+**Suggested next branch:** `phase2-from-v7.5.1`  
 **Hardware:** ESP32-C3 SuperMini running ESPHome on ESP-IDF (not Arduino)  
 **Sensors:** 3 × ThermoPro TP357 BLE (configurable 1–4)
 
@@ -72,6 +72,7 @@ This behavior must not be accidentally broken by future history/import/manifest 
 | File | Purpose |
 |---|---|
 | `dashboard/sensor_history_multi.h` | All C++ firmware logic — data model, NVS persistence, HTTP endpoints |
+| `dashboard/gateway_manifest.h` | Generated compile-time static v2 manifest JSON — do not edit directly |
 | `dashboard/dashboard.js` | Dashboard JavaScript — manifest loading, card rendering, history fetching |
 | `dashboard/dashboard.html` | Dashboard HTML source of truth — edit this, then regenerate min/header |
 | `dashboard/dashboard.h` | Generated embedded payload — do not edit directly |
@@ -80,9 +81,10 @@ This behavior must not be accidentally broken by future history/import/manifest 
 ### Generator / config
 | File | Purpose |
 |---|---|
-| `config/sensors.json` | Canonical sensor manifest — single source of truth for id/name/MAC |
-| `scripts/sensor_manifest_lib.py` | Manifest loading, validation, canonicalization |
-| `scripts/render_sensor_config.py` | Generates all dependent files from `config/sensors.json` |
+| `config/sensors.json` | Canonical sensor manifest v2 — single source of truth for id/name/MAC/gateway/history |
+| `config/sensors.v2.example.json` | v2 schema example with environmental and network sensor examples |
+| `scripts/sensor_manifest_lib.py` | Manifest loading, validation, canonicalization, v2 schema helpers |
+| `scripts/render_sensor_config.py` | Generates all dependent files from `config/sensors.json` including `gateway_manifest.h` |
 
 ### Test layer
 | File | Purpose |

@@ -4,6 +4,23 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.1 — 2026-03-15
+
+**Completed:** Phase 1 completion — full v2 manifest schema, generated gateway_manifest.h, dead code removal, preflight hardening
+
+- Upgraded `config/sensors.json` from schema v1 to full v2 with gateway identity block, history retention policy, and per-measurement class/data_type/display hints
+- Created `config/sensors.v2.example.json` showing v2 schema with environmental and network sensor examples
+- Extended `sensor_manifest_lib.py` with `to_manifest_v2()`, `validate_v2_schema()`, `load_manifest_v2()`, `save_manifest()`, and `validate_sensors()` functions
+- Extended `render_sensor_config.py` to generate `dashboard/gateway_manifest.h` — compile-time static C string literal of the full v2 manifest JSON
+- Replaced inline `resp->print()` manifest handler in `sensor_history_multi.h` with zero-overhead serving from generated `gateway_manifest.h`
+- Updated `tests/fixtures/manifest.json` to full v2 schema including gateway, history, and per-measurement blocks
+- Removed dead code: `scripts/apply_phase1_manifest_patch.py`, `scripts/preflight-esphome-parse.sh` (integrated into main preflight)
+- Integrated ESPHome config parse and generator idempotence check into `preflight.sh`
+- Added v2 manifest schema validation checks to preflight (gateway, history, measurements blocks)
+- Version: `v7.5.1`
+
+---
+
 ## v7.5.0.1 — 2026-03-14
 
 **Completed:** Phase 1 — manifest endpoint, dashboard migration, and runtime fixes

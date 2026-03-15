@@ -12,7 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
-const VERSION = 'v7.5.0.0';
+const VERSION = 'v7.5.1';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },
@@ -60,6 +60,47 @@ function readManifestSensors(manifestPath) {
   return materializeSensors(sensors);
 }
 
+const THERMOPRO_MEASUREMENTS = [
+  {
+    key: 'temp',
+    name: 'Temperature',
+    class: 'analog_numeric',
+    data_type: 'float',
+    unit: 'celsius',
+    unit_symbol: '\u00b0C',
+    bounds: { min: -50, max: 80 },
+    history: true,
+    history_suffix: 'temp',
+    display: { precision: 1, chart: true },
+  },
+  {
+    key: 'hum',
+    name: 'Humidity',
+    class: 'analog_numeric',
+    data_type: 'float',
+    unit: 'percent',
+    unit_symbol: '%',
+    bounds: { min: 0, max: 100 },
+    history: true,
+    history_suffix: 'hum',
+    display: { precision: 1, chart: true },
+  },
+];
+
+const DEFAULT_GATEWAY = {
+  id: 'gw-main',
+  name: 'Main Gateway',
+  role: 'satellite',
+  hardware: 'ESP32-C3',
+};
+
+const DEFAULT_HISTORY = {
+  backend: 'nvs',
+  retention_hours: 1080,
+  ram_window_hours: 24,
+  sample_interval_seconds: 900,
+};
+
 function fixtureManifestV1(sensors) {
   return sensors.map(({ id, name }) => ({ id, name }));
 }
@@ -70,32 +111,15 @@ function fixtureManifestV2(sensors, tag) {
     schema_version: 2,
     source: tag || 'mock',
     version: VERSION,
+    gateway: DEFAULT_GATEWAY,
+    history: DEFAULT_HISTORY,
     sensor_count: sensors.length,
-    metrics: [
-      {
-        key: 'temp',
-        name: 'Temperature',
-        unit: 'celsius',
-        unit_symbol: '°C',
-        bounds: { min: -50, max: 80 },
-        history_suffix: 'temp',
-      },
-      {
-        key: 'hum',
-        name: 'Humidity',
-        unit: 'percent',
-        unit_symbol: '%',
-        bounds: { min: 0, max: 100 },
-        history_suffix: 'hum',
-      },
-    ],
     sensors: sensors.map(({ id, name }) => ({
       id,
       name,
-      metrics: [
-        { key: 'temp', history: `/history/${id}/temp` },
-        { key: 'hum', history: `/history/${id}/hum` },
-      ],
+      category: 'environmental',
+      adapter: 'thermopro_ble',
+      measurements: THERMOPRO_MEASUREMENTS,
     })),
   };
 }

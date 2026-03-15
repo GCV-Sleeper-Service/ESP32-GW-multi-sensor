@@ -21,12 +21,12 @@ check_not_contains() {
 REQUIRED_FILES=(
   VERSION
   config/sensors.json
+  config/sensors.v2.example.json
   dashboard/dashboard.html
   dashboard/dashboard.js
   dashboard/dashboard.h
   dashboard/sensor_history_multi.h
-  firmware/esp32-c3-multi-sensor.yaml
-  scripts/apply_phase1_manifest_patch.py
+  dashboard/gateway_manifest.h
   scripts/render_sensor_config.py
   scripts/sensor_manifest_lib.py
   scripts/generate-header.sh
@@ -53,13 +53,23 @@ check_contains "dashboard_legacy_manifest_fallback" dashboard/dashboard.js "fetc
 check_contains "mock_server_serves_api_manifest" tests/mock-server/server.js "pathname === '/api/manifest'"
 check_contains "fixture_manifest_schema_v2" tests/fixtures/manifest.json '"schema_version": 2'
 check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"sensor_count": 3'
+check_contains "fixture_manifest_has_gateway_block" tests/fixtures/manifest.json '"gateway"'
+check_contains "fixture_manifest_has_history_block" tests/fixtures/manifest.json '"history"'
+check_contains "fixture_manifest_has_measurements" tests/fixtures/manifest.json '"measurements"'
+check_contains "gateway_manifest_h_exists" dashboard/gateway_manifest.h 'GATEWAY_MANIFEST_JSON'
 check_contains "browser_spec_present" tests/browser/manifest.spec.js "dashboard falls back to /sensors.json"
 check_not_contains "no_old_dashboard_version" dashboard/dashboard.js "App.version = 'v7.4.5.1'"
-check_not_contains "no_old_firmware_version" firmware/esp32-c3-multi-sensor.yaml "v7.4.5.1"
+check_not_contains "no_old_firmware_version" firmware/esp32-c3-multi-sensor.yaml "v7.5.0.1"
 
 python3 scripts/render_sensor_config.py --check
 node tests/fixtures/generate-fixtures.js --manifest config/sensors.json --overwrite-baseline >/dev/null
 check_contains "fixture_baseline_manifest_regenerated" tests/fixtures/manifest.json '"schema_version": 2'
+
+if command -v esphome >/dev/null 2>&1; then
+  esphome config firmware/esp32-c3-multi-sensor.yaml >/dev/null 2>&1 && pass "esphome_config_parse" || fail "esphome_config_parse"
+else
+  echo "esphome_config_parse: SKIP (esphome not available)"
+fi
 
 if command -v node >/dev/null 2>&1; then
   if [[ -d node_modules/@playwright/test ]]; then
