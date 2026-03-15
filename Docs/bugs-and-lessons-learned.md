@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-14 — v7.5.0.1 (BUG-033–039, LESSON-OPS-039–045 added)_
+_Last updated: 2026-03-15 — v7.5.1.1 (BUG-040, LESSON-OPS-046 added)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -10,6 +10,18 @@ Both sections are in **reverse chronological order** — most recent entry first
 ---
 
 ## Bug Fixes
+
+### BUG-040: No automated validation of manifest v2 schema (v7.5.1.1)
+
+**Symptom:** Generator could produce malformed JSON or missing required fields without detection until runtime or manual inspection.
+
+**Root cause:** Preflight only validated that `src/gateway_manifest.h` existed, was included, and that the generator sync check passed. It did not verify the content of the generated manifest against the v2 schema contract.
+
+**Fix:** Added preflight checks that validate `gateway_manifest.h` contains all required v2 schema fields: top-level fields, `gateway` block fields, `history` block fields, `metrics` array fields, and that `schema_version` is exactly `2`.
+
+**Lesson:** See LESSON-OPS-046.
+
+---
 
 ### BUG-039: Dashboard source and generated artifacts drifted after Phase 1 work (v7.5.0.1)
 
@@ -325,6 +337,16 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-046: Generated artifacts with structured schemas need compile-time validation (v7.5.1.1)
+
+For any generated file with a required schema (JSON, YAML, etc.), preflight must validate structure, not just existence. A generator bug or incomplete update can produce syntactically valid but semantically broken output — for example, a JSON file that parses correctly but is missing required fields. Existence checks and generator sync checks (`--check`) do not catch this class of failure.
+
+Add field-level validation for every generated artifact that has a documented schema contract. This catches regressions early and prevents malformed output from reaching `main`.
+
+Related: BUG-040
+
+---
 
 ### LESSON-OPS-045: Preflight must include a YAML/ESPHome parse gate, not just generated-file sync checks (v7.5.0.1)
 

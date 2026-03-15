@@ -4,6 +4,26 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.1.1 (2026-03-15)
+
+**Phase 1 Refinement — Manifest Schema Validation**
+
+Adds automated validation to preflight that verifies the generated manifest conforms to the v2 schema specification:
+
+- **TEST**: Preflight validates `src/gateway_manifest.h` contains parseable JSON
+- **TEST**: Preflight validates required top-level fields: `schema_version`, `gateway`, `history`, `sensor_count`, `metrics`, `sensors`
+- **TEST**: Preflight validates `gateway` block fields: `id`, `name`, `role`, `hardware`, `firmware_version`, `api_version`
+- **TEST**: Preflight validates `history` block fields: `backend`, `retention_hours`, `ram_window_hours`, `sample_interval_seconds`
+- **TEST**: Preflight validates `metrics` array contains: `key`, `name`, `unit`, `class`, `data_type`, `history`
+- **TEST**: Preflight validates `schema_version` is exactly `2`
+- **DOCS**: Updated architecture plan — Phase 1 refinement step 1 of 3 complete
+
+This is the first incremental Phase 1 refinement (v7.5.1.1). Ensures manifest generation cannot produce invalid schema.
+
+Related: ISSUE-003 (manifest v2 schema alignment)
+
+---
+
 ## v7.5.1.0 — 2026-03-15
 
 **Phase 1 Completion — Full Manifest v2 Implementation**

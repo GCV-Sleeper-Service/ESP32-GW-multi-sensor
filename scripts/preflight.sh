@@ -68,6 +68,74 @@ fi
 check_contains "gateway_manifest_json_used" dashboard/sensor_history_multi.h "GATEWAY_MANIFEST_JSON"
 check_contains "gateway_manifest_yaml_includes" firmware/esp32-c3-multi-sensor.yaml "../src/gateway_manifest.h"
 
+FAIL_COUNT=0
+
+echo "→ Validating manifest v2 schema structure..."
+
+# Extract the JSON from gateway_manifest.h (skip C++ wrapper, get raw JSON)
+MANIFEST_JSON=$(sed -n '/R"MANIFEST(/,/)MANIFEST"/p' src/gateway_manifest.h | sed '1d;$d')
+
+# Check if extraction succeeded
+if [[ -z "$MANIFEST_JSON" ]]; then
+  echo "✗ Failed to extract JSON from gateway_manifest.h"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+else
+  # Validate required top-level fields
+  for field in "schema_version" "gateway" "history" "sensor_count" "metrics" "sensors"; do
+    if ! echo "$MANIFEST_JSON" | grep -q "\"$field\""; then
+      echo "✗ Manifest missing required field: $field"
+      FAIL_COUNT=$((FAIL_COUNT + 1))
+    fi
+  done
+
+  # Validate gateway block required fields
+  for field in "id" "name" "role" "hardware" "firmware_version" "api_version"; do
+    if ! echo "$MANIFEST_JSON" | sed -n '/"gateway"/,/}/p' | grep -q "\"$field\""; then
+      echo "✗ Manifest gateway block missing required field: $field"
+      FAIL_COUNT=$((FAIL_COUNT + 1))
+    fi
+  done
+
+  # Validate history block required fields
+  for field in "backend" "retention_hours" "ram_window_hours" "sample_interval_seconds"; do
+    if ! echo "$MANIFEST_JSON" | sed -n '/"history"/,/}/p' | grep -q "\"$field\""; then
+      echo "✗ Manifest history block missing required field: $field"
+      FAIL_COUNT=$((FAIL_COUNT + 1))
+    fi
+  done
+
+  # Validate metrics array has required fields (check first metric as representative)
+  if ! echo "$MANIFEST_JSON" | grep -q '"metrics"'; then
+    echo "✗ Manifest missing metrics array"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  else
+    # Check that metrics array contains expected fields
+    METRICS_BLOCK=$(echo "$MANIFEST_JSON" | sed -n '/"metrics"/,/]/p')
+    for field in "key" "name" "unit" "class" "data_type" "history"; do
+      if ! echo "$METRICS_BLOCK" | grep -q "\"$field\""; then
+        echo "✗ Manifest metrics missing required field: $field"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+      fi
+    done
+  fi
+
+  # Validate schema_version is 2
+  SCHEMA_VERSION=$(echo "$MANIFEST_JSON" | grep -o '"schema_version"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*$')
+  if [[ "$SCHEMA_VERSION" != "2" ]]; then
+    echo "✗ Manifest schema_version is $SCHEMA_VERSION, expected 2"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+
+  if [[ "$FAIL_COUNT" -eq 0 ]]; then
+    echo "✓ Manifest v2 schema validation passed"
+  fi
+fi
+
+if [[ "$FAIL_COUNT" -gt 0 ]]; then
+  echo "✗ Manifest v2 schema validation failed with $FAIL_COUNT error(s)"
+  exit 1
+fi
+
 python3 scripts/render_sensor_config.py --check
 node tests/fixtures/generate-fixtures.js --manifest config/sensors.json --overwrite-baseline >/dev/null
 check_contains "fixture_baseline_manifest_regenerated" tests/fixtures/manifest.json '"schema_version": 2'
