@@ -211,9 +211,31 @@ This prevents generator bugs (BUG-035: YAML indentation regression, BUG-036: YAM
 
 Related: ISSUE-004, LESSON-OPS-045
 
-### v7.5.1.3 — Test Fixture Alignment (planned)
+### v7.5.1.3 — Test Fixture Alignment (2026-03-15)
 
-Align `tests/fixtures/manifest.json` to full v2 schema for Playwright tests.
+Aligned test fixtures to the full v2 manifest schema:
+- Updated `tests/fixtures/generate-fixtures.js` to generate complete v2 schema with `gateway`, `history`, per-metric metadata
+- Regenerated `tests/fixtures/manifest.json` from updated generator
+- Extended Playwright manifest test to validate all v2 fields (gateway block, history block, metric metadata)
+- Mock server now serves complete v2 schema to browser tests
+
+This completes Phase 1 refinements. All generated artifacts are now aligned to the full v2 specification.
+
+---
+
+## Phase 1 Summary
+
+**Baseline delivery**: v7.5.0.1 — `/api/manifest` endpoint with partial v2 schema
+
+**Refinements**:
+- v7.5.1.0 — Fixed inline manifest builder, added `gateway_manifest.h`, full v2 schema
+- v7.5.1.1 — Added manifest schema validation to preflight
+- v7.5.1.2 — Added ESPHome YAML parse gate to preflight
+- v7.5.1.3 — Aligned test fixtures to full v2 schema
+
+**Status**: Phase 1 COMPLETE ✅
+
+**Next**: Phase 2 — Dashboard consumes `/api/manifest` (manifest-driven rendering)
 
 ---
 

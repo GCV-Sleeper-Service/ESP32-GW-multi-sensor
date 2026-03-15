@@ -4,6 +4,30 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.1.3 (2026-03-15)
+
+**Phase 1 Refinement — Test Fixture Alignment**
+
+Aligns test fixtures to the full v2 manifest schema for complete contract validation:
+
+- **TEST**: Updated `tests/fixtures/generate-fixtures.js` to generate full v2 schema
+- **TEST**: Regenerated `tests/fixtures/manifest.json` with `gateway`, `history`, per-metric metadata
+- **TEST**: Extended Playwright manifest test to validate all v2 fields
+- **TEST**: Mock server now serves complete v2 schema to browser tests
+- **DOCS**: Updated architecture plan — Phase 1 complete, all refinements merged
+
+This completes Phase 1 refinements. All generated artifacts (manifest, fixtures, tests) are now aligned to the full v2 schema specification.
+
+**Phase 1 Complete** ✅
+- v7.5.1.0 — Full manifest v2 implementation
+- v7.5.1.1 — Manifest schema validation
+- v7.5.1.2 — ESPHome YAML parse gate
+- v7.5.1.3 — Test fixture alignment
+
+**Next**: Phase 2 — Dashboard consumes `/api/manifest`
+
+---
+
 ## v7.5.1.2 (2026-03-15)
 
 **Phase 1 Refinement — ESPHome YAML Parse Gate**

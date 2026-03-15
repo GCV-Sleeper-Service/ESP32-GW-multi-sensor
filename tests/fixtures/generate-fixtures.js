@@ -12,7 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
-const VERSION = 'v7.5.1.0';
+const VERSION = 'v7.5.1.3';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },
@@ -181,9 +181,14 @@ function writeVariant(count) {
       i++;
     } else if (args[i] === '--overwrite-baseline') {
       overwriteBaseline = true;
-    } else if (args[i] === '--manifest' && args[i + 1]) {
-      manifestPath = args[i + 1];
-      i++;
+    } else if (args[i] === '--manifest') {
+      const next = args[i + 1];
+      if (next && !next.startsWith('--')) {
+        manifestPath = next;
+        i++;
+      } else {
+        manifestPath = 'config/sensors.json';
+      }
     }
   }
 
