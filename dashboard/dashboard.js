@@ -1,6 +1,9 @@
 // ╔════════════════════════════════════════════════════════════════╗
 // ║  Multi-Sensor Gateway Dashboard                               ║
 // ║                                                                ║
+// ║  v7.5.2.0 — Phase 2 Step 1: manifest v2 loader with          ║
+// ║             three-tier fallback chain (data loading only)     ║
+// ║                                                                ║
 // ║  Current dashboard features:                                   ║
 // ║    • 24h/7d/30d/45d selectable Min/Max toggle per sensor card     ║
 // ║    • BLE RSSI signal strength indicator (needs YAML sensor)    ║
@@ -35,7 +38,7 @@
 // The bulk of the logic still lives in existing functions so regression risk stays low.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.1.3';
+App.version = 'v7.5.2.0';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -516,6 +519,59 @@ function loadSensorManifest() {
         });
     });
 };
+// ── v7.5.2.0: manifest v2 loader with three-tier fallback ──
+async function loadManifestV2() {
+  try {
+    // Tier 1: Try v2 manifest endpoint
+    var resp = await fetch(ESP_HOST + '/api/manifest', {cache: 'no-store'});
+    if (resp.ok) {
+      var manifest = await resp.json();
+      if (manifest.schema_version === 2 && manifest.sensors) {
+        console.log('[manifest] Loaded v2 manifest from /api/manifest');
+        return manifest;
+      }
+    }
+  } catch (e) {
+    console.warn('[manifest] /api/manifest failed:', e.message);
+  }
+
+  try {
+    // Tier 2: Fall back to legacy /sensors.json, auto-promote to v2
+    var resp = await fetch(ESP_HOST + '/sensors.json', {cache: 'no-store'});
+    if (resp.ok) {
+      var sensors = await resp.json();
+      console.log('[manifest] Falling back to /sensors.json \u2192 auto-promote to v2');
+      return autoPromoteV1ToV2(sensors);
+    }
+  } catch (e) {
+    console.warn('[manifest] /sensors.json failed:', e.message);
+  }
+
+  // Tier 3: Use hardcoded DEFAULT_SENSOR_META
+  console.warn('[manifest] Using hardcoded DEFAULT_SENSOR_META fallback');
+  return autoPromoteV1ToV2(DEFAULT_SENSOR_META);
+}
+
+function autoPromoteV1ToV2(sensorsArray) {
+  // Convert v1 [{id, name}] to v2 manifest structure with ThermoPro defaults
+  return {
+    ok: true,
+    schema_version: 2,
+    source: 'auto-promoted',
+    version: App.version,
+    gateway: { id: 'gw-main', name: 'Main Gateway', role: 'satellite', hardware: 'ESP32-C3', firmware_version: App.version, api_version: 'v2' },
+    history: { backend: 'nvs', retention_hours: 1080, ram_window_hours: 24, sample_interval_seconds: 900 },
+    sensor_count: sensorsArray.length,
+    metrics: [
+      { key: 'temp', name: 'Temperature', unit: 'celsius', unit_symbol: '\u00b0C', class: 'analog_numeric', data_type: 'float', bounds: {min: -50, max: 80}, history: true, history_suffix: 'temp', display: {precision: 1, chart: true} },
+      { key: 'hum', name: 'Humidity', unit: 'percent', unit_symbol: '%', class: 'analog_numeric', data_type: 'float', bounds: {min: 0, max: 100}, history: true, history_suffix: 'hum', display: {precision: 1, chart: true} }
+    ],
+    sensors: sensorsArray.map(function(s) {
+      return { id: s.id, name: s.name, category: 'environmental', adapter: 'thermopro_ble', source: { mac: s.mac || '' }, measurements: [{ key: 'temp', history_url: '/history/' + s.id + '/temp' }, { key: 'hum', history_url: '/history/' + s.id + '/hum' }] };
+    })
+  };
+}
+
 var TELEMETRY_IDS = { heap:'sensor-free_heap', uptime:'sensor-uptime', wifi:'sensor-wifi_signal' };
 
 var POLL_SHARED = ['/text_sensor/Current%20Time', '/sensor/WiFi%20Signal'];
@@ -2795,6 +2851,13 @@ App.Features.register({
 App.Boot.start = function() {
   var modeStr = TRANSPORT === 'sse' ? (ESP_HOST === '' ? 'HOSTED' : 'SSE') : 'POLLING';
   document.getElementById('modeLabel').textContent = '[' + modeStr + ' mode]';
+  loadManifestV2().then(function(manifest) {
+    window._manifest = manifest;
+    dlog('[manifest] v2 manifest stored in window._manifest (source: ' + (manifest.source || 'unknown') + ')', 'ok');
+  }).catch(function(e) {
+    dlog('[manifest] loadManifestV2 failed: ' + e.message, 'err');
+    window._manifest = null;
+  });
   loadSensorManifest().then(function() {
     dlog('init - ' + SENSORS.length + ' sensors, transport=' + TRANSPORT + ', host=' + (ESP_HOST || '(same-origin)'));
     buildSensorCards();

@@ -4,6 +4,31 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.2.0 (2026-03-15)
+
+**Phase 2 Step 1 — Dashboard manifest v2 loader with fallback chain**
+
+Adds `loadManifestV2()` and `autoPromoteV1ToV2()` to the dashboard boot flow. The full v2 manifest is now loaded on boot and stored in `window._manifest` for future use by Phase 2 rendering steps. No rendering changes — data loading only.
+
+- **FEAT**: Added `loadManifestV2()` with three-tier fallback: `/api/manifest` → `/sensors.json` (auto-promoted) → `DEFAULT_SENSOR_META` (auto-promoted)
+- **FEAT**: Added `autoPromoteV1ToV2()` — converts legacy v1 `[{id, name}]` array to full v2 manifest structure with ThermoPro defaults
+- **FEAT**: Boot flow now calls `loadManifestV2()` and stores result in `window._manifest`
+- **TEST**: Added Playwright group 9 — manifest v2 loader: verifies `window._manifest` is set, has correct structure, sensors, gateway block, metrics
+- **TEST**: Added Playwright group 10 — fallback chain: verifies dashboard loads when `/api/manifest` returns 404 (falls back to `/sensors.json`), verifies both functions are defined
+- **DOCS**: Changelog updated
+- **VERSION**: Bumped to 7.5.2.0 across all canonical locations
+
+**Phase 2 in progress:**
+- v7.5.2.0 — Manifest v2 loader with fallback chain ✅
+- v7.5.2.1 — Card renderer registry (next)
+- v7.5.2.2 — Metric formatters registry
+- v7.5.2.3 — Generic history fetching
+- v7.5.2.4 — Full Playwright regression + Phase 2 closure
+
+Related: phase2-implementation-plan.md
+
+---
+
 ## v7.5.1.3 (2026-03-15)
 
 **Phase 1 Refinement — Test Fixture Alignment & Version Sync**

@@ -905,7 +905,7 @@ static const char DASHBOARD_HTML[] DASHBOARD_STORAGE_ATTR = R"DASH64(
 // The bulk of the logic still lives in existing functions so regression risk stays low.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.1.3';
+App.version = 'v7.5.2.0';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};

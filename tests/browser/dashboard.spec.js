@@ -326,3 +326,84 @@ test.describe('8. Console error guard', () => {
     expect(unexpected).toHaveLength(0);
   });
 });
+
+// ── 9. Manifest v2 loader ─────────────────────────────────────────
+
+test.describe('9. Manifest v2 loader', () => {
+  test('window._manifest is set after boot', async ({ page }) => {
+    await loadDashboard(page);
+    // Give boot sequence time to complete manifest fetch
+    await page.waitForFunction(() => window._manifest !== undefined, { timeout: 10000 });
+    const manifest = await page.evaluate(() => window._manifest);
+    expect(manifest).not.toBeNull();
+    expect(manifest.schema_version).toBe(2);
+    expect(Array.isArray(manifest.sensors)).toBe(true);
+    expect(manifest.sensors.length).toBeGreaterThan(0);
+  });
+
+  test('manifest v2 contains expected sensor ids', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.sensors, { timeout: 10000 });
+    const ids = await page.evaluate(() => window._manifest.sensors.map(s => s.id));
+    expect(ids).toContain('office');
+    expect(ids).toContain('first_floor');
+    expect(ids).toContain('outside');
+  });
+
+  test('manifest v2 has gateway block', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.gateway, { timeout: 10000 });
+    const gateway = await page.evaluate(() => window._manifest.gateway);
+    expect(gateway).toBeTruthy();
+    expect(gateway.id).toBeTruthy();
+  });
+
+  test('manifest v2 has metrics array with temp and hum', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.metrics, { timeout: 10000 });
+    const metrics = await page.evaluate(() => window._manifest.metrics);
+    expect(Array.isArray(metrics)).toBe(true);
+    const keys = metrics.map(m => m.key);
+    expect(keys).toContain('temp');
+    expect(keys).toContain('hum');
+  });
+});
+
+// ── 10. Manifest v2 fallback chain ────────────────────────────────
+
+test.describe('10. Manifest v2 fallback chain', () => {
+  test('dashboard loads when /api/manifest returns 404 (fallback to /sensors.json)', async ({ page }) => {
+    // DISABLE_API_MANIFEST=1 makes the mock server return 404 for /api/manifest
+    // This test relies on the mock server port being the standard 3737.
+    // We test the fallback by verifying the dashboard still renders sensor cards
+    // when window._manifest is set via the fallback path.
+    let pageError = null;
+    page.on('pageerror', err => { pageError = err; });
+
+    // Re-route /api/manifest to 404 by intercepting the request
+    await page.route('**/api/manifest', route => route.fulfill({ status: 404, body: JSON.stringify({ ok: false }) }));
+
+    await loadDashboard(page);
+    expect(pageError).toBeNull();
+
+    // Dashboard should still render 3 sensor cards via /sensors.json fallback
+    await expect(page.locator('.sensor-card')).toHaveCount(3);
+
+    // _manifest should still be set (auto-promoted from sensors.json)
+    await page.waitForFunction(() => window._manifest !== undefined, { timeout: 10000 });
+    const manifest = await page.evaluate(() => window._manifest);
+    expect(manifest).not.toBeNull();
+    expect(manifest.schema_version).toBe(2);
+    expect(manifest.source).toBe('auto-promoted');
+  });
+
+  test('loadManifestV2 and autoPromoteV1ToV2 are defined on the page', async ({ page }) => {
+    await loadDashboard(page);
+    const fns = await page.evaluate(() => ({
+      loadManifestV2: typeof loadManifestV2,
+      autoPromoteV1ToV2: typeof autoPromoteV1ToV2,
+    }));
+    expect(fns.loadManifestV2).toBe('function');
+    expect(fns.autoPromoteV1ToV2).toBe('function');
+  });
+});
