@@ -199,9 +199,17 @@ Added automated preflight validation that verifies the generated manifest confor
 
 This prevents malformed manifest JSON from reaching `main`.
 
-### v7.5.1.2 — ESPHome YAML Parse Gate (planned)
+### v7.5.1.2 — ESPHome YAML Parse Gate (2026-03-15)
 
-Add `esphome config` validation to preflight (ISSUE-004, LESSON-OPS-045).
+Added automated preflight validation that verifies the generated ESPHome YAML is syntactically valid:
+- Runs `esphome config firmware/esp32-c3-multi-sensor.yaml` to validate YAML structure
+- Fails preflight if YAML has syntax errors, indentation issues, or schema violations
+- Skips check with warning if `esphome` not installed (graceful degradation for non-ESPHome environments)
+- CI workflow installs ESPHome to ensure parse check always runs in automated testing
+
+This prevents generator bugs (BUG-035: YAML indentation regression, BUG-036: YAML generator reintroduced broken indentation) from producing broken YAML that passes file sync checks but fails at compile time.
+
+Related: ISSUE-004, LESSON-OPS-045
 
 ### v7.5.1.3 — Test Fixture Alignment (planned)
 

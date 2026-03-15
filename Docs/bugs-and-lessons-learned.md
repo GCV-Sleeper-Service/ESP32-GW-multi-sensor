@@ -354,6 +354,8 @@ The existing preflight catches version drift and generator sync failures. It doe
 
 Without this gate, a generator bug can produce invalid YAML that passes preflight, passes `--check`, and only fails at `esphome compile`. The gap between "preflight green" and "compile fails" wastes time and creates false confidence.
 
+**Implementation**: v7.5.1.2 — preflight runs `esphome config firmware/esp32-c3-multi-sensor.yaml`
+
 ---
 
 ### LESSON-OPS-044: Runtime validation must cover both the custom dashboard and the built-in ESPHome web page (v7.5.0.1)
@@ -705,6 +707,8 @@ Single-sensor import is now safe/merge-based, but multi-sensor import still clea
 
 The endpoint was implemented as Phase 1, but the response does not yet include the full v2 schema as specified in `Docs/v7.5-v7.6-architecture-plan.md` — specifically: the `gateway` identity block, the `history` retention policy block, and per-measurement `class`, `data_type`, and `display` hints. These are required before Phase 2 (dashboard consuming full manifest) can be fully implemented.
 
-### ISSUE-004: Preflight does not gate on ESPHome YAML validity
+### ISSUE-004: ✅ RESOLVED (v7.5.1.2) — Preflight does not gate on ESPHome YAML validity
 
 `preflight.sh` validates version strings, generator sync, and fixture alignment but does not run `esphome config` to verify YAML parse. A generator bug can produce structurally invalid YAML that passes all preflight checks. See LESSON-OPS-045.
+
+**Resolution**: Preflight now runs `esphome config` to validate YAML structure before allowing merge

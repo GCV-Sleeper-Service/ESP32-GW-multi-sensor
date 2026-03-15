@@ -4,6 +4,24 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.1.2 (2026-03-15)
+
+**Phase 1 Refinement — ESPHome YAML Parse Gate**
+
+Adds automated validation to preflight that verifies the generated ESPHome YAML is syntactically valid and parseable:
+
+- **TEST**: Preflight runs `esphome config` to validate YAML structure
+- **TEST**: Preflight fails if YAML has syntax errors, indentation issues, or schema violations
+- **TEST**: Preflight skips check with warning if `esphome` not installed (graceful degradation)
+- **CI**: GitHub Actions workflow installs ESPHome to ensure parse check always runs in automated testing
+- **DOCS**: Updated architecture plan — Phase 1 refinement step 2 of 3 complete
+
+This prevents generator bugs (like BUG-035/BUG-036) from producing broken YAML that passes preflight but fails at compile time.
+
+Related: ISSUE-004 (ESPHome parse gate), LESSON-OPS-045 (YAML parse validation)
+
+---
+
 ## v7.5.1.1 (2026-03-15)
 
 **Phase 1 Refinement — Manifest Schema Validation**

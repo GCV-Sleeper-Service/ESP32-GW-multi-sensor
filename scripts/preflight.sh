@@ -131,8 +131,26 @@ else
   fi
 fi
 
+echo "→ Validating ESPHome YAML configuration..."
+
+# Check if esphome is available
+if ! command -v esphome &> /dev/null; then
+  echo "⚠ esphome not found — skipping YAML parse check"
+  echo "  (Install via: pip install esphome)"
+else
+  # Run esphome config to validate YAML structure
+  # This parses the YAML and validates the configuration without compiling
+  if esphome config firmware/esp32-c3-multi-sensor.yaml > /dev/null 2>&1; then
+    echo "✓ ESPHome YAML configuration is valid"
+  else
+    echo "✗ ESPHome YAML configuration is invalid"
+    echo "  Run 'esphome config firmware/esp32-c3-multi-sensor.yaml' to see errors"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+fi
+
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
-  echo "✗ Manifest v2 schema validation failed with $FAIL_COUNT error(s)"
+  echo "✗ Preflight failed with $FAIL_COUNT error(s)"
   exit 1
 fi
 
