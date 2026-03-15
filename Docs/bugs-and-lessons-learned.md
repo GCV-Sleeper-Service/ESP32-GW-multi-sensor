@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-14 — v7.5.0.1 (BUG-033–039, LESSON-OPS-039–045 added)_
+_Last updated: 2026-03-15 — v7.5.1.1 (BUG-040, LESSON-OPS-046–047 added; PR#14/PR#15 case study documented)
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -10,6 +10,24 @@ Both sections are in **reverse chronological order** — most recent entry first
 ---
 
 ## Bug Fixes
+
+### BUG-040: `/api/manifest` handler built inline — violating architectural spec for generated C string literal (v7.5.0.1 → fixed v7.5.1.1)
+
+**Symptom:** The `/api/manifest` endpoint in `dashboard/sensor_history_multi.h` was implemented as a sequence of inline `resp->print()` calls building JSON at runtime. This functioned correctly but violated the architectural design specified in `Docs/v7.5-v7.6-architecture-plan.md` Section 5.4, which requires a compile-time static string literal generated from `config/sensors.json` via `scripts/render_sensor_config.py`.
+
+**Root cause:** Phase 1 implementation used an inline approach as a pragmatic shortcut when the generator was not yet extended to produce `dashboard/gateway_manifest.h`. The shortcut was never replaced, and no generator check or preflight gate existed to detect the deviation.
+
+**Fix (v7.5.1.1):**
+1. Added `generate_gateway_manifest_header()` function to `scripts/render_sensor_config.py` — generates `dashboard/gateway_manifest.h` containing a `static const char GATEWAY_MANIFEST_JSON[]` R-string literal wrapping the full v2 manifest JSON.
+2. Added `GATEWAY_MANIFEST_H_PATH` to the `expected` dict in `render_sensor_config.py` so the header is regenerated and idempotency-checked on every `--write` / `--check` invocation.
+3. Added `#include "gateway_manifest.h"` to `dashboard/sensor_history_multi.h`.
+4. Replaced the inline multi-call handler body with a single `resp->print(GATEWAY_MANIFEST_JSON)` call.
+5. Added `gateway_manifest.h` to `REQUIRED_FILES` in `preflight.sh`.
+6. Added four preflight checks: include present, `GATEWAY_MANIFEST_JSON` usage, `#pragma once`, and `R"MANIFEST(` raw string delimiter.
+
+**Lesson:** See LESSON-OPS-046.
+
+---
 
 ### BUG-039: Dashboard source and generated artifacts drifted after Phase 1 work (v7.5.0.1)
 
@@ -325,6 +343,47 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-047: Incremental PR strategy — what PR#14/PR#15 taught us (v7.5.1.x case study)
+
+**Context:** PR#14 and PR#15 were both attempts to complete Phase 1 deliverables (manifest generator, schema completion, fixture alignment, preflight gates) in the days following the v7.5.0.1 baseline.
+
+**PR#14 (merged successfully):**
+- **Scope:** Three atomic byte-level mismatches in the Python/JS fixture generators (source field, Unicode encoding, version prefix).
+- **Result:** Merged cleanly. CI green. Tests passed.
+- **Why it worked:** Single concern, one-sentence description of the change, 3 files changed, no cascading effects.
+
+**PR#15 (draft, closed/deleted — failure):**
+- **Scope:** Attempted to deliver ALL of the following in one PR: generate `gateway_manifest.h`, upgrade `manifest_v2()` to full schema (gateway block, history policy, per-sensor measurements), upgrade `config/sensors.json` to v2, extend `sensor_manifest_lib.py`, update fixture files, add preflight schema validator.
+- **Size:** ~21 files changed, 810 additions, 245 deletions.
+- **Result:** Abandoned. The PR touched too many concerns simultaneously, making it impossible to isolate which change caused which failure. Version bumps were mixed with schema changes. Generator changes broke the YAML validator. Fixture expectations diverged from the new schema mid-PR.
+- **Why it failed:** Violated the atomic-change principle. A single PR can only be validated correctly when it changes one thing and has one test. When multiple things change, test failures cannot be attributed, rollback is painful, and reviewer confidence collapses.
+
+**Operational rule extracted:**
+> A PR for generated-code infrastructure must change exactly one concern: either the generator, or the schema, or the fixture, or the validator — never all four in one shot.
+
+**Correct incremental sequence for Phase 1 completion:**
+1. v7.5.1.1 — generate `gateway_manifest.h` + replace inline handler (this PR)
+2. v7.5.1.2 — upgrade `manifest_v2()` to full schema
+3. v7.5.1.3 — upgrade `config/sensors.json` to v2 + extend `sensor_manifest_lib.py`
+4. v7.5.1.4 — add `validate_v2_schema()` to preflight + create `tests/fixtures/manifest-v2.json`
+5. v7.5.1.5 — extend generator `--check` for all generated artifacts
+
+Each step is validated (preflight pass + idempotence check) before the next begins.
+
+---
+
+### LESSON-OPS-046: Generated C headers must be owned by the generator, not written by hand (v7.5.1.1)
+
+When a C/C++ header is derived from a configuration source (such as `config/sensors.json`), it must be:
+1. Generated by the canonical generator script (`render_sensor_config.py`)
+2. Listed in the generator's `expected` dict so `--check` detects drift
+3. Listed in `REQUIRED_FILES` in `preflight.sh`
+4. Validated by content checks in `preflight.sh` (pragma once, raw string delimiter, include present, usage present)
+
+If a generated artifact exists but is not owned by the generator, it will silently diverge as configuration changes. The generator is the single source of truth for all derived artifacts.
+
+---
 
 ### LESSON-OPS-045: Preflight must include a YAML/ESPHome parse gate, not just generated-file sync checks (v7.5.0.1)
 
@@ -679,9 +738,9 @@ The current export path remains acceptable for the present dataset sizes, but it
 
 Single-sensor import is now safe/merge-based, but multi-sensor import still clears existing history before writing.
 
-### ISSUE-003: `/api/manifest` response is a partial v2 schema
+### ISSUE-003: `/api/manifest` response is a partial v2 schema (schema upgrade pending v7.5.1.2)
 
-The endpoint was implemented as Phase 1, but the response does not yet include the full v2 schema as specified in `Docs/v7.5-v7.6-architecture-plan.md` — specifically: the `gateway` identity block, the `history` retention policy block, and per-measurement `class`, `data_type`, and `display` hints. These are required before Phase 2 (dashboard consuming full manifest) can be fully implemented.
+The endpoint handler was converted in v7.5.1.1 to serve a compile-time static string from `dashboard/gateway_manifest.h`. However, the schema is still partial — it does not yet include the full v2 schema as specified in `Docs/v7.5-v7.6-architecture-plan.md` — specifically: the `gateway` identity block, the `history` retention policy block, and per-measurement `class`, `data_type`, and `display` hints. These are required before Phase 2 (dashboard consuming full manifest) can be fully implemented. **Tracked for v7.5.1.2.**
 
 ### ISSUE-004: Preflight does not gate on ESPHome YAML validity
 

@@ -4,6 +4,28 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.1.1 — 2026-03-15
+
+**Completed:** Phase 1 remediation — generate `gateway_manifest.h`, replace inline `/api/manifest` handler
+
+- Generated `dashboard/gateway_manifest.h` containing a compile-time `static const char GATEWAY_MANIFEST_JSON[]` R-string literal holding the full v2 manifest JSON, produced by `scripts/render_sensor_config.py` from `config/sensors.json`
+- Extended `scripts/render_sensor_config.py` with `generate_gateway_manifest_header()` function and added `gateway_manifest.h` to the `expected` dict for idempotency checks
+- Replaced the inline `handle_api_manifest_()` handler in `dashboard/sensor_history_multi.h` (which built JSON via multiple `resp->print()` calls at runtime) with a single `resp->print(GATEWAY_MANIFEST_JSON)` call using the compile-time string
+- Added `#include "gateway_manifest.h"` to `dashboard/sensor_history_multi.h`
+- Added `dashboard/gateway_manifest.h` to `REQUIRED_FILES` in `scripts/preflight.sh`
+- Added four preflight content checks: include present, `GATEWAY_MANIFEST_JSON` usage, `#pragma once`, and `R"MANIFEST(` raw string delimiter
+- Documented PR#14/PR#15 failure case study in `Docs/bugs-and-lessons-learned.md` (LESSON-OPS-047)
+- No version bump (fix is within v7.5.0.1 baseline — architectural alignment only)
+
+**Validated:**
+- `python3 scripts/render_sensor_config.py --write` → generates `dashboard/gateway_manifest.h` ✓
+- `python3 scripts/render_sensor_config.py --check` → PASS (idempotent) ✓
+- `bash ./scripts/preflight.sh` → all checks PASS ✓
+- `/api/manifest` endpoint behavior unchanged (returns same JSON structure) ✓
+- No runtime regressions
+
+---
+
 ## v7.5.0.1 — 2026-03-14
 
 **Completed:** Phase 1 — manifest endpoint, dashboard migration, and runtime fixes

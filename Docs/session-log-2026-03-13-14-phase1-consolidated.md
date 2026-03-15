@@ -166,21 +166,77 @@ All bugs and lessons from this phase are recorded in `Docs/bugs-and-lessons-lear
 
 ---
 
-## Open Items for Phase 2
+## Session: v7.5.1.x Remediation Series — 2026-03-15
 
-The following items were scoped out of Phase 1 and are required inputs for Phase 2:
+**Session Date:** 2026-03-15  
+**Baseline:** v7.5.0.1 (commit 9a3ada3c)  
+**Objective:** Complete Phase 1 architectural deliverables through incremental patch releases v7.5.1.1 through v7.5.1.5
 
-1. **Upgrade `/api/manifest` to full v2 schema.** Add `gateway` identity block, `history` retention policy block, and per-measurement `class`/`data_type`/`display` hints. See ISSUE-003 and `Docs/v7.5-v7.6-architecture-plan.md` section 5.2.
-2. **Add ESPHome YAML parse gate to preflight.** `esphome config firmware/esp32-c3-multi-sensor.yaml` should be a preflight step. See ISSUE-004 and LESSON-OPS-045.
-3. **Align `tests/fixtures/manifest.json` to the full v2 schema.** Currently this is a partial schema sufficient for Phase 1 tests only.
-4. **Phase 2 dashboard work.** See `Docs/esp32-gateway-fresh-start-handoff.md` section 7 for the full Phase 2 task sequence.
+### Request Understanding
+
+User requested:
+1. Fix the gap between architectural intent (generated C string literal for `/api/manifest`) and actual implementation (inline runtime handler)
+2. Document PR#14 and PR#15 as a case study for incremental work scheduling — PR#14 succeeded (focused, atomic), PR#15 failed (too broad, mixed concerns)
+3. Update session log, changelog, and bugs-and-lessons-learned alongside each fix
+4. Update `esp32-gateway-fresh-start-handoff.md` at the end of each v7.5.1.x series
+
+### Deliverable: v7.5.1.1 — Generate `gateway_manifest.h` + Replace Inline Handler
+
+**Files changed:**
+- `scripts/render_sensor_config.py` — Added `GATEWAY_MANIFEST_H_PATH` constant and `generate_gateway_manifest_header()` function; added header to `expected` dict
+- `dashboard/gateway_manifest.h` — **New file**, generated; contains `static const char GATEWAY_MANIFEST_JSON[]` R-string literal
+- `dashboard/sensor_history_multi.h` — Added `#include "gateway_manifest.h"`; replaced 20-call inline handler with `resp->print(GATEWAY_MANIFEST_JSON)`
+- `scripts/preflight.sh` — Added `gateway_manifest.h` to `REQUIRED_FILES`; added 4 content checks
+- `Docs/changelog.md` — Added v7.5.1.1 entry
+- `Docs/bugs-and-lessons-learned.md` — Added BUG-040, LESSON-OPS-046, LESSON-OPS-047 (PR#14/PR#15 case study)
+- `Docs/session-log-2026-03-13-14-phase1-consolidated.md` — This section
+
+**Why this fix matters:**
+
+The architectural intent (Section 5.4 of the architecture plan) requires the manifest to be a compile-time static string. The reasons:
+- No JSON serializer needed on ESP32 at runtime
+- Zero heap pressure (string is in flash/rodata, not heap)
+- No failure modes (the string is always valid)
+- The manifest is derived from `config/sensors.json` — it should be generated, not hand-coded in firmware
+
+The inline approach was functional but violated this intent and created a maintenance risk: the inline code could diverge from the generated fixtures undetected.
+
+**PR#14/PR#15 Case Study (what NOT to do):**
+
+PR#14 (merged) — changed 3 files, one concern (byte-level fixture mismatches), CI green, merged same day.
+
+PR#15 (abandoned) — attempted to deliver ALL of: gateway_manifest.h, full manifest schema upgrade, config/sensors.json v2 upgrade, sensor_manifest_lib.py extension, fixture updates, preflight schema validator. Result: 21 files, 810 additions, impossible to isolate failures, abandoned.
+
+**Rule extracted:** One PR = one concern. Validate (preflight + idempotence) before starting the next.
+
+### Validation Results (v7.5.1.1)
+
+| Check | Result |
+|---|---|
+| `python3 scripts/render_sensor_config.py --write` | Generated `dashboard/gateway_manifest.h` |
+| `python3 scripts/render_sensor_config.py --check` | PASS (idempotent) |
+| `bash ./scripts/preflight.sh` | All 19 checks PASS |
+| `gateway_manifest.h` contains valid JSON in R-string | ✓ |
+| `sensor_history_multi.h` includes header and uses `GATEWAY_MANIFEST_JSON` | ✓ |
+| No version bump | VERSION stays at 7.5.0.1 |
 
 ---
 
-## Suggested Branch for Next Work
+## Open Items for v7.5.1.x Series (Remaining)
+
+1. **v7.5.1.2** — Upgrade `manifest_v2()` to full schema (add `gateway` identity block, `history` retention policy block, per-measurement `class`/`data_type`/`display` hints). See ISSUE-003.
+2. **v7.5.1.3** — Upgrade `config/sensors.json` to v2 + extend `sensor_manifest_lib.py` to read and validate v2 fields.
+3. **v7.5.1.4** — Add `validate_v2_schema()` to preflight + create `tests/fixtures/manifest-v2.json` with full schema.
+4. **v7.5.1.5** — Extend `render_sensor_config.py --check` validation for all generated artifacts.
+5. **End of series** — Update `Docs/esp32-gateway-fresh-start-handoff.md` with complete Phase 1 picture before starting Phase 2.
+
+---
+
+## Suggested Branch for v7.5.1.2 Work
 
 ```bash
 git checkout main
 git pull
-git checkout -b phase2-from-v7.5.0.1
+git checkout -b v7.5.1.2-manifest-full-schema
 ```
+

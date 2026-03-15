@@ -25,6 +25,7 @@ REQUIRED_FILES=(
   dashboard/dashboard.js
   dashboard/dashboard.h
   dashboard/sensor_history_multi.h
+  dashboard/gateway_manifest.h
   firmware/esp32-c3-multi-sensor.yaml
   scripts/apply_phase1_manifest_patch.py
   scripts/render_sensor_config.py
@@ -48,6 +49,10 @@ check_contains "dashboard_js_version_matches" dashboard/dashboard.js "App.versio
 check_contains "firmware_version_matches" firmware/esp32-c3-multi-sensor.yaml "${VER_TAG}"
 check_contains "history_header_version_matches" dashboard/sensor_history_multi.h "sensor_history_multi-${VER_TAG}.h"
 check_contains "history_handler_has_api_manifest_route" dashboard/sensor_history_multi.h "/api/manifest"
+check_contains "sensor_history_includes_gateway_manifest_h" dashboard/sensor_history_multi.h '#include "gateway_manifest.h"'
+check_contains "sensor_history_uses_GATEWAY_MANIFEST_JSON" dashboard/sensor_history_multi.h "resp->print(GATEWAY_MANIFEST_JSON)"
+check_contains "gateway_manifest_h_pragma_once" dashboard/gateway_manifest.h "#pragma once"
+check_contains "gateway_manifest_h_raw_string" dashboard/gateway_manifest.h 'R"MANIFEST('
 check_contains "dashboard_prefers_api_manifest" dashboard/dashboard.js "fetch(ESP_HOST + '/api/manifest'"
 check_contains "dashboard_legacy_manifest_fallback" dashboard/dashboard.js "fetch(ESP_HOST + '/sensors.json'"
 check_contains "mock_server_serves_api_manifest" tests/mock-server/server.js "pathname === '/api/manifest'"
