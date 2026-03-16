@@ -905,9 +905,11 @@ static const char DASHBOARD_HTML[] DASHBOARD_STORAGE_ATTR = R"DASH64(
 // The bulk of the logic still lives in existing functions so regression risk stays low.
 // v7.5.2.0 (Phase 2 Step 1): adds loadManifestV2() + autoPromoteV1ToV2() for
 // manifest v2 consumption; result stored in window._manifest. No rendering changes.
+// v7.5.2.3 (Phase 2 Step 4): adds fetchDeviceHistory() — manifest-driven history URL
+// resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.2.2';
+App.version = 'v7.5.2.3';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -1262,12 +1264,61 @@ function buildNormalizedSensorRows(tempText, humText) {
   });
 }
 
+// fetchDeviceHistory — manifest-driven history URL resolution (v7.5.2.3)
+// Derives history URLs from manifest measurements[].history_url when available.
+// Falls back to legacy /history/{id}/temp and /history/{id}/hum when manifest data is absent.
+// Returns Promise<Array<{key, raw}>> where raw is the CSV text.
+function fetchDeviceHistory(sensor, manifest) {
+  var historyMeasurements = [];
+
+  // Manifest-driven: look up this sensor's measurements and their history URLs
+  if (manifest && manifest.sensors) {
+    var manifestDevice = null;
+    for (var i = 0; i < manifest.sensors.length; i++) {
+      if (manifest.sensors[i].id === sensor.id) { manifestDevice = manifest.sensors[i]; break; }
+    }
+    if (manifestDevice && manifestDevice.measurements) {
+      manifestDevice.measurements.forEach(function(m) {
+        var metricDef = null;
+        if (manifest.metrics) {
+          for (var j = 0; j < manifest.metrics.length; j++) {
+            if (manifest.metrics[j].key === m.key) { metricDef = manifest.metrics[j]; break; }
+          }
+        }
+        // Only include measurements that have history + chart enabled
+        if (metricDef && metricDef.history && metricDef.display && metricDef.display.chart) {
+          historyMeasurements.push({
+            key: m.key,
+            url: m.history_url || ('/history/' + sensor.id + '/' + (metricDef.history_suffix || m.key))
+          });
+        }
+      });
+    }
+  }
+
+  // Fallback: if no manifest data available, use legacy temp/hum paths
+  if (historyMeasurements.length === 0) {
+    historyMeasurements = [
+      { key: 'temp', url: '/history/' + sensor.id + '/temp' },
+      { key: 'hum',  url: '/history/' + sensor.id + '/hum'  }
+    ];
+  }
+
+  return Promise.all(historyMeasurements.map(function(m) {
+    return fetch(ESP_HOST + m.url, {cache:'no-store'})
+      .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function(text) { return { key: m.key, raw: text }; });
+  }));
+}
+
 function fetchSensorHistoryRows(sensor) {
-  return Promise.all([
-    fetch(ESP_HOST + '/history/' + sensor.id + '/temp', {cache:'no-store'}).then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }),
-    fetch(ESP_HOST + '/history/' + sensor.id + '/hum', {cache:'no-store'}).then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-  ]).then(function(results) {
-    return buildNormalizedSensorRows(results[0], results[1]);
+  return fetchDeviceHistory(sensor, window._manifest).then(function(series) {
+    var temp = '', hum = '';
+    series.forEach(function(s) {
+      if (s.key === 'temp') temp = s.raw;
+      else if (s.key === 'hum') hum = s.raw;
+    });
+    return buildNormalizedSensorRows(temp, hum);
   });
 }
 
@@ -3582,14 +3633,19 @@ function loadHistory() {
 
     var s = SENSORS[sensorIdx];
 
-    fetch(ESP_HOST + '/history/' + s.id + '/temp', {cache:'no-store'})
-    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-    .then(function(text) {
-      var pts = parseCompactHistory(text);
-      ensureHistoryStore(s.id).temp = pts;
-      loaded += pts.length;
-      if (pts.length > 0) {
-        var last = pts[pts.length - 1];
+    fetchDeviceHistory(s, window._manifest)
+    .then(function(series) {
+      var tempPts = [], humPts = [];
+      series.forEach(function(item) {
+        var pts = parseCompactHistory(item.raw);
+        if (item.key === 'temp') tempPts = pts;
+        else if (item.key === 'hum') humPts = pts;
+      });
+
+      ensureHistoryStore(s.id).temp = tempPts;
+      loaded += tempPts.length;
+      if (tempPts.length > 0) {
+        var last = tempPts[tempPts.length - 1];
         if (last.y !== null) {
           var el = document.getElementById('val-' + esc(s.tempAvgId));
           if (el) {
@@ -3598,22 +3654,19 @@ function loadHistory() {
           }
         }
       }
-      updateMinMax(pts, s.id, true);
-      return fetch(ESP_HOST + '/history/' + s.id + '/hum', {cache:'no-store'});
-    })
-    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-    .then(function(text) {
-      var pts = parseCompactHistory(text);
-      ensureHistoryStore(s.id).hum = pts;
-      loaded += pts.length;
-      if (pts.length > 0) {
-        var last = pts[pts.length - 1], el = document.getElementById('val-' + esc(s.humAvgId));
-        if (el) {
-          el.textContent = (last.y !== null) ? formatMetricValue('humidity', last.y, getMetricDef('hum')) : 'No data';
-          el.classList.remove('waiting');
+      updateMinMax(tempPts, s.id, true);
+
+      ensureHistoryStore(s.id).hum = humPts;
+      loaded += humPts.length;
+      if (humPts.length > 0) {
+        var lastH = humPts[humPts.length - 1], elH = document.getElementById('val-' + esc(s.humAvgId));
+        if (elH) {
+          elH.textContent = (lastH.y !== null) ? formatMetricValue('humidity', lastH.y, getMetricDef('hum')) : 'No data';
+          elH.classList.remove('waiting');
         }
       }
-      updateMinMax(pts, s.id, false);
+      updateMinMax(humPts, s.id, false);
+
       dlog(s.name + ' history loaded', 'ok');
       sensorIdx++;
       loadNext();
@@ -3773,6 +3826,7 @@ try {
   App.API.loadSensorManifest = loadSensorManifest;
   App.API.loadHistory = loadHistory;
   App.API.loadStorageStats = loadStorageStats;
+  App.API.fetchDeviceHistory = fetchDeviceHistory;
 
   // Transport
   App.Transport.connectSSE = connectSSE;

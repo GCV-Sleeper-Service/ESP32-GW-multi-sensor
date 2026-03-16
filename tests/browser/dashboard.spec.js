@@ -527,3 +527,80 @@ test.describe('12. Metric formatter registry', () => {
     expect(result).toContain('20.0');
   });
 });
+
+// ── 13. Manifest-driven history fetching ─────────────────────────
+
+test.describe('13. Manifest-driven history fetching', () => {
+  test('fetchDeviceHistory is a callable function', async ({ page }) => {
+    await loadDashboard(page);
+    const ok = await page.evaluate(() => typeof fetchDeviceHistory === 'function');
+    expect(ok).toBe(true);
+  });
+
+  test('App.API.fetchDeviceHistory is exported', async ({ page }) => {
+    await loadDashboard(page);
+    const ok = await page.evaluate(() => typeof App.API.fetchDeviceHistory === 'function');
+    expect(ok).toBe(true);
+  });
+
+  test('fetchDeviceHistory uses history_url from manifest measurements', async ({ page }) => {
+    await loadDashboard(page);
+
+    // Intercept subsequent history requests (after initial page load)
+    const requestedUrls = [];
+    await page.route('**/history/**', (route) => {
+      requestedUrls.push(new URL(route.request().url()).pathname);
+      route.fulfill({ status: 200, contentType: 'text/plain', body: '1700000000,22.5\n' });
+    });
+
+    // Call fetchDeviceHistory with a sensor that exists in window._manifest
+    await page.evaluate(() => {
+      return fetchDeviceHistory({ id: 'office', name: 'Office' }, window._manifest);
+    });
+
+    // Manifest has history_url: '/history/office/temp' and '/history/office/hum'
+    expect(requestedUrls).toContain('/history/office/temp');
+    expect(requestedUrls).toContain('/history/office/hum');
+  });
+
+  test('fetchDeviceHistory falls back to legacy URLs when manifest is null', async ({ page }) => {
+    await loadDashboard(page);
+
+    const requestedUrls = [];
+    await page.route('**/history/**', (route) => {
+      requestedUrls.push(new URL(route.request().url()).pathname);
+      route.fulfill({ status: 200, contentType: 'text/plain', body: '' });
+    });
+
+    // Call fetchDeviceHistory with null manifest — should fall back to /history/{id}/temp and /history/{id}/hum
+    await page.evaluate(() => {
+      return fetchDeviceHistory({ id: 'office', name: 'Office' }, null);
+    });
+
+    expect(requestedUrls).toContain('/history/office/temp');
+    expect(requestedUrls).toContain('/history/office/hum');
+  });
+
+  test('fetchDeviceHistory falls back to legacy URLs when manifest has no matching sensor', async ({ page }) => {
+    await loadDashboard(page);
+
+    const requestedUrls = [];
+    await page.route('**/history/**', (route) => {
+      requestedUrls.push(new URL(route.request().url()).pathname);
+      route.fulfill({ status: 200, contentType: 'text/plain', body: '' });
+    });
+
+    // Call with a manifest that has no sensor matching 'test-sensor'
+    const ok = await page.evaluate(() => {
+      var sensor = { id: 'test-sensor', name: 'Test Sensor' };
+      var emptyManifest = { schema_version: 2, sensors: [], metrics: [] };
+      return fetchDeviceHistory(sensor, emptyManifest)
+        .then(function() { return true; })
+        .catch(function() { return false; });
+    });
+
+    expect(ok).toBe(true);
+    expect(requestedUrls).toContain('/history/test-sensor/temp');
+    expect(requestedUrls).toContain('/history/test-sensor/hum');
+  });
+});
