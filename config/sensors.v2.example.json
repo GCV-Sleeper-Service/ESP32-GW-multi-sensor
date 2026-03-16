@@ -1,0 +1,19 @@
+{
+  "schema_version": 2,
+  "sensors": [
+    {
+      "id": "office",
+      "name": "Office",
+      "mac": "DB:06:2C:58:8A:59",
+      "category": "environmental",
+      "adapter": "thermopro_ble"
+    },
+    {
+      "id": "wan_ping",
+      "name": "WAN Latency",
+      "category": "network",
+      "adapter": "icmp_ping",
+      "source": { "target": "8.8.8.8" }
+    }
+  ]
+}

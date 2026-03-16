@@ -897,7 +897,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.2.4';
+App.version = 'v7.5.3.0';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -3846,15 +3846,17 @@ App.Features.register({
 App.Boot.start = function() {
   var modeStr = TRANSPORT === 'sse' ? (ESP_HOST === '' ? 'HOSTED' : 'SSE') : 'POLLING';
   document.getElementById('modeLabel').textContent = '[' + modeStr + ' mode]';
-  // v7.5.2.0: load full v2 manifest alongside existing sensor manifest
+  // v7.5.3.0: sequence manifest v2 load before sensor manifest load
+  // to ensure window._manifest is available when buildDeviceCards() runs
   loadManifestV2().then(function(manifest) {
     window._manifest = manifest;
-    dlog('[manifest] v2 manifest stored in window._manifest (source: ' + (manifest.source || 'unknown') + ')', 'ok');
+    dlog('[manifest] v2 manifest stored (source: ' + (manifest.source || 'unknown') + ')', 'ok');
   }).catch(function(e) {
     dlog('[manifest] loadManifestV2 failed: ' + e.message, 'err');
     window._manifest = null;
-  });
-  loadSensorManifest().then(function() {
+  }).then(function() {
+    return loadSensorManifest();
+  }).then(function() {
     dlog('init - ' + SENSORS.length + ' sensors, transport=' + TRANSPORT + ', host=' + (ESP_HOST || '(same-origin)'));
     buildSensorCards();
     try { initCharts(); setHistoryRange(24); } catch(e) { dlog('initCharts: ' + e.message, 'err'); showError('Chart init failed'); }

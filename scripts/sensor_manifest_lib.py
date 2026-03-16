@@ -104,6 +104,9 @@ def load_manifest(path: Path) -> List[Dict[str, str]]:
     if isinstance(payload, list):
         sensors = payload
     elif isinstance(payload, dict):
+        # NOTE: The architecture plan uses "devices" but the implementation uses "sensors"
+        # for backward compatibility. The names are functionally equivalent. Migration to
+        # "devices" is deferred to a future major version if needed.
         sensors = payload.get("sensors")
     else:
         raise ManifestError("Manifest root must be an object or an array.")
