@@ -4,6 +4,29 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.2.3 (2026-03-16)
+
+**Phase 2 Step 4 — Generic History Fetching (Manifest-Driven)**
+
+Refactors history URL resolution so it is driven by manifest measurement definitions instead
+of hardcoded `/history/{id}/temp` and `/history/{id}/hum` paths. ThermoPro rendering remains
+pixel-identical to v7.5.2.2.
+
+- **FEAT**: Added `fetchDeviceHistory(sensor, manifest)` — manifest-driven history URL resolver; reads `measurements[].history_url` from `window._manifest.sensors`; falls back to legacy `/history/{id}/temp` and `/history/{id}/hum` when manifest data is absent or has no matching sensor
+- **REFACTOR**: `fetchSensorHistoryRows(sensor)` now delegates to `fetchDeviceHistory(sensor, window._manifest)` instead of directly building hardcoded URLs
+- **REFACTOR**: `loadHistory()` inline fetch chain refactored to use `fetchDeviceHistory()` with `Promise.all()` per sensor; behavior is identical — sequential per-sensor loading, min/max and display updates unchanged
+- **FEAT**: `App.API.fetchDeviceHistory` exported for testability
+- **TEST**: Added Group 13 (5 tests) in `tests/browser/dashboard.spec.js`:
+  - `fetchDeviceHistory` is a callable function
+  - `App.API.fetchDeviceHistory` is exported
+  - `fetchDeviceHistory` uses `history_url` from manifest measurements (URL interception test)
+  - `fetchDeviceHistory` falls back to legacy URLs when manifest is null
+  - `fetchDeviceHistory` falls back to legacy URLs when manifest has no matching sensor
+- **BUMP**: Version 7.5.2.2 → 7.5.2.3 across all canonical locations
+- **SYNC**: `dashboard/dashboard.html` kept in sync with `dashboard/dashboard.js`; `dashboard/dashboard.h` regenerated
+
+---
+
 ## v7.5.2.2 (2026-03-16)
 
 **Phase 2 Step 3 — Metric Formatter Registry**
