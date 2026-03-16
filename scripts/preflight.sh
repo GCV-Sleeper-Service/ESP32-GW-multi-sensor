@@ -17,6 +17,10 @@ check_not_contains() {
   local label="$1" file="$2" needle="$3"
   grep -Fq -- "$needle" "$file" && fail "$label" || pass "$label"
 }
+check_contains_regex() {
+  local label="$1" file="$2" pattern="$3"
+  grep -Eq -- "$pattern" "$file" && pass "$label" || fail "$label"
+}
 
 REQUIRED_FILES=(
   VERSION
@@ -30,6 +34,7 @@ REQUIRED_FILES=(
   scripts/render_sensor_config.py
   scripts/sensor_manifest_lib.py
   scripts/generate-header.sh
+  scripts/bump-version.sh
   tests/mock-server/server.js
   tests/fixtures/generate-fixtures.js
   tests/fixtures/sensors.json
@@ -46,6 +51,8 @@ done
 
 check_contains "version_file_present" VERSION "${VER_RAW}"
 check_contains "dashboard_js_version_matches" dashboard/dashboard.js "App.version = '${VER_TAG}'"
+# dashboard.h is generated from minified source (quotes and spacing may differ) — use regex
+check_contains_regex "dashboard_h_version_matches" dashboard/dashboard.h "App\.version[[:space:]]*=[[:space:]]*['\"]${VER_TAG}['\"]"
 check_contains "firmware_version_matches" firmware/esp32-c3-multi-sensor.yaml "${VER_TAG}"
 check_contains "history_header_version_matches" dashboard/sensor_history_multi.h "sensor_history_multi-${VER_TAG}.h"
 check_contains "history_handler_has_api_manifest_route" dashboard/sensor_history_multi.h "/api/manifest"
@@ -57,6 +64,15 @@ check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"se
 check_contains "browser_spec_present" tests/browser/manifest.spec.js "dashboard falls back to /sensors.json"
 check_not_contains "no_old_dashboard_version" dashboard/dashboard.js "App.version = 'v7.4.5.1'"
 check_not_contains "no_old_firmware_version" firmware/esp32-c3-multi-sensor.yaml "v7.4.5.1"
+
+echo "→ Checking render_sensor_config.py version sync..."
+RENDER_PY_VERSION=$(grep -oP '^VERSION = "\K[^"]+' scripts/render_sensor_config.py || true)
+if [[ "$VER_RAW" != "$RENDER_PY_VERSION" ]]; then
+  echo "✗ scripts/render_sensor_config.py VERSION (${RENDER_PY_VERSION}) does not match canonical VERSION (${VER_RAW})"
+  fail "render_sensor_config_py_version_sync"
+else
+  pass "render_sensor_config_py_version_sync"
+fi
 
 echo "→ Checking fixture generator version sync..."
 FIXTURE_VERSION=$(grep -oP "const VERSION = 'v\K[^']+" tests/fixtures/generate-fixtures.js || true)
