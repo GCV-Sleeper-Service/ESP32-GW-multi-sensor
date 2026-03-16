@@ -4,6 +4,23 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## Process & Documentation Hardening (2026-03-16, post-v7.5.2.0)
+
+**Long-term version-drift prevention — no firmware version change**
+
+Closes a preflight gap where `dashboard/dashboard.h` version could silently drift from `dashboard/dashboard.js` after a version bump without regenerating the header. Adds an atomic version bump script to prevent partial bumps.
+
+- **CI**: Added `dashboard_h_version_matches` preflight check — verifies `dashboard/dashboard.h` contains the current `App.version` string (catches missing `generate-header.sh` run after version bump)
+- **CI**: Added `render_sensor_config_py_version_sync` preflight check — explicitly verifies `scripts/render_sensor_config.py` VERSION constant matches canonical `VERSION` file before running `--check` (gives clearer error than generic sync failure)
+- **TOOL**: Added `scripts/bump-version.sh` — atomic version bump script that updates all canonical version locations, regenerates all artifacts, and runs preflight in one command
+- **DOCS**: Added BUG-042 and LESSON-OPS-048 to `Docs/bugs-and-lessons-learned.md`
+- **DOCS**: Added `Docs/session-log-2026-03-16-docs-version-drift-prevention.md` — session handoff log
+- **NOTE**: PR #23 is superseded by PR #24 (merged). PR #23 should be closed with a superseded comment; see session log for exact wording.
+
+Related: BUG-042, LESSON-OPS-048
+
+---
+
 ## v7.5.2.0 (2026-03-16)
 
 **Phase 2 Step 1 — Dashboard Manifest v2 Loader with Fallback Chain**
