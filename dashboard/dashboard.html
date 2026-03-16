@@ -895,7 +895,7 @@
 // manifest v2 consumption; result stored in window._manifest. No rendering changes.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.2.1';
+App.version = 'v7.5.2.2';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -1150,6 +1150,38 @@ function csvEscape(value) {
 
 function formatMetricNumber(value) {
   return (typeof value === 'number' && isFinite(value)) ? value.toFixed(1) : '';
+}
+
+// ── v7.5.2.2 — Metric formatter registry ─────────────────────────
+var METRIC_FORMATTERS = {
+  temperature: function(value, unit) {
+    if (unit === 'celsius' || unit === '\u00b0C') {
+      var f = value * 9 / 5 + 32;
+      return value.toFixed(1) + ' \u00b0C / ' + f.toFixed(1) + ' \u00b0F';
+    }
+    return value.toFixed(1) + ' ' + (unit || '');
+  },
+  humidity: function(value) {
+    return Math.round(value) + ' %';
+  },
+  _default: function(value, unit) {
+    return value.toFixed(1) + ' ' + (unit || '');
+  }
+};
+
+function formatMetricValue(key, value, metric_def) {
+  var formatter = METRIC_FORMATTERS[key] || METRIC_FORMATTERS._default;
+  var unit = metric_def ? (metric_def.unit_symbol || metric_def.unit || '') : '';
+  return formatter(value, unit);
+}
+
+function getMetricDef(key) {
+  if (window._manifest && window._manifest.metrics) {
+    for (var i = 0; i < window._manifest.metrics.length; i++) {
+      if (window._manifest.metrics[i].key === key) return window._manifest.metrics[i];
+    }
+  }
+  return null;
 }
 
 function triggerCsvDownload(csv, filename) {
@@ -3549,7 +3581,7 @@ function loadHistory() {
         if (last.y !== null) {
           var el = document.getElementById('val-' + esc(s.tempAvgId));
           if (el) {
-            el.textContent = last.y.toFixed(1) + ' \u00B0C / ' + cToF(last.y).toFixed(1) + ' \u00B0F';
+            el.textContent = formatMetricValue('temperature', last.y, getMetricDef('temp'));
             el.classList.remove('waiting');
           }
         }
@@ -3565,7 +3597,7 @@ function loadHistory() {
       if (pts.length > 0) {
         var last = pts[pts.length - 1], el = document.getElementById('val-' + esc(s.humAvgId));
         if (el) {
-          el.textContent = (last.y !== null) ? (Math.round(last.y) + ' %') : 'No data';
+          el.textContent = (last.y !== null) ? formatMetricValue('humidity', last.y, getMetricDef('hum')) : 'No data';
           el.classList.remove('waiting');
         }
       }
@@ -3608,7 +3640,7 @@ function handleState(d) {
       var v = parseVal(d.state); if (v === null) return;
       sensorCurrentHum[s.id] = v;
       var el = document.getElementById('val-' + esc(s.humId));
-      if (el) { el.textContent = Math.round(v) + ' %'; el.classList.remove('waiting'); }
+      if (el) { el.textContent = formatMetricValue('humidity', v, getMetricDef('hum')); el.classList.remove('waiting'); }
       updateDewPoint(s.id);
       updateComfortLevel(s.id);
       if (chartsReady) { humChart.data.datasets[idx].data.push({x:now,y:v}); if(humChart.data.datasets[idx].data.length>MAX_POINTS) humChart.data.datasets[idx].data.shift(); document.getElementById('humNoData').classList.add('hidden'); humChart.update('none'); totalPoints++; }
@@ -3628,7 +3660,7 @@ function handleState(d) {
     if (eid === s.tempAvgId) {
       var v = parseVal(d.value !== undefined ? d.value : d.state), isGap = (v === null);
       var el = document.getElementById('val-' + esc(s.tempAvgId));
-      if (el) { el.textContent = isGap ? 'No data' : (d.state || (v.toFixed(1)+' \u00B0C / '+cToF(v).toFixed(1)+' \u00B0F')); el.classList.remove('waiting'); }
+      if (el) { el.textContent = isGap ? 'No data' : (d.state || formatMetricValue('temperature', v, getMetricDef('temp'))); el.classList.remove('waiting'); }
       if (TRANSPORT === 'polling') { var prev = pollAvgLast[s.tempAvgId], sig = isGap ? 'NA' : v; if (prev && prev.val === sig && (nowEpoch - prev.epoch) < 600) return; pollAvgLast[s.tempAvgId] = {val:sig, epoch:nowEpoch}; }
       else { if (lastAvgEpoch[s.tempAvgId] && nowEpoch <= lastAvgEpoch[s.tempAvgId] + 30) return; lastAvgEpoch[s.tempAvgId] = nowEpoch; }
       var store = ensureHistoryStore(s.id);
@@ -3643,7 +3675,7 @@ function handleState(d) {
     if (eid === s.humAvgId) {
       var v = parseVal(d.value !== undefined ? d.value : d.state), isGap = (v === null);
       var el = document.getElementById('val-' + esc(s.humAvgId));
-      if (el) { el.textContent = isGap ? 'No data' : (Math.round(v) + ' %'); el.classList.remove('waiting'); }
+      if (el) { el.textContent = isGap ? 'No data' : formatMetricValue('humidity', v, getMetricDef('hum')); el.classList.remove('waiting'); }
       if (TRANSPORT === 'polling') { var prev = pollAvgLast[s.humAvgId], sig = isGap ? 'NA' : v; if (prev && prev.val === sig && (nowEpoch - prev.epoch) < 600) return; pollAvgLast[s.humAvgId] = {val:sig, epoch:nowEpoch}; }
       else { if (lastAvgEpoch[s.humAvgId] && nowEpoch <= lastAvgEpoch[s.humAvgId] + 30) return; lastAvgEpoch[s.humAvgId] = nowEpoch; }
       var store = ensureHistoryStore(s.id);

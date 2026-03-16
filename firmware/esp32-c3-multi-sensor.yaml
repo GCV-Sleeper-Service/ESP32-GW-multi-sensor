@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.5.2.1
+# ESP32-C3 Multi-Sensor Gateway - v7.5.2.2
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -50,7 +50,7 @@ esphome:
     priority: -100
     then:
       - lambda: |-
-          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.2.1");
+          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.2.2");
           id(dashboard_link).publish_state(
             "Open /dashboard or /dashboard.html for the live dashboard. v7.5.0.1: multi-sensor BLE gateway with 45-day history, CSV export/import, dark/light mode, real-time and averaged charts, and ESP management. /dashboard-download provides a standalone copy. "
             "The ESPHome v3 built-in web page shows text sensor states as plain text, so clickable HTML links are not rendered here.");

@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-16 — post-v7.5.2.0 (BUG-042, LESSON-OPS-048 added)_
+_Last updated: 2026-03-16 — v7.5.2.2 (LESSON-OPS-049 added)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -361,6 +361,29 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-049: `dashboard.html` must be manually updated after every version bump and every code change — `bump-version.sh` does not sync it (v7.5.2.1/v7.5.2.2)
+
+`dashboard/dashboard.html` embeds all dashboard JavaScript inline (no `<script src>`). It is
+the source of truth that `generate-header.sh` uses to produce `dashboard/dashboard.h` (the
+embedded firmware payload). However, `bump-version.sh` and `render_sensor_config.py --write`
+only update `dashboard/dashboard.js` — they do **not** touch `dashboard.html`.
+
+**Gap:** `bump-version.sh` calls `generate-header.sh`, which auto-selects `dashboard.min.html`
+if it exists. If `dashboard.min.html` is stale (not re-minified yet), `dashboard.h` is
+regenerated from the stale min file and the version check in `preflight.sh` fails.
+
+**Workaround (until bump-version.sh is extended):**
+1. Run `bash scripts/bump-version.sh <new-version>` (will fail at preflight if dashboard.html is stale — that is expected).
+2. Manually update `App.version` in `dashboard/dashboard.html` to the new version.
+3. Apply the same code changes to `dashboard/dashboard.html` that were applied to `dashboard/dashboard.js`.
+4. Run `bash scripts/generate-header.sh dashboard/dashboard.html dashboard/dashboard.h` (pass the html source explicitly to bypass the stale min.html).
+5. Confirm `bash scripts/preflight.sh` passes.
+
+**Future fix:** Extend `bump-version.sh` to `sed` the `App.version` string in `dashboard.html`
+the same way `render_sensor_config.py --write` updates it in `dashboard.js`.
+
+---
 
 ### LESSON-OPS-048: Use `bump-version.sh` for all version bumps — never update version sources partially (post-v7.5.2.0)
 
