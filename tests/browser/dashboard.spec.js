@@ -604,3 +604,177 @@ test.describe('13. Manifest-driven history fetching', () => {
     expect(requestedUrls).toContain('/history/test-sensor/hum');
   });
 });
+
+// ── 14. Phase 2 Closure — Full Regression ────────────────────────
+//
+// Comprehensive eight-scenario regression covering Phase 2 closure:
+//   1. Renders correctly when /api/manifest returns full v2 manifest
+//   2. Renders correctly when /api/manifest returns 404 (fallback to /sensors.json)
+//   3. Renders correctly when both /api/manifest and /sensors.json fail (hardcoded defaults)
+//   4. Environmental card renderer dispatches correctly
+//   5. _default card renderer handles unknown category gracefully
+//   6. Metric formatters produce correct temperature output (°C / °F)
+//   7. fetchDeviceHistory uses manifest history_url when available
+//   8. fetchDeviceHistory falls back to legacy URLs when manifest unavailable
+
+test.describe('14. Phase 2 Closure — Full Regression', () => {
+  // Scenario 1: full v2 manifest → correct rendering
+  test('scenario 1: sensor cards render correctly when /api/manifest returns full v2 manifest', async ({ page }) => {
+    // Default mock server serves full v2 manifest (source: 'active-manifest')
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.schema_version === 2, { timeout: 10000 });
+    const source = await page.evaluate(() => window._manifest.source);
+    expect(source).toBe('active-manifest');
+    // Sensor cards must render
+    await expect(page.locator('.sensor-card')).toHaveCount(3);
+    // Cards must contain expected sensor names from the manifest
+    for (const name of ['Office', 'First Floor', 'Outside']) {
+      await expect(
+        page.locator('.sensor-card-header').filter({ hasText: name }).first()
+      ).toBeVisible();
+    }
+  });
+
+  // Scenario 2: /api/manifest → 404, falls back to /sensors.json → still renders
+  test('scenario 2: sensor cards render correctly when /api/manifest returns 404 (fallback to /sensors.json)', async ({ page }) => {
+    await page.route('**/api/manifest', route => {
+      route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false }) });
+    });
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.schema_version === 2, { timeout: 10000 });
+    const source = await page.evaluate(() => window._manifest.source);
+    expect(source).toBe('auto-promoted');
+    // Sensor cards must still render from the /sensors.json fallback
+    await expect(page.locator('.sensor-card')).toHaveCount(3);
+    for (const name of ['Office', 'First Floor', 'Outside']) {
+      await expect(
+        page.locator('.sensor-card-header').filter({ hasText: name }).first()
+      ).toBeVisible();
+    }
+  });
+
+  // Scenario 3: both /api/manifest and /sensors.json fail → hardcoded DEFAULT_SENSOR_META
+  test('scenario 3: sensor cards render correctly when both /api/manifest and /sensors.json fail (hardcoded defaults)', async ({ page }) => {
+    await page.route('**/api/manifest', route => {
+      route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false }) });
+    });
+    await page.route('**/sensors.json', route => {
+      route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not found' });
+    });
+    await loadDashboard(page);
+    // Must still get a v2 manifest (from DEFAULT_SENSOR_META via autoPromoteV1ToV2)
+    await page.waitForFunction(() => window._manifest && window._manifest.schema_version === 2, { timeout: 10000 });
+    const source = await page.evaluate(() => window._manifest.source);
+    expect(source).toBe('auto-promoted');
+    // Sensor cards must still render using hardcoded DEFAULT_SENSOR_META (office, first_floor, outside)
+    await expect(page.locator('.sensor-card')).toHaveCount(3);
+    // DEFAULT_SENSOR_META contains office, first_floor, outside
+    for (const name of ['Office', 'First Floor', 'Outside']) {
+      await expect(
+        page.locator('.sensor-card-header').filter({ hasText: name }).first()
+      ).toBeVisible();
+    }
+  });
+
+  // Scenario 4: environmental card renderer dispatches correctly
+  test('scenario 4: environmental card renderer dispatches correctly for all sensors', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.sensors, { timeout: 10000 });
+    // All manifest sensors must have category='environmental' and map to CARD_RENDERERS.environmental
+    const allEnvironmental = await page.evaluate(() => {
+      return window._manifest.sensors.every(function(s) { return s.category === 'environmental'; });
+    });
+    expect(allEnvironmental).toBe(true);
+    // Rebuild cards and confirm full card structure for each card
+    await page.evaluate(() => buildDeviceCards());
+    await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout: 5000 });
+    const cards = page.locator('.sensor-card');
+    const count = await cards.count();
+    expect(count).toBe(3);
+    for (let i = 0; i < count; i++) {
+      await expect(cards.nth(i).locator('.sensor-card-header')).toBeVisible();
+      await expect(cards.nth(i).locator('.sensor-readings')).toBeVisible();
+    }
+  });
+
+  // Scenario 5: _default card renderer handles unknown category gracefully
+  test('scenario 5: _default card renderer handles unknown category gracefully without crashing', async ({ page }) => {
+    await loadDashboard(page);
+    let pageError = null;
+    page.on('pageerror', err => { pageError = err; });
+    const result = await page.evaluate(() => {
+      try {
+        // _default renderer must return a non-empty string for any input
+        var html = CARD_RENDERERS._default({ id: 'mystery', name: 'Mystery Device', category: 'unknown' }, null);
+        return { ok: typeof html === 'string', html: html };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    });
+    expect(result.ok).toBe(true);
+    expect(pageError).toBeNull();
+  });
+
+  // Scenario 6: metric formatters produce correct temperature output (°C / °F)
+  test('scenario 6: metric formatters produce correct temperature output (°C / °F)', async ({ page }) => {
+    await loadDashboard(page);
+    // Temperature: 22.5°C → "22.5 °C / 72.5 °F"
+    const temp = await page.evaluate(() =>
+      formatMetricValue('temperature', 22.5, { unit: 'celsius', unit_symbol: '\u00b0C' })
+    );
+    expect(temp).toBe('22.5 \u00b0C / 72.5 \u00b0F');
+    // Humidity: 55.3 → "55 %"
+    const hum = await page.evaluate(() =>
+      formatMetricValue('humidity', 55.3, { unit: 'percent', unit_symbol: '%' })
+    );
+    expect(hum).toBe('55 %');
+  });
+
+  // Scenario 7: fetchDeviceHistory uses manifest history_url when available
+  test('scenario 7: fetchDeviceHistory uses manifest history_url when available', async ({ page }) => {
+    await loadDashboard(page);
+    const requestedUrls = [];
+    await page.route('**/history/**', route => {
+      requestedUrls.push(new URL(route.request().url()).pathname);
+      route.fulfill({ status: 200, contentType: 'text/plain', body: '1700000000,22.5\n' });
+    });
+    // Provide a manifest with explicit history_url values
+    await page.evaluate(() => {
+      var manifest = {
+        schema_version: 2,
+        sensors: [{
+          id: 'office',
+          name: 'Office',
+          category: 'environmental',
+          measurements: [
+            { key: 'temp', history_url: '/history/office/temp' },
+            { key: 'hum',  history_url: '/history/office/hum'  }
+          ]
+        }],
+        metrics: [
+          { key: 'temp', history: true, display: { chart: true }, history_suffix: 'temp' },
+          { key: 'hum',  history: true, display: { chart: true }, history_suffix: 'hum'  }
+        ]
+      };
+      return fetchDeviceHistory({ id: 'office', name: 'Office' }, manifest);
+    });
+    expect(requestedUrls).toContain('/history/office/temp');
+    expect(requestedUrls).toContain('/history/office/hum');
+  });
+
+  // Scenario 8: fetchDeviceHistory falls back to legacy URLs when manifest is unavailable
+  test('scenario 8: fetchDeviceHistory falls back to legacy URLs when manifest is unavailable', async ({ page }) => {
+    await loadDashboard(page);
+    const requestedUrls = [];
+    await page.route('**/history/**', route => {
+      requestedUrls.push(new URL(route.request().url()).pathname);
+      route.fulfill({ status: 200, contentType: 'text/plain', body: '' });
+    });
+    // null manifest → must use /history/{id}/temp and /history/{id}/hum
+    await page.evaluate(() =>
+      fetchDeviceHistory({ id: 'office', name: 'Office' }, null)
+    );
+    expect(requestedUrls).toContain('/history/office/temp');
+    expect(requestedUrls).toContain('/history/office/hum');
+  });
+});

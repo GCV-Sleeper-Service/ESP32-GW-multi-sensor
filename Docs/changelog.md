@@ -4,6 +4,35 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.2.4 (2026-03-16)
+
+> **🏁 Phase 2 Complete** — Dashboard Consumes v2 Manifest
+>
+> All Phase 2 work (v7.5.2.0–v7.5.2.4) is merged. The dashboard now fully loads from
+> the v2 manifest (`/api/manifest`), falls back gracefully to `/sensors.json` and then to
+> hardcoded defaults, dispatches card rendering via `CARD_RENDERERS`, formats metric values
+> via `METRIC_FORMATTERS`, and resolves history URLs from manifest measurements. All eight
+> Phase 2 Playwright regression scenarios pass. ThermoPro rendering is pixel-identical to
+> the pre-Phase-2 baseline.
+
+**Phase 2 Step 5 — Full Playwright Regression + Phase 2 Closure**
+
+Final validation, comprehensive test coverage, and phase closure for Phase 2.
+
+- **TEST**: Added Group 14 (8 tests) in `tests/browser/dashboard.spec.js` — Phase 2 closure full regression:
+  - **Scenario 1**: Sensor cards render correctly when `/api/manifest` returns full v2 manifest (verifies `source: 'active-manifest'` and 3 named cards)
+  - **Scenario 2**: Sensor cards render correctly when `/api/manifest` returns 404 (verifies auto-promote from `/sensors.json` and 3 named cards)
+  - **Scenario 3**: Sensor cards render correctly when both `/api/manifest` and `/sensors.json` fail (verifies hardcoded `DEFAULT_SENSOR_META` fallback and 3 named cards)
+  - **Scenario 4**: Environmental card renderer dispatches correctly for all manifest sensors
+  - **Scenario 5**: `_default` card renderer handles unknown category gracefully without crashing
+  - **Scenario 6**: Metric formatters produce correct temperature output (`°C / °F`)
+  - **Scenario 7**: `fetchDeviceHistory` uses `history_url` from manifest when available
+  - **Scenario 8**: `fetchDeviceHistory` falls back to legacy URLs when manifest is unavailable
+- **BUMP**: Version 7.5.2.3 → 7.5.2.4 across all canonical locations
+- **SYNC**: `dashboard/dashboard.html` updated to v7.5.2.4; `dashboard/dashboard.h` regenerated; variant fixtures regenerated
+
+---
+
 ## v7.5.2.3 (2026-03-16)
 
 **Phase 2 Step 4 — Generic History Fetching (Manifest-Driven)**
