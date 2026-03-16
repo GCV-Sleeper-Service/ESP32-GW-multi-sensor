@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-16 — v7.5.2.2 (LESSON-OPS-049 added)_
+_Last updated: 2026-03-16 — v7.5.3.0 (LESSON-OPS-049 resolved; LESSON-OPS-048 updated)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -362,34 +362,38 @@ The original validation helper silently normalized MAC addresses inside the call
 
 ## Operational Lessons
 
-### LESSON-OPS-049: `dashboard.html` must be manually updated after every version bump and every code change — `bump-version.sh` does not sync it (v7.5.2.1/v7.5.2.2)
+### LESSON-OPS-049: `dashboard.html` must be kept in sync with `dashboard.js` for all code changes — `bump-version.sh` now handles the version string automatically (v7.5.2.1/v7.5.2.2; **fixed in v7.5.3.0**)
 
 `dashboard/dashboard.html` embeds all dashboard JavaScript inline (no `<script src>`). It is
 the source of truth that `generate-header.sh` uses to produce `dashboard/dashboard.h` (the
-embedded firmware payload). However, `bump-version.sh` and `render_sensor_config.py --write`
-only update `dashboard/dashboard.js` — they do **not** touch `dashboard.html`.
+embedded firmware payload). Prior to v7.5.3.0, `bump-version.sh` and `render_sensor_config.py --write`
+only updated `dashboard/dashboard.js` — they did **not** touch `dashboard.html`.
 
-**Gap:** `bump-version.sh` calls `generate-header.sh`, which auto-selects `dashboard.min.html`
-if it exists. If `dashboard.min.html` is stale (not re-minified yet), `dashboard.h` is
-regenerated from the stale min file and the version check in `preflight.sh` fails.
+**✅ Fixed in v7.5.3.0:** `bump-version.sh` now runs `sed -i "s/App\.version = 'v[0-9.]*'/..."` on
+`dashboard/dashboard.html` immediately after updating `tests/fixtures/generate-fixtures.js`. The
+`App.version` string is now updated atomically by the bump script.
 
-**Workaround (until bump-version.sh is extended):**
+**Remaining manual requirement:** Code changes to `App.Boot.start()` or any other JS logic in
+`dashboard.js` must still be manually mirrored to `dashboard.html`. There is no automated tool that
+propagates non-version JS edits from `dashboard.js` → `dashboard.html`. After any such edit:
+1. Apply identical code changes to `dashboard/dashboard.html`.
+2. Run `bash scripts/generate-header.sh` to regenerate `dashboard/dashboard.h`.
+3. Confirm `bash scripts/preflight.sh` passes.
+
+**Historical workaround (v7.5.2.x, no longer needed for version bumps):**
 1. Run `bash scripts/bump-version.sh <new-version>` (will fail at preflight if dashboard.html is stale — that is expected).
 2. Manually update `App.version` in `dashboard/dashboard.html` to the new version.
 3. Apply the same code changes to `dashboard/dashboard.html` that were applied to `dashboard/dashboard.js`.
 4. Run `bash scripts/generate-header.sh dashboard/dashboard.html dashboard/dashboard.h` (pass the html source explicitly to bypass the stale min.html).
 5. Confirm `bash scripts/preflight.sh` passes.
 
-**Future fix:** Extend `bump-version.sh` to `sed` the `App.version` string in `dashboard.html`
-the same way `render_sensor_config.py --write` updates it in `dashboard.js`.
-
 ---
 
 ### LESSON-OPS-048: Use `bump-version.sh` for all version bumps — never update version sources partially (post-v7.5.2.0)
 
-Version drift occurs when the developer updates some canonical sources but misses others, or forgets to regenerate dependent artifacts. The version surfaces in at least seven places in this repo (VERSION, render_sensor_config.py, generate-fixtures.js, dashboard.js, sensor_history_multi.h, firmware YAML, and the generated dashboard.h). Manually tracking all of them is error-prone.
+Version drift occurs when the developer updates some canonical sources but misses others, or forgets to regenerate dependent artifacts. The version surfaces in at least eight places in this repo (VERSION, render_sensor_config.py, generate-fixtures.js, dashboard.html, dashboard.js, sensor_history_multi.h, firmware YAML, and the generated dashboard.h). Manually tracking all of them is error-prone.
 
-**Rule:** Use `bash scripts/bump-version.sh <new-version>` for all version bumps. This script updates all three canonical sources atomically, runs `render_sensor_config.py --write` to regenerate all derived artifacts, runs `generate-header.sh` to regenerate `dashboard.h`, and then runs `preflight.sh` to verify sync. Do not manually edit individual version strings.
+**Rule:** Use `bash scripts/bump-version.sh <new-version>` for all version bumps. This script updates all four canonical sources atomically, runs `render_sensor_config.py --write` to regenerate all derived artifacts, runs `generate-header.sh` to regenerate `dashboard.h`, and then runs `preflight.sh` to verify sync. Do not manually edit individual version strings.
 
 **Enforcement:** Preflight now includes `dashboard_h_version_matches` (detects missing `generate-header.sh`; uses regex to match both minified and non-minified forms) and `render_sensor_config_py_version_sync` (detects missing `render_sensor_config.py` VERSION update) in addition to the existing `fixture_generator_version_sync` and `render_sensor_config --check`.
 
@@ -397,6 +401,7 @@ Version drift occurs when the developer updates some canonical sources but misse
 1. `VERSION` file (canonical root)
 2. `scripts/render_sensor_config.py` VERSION constant
 3. `tests/fixtures/generate-fixtures.js` VERSION constant
+4. `dashboard/dashboard.html` App.version (**added in v7.5.3.0** — see LESSON-OPS-049)
 
 **Derived artifacts (all regenerated by bump-version.sh):**
 - `dashboard/dashboard.js` (App.version — via render_sensor_config.py --write)
