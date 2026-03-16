@@ -8,13 +8,13 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
   "ok": true,
   "schema_version": 2,
   "source": "active-manifest",
-  "version": "v7.5.3.1",
+  "version": "v7.5.3.2",
   "gateway": {
     "id": "gw-main",
     "name": "Main Gateway",
     "role": "satellite",
     "hardware": "ESP32-C3",
-    "firmware_version": "v7.5.3.1",
+    "firmware_version": "v7.5.3.2",
     "api_version": "v2"
   },
   "history": {
