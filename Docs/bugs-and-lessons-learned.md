@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-16 — v7.5.3.0 (LESSON-OPS-049 resolved; LESSON-OPS-048 updated)_
+_Last updated: 2026-03-16 — v7.5.3.3-hotfix (BUG-037 confirmed root cause; LESSON-OPS-050, LESSON-OPS-051 added)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -11,13 +11,15 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 ---
 
-## BUG-037 — Dashboard request fanout / polling can destabilize ESP32-C3
+## BUG-037 — Dashboard request fanout / polling destabilizes ESP32-C3 (CONFIRMED)
 
-**Date:** 2026-03-16  
-**Version observed:** `v7.5.3.3` post-merge validation, with related non-feature behavior also confirmed against `v7.5.3.2`
+**Date:** 2026-03-16
+**Version observed:** `v7.5.3.3` post-merge validation
+**Status:** Root cause confirmed; remediation plan created
+**Remediation:** `Docs/dashboard-stability-remediation-plan.md`
 
 ### Symptom
-Opening the dashboard on the real device can trigger panic/reboot shortly after page load.
+Opening the dashboard on the real device triggers panic/reboot shortly after page load.
 
 Most reproducible cases:
 - local dashboard: `http://<device-ip>/dashboard.html`
@@ -26,27 +28,39 @@ Most reproducible cases:
 Remote hosted polling mode is worse and can repeatedly retrigger resets on polling cadence.
 
 ### Initial false lead
-The initial investigation focused on `/api/v2/live`. Later isolation showed:
+Initial investigation focused on `/api/v2/live`. Later isolation showed:
 - direct curl requests to `/`, `/api/status`, and `/api/v2/live` do not consistently trigger the crash
 - the more reliable trigger is **dashboard access itself**
+- `/api/v2/live` is not yet implemented (`v7.5.3.4`) — empty reply is expected
 
-### Important clarification
-`/api/v2/live` is a later planned feature and is not yet implemented in the current milestone line. Empty reply from that route is not the primary defect here.
+### Confirmed root cause
+The dashboard JavaScript overwhelms the ESP32-C3 HTTP server (ESP-IDF `httpd`, ~4-7 concurrent connections) through six independent issues acting together:
+
+1. **SSE `ping` handler fires `loadStatusSnapshot()` on every ping** (`dashboard.js:2891`) — 10-20+ redundant `/api/status` requests per minute while SSE is connected. SSE already delivers state via `state` events.
+2. **SSE `onopen` handler fires `loadStatusSnapshot()`** (`dashboard.js:2892`) — creates a duplicate `/api/status` request at boot, concurrent with the explicit call at line 2999.
+3. **Double status polling in polling mode** — `startPolling()` calls `loadStatusSnapshot()` every 15s (line 2926), AND the boot sequence creates a separate 30s `statusSnapshotIntervalId` (line 3007). Both fire simultaneously every 30s.
+4. **No in-flight guard on `loadStatusSnapshot()`** (`dashboard.js:698`) — concurrent calls stack up when the ESP is slow to respond, holding multiple HTTP connection slots.
+5. **No in-flight guard on `loadStorageStats()`** (`dashboard.js:1530`) — same stacking issue, compounded by built-in retry logic (up to 3 recursive attempts on failure).
+6. **Startup request burst with no staggering** (`dashboard.js:2999-3014`) — 8-12+ HTTP requests within ~2 seconds of boot: `loadStatusSnapshot()` + `connectSSE()`/`startPolling()` + `loadStorageStats()` + 6 history CSV fetches at t+2s.
+
+**Combined effect:** Peak concurrent connections at boot: 8-12+. Sustained concurrent connections: 3-6. Both exceed the ESP-IDF HTTP server's capacity (~4-7 slots), causing `httpd_accept_conn: error in accept (23)` followed by panic/reboot.
 
 ### Evidence
-- browser network tab showed repeated `status` and `storage-stats` fetches, plus EventSource and other startup requests
-- device logs showed:
-  - `httpd_accept_conn: error in accept (23)`
-  - ESPHome API disconnect/reconnect
-  - component blocking warnings
-- dashboard UI showed reset reason `exception/panic`
+- browser network tab: repeated `status` and `storage-stats` fetches, EventSource, startup burst
+- device logs: `httpd_accept_conn: error in accept (23)`, ESPHome API disconnect/reconnect, component blocking warnings
+- dashboard UI: reset reason `exception/panic`
+- free heap during dashboard activity: ~69.7 KB (limited headroom)
 
-### Root cause hypothesis
-The dashboard likely creates excessive or overlapping HTTP load on the ESP32-C3:
-- duplicated or overlapping polling loops
-- status refresh still active while SSE is connected
-- startup request fanout too aggressive
-- socket / accept-loop exhaustion in the ESP-IDF web server under constrained resources
+### Fix
+See `Docs/dashboard-stability-remediation-plan.md` for the complete step-by-step fix plan:
+1. In-flight guard on `loadStatusSnapshot()` — max 1 concurrent request
+2. In-flight guard on `loadStorageStats()` — max 1 concurrent request (retries allowed)
+3. Remove `loadStatusSnapshot()` from SSE `ping` handler
+4. Remove `loadStatusSnapshot()` from SSE `onopen` handler
+5. Make 30s `statusSnapshotIntervalId` conditional — polling mode only
+6. Remove `loadStatusSnapshot()` from `startPolling()` 15s interval
+7. Stagger startup requests over 5s instead of firing all within ~200ms
+8. Increase storage stats interval from 60s to 120s
 
 ### Rule
 When debugging real-device crashes involving the dashboard:
@@ -54,13 +68,17 @@ When debugging real-device crashes involving the dashboard:
 2. inspect the browser Network tab before blaming one route
 3. verify whether polling and SSE are both active or partially overlapping
 4. check for duplicate interval creation and startup request storms
+5. count concurrent connections at boot — must not exceed ~4
 
 ### Prevention
-- ensure only one polling interval exists for each refresh category
-- do not poll `/api/status` aggressively when SSE is active
-- stagger startup network calls
-- avoid overlapping fetches if the previous refresh is still in flight
-- validate local and hosted dashboard behavior on device before declaring a milestone complete
+- **In-flight guards are mandatory** on all interval-driven fetch functions (LESSON-OPS-050)
+- Never fire HTTP requests from SSE event handlers (`ping`, `onopen`)
+- Only one polling interval per endpoint category
+- Stagger startup requests across 3-5 seconds
+- Reduce polling cadence to match data change rate (not faster than needed)
+- **Real-device validation with dashboard open** required before merge for any dashboard network code change (LESSON-OPS-051)
+
+Related: LESSON-OPS-050, LESSON-OPS-051
 
 ---
 
@@ -414,6 +432,39 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-051: Dashboard code changes that affect network behavior require real-device validation with dashboard open (v7.5.3.3-hotfix)
+
+Playwright tests validate rendering and data flow against a mock server with unlimited HTTP capacity. They do **NOT** validate HTTP connection pressure on a real ESP32-C3 (~4-7 concurrent connections). BUG-037 passed all 73 Playwright tests but crashed the real device within seconds of opening the dashboard.
+
+**Rule:** Any dashboard change that modifies `setInterval()` / `setTimeout()` scheduling, `fetch()` call sites, SSE event handlers, boot sequence request ordering, or polling/refresh cadence **must** be validated on a real device with the dashboard open before the PR is merged.
+
+**Real-device validation checklist:**
+1. Open local dashboard — no crash for 5+ minutes
+2. Close and reopen — no crash
+3. Open remote dashboard (polling mode) — no crash for 3+ polling cycles
+4. Check browser Network tab — no request storms or duplicate fetches
+5. Check device logs — no `httpd_accept_conn: error in accept` warnings
+
+Related: BUG-037
+
+---
+
+### LESSON-OPS-050: Dashboard HTTP request budgeting — ESP32-C3 has strict concurrent connection limits (v7.5.3.3-hotfix)
+
+The ESP32-C3 HTTP server (ESP-IDF `httpd`) supports approximately 4-7 concurrent connections. Dashboard JavaScript must respect this constraint at all times.
+
+**Rules for dashboard network code:**
+1. **In-flight guards are mandatory** — every `fetch()` function that runs on an interval or event handler must have a module-level boolean guard preventing concurrent invocations. Pattern: set flag before fetch, clear in both `.then()` success and `.catch()` error paths.
+2. **Never trigger HTTP fetches from SSE event handlers** — SSE `ping` and `onopen` should only update UI status indicators, never fire additional HTTP requests. SSE already delivers data via `state` events.
+3. **Stagger startup requests** — boot sequence must not fire more than 2-3 concurrent requests. Use `setTimeout()` to spread non-critical fetches (storage stats, history) across 3-5 seconds.
+4. **One polling interval per endpoint category** — never create two `setInterval()` calls that both invoke the same fetch function.
+5. **Polling cadence should match data change rate** — storage stats change hourly (poll every 120s max), status changes every ~15 minutes (poll every 30s max).
+6. **Verify with browser DevTools Network tab** — before any dashboard PR is merged, verify the request pattern. There should be no request storms, no duplicate concurrent fetches, and no unbounded request stacking.
+
+Related: BUG-037
+
+---
 
 ### LESSON-OPS-049: `dashboard.html` must be kept in sync with `dashboard.js` for all code changes — `bump-version.sh` now handles the version string automatically (v7.5.2.1/v7.5.2.2; **fixed in v7.5.3.0**)
 
