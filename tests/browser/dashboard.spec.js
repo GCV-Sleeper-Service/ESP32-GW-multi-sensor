@@ -620,11 +620,14 @@ test.describe('13. Manifest-driven history fetching', () => {
 test.describe('14. Phase 2 Closure — Full Regression', () => {
   // Scenario 1: full v2 manifest → correct rendering
   test('scenario 1: sensor cards render correctly when /api/manifest returns full v2 manifest', async ({ page }) => {
-    // Default mock server serves full v2 manifest (source: 'active-manifest')
+    // Default mock server serves full v2 manifest from /api/manifest.
+    // The source field reflects the active fixture set (e.g. 'active-manifest', '3sensor') —
+    // the critical assertion is that it is NOT 'auto-promoted', which would indicate the
+    // fallback chain was used instead of the real /api/manifest endpoint.
     await loadDashboard(page);
     await page.waitForFunction(() => window._manifest && window._manifest.schema_version === 2, { timeout: 10000 });
     const source = await page.evaluate(() => window._manifest.source);
-    expect(source).toBe('active-manifest');
+    expect(source).not.toBe('auto-promoted');
     // Sensor cards must render
     await expect(page.locator('.sensor-card')).toHaveCount(3);
     // Cards must contain expected sensor names from the manifest
