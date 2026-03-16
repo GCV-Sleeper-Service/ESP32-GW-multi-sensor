@@ -4,6 +4,33 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.2.1 (2026-03-16)
+
+**Phase 2 Step 2 — Card Renderer Registry (Environmental Only)**
+
+Introduces a `CARD_RENDERERS` registry and refactors `buildSensorCards()` into a
+category-dispatched rendering pipeline. Environmental/ThermoPro rendering is pixel-identical
+to v7.5.2.0. `buildSensorCards()` retained as a compatibility alias.
+
+- **FEAT**: Added `CARD_RENDERERS` registry with `environmental` and `_default` entries
+- **FEAT**: Added `buildEnvironmentalCard(sensor, manifest)` — extracted from `buildSensorCards()`, produces HTML identical to previous behavior
+- **FEAT**: Added `buildDeviceCards()` — clears `#sensorGrid`, iterates `SENSORS`, looks up `manifest.sensors[].category`, dispatches to `CARD_RENDERERS[category] || CARD_RENDERERS._default`, calls `buildExportButtons()`
+- **FEAT**: `buildSensorCards()` is now a compatibility alias/wrapper calling `buildDeviceCards()`
+- **FEAT**: `_default` renderer gracefully handles unknown categories with a minimal key/value card
+- **FEAT**: `App.Render` exports extended with `buildDeviceCards` and `buildEnvironmentalCard`
+- **TEST**: Added Group 11 (7 tests) in `tests/browser/dashboard.spec.js`:
+  - `CARD_RENDERERS` registry exists with `environmental` and `_default` entries
+  - `buildDeviceCards` and `buildEnvironmentalCard` are accessible
+  - `buildSensorCards` is still a callable function (compatibility alias)
+  - Environmental renderer dispatches correctly and produces sensor cards
+  - Environmental renderer produces full card structure (temp, hum, minmax, batt, rssi)
+  - `_default` renderer handles unknown category gracefully without crashing
+  - `App.Render` exposes `buildDeviceCards` and `buildEnvironmentalCard`
+- **BUMP**: Version 7.5.2.0 → 7.5.2.1 across all canonical locations
+- **SYNC**: `dashboard/dashboard.html` kept in sync with `dashboard/dashboard.js` per repo convention; `dashboard/dashboard.h` regenerated
+
+---
+
 ## Process & Documentation Hardening (2026-03-16, post-v7.5.2.0)
 
 **Long-term version-drift prevention — no firmware version change**
