@@ -4,6 +4,25 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.3.3-postmerge-dashboard-investigation (2026-03-16)
+
+### Investigation summary
+- **INVESTIGATION**: Post-merge real-device validation showed that the primary instability is **dashboard-triggered**, not direct `/api/v2/live` access alone.
+- **CONFIRMED**: `GET /api/v2/live` is not yet implemented in the current phase line and belongs to later planned work (`v7.5.3.4`), so empty reply behavior is not the main regression.
+- **OBSERVED**: Local dashboard access at `/dashboard.html` can trigger panic/reboot shortly after page load; remote hosted dashboard in polling mode is worse and can trigger repeated resets on polling cadence.
+- **EVIDENCE**: Browser network traces showed repeated `/api/status` and `/api/storage-stats` requests alongside EventSource / startup traffic; device logs showed `httpd_accept_conn: error in accept (23)`, ESPHome API disconnects, and component blocking warnings.
+- **STATUS**: `v7.5.3.3` remains compile-valid and dual-write behavior was merged, but dashboard stability is unresolved and requires remediation before advancing to the next feature milestone.
+
+### Documentation added
+- `Docs/session-log-2026-03-16-v7.5.3.3-dashboard-instability.md`
+- `Docs/handoff-2026-03-16-v7.5.3.3-dashboard-instability.md`
+- `Docs/dashboard-instability-investigation-2026-03-16.md`
+
+### Next action
+- **NEXT**: Focus next session on dashboard request scheduling / polling stability, not `/api/v2/live` feature implementation.
+
+---
+
 ## v7.5.3.3 (2026-03-16)
 
 **Phase 3 Step 3 — Wire YAML Lambdas to SensorEntity (Dual-Write)**
