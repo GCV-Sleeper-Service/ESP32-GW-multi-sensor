@@ -8,5 +8,5 @@
   "retention_oldest_epoch": 1741608000,
   "retention_newest_epoch": 1741694400,
   "segment_count": 96,
-  "mode": "mock"
+  "mode": "1sensor"
 }

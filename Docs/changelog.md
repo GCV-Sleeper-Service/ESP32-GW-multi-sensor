@@ -4,6 +4,28 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.2.0 (2026-03-16)
+
+**Phase 2 Step 1 — Dashboard Manifest v2 Loader with Fallback Chain**
+
+Adds manifest v2 loading to the dashboard boot flow. Data loading only — no rendering changes.
+
+- **FEAT**: Added `loadManifestV2()` — async three-tier fallback loader:
+  - Tier 1: `GET /api/manifest` → validates `schema_version === 2 && sensors`
+  - Tier 2: `GET /sensors.json` → `autoPromoteV1ToV2()`
+  - Tier 3: `DEFAULT_SENSOR_META` → `autoPromoteV1ToV2()`
+- **FEAT**: Added `autoPromoteV1ToV2(sensorsArray)` — wraps a v1 `[{id, name}]` array in a full v2 manifest envelope with ThermoPro metric defaults
+- **FEAT**: `loadManifestV2()` fires alongside existing `loadSensorManifest()` (unchanged) during boot; result stored in `window._manifest`
+- **TEST**: Added Groups 9 and 10 in `tests/browser/dashboard.spec.js`:
+  - Group 9 (5 tests): `window._manifest` set after boot; correct `schema_version`, sensors, gateway block, metrics array
+  - Group 10 (2 tests): dashboard loads and `window._manifest` is auto-promoted when `/api/manifest` returns 404; both functions accessible
+- **FIX**: Correctly ran `python3 scripts/render_sensor_config.py --write` after version bump to keep `sensor_history_multi.h`, `gateway_manifest.h`, and fixture files in sync — fixes PR #23 preflight failure
+- **BUMP**: Version 7.5.1.3 → 7.5.2.0 across all canonical locations
+
+**Addresses**: PR #23 preflight failure (generated files out of sync with config/sensors.json after version bump)
+
+---
+
 ## v7.5.1.3 (2026-03-15)
 
 **Phase 1 Refinement — Test Fixture Alignment & Version Sync**

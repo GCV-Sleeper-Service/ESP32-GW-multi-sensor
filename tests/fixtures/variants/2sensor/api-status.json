@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "version": "v7.4.4.0",
+  "version": "v7.5.2.0",
   "sensor_count": 2,
   "sensors": [
     {
@@ -12,6 +12,6 @@
       "name": "First Floor"
     }
   ],
-  "mode": "mock",
+  "mode": "2sensor",
   "connected": true
 }

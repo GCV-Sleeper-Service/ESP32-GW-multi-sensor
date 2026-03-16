@@ -326,3 +326,66 @@ test.describe('8. Console error guard', () => {
     expect(unexpected).toHaveLength(0);
   });
 });
+
+// ── 9. Manifest v2 loader ─────────────────────────────────────────
+
+test.describe('9. Manifest v2 loader', () => {
+  test('window._manifest is set after boot', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => typeof window._manifest !== 'undefined' && window._manifest !== null, { timeout: 10000 });
+    const manifest = await page.evaluate(() => window._manifest);
+    expect(manifest).not.toBeNull();
+    expect(manifest.ok).toBe(true);
+  });
+
+  test('window._manifest has correct schema_version', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.schema_version === 2, { timeout: 10000 });
+    const schemaVersion = await page.evaluate(() => window._manifest.schema_version);
+    expect(schemaVersion).toBe(2);
+  });
+
+  test('window._manifest contains sensors array', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && Array.isArray(window._manifest.sensors), { timeout: 10000 });
+    const sensors = await page.evaluate(() => window._manifest.sensors.map(s => s.id));
+    expect(sensors).toEqual(['office', 'first_floor', 'outside']);
+  });
+
+  test('window._manifest contains gateway block', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.gateway, { timeout: 10000 });
+    const gateway = await page.evaluate(() => window._manifest.gateway);
+    expect(gateway.role).toBe('satellite');
+    expect(gateway.api_version).toBe('v2');
+  });
+
+  test('window._manifest contains metrics array', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && Array.isArray(window._manifest.metrics), { timeout: 10000 });
+    const metricKeys = await page.evaluate(() => window._manifest.metrics.map(m => m.key));
+    expect(metricKeys).toEqual(['temp', 'hum']);
+  });
+});
+
+// ── 10. Manifest v2 fallback chain ───────────────────────────────
+
+test.describe('10. Manifest v2 fallback chain', () => {
+  test('dashboard loads and window._manifest is auto-promoted when /api/manifest returns 404', async ({ page }) => {
+    await page.route('**/api/manifest', async route => {
+      await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false }) });
+    });
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.schema_version === 2, { timeout: 10000 });
+    const source = await page.evaluate(() => window._manifest.source);
+    expect(source).toBe('auto-promoted');
+    const sensors = await page.evaluate(() => App.State.getSensors().map(s => s.id));
+    expect(sensors.length).toBeGreaterThan(0);
+  });
+
+  test('loadManifestV2 and autoPromoteV1ToV2 are accessible on window', async ({ page }) => {
+    await loadDashboard(page);
+    const hasFns = await page.evaluate(() => typeof loadManifestV2 === 'function' && typeof autoPromoteV1ToV2 === 'function');
+    expect(hasFns).toBe(true);
+  });
+});

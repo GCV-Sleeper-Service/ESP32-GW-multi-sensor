@@ -1,7 +1,7 @@
 {
   "ok": true,
   "schema_version": 2,
-  "source": "active-manifest",
+  "source": "3sensor",
   "version": "v7.5.2.0",
   "gateway": {
     "id": "gw-main",
@@ -63,7 +63,7 @@
       "category": "environmental",
       "adapter": "thermopro_ble",
       "source": {
-        "mac": "DB:06:2C:58:8A:59"
+        "mac": null
       },
       "measurements": [
         {
@@ -82,7 +82,7 @@
       "category": "environmental",
       "adapter": "thermopro_ble",
       "source": {
-        "mac": "D5:D8:4C:25:06:49"
+        "mac": null
       },
       "measurements": [
         {
@@ -101,7 +101,7 @@
       "category": "environmental",
       "adapter": "thermopro_ble",
       "source": {
-        "mac": "DF:EB:DE:19:11:6C"
+        "mac": null
       },
       "measurements": [
         {
