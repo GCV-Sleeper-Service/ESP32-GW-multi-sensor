@@ -7,9 +7,62 @@ It is also the place where project guardrails are recorded so they are not re-le
 
 Both sections are in **reverse chronological order** — most recent entry first.
 
+## Bug Fixes
+
 ---
 
-## Bug Fixes
+## BUG-037 — Dashboard request fanout / polling can destabilize ESP32-C3
+
+**Date:** 2026-03-16  
+**Version observed:** `v7.5.3.3` post-merge validation, with related non-feature behavior also confirmed against `v7.5.3.2`
+
+### Symptom
+Opening the dashboard on the real device can trigger panic/reboot shortly after page load.
+
+Most reproducible cases:
+- local dashboard: `http://<device-ip>/dashboard.html`
+- remote hosted dashboard in polling mode: `https://esp32-2.high-lands.online/dashboard.html`
+
+Remote hosted polling mode is worse and can repeatedly retrigger resets on polling cadence.
+
+### Initial false lead
+The initial investigation focused on `/api/v2/live`. Later isolation showed:
+- direct curl requests to `/`, `/api/status`, and `/api/v2/live` do not consistently trigger the crash
+- the more reliable trigger is **dashboard access itself**
+
+### Important clarification
+`/api/v2/live` is a later planned feature and is not yet implemented in the current milestone line. Empty reply from that route is not the primary defect here.
+
+### Evidence
+- browser network tab showed repeated `status` and `storage-stats` fetches, plus EventSource and other startup requests
+- device logs showed:
+  - `httpd_accept_conn: error in accept (23)`
+  - ESPHome API disconnect/reconnect
+  - component blocking warnings
+- dashboard UI showed reset reason `exception/panic`
+
+### Root cause hypothesis
+The dashboard likely creates excessive or overlapping HTTP load on the ESP32-C3:
+- duplicated or overlapping polling loops
+- status refresh still active while SSE is connected
+- startup request fanout too aggressive
+- socket / accept-loop exhaustion in the ESP-IDF web server under constrained resources
+
+### Rule
+When debugging real-device crashes involving the dashboard:
+1. isolate single-endpoint behavior from full dashboard behavior
+2. inspect the browser Network tab before blaming one route
+3. verify whether polling and SSE are both active or partially overlapping
+4. check for duplicate interval creation and startup request storms
+
+### Prevention
+- ensure only one polling interval exists for each refresh category
+- do not poll `/api/status` aggressively when SSE is active
+- stagger startup network calls
+- avoid overlapping fetches if the previous refresh is still in flight
+- validate local and hosted dashboard behavior on device before declaring a milestone complete
+
+---
 
 ### BUG-042: `dashboard/dashboard.h` version check fails due to minification (post-v7.5.2.0)
 
