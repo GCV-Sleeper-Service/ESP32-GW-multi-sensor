@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "version": "v7.4.4.0",
+  "version": "v7.5.2.0",
   "sensor_count": 3,
   "sensors": [
     {
@@ -16,6 +16,6 @@
       "name": "Outside"
     }
   ],
-  "mode": "mock",
+  "mode": "3sensor",
   "connected": true
 }
