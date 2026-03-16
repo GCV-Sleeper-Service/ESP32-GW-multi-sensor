@@ -2,7 +2,7 @@
 
 _Implementation Plan for v7.5.3.x_  
 _Date: 2026-03-16_  
-_Prerequisite: Phase 2 Complete (v7.5.2.4 on `main`)_  
+_Prerequisite: Phase 2 Complete (v7.5.2.4 on `main`); v7.5.3.0 pre-Phase 3 cleanup complete_  
 _Repo: [GCV-Sleeper-Service/ESP32-GW-multi-sensor](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor)_
 
 ---
@@ -112,12 +112,14 @@ Before the C++ refactor starts, resolve the gaps identified in the Phase 1/2 ass
    ```
 
 **Acceptance criteria:**
-- [ ] `bump-version.sh` updates `dashboard.html` automatically
-- [ ] `config/sensors.v2.example.json` exists with mixed-category example
-- [ ] Boot flow loads manifest v2 before sensor manifest
-- [ ] All 73 Playwright tests pass
-- [ ] Preflight passes
-- [ ] Version is `7.5.3.0` everywhere
+- [x] `bump-version.sh` updates `dashboard.html` automatically
+- [x] `config/sensors.v2.example.json` exists with mixed-category example
+- [x] Boot flow loads manifest v2 before sensor manifest
+- [x] All 73 Playwright tests pass
+- [x] Preflight passes
+- [x] Version is `7.5.3.0` everywhere
+
+**Status: ✅ Complete (merged in PR #31, 2026-03-16)**
 
 **Risk:** Low. Cleanup step — no new features, no firmware changes.  
 **Estimated effort:** 1 session.
