@@ -895,7 +895,7 @@
 // manifest v2 consumption; result stored in window._manifest. No rendering changes.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.2.0';
+App.version = 'v7.5.2.1';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -3064,82 +3064,125 @@ function onSensorColorPicked(sensorId, color) {
   recolor(tempChart); recolor(humChart); recolor(tempAvgChart); recolor(humAvgChart);
 }
 
-function buildSensorCards() {
+// ── Card renderer registry (v7.5.2.1) ────────────────────────────
+// Dispatches card rendering by device category from the manifest.
+// Environmental (ThermoPro) is the only category for this step.
+
+var CARD_RENDERERS = {
+  environmental: function(device, manifest) {
+    return buildEnvironmentalCard(device, manifest);
+  },
+  _default: function(device, manifest) {
+    // Graceful fallback for unknown categories — simple key/value card
+    var html = '<div class="sensor-card">' +
+      '<div class="sensor-card-header">' + (device.name || device.id || 'Unknown') + '</div>' +
+      '<div class="sensor-readings">';
+    var keys = Object.keys(device);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k === 'name' || k === 'id' || k === 'color') continue;
+      html += '<div class="sensor-reading">' +
+        '<div class="reading-label">' + k + '</div>' +
+        '<div class="reading-value">' + String(device[k]) + '</div>' +
+        '</div>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+};
+
+function buildEnvironmentalCard(s, manifest) {
+  var avgLabel = '15m avg';
+  minmaxPeriod[s.id] = 24;  // default 24h
+  return (
+    '<div class="sensor-card">' +
+      '<div class="sensor-card-header">' +
+        '<input class="sensor-color-picker" id="picker-' + s.id + '" type="color" value="' + s.color + '" title="Click to change sensor color" data-sensor-color="' + s.id + '">' +
+        s.name +
+        '<img class="sensor-photo-thumb" src="https://buythermopro.com/cdn/shop/files/TP-357-3436-1.jpg?v=1742547257" alt="TP357" loading="lazy">' +
+      '</div>' +
+      '<div class="sensor-readings">' +
+        '<div class="sensor-reading"><div class="reading-label">Temperature</div><div class="reading-value waiting" id="val-' + esc(s.tempId) + '" style="color:' + s.color + '">&mdash;</div><div class="reading-time" id="time-' + s.id + '">last: &mdash;</div></div>' +
+        '<div class="sensor-reading"><div class="reading-label">' + avgLabel + ' Temp</div><div class="reading-value waiting" id="val-' + esc(s.tempAvgId) + '" style="color:' + s.color + '">&mdash;</div></div>' +
+        '<div class="sensor-reading"><div class="reading-label">Humidity</div><div class="reading-value waiting" id="val-' + esc(s.humId) + '" style="color:' + s.color + '">&mdash;</div></div>' +
+        '<div class="sensor-reading"><div class="reading-label">' + avgLabel + ' Hum</div><div class="reading-value waiting" id="val-' + esc(s.humAvgId) + '" style="color:' + s.color + '">&mdash;</div></div>' +
+      '</div>' +
+      '<div class="sensor-env-grid">' +
+        '<div class="sensor-env-item">' +
+          '<div class="dewpoint-label">Dew Point</div>' +
+          '<div class="dewpoint-value waiting" id="dewpoint-' + s.id + '">&mdash;</div>' +
+        '</div>' +
+        '<div class="sensor-env-item">' +
+          '<div class="comfort-label">Comfort</div>' +
+          '<div class="comfort-chip waiting" id="comfort-' + s.id + '">&mdash;</div>' +
+        '</div>' +
+      '</div>' +
+      // Min/max with 24h/7d/30d/45d toggle
+      '<div class="sensor-minmax">' +
+        '<div class="minmax-col">' +
+          '<div class="minmax-col-title">Min' +
+            '<span class="minmax-toggle">' +
+              '<button class="active" id="mmtog-24-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="24">24h</button>' +
+              '<button id="mmtog-168-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="168">7d</button>' +
+              '<button id="mmtog-720-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="720">30d</button>' +
+              '<button id="mmtog-1080-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="1080">45d</button>' +
+              '<button id="mmtog-custom-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="custom">Custom</button>' +
+            '</span>' +
+          '</div>' +
+          '<div class="minmax-line" id="minmax-temp-min-' + s.id + '"><span class="waiting" style="font-size:.78rem">temp: calculating...</span></div>' +
+          '<div class="minmax-line" id="minmax-hum-min-' + s.id + '"><span class="waiting" style="font-size:.78rem">hum: calculating...</span></div>' +
+        '</div>' +
+        '<div class="minmax-col">' +
+          '<div class="minmax-col-title">Max' +
+            '<span class="minmax-toggle">' +
+              '<button class="active" id="mmtog-24m-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="24">24h</button>' +
+              '<button id="mmtog-168m-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="168">7d</button>' +
+              '<button id="mmtog-720m-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="720">30d</button>' +
+              '<button id="mmtog-1080m-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="1080">45d</button>' +
+              '<button id="mmtog-customm-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="custom">Custom</button>' +
+            '</span>' +
+          '</div>' +
+          '<div class="minmax-line" id="minmax-temp-max-' + s.id + '"><span class="waiting" style="font-size:.78rem">temp: calculating...</span></div>' +
+          '<div class="minmax-line" id="minmax-hum-max-' + s.id + '"><span class="waiting" style="font-size:.78rem">hum: calculating...</span></div>' +
+        '</div>' +
+      '</div>' +
+      // Battery row
+      '<div class="sensor-batt-row">' +
+        '<div class="batt-label">Battery</div>' +
+        '<div class="batt-bar-bg"><div class="batt-bar-fill" id="batt-fill-' + s.id + '" style="width:0%"></div></div>' +
+        '<div class="batt-pct waiting" id="val-' + esc(s.battId) + '">&mdash;%</div>' +
+      '</div>' +
+      // RSSI signal strength row
+      '<div class="sensor-rssi-row">' +
+        '<div class="rssi-label">Signal</div>' +
+        '<div class="rssi-bars" id="rssi-bars-' + s.id + '">' +
+          '<div class="rssi-bar b1"></div><div class="rssi-bar b2"></div><div class="rssi-bar b3"></div><div class="rssi-bar b4"></div>' +
+        '</div>' +
+        '<div class="rssi-dbm waiting" id="rssi-dbm-' + s.id + '">&mdash; dBm</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function buildDeviceCards() {
   var grid = document.getElementById('sensorGrid');
   grid.innerHTML = '';
-  var avgLabel = '15m avg';
-  SENSORS.forEach(function(s) {
-    minmaxPeriod[s.id] = 24;  // default 24h
-    grid.innerHTML +=
-      '<div class="sensor-card">' +
-        '<div class="sensor-card-header">' +
-          '<input class="sensor-color-picker" id="picker-' + s.id + '" type="color" value="' + s.color + '" title="Click to change sensor color" data-sensor-color="' + s.id + '">' +
-          s.name +
-          '<img class="sensor-photo-thumb" src="https://buythermopro.com/cdn/shop/files/TP-357-3436-1.jpg?v=1742547257" alt="TP357" loading="lazy">' +
-        '</div>' +
-        '<div class="sensor-readings">' +
-          '<div class="sensor-reading"><div class="reading-label">Temperature</div><div class="reading-value waiting" id="val-' + esc(s.tempId) + '" style="color:' + s.color + '">&mdash;</div><div class="reading-time" id="time-' + s.id + '">last: &mdash;</div></div>' +
-          '<div class="sensor-reading"><div class="reading-label">' + avgLabel + ' Temp</div><div class="reading-value waiting" id="val-' + esc(s.tempAvgId) + '" style="color:' + s.color + '">&mdash;</div></div>' +
-          '<div class="sensor-reading"><div class="reading-label">Humidity</div><div class="reading-value waiting" id="val-' + esc(s.humId) + '" style="color:' + s.color + '">&mdash;</div></div>' +
-          '<div class="sensor-reading"><div class="reading-label">' + avgLabel + ' Hum</div><div class="reading-value waiting" id="val-' + esc(s.humAvgId) + '" style="color:' + s.color + '">&mdash;</div></div>' +
-        '</div>' +
-        '<div class="sensor-env-grid">' +
-          '<div class="sensor-env-item">' +
-            '<div class="dewpoint-label">Dew Point</div>' +
-            '<div class="dewpoint-value waiting" id="dewpoint-' + s.id + '">&mdash;</div>' +
-          '</div>' +
-          '<div class="sensor-env-item">' +
-            '<div class="comfort-label">Comfort</div>' +
-            '<div class="comfort-chip waiting" id="comfort-' + s.id + '">&mdash;</div>' +
-          '</div>' +
-        '</div>' +
-        // Min/max with 24h/7d/30d/45d toggle
-        '<div class="sensor-minmax">' +
-          '<div class="minmax-col">' +
-            '<div class="minmax-col-title">Min' +
-              '<span class="minmax-toggle">' +
-                '<button class="active" id="mmtog-24-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="24">24h</button>' +
-                '<button id="mmtog-168-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="168">7d</button>' +
-                '<button id="mmtog-720-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="720">30d</button>' +
-                '<button id="mmtog-1080-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="1080">45d</button>' +
-                '<button id="mmtog-custom-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="custom">Custom</button>' +
-              '</span>' +
-            '</div>' +
-            '<div class="minmax-line" id="minmax-temp-min-' + s.id + '"><span class="waiting" style="font-size:.78rem">temp: calculating...</span></div>' +
-            '<div class="minmax-line" id="minmax-hum-min-' + s.id + '"><span class="waiting" style="font-size:.78rem">hum: calculating...</span></div>' +
-          '</div>' +
-          '<div class="minmax-col">' +
-            '<div class="minmax-col-title">Max' +
-              '<span class="minmax-toggle">' +
-                '<button class="active" id="mmtog-24m-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="24">24h</button>' +
-                '<button id="mmtog-168m-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="168">7d</button>' +
-                '<button id="mmtog-720m-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="720">30d</button>' +
-                '<button id="mmtog-1080m-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="1080">45d</button>' +
-                '<button id="mmtog-customm-' + s.id + '" data-minmax-sensor="' + s.id + '" data-minmax-hours="custom">Custom</button>' +
-              '</span>' +
-            '</div>' +
-            '<div class="minmax-line" id="minmax-temp-max-' + s.id + '"><span class="waiting" style="font-size:.78rem">temp: calculating...</span></div>' +
-            '<div class="minmax-line" id="minmax-hum-max-' + s.id + '"><span class="waiting" style="font-size:.78rem">hum: calculating...</span></div>' +
-          '</div>' +
-        '</div>' +
-        // Battery row
-        '<div class="sensor-batt-row">' +
-          '<div class="batt-label">Battery</div>' +
-          '<div class="batt-bar-bg"><div class="batt-bar-fill" id="batt-fill-' + s.id + '" style="width:0%"></div></div>' +
-          '<div class="batt-pct waiting" id="val-' + esc(s.battId) + '">&mdash;%</div>' +
-        '</div>' +
-        // RSSI signal strength row
-        '<div class="sensor-rssi-row">' +
-          '<div class="rssi-label">Signal</div>' +
-          '<div class="rssi-bars" id="rssi-bars-' + s.id + '">' +
-            '<div class="rssi-bar b1"></div><div class="rssi-bar b2"></div><div class="rssi-bar b3"></div><div class="rssi-bar b4"></div>' +
-          '</div>' +
-          '<div class="rssi-dbm waiting" id="rssi-dbm-' + s.id + '">&mdash; dBm</div>' +
-        '</div>' +
-      '</div>';
+  SENSORS.forEach(function(sensor) {
+    var manifestEntry = null;
+    if (window._manifest && window._manifest.sensors) {
+      manifestEntry = window._manifest.sensors.find(function(s) { return s.id === sensor.id; });
+    }
+    var category = (manifestEntry && manifestEntry.category) || 'environmental';
+    var renderer = CARD_RENDERERS[category] || CARD_RENDERERS._default;
+    grid.innerHTML += renderer(sensor, window._manifest);
   });
   // Build export buttons dynamically
   buildExportButtons();
+}
+
+function buildSensorCards() {
+  // Compatibility alias — delegates to the registry-dispatched buildDeviceCards()
+  buildDeviceCards();
 }
 
 function buildExportButtons() {
@@ -3693,6 +3736,8 @@ try {
 
   // Rendering + charts
   App.Render.buildSensorCards = buildSensorCards;
+  App.Render.buildDeviceCards = buildDeviceCards;
+  App.Render.buildEnvironmentalCard = buildEnvironmentalCard;
   App.Render.bindEvents = bindEvents;
   App.Render.handleState = handleState;
   App.Charts.initCharts = initCharts;

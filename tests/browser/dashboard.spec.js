@@ -389,3 +389,83 @@ test.describe('10. Manifest v2 fallback chain', () => {
     expect(hasFns).toBe(true);
   });
 });
+
+// ── 11. Card renderer registry (v7.5.2.1) ────────────────────────
+
+test.describe('11. Card renderer registry', () => {
+  test('CARD_RENDERERS registry exists with environmental and _default entries', async ({ page }) => {
+    await loadDashboard(page);
+    const hasRegistry = await page.evaluate(() => {
+      return typeof CARD_RENDERERS === 'object' &&
+        typeof CARD_RENDERERS.environmental === 'function' &&
+        typeof CARD_RENDERERS._default === 'function';
+    });
+    expect(hasRegistry).toBe(true);
+  });
+
+  test('buildDeviceCards and buildEnvironmentalCard are accessible', async ({ page }) => {
+    await loadDashboard(page);
+    const hasFns = await page.evaluate(() => {
+      return typeof buildDeviceCards === 'function' &&
+        typeof buildEnvironmentalCard === 'function';
+    });
+    expect(hasFns).toBe(true);
+  });
+
+  test('buildSensorCards is still a callable function (compatibility alias)', async ({ page }) => {
+    await loadDashboard(page);
+    const hasAlias = await page.evaluate(() => typeof buildSensorCards === 'function');
+    expect(hasAlias).toBe(true);
+  });
+
+  test('environmental renderer dispatches correctly and produces sensor cards', async ({ page }) => {
+    await loadDashboard(page);
+    // Wait for manifest and cards
+    await page.waitForFunction(() => window._manifest && window._manifest.sensors, { timeout: 10000 });
+    // Re-invoke buildDeviceCards and verify cards are rebuilt without error
+    let pageError = null;
+    page.on('pageerror', err => { pageError = err; });
+    await page.evaluate(() => buildDeviceCards());
+    await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout: 5000 });
+    await expect(page.locator('.sensor-card')).toHaveCount(3);
+    expect(pageError).toBeNull();
+  });
+
+  test('environmental renderer produces full card structure (temp, hum, minmax, batt, rssi)', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.sensors, { timeout: 10000 });
+    const card = page.locator('.sensor-card').first();
+    await expect(card.locator('.sensor-card-header')).toBeVisible();
+    await expect(card.locator('.sensor-readings')).toBeVisible();
+    await expect(card.locator('.sensor-env-grid')).toBeVisible();
+    await expect(card.locator('.sensor-minmax')).toBeVisible();
+    await expect(card.locator('.sensor-batt-row')).toBeVisible();
+    await expect(card.locator('.sensor-rssi-row')).toBeVisible();
+  });
+
+  test('_default renderer handles unknown category gracefully without crashing', async ({ page }) => {
+    await loadDashboard(page);
+    let pageError = null;
+    page.on('pageerror', err => { pageError = err; });
+    // Call the _default renderer directly with a minimal device object
+    const result = await page.evaluate(() => {
+      try {
+        var html = CARD_RENDERERS._default({ id: 'test-unknown', name: 'Test Device', foo: 'bar' }, null);
+        return { ok: typeof html === 'string' && html.length > 0, html: html };
+      } catch(e) {
+        return { ok: false, error: e.message };
+      }
+    });
+    expect(result.ok).toBe(true);
+    expect(pageError).toBeNull();
+  });
+
+  test('App.Render exposes buildDeviceCards and buildEnvironmentalCard', async ({ page }) => {
+    await loadDashboard(page);
+    const hasExports = await page.evaluate(() => {
+      return typeof App.Render.buildDeviceCards === 'function' &&
+        typeof App.Render.buildEnvironmentalCard === 'function';
+    });
+    expect(hasExports).toBe(true);
+  });
+});

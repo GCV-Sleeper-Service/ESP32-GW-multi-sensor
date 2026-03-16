@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_manifest, manifest_v2
 
-VERSION = "7.5.2.0"
+VERSION = "7.5.2.1"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 MANIFEST_PATH = ROOT / "config" / "sensors.json"
