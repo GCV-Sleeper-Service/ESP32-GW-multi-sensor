@@ -4,6 +4,20 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.3.0 (2026-03-16)
+
+**Pre-Phase 3 Cleanup — Boot Sequencing, Schema Naming Decision, Version Management**
+
+Clears technical debt identified in the Phase 1/2 assessment before the Phase 3 C++ SensorEntity refactor begins.
+
+- **FIX**: `scripts/bump-version.sh` now updates `dashboard/dashboard.html` App.version string automatically (was previously a manual step required after every bump)
+- **FIX**: Boot flow sequencing in `App.Boot.start()` — `loadManifestV2()` now completes before `loadSensorManifest()` begins, ensuring `window._manifest` is available when `buildDeviceCards()` runs. Both `dashboard/dashboard.js` and `dashboard/dashboard.html` updated in sync.
+- **DOCS**: Added `config/sensors.v2.example.json` — reference config showing mixed-category v2 sensor definitions (ThermoPro BLE + ICMP ping probe). Documentation/example only; generator still reads `config/sensors.json`.
+- **DOCS**: Added schema naming decision comment in `scripts/sensor_manifest_lib.py` — implementation uses `sensors` key for backward compatibility; architecture plan's `devices` naming deferred to a future major version.
+- **BUMP**: Version 7.5.2.4 → 7.5.3.0 across all canonical locations
+
+---
+
 ## v7.5.2.4 (2026-03-16)
 
 > **🏁 Phase 2 Complete** — Dashboard Consumes v2 Manifest
