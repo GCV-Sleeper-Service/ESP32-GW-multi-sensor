@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.3.0.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.3.1.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -289,6 +289,75 @@ struct SensorSlot {
 };
 
 
+// ── Phase 3: Generalized sensor model (v7.5.3.1) ──────────────────────
+// These structs coexist with SensorSlot during the migration.
+// SensorSlot will be removed once SensorEntity is fully wired.
+
+#define MAX_METRICS_PER_DEVICE 4
+
+struct MetricDef {
+  const char* key;         // "temp_c", "humidity_pct", "ping_ms"
+  const char* label;       // "Temperature", "Humidity"
+  const char* unit;        // "°C", "%", "ms"
+  uint8_t class_id;        // 0=analog, 1=binary, 2=counter, 3=metadata
+  bool history_enabled;    // whether this metric has a HistoryBuffer
+};
+
+struct MetricState {
+  float current_value;     // latest value or NAN
+  float accumulator;       // for rolling average
+  int sample_count;        // samples since last average
+  bool valid;              // whether current_value is trustworthy
+  uint32_t last_update_epoch;
+  HistoryBuffer* history;  // nullptr if history_enabled == false
+};
+
+struct SensorEntity {
+  // Identity (from manifest)
+  const char* id;
+  const char* name;
+  uint8_t category_id;        // 0=environmental, 1=system, 2=network
+  const char* adapter;         // "thermopro_ble", "icmp_ping"
+
+  // Metrics (generated static arrays)
+  const MetricDef* metric_defs;
+  MetricState metric_states[MAX_METRICS_PER_DEVICE];
+  uint8_t metric_count;       // actual metrics for this device (≤ MAX)
+
+  // Adapter-specific fields
+  const char* mac;             // non-null only for BLE devices
+  int8_t last_rssi;
+  uint32_t last_seen_epoch;
+
+  // Generic methods
+  void add_sample(uint8_t metric_index, float value) {
+    if (metric_index >= metric_count) return;
+    auto& st = metric_states[metric_index];
+    st.current_value = value;
+    st.accumulator += value;
+    st.sample_count++;
+    st.valid = true;
+    st.last_update_epoch = ::time(nullptr);
+  }
+
+  void compute_averages(uint32_t epoch) {
+    for (uint8_t i = 0; i < metric_count; i++) {
+      auto& st = metric_states[i];
+      if (st.sample_count > 0 && st.history != nullptr) {
+        float avg = st.accumulator / st.sample_count;
+        st.history->add(epoch, avg);
+      }
+      st.accumulator = 0;
+      st.sample_count = 0;
+    }
+  }
+
+  void mark_seen(uint32_t epoch) {
+    last_seen_epoch = epoch;
+  }
+};
+
+
 // ═══════════════════════════════════════════════════════════════════
 // Global sensor array — CONFIGURE SENSORS HERE
 // ═══════════════════════════════════════════════════════════════════
@@ -304,7 +373,7 @@ static SensorSlot sensors[NUM_SENSORS] = {
 // <<< SENSOR_MANIFEST:HEADER_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.3.0) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.3.1) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //

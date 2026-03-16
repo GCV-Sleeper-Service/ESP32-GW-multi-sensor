@@ -4,6 +4,24 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.3.1 (2026-03-16)
+
+**Phase 3 Step 1 — Define SensorEntity, MetricDef, MetricState Structs**
+
+Adds the three passive C++ struct definitions that form the foundation of the Phase 3
+generalized sensor model. These structs coexist with `SensorSlot` during migration.
+No runtime code references them yet.
+
+- **FEAT**: Added `MetricDef` struct — describes a single sensor metric (key, label, unit, class_id, history_enabled)
+- **FEAT**: Added `MetricState` struct — runtime state for one metric per device (current_value, accumulator, sample_count, valid flag, last_update_epoch, HistoryBuffer pointer)
+- **FEAT**: Added `SensorEntity` struct — generalized device model with identity, metric arrays (up to `MAX_METRICS_PER_DEVICE=4`), adapter-specific fields, and methods `add_sample()`, `compute_averages()`, `mark_seen()`
+- **FEAT**: Added `#define MAX_METRICS_PER_DEVICE 4` — covers ThermoPro (temp+hum+battery+rssi) and ping (latency+success+uptime+loss)
+- `SensorSlot` is unchanged and remains the only active runtime model
+- Uses `::time(nullptr)` per ESPHome project convention
+- **BUMP**: Version 7.5.3.0 → 7.5.3.1 across all canonical locations
+
+---
+
 ## v7.5.3.0 (2026-03-16)
 
 **Pre-Phase 3 Cleanup — Boot Sequencing, Schema Naming Decision, Version Management**
