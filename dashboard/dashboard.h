@@ -909,7 +909,7 @@ static const char DASHBOARD_HTML[] DASHBOARD_STORAGE_ATTR = R"DASH64(
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.3.2';
+App.version = 'v7.5.3.3';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
