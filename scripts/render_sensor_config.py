@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_manifest, manifest_v2
 
-VERSION = "7.5.3.2"
+VERSION = "7.5.3.3"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 MANIFEST_PATH = ROOT / "config" / "sensors.json"
@@ -135,6 +135,7 @@ def avg_lines(sensor: Dict[str, str], idx: int) -> List[str]:
     return [
         f" // ── {name} ─────────────────────────────────────",
         f" sensors[{idx}].compute_and_format(epoch);",
+        f" devices[{idx}].compute_averages(epoch);",
         f" id(avg_temp_{sid}).publish_state(sensors[{idx}].temp_avg_str);",
         f" id(avg_hum_{sid}).publish_state(sensors[{idx}].hum_avg_str);",
         f" if (sensors[{idx}].batt_last >= 0) id(battery_{sid}).publish_state(sensors[{idx}].batt_str);",
@@ -183,6 +184,8 @@ def thermopro_block(sensor: Dict[str, str], idx: int) -> str:
        then:
          - lambda: |-
              sensors[{idx}].add_temp(x);
+             devices[{idx}].add_sample(0, x);
+             devices[{idx}].mark_seen(::time(nullptr));
              auto now = id(sntp_time).now();
              if (now.is_valid()) {{
                sensors[{idx}].mark_seen(now.timestamp);
@@ -204,6 +207,8 @@ def thermopro_block(sensor: Dict[str, str], idx: int) -> str:
        then:
          - lambda: |-
              sensors[{idx}].add_hum(x);
+             devices[{idx}].add_sample(1, x);
+             devices[{idx}].mark_seen(::time(nullptr));
              auto now = id(sntp_time).now();
              if (now.is_valid()) {{
                sensors[{idx}].mark_seen(now.timestamp);

@@ -4,6 +4,28 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.3.3 (2026-03-16)
+
+**Phase 3 Step 3 — Wire YAML Lambdas to SensorEntity (Dual-Write)**
+
+Implements the dual-write phase: BLE `on_value` lambdas now call both the legacy
+`SensorSlot` methods and the new `SensorEntity` methods in parallel. Dashboard polling
+continues to read from `SensorSlot` while `SensorEntity` accumulates data for the
+future v2 endpoints.
+
+- **FEAT**: `thermopro_ble` temperature `on_value` lambdas now call `devices[i].add_sample(0, x)` and `devices[i].mark_seen(::time(nullptr))` alongside the existing `sensors[i].add_temp(x)` call (dual-write)
+- **FEAT**: `thermopro_ble` humidity `on_value` lambdas now call `devices[i].add_sample(1, x)` and `devices[i].mark_seen(::time(nullptr))` alongside the existing `sensors[i].add_hum(x)` call (dual-write)
+- **FEAT**: 15-minute averaging timer lambda now calls `devices[i].compute_averages(epoch)` alongside existing `sensors[i].compute_and_format(epoch)`, accumulating 15-minute averages into `SensorEntity` history buffers
+- **COMPAT**: `SensorSlot sensors[]` calls are fully preserved — both models receive identical data in parallel
+- **COMPAT**: `::time(nullptr)` used (not `time(nullptr)`) per ESPHome project convention and BUG-035/036 guardrails
+- **BUILD**: All YAML changes generated via `apply_yaml_marker_block()` per BUG-035/036 guardrails; `replace_marker_block()` never used for YAML regions
+- **TEST**: `render_sensor_config.py --check` passes
+- **TEST**: All preflight checks pass
+- **TEST**: 73 Playwright tests pass
+- **BUMP**: Version 7.5.3.2 → 7.5.3.3 across all canonical locations
+
+---
+
 ## v7.5.3.2 (2026-03-16)
 
 **Phase 3 Step 2 — Generator Produces SensorEntity Arrays (Dual Output)**
