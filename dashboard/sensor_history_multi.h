@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.2.1.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.2.2.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -304,7 +304,7 @@ static SensorSlot sensors[NUM_SENSORS] = {
 // <<< SENSOR_MANIFEST:HEADER_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.2.1) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.2.2) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //

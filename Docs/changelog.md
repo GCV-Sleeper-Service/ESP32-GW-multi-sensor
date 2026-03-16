@@ -4,6 +4,31 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.2.2 (2026-03-16)
+
+**Phase 2 Step 3 — Metric Formatter Registry**
+
+Extracts value-formatting logic into a `METRIC_FORMATTERS` registry and adds a unified
+`formatMetricValue()` lookup function. Dashboard reads `unit`, `unit_symbol`, and
+`display.precision` from the manifest. ThermoPro rendering remains pixel-identical to
+v7.5.2.1.
+
+- **FEAT**: Added `METRIC_FORMATTERS` registry with `temperature`, `humidity`, and `_default` entries
+- **FEAT**: Added `formatMetricValue(key, value, metric_def)` — unified formatter lookup; dispatches to registered formatter or `_default`
+- **FEAT**: Added `getMetricDef(key)` — looks up a metric definition by key from `window._manifest.metrics`
+- **REFACTOR**: Replaced 5 inline temperature/humidity formatting strings across `handleState()` and history loader with `formatMetricValue()` calls
+- **TEST**: Added Group 12 (6 tests) in `tests/browser/dashboard.spec.js`:
+  - `METRIC_FORMATTERS` registry exists with `temperature`, `humidity`, and `_default` entries
+  - `formatMetricValue` is a callable function
+  - Temperature formatted as `22.5 °C / 72.5 °F` (identical to prior behavior)
+  - Humidity formatted as `55 %` with `Math.round()` (identical to prior behavior)
+  - Unknown metric key falls back to `_default` formatter
+  - `null` metric_def handled gracefully
+- **BUMP**: Version 7.5.2.1 → 7.5.2.2 across all canonical locations
+- **SYNC**: `dashboard/dashboard.html` kept in sync with `dashboard/dashboard.js`; `dashboard/dashboard.h` regenerated
+
+---
+
 ## v7.5.2.1 (2026-03-16)
 
 **Phase 2 Step 2 — Card Renderer Registry (Environmental Only)**
