@@ -3703,12 +3703,14 @@ function loadHistory() {
 
       dlog(s.name + ' history loaded', 'ok');
       sensorIdx++;
-      loadNext();
+      // BUG-043-cont (PR2) Fix C: 500ms inter-sensor pause lets the ESP32-C3 service BLE/WiFi
+      // between NVS scan loops instead of chaining the next history request immediately.
+      setTimeout(loadNext, 500);
     })
     .catch(function(e) {
       dlog(s.name + ' history failed: ' + e.message, 'err');
       sensorIdx++;
-      loadNext();
+      setTimeout(loadNext, 500); // BUG-043-cont (PR2): maintain inter-sensor gap on failure too
     });
   }
 
@@ -3834,11 +3836,12 @@ function startPolling() {
   dlog('Starting REST polling (batched)...');
   var livePaths = POLL_SHARED.slice();
   SENSORS.forEach(function(s) { livePaths = livePaths.concat(s.restPaths); });
-  // BUG-043-cont Fix 4: defer initial poll by 1s and reduce batch size from 4 to 2 to
-  // lower peak concurrent connections during the critical startup window.
-  // loadStatusSnapshot() moved here from boot sequence so polling mode only triggers it once.
+  // BUG-043-cont (PR2) Fix B: Fully sequential startup poll (batch=1, 200ms gap).
+  // Promise.all(batch.map()) with batchSize=1 resolves to a single request — no concurrency.
+  // The 200ms inter-request gap gives the ESP32-C3 more recovery time than the previous
+  // batch-2 + 120ms scheme, and ensures history/storage-stats timers fire into a quiet bus.
   setTimeout(function() {
-    pollAll(POLL_DEVICE.concat(livePaths), 2).then(function() {
+    pollAll(POLL_DEVICE.concat(livePaths), 1, 200).then(function() {
       dlog('Initial poll done', 'ok');
       loadStatusSnapshot().catch(function(){});
     });
@@ -3933,17 +3936,20 @@ App.Boot.start = function() {
     // to avoid overwhelming the ESP32-C3 HTTP server (~4-7 concurrent connections).
     // See Docs/dashboard-stability-remediation-plan.md for full rationale.
 
-    // BUG-043-cont Fix 4: in SSE mode, fire status snapshot immediately (SSE has no initial
-    // poll burst, so one extra connection is safe); in polling mode, startPolling() fires
-    // loadStatusSnapshot() after the deferred 1-second initial poll to avoid a concurrent burst.
+    // BUG-043-cont (PR2) Fix A: In SSE mode, start the event stream first, then defer the
+    // status snapshot ~2s. SSE 'state' events already carry initial live state so an
+    // immediate /api/status call is unnecessary and adds pressure during the fragile
+    // connection-open window. Polling mode is unchanged — startPolling() handles its
+    // own status fetch after the deferred sequential initial poll completes.
     if (TRANSPORT === 'sse') {
-      loadStatusSnapshot().catch(function(){});
       try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); }
+      setTimeout(function() { loadStatusSnapshot().catch(function(){}); }, 2000);
     } else {
       try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); }
     }
 
-    // BUG-037 Fix 7: Defer storage stats by 3s (displayed below the fold, not urgent)
+    // BUG-043-cont (PR2) Fix D: Defer storage stats from 3s to 5s — reduces overlap with
+    // the sequential initial poll (which now takes ~7-8s at batch=1, 200ms gap).
     setTimeout(function() {
       if (isImportActive()) return;
       loadStorageStats().catch(function(){});
@@ -3953,7 +3959,7 @@ App.Boot.start = function() {
         if (isImportActive()) return;
         loadStorageStats().catch(function(){});
       }, 120000);
-    }, 3000);
+    }, 5000);
 
     // BUG-037 Fix 5: 30s status interval only in polling mode — in SSE mode,
     // state is delivered via SSE events, so periodic /api/status polling is unnecessary
@@ -3964,13 +3970,14 @@ App.Boot.start = function() {
       }, 30000);
     }
 
-    // BUG-043-cont Fix 5: History deferred from 5s to 8s — ensures the storage stats
-    // request (t+3s) and the deferred initial poll (~3.5s total) both complete before
-    // the NVS-heavy sequential history fetches begin.
+    // BUG-043-cont (PR2) Fix E: History deferred from 8s to 10s — the sequential initial
+    // poll (batch=1, 200ms gap, ~30 paths) takes roughly 7-8s on a loaded device. Adding
+    // 2s headroom prevents NVS-heavy history scans from overlapping with poll tail or
+    // storage stats (t+5s), keeping the startup window clean.
     historyBootstrapTimerId = setTimeout(function() {
       if (isImportActive()) return;
       loadHistory();
-    }, 8000);
+    }, 10000);
   });
 };
 

@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-17 — v7.5.3.5 (BUG-043 firmware root-cause fix; LESSON-OPS-053 added)_
+_Last updated: 2026-03-17 — dashboard hardening PR2 (BUG-043 dashboard-side finish; LESSON-OPS-054 added)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -13,11 +13,11 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 ## BUG-043 — Dashboard request fanout / polling destabilizes ESP32-C3 (CONFIRMED)
 
-**Date:** 2026-03-16 / continued 2026-03-17 / firmware fix 2026-03-17
+**Date:** 2026-03-16 / continued 2026-03-17 / firmware fix 2026-03-17 / dashboard hardening 2026-03-17
 **Version observed:** `v7.5.3.3` post-merge validation; crash persists through `v7.5.3.4`, partial mitigation in `v7.5.3.5`
-**Status:** PARTIALLY FIXED — dashboard-side mitigations in v7.5.3.5 (PR #39); firmware-side root-cause fix applied (NVS yield); dashboard hardening follow-up PR pending
+**Status:** FIXED — firmware NVS yield (PR #40) + dashboard hardening (PR2, this PR). Post-merge device validation still required.
 **Remediation:** `Docs/dashboard-stability-remediation-plan.md`, `Docs/BUG-043-continued-fix-plan.md`
-**Fix PRs:** PRs #36–#38 (v7.5.3.3-hotfix); continued fix in v7.5.3.5 (PR #39); firmware NVS yield fix (this PR)
+**Fix PRs:** PRs #36–#38 (v7.5.3.3-hotfix); v7.5.3.5 (PR #39); firmware NVS yield (PR #40); dashboard hardening (this PR)
 
 ### Symptom (continued, post-hotfix)
 Despite the v7.5.3.3-hotfix implementing all 8 remediation steps, the ESP32-C3 still crashed when the dashboard was opened in SSE or polling mode:
@@ -80,6 +80,19 @@ Implements the "Future Work" item from `Docs/BUG-043-continued-fix-plan.md`. Spl
    - `handle_history_()` — per-request history streaming loop (up to `meta.valid_segments` blobs, max 1080)
 3. No dashboard JS changes in this PR — dashboard request-scheduling hardening is a separate follow-up PR
 
+### Fix (dashboard hardening — PR2)
+Completes BUG-043 resolution by fully serializing the startup request schedule:
+
+1. **SSE startup**: `connectSSE()` fires first; `loadStatusSnapshot()` deferred 2s. SSE state events carry initial state; immediate status fetch was unnecessary overhead during the fragile SSE-open window.
+2. **Polling startup**: Initial `pollAll` changed from batch=2/120ms to **batch=1/200ms** (fully sequential, one request at a time).
+3. **History inter-sensor gap**: `loadHistory()` waits **500ms** between sensors instead of chaining immediately — lets ESP32-C3 complete BLE/WiFi work between NVS scan loops.
+4. **Storage stats defer**: Deferred from 3s → 5s to avoid overlapping with the sequential poll still in flight.
+5. **History bootstrap defer**: Deferred from 8s → 10s to ensure sequential poll and storage stats both complete before NVS-heavy history starts.
+6. `startup_poll_sequential` preflight regression guard added.
+7. `dashboard/dashboard.h` regenerated.
+
+**Favicon/routing note**: `/favicon.ico` returns HTTP 500 on real devices despite correct 204 handling in `sensor_history_multi.h`. Root cause: ESPHome's `web_server` component registers its catch-all `AsyncWebHandler` during component `setup()` (before our `on_boot` lambda runs), so it intercepts `/favicon.ico` first and returns 500 for unrecognized routes. The fix requires changing when `register_history_handler()` is called (from `on_boot` to a hook that executes before ESPHome's web_server setup). This is a separate, larger change documented in LESSON-OPS-054.
+
 ### Fix (original — v7.5.3.3-hotfix)
 See `Docs/dashboard-stability-remediation-plan.md`:
 1. In-flight guard on `loadStatusSnapshot()`
@@ -99,17 +112,20 @@ When debugging real-device crashes involving the dashboard:
 4. Count concurrent connections at boot — must not exceed ~4
 5. Check for blocking firmware operations triggered by HTTP requests (e.g., NVS scans)
 6. **Even a single serialized history request can block the HTTP task** if the firmware loops over many NVS blobs without yielding — always add `vTaskDelay` in long NVS scan loops
+7. **SSE mode**: connect the stream first, then defer non-critical status fetches — the stream open is the most fragile moment
 
 ### Prevention
 - **In-flight guards are mandatory** on all interval-driven fetch functions (LESSON-OPS-050)
 - **History fetches must be sequential** — never use `Promise.all` for history endpoints (LESSON-OPS-052)
+- **Startup polling must be batch=1** — fully sequential initial poll is mandatory for ESP32-C3 stability (LESSON-OPS-054)
 - Never fire HTTP requests from SSE event handlers (`ping`, `onopen`)
 - Only one polling interval per endpoint category
-- Stagger startup requests across 3-8 seconds
+- Stagger startup requests: SSE status 2s, storage stats 5s, history 10s
 - **Real-device validation with dashboard open** required before merge (LESSON-OPS-051)
 - **NVS scan loops must yield** — any loop over persisted segments must call `vTaskDelay(pdMS_TO_TICKS(1))` periodically (LESSON-OPS-053)
+- **ESPHome handler ordering**: `HistoryWebHandler` must be registered before ESPHome's web_server handler or it will never be reached for routes the catch-all intercepts (LESSON-OPS-054)
 
-Related: LESSON-OPS-050, LESSON-OPS-051, LESSON-OPS-052, LESSON-OPS-053
+Related: LESSON-OPS-050, LESSON-OPS-051, LESSON-OPS-052, LESSON-OPS-053, LESSON-OPS-054
 
 ---
 
@@ -464,6 +480,36 @@ The original validation helper silently normalized MAC addresses inside the call
 
 ## Operational Lessons
 
+### LESSON-OPS-054: Dashboard startup polling must be fully sequential (batch=1); ESPHome handler ordering affects custom routes (dashboard hardening PR2)
+
+#### Part A: Startup polling must be fully sequential
+
+The `pollAll()` function uses `Promise.all(batch.map(pollEntity))` to run each batch. With batch size > 1, multiple requests fire simultaneously. On the ESP32-C3, even 2 concurrent connections during the critical startup window (SSE open, fresh reboot, or F5) can trigger API disconnects or 502 errors.
+
+**Rule:** The **initial poll in `startPolling()`** must always use `batchSize=1`. `Promise.all` with a single-element array is a sequential call, so this reuses the existing batching infrastructure without adding new code paths.
+
+**Current values:**
+- `pollAll(paths, 1, 200)` — initial startup poll, fully sequential, 200ms between requests
+- `pollAll(livePaths)` — periodic live poll (uses default batch=4), which is acceptable for steady-state (device is stable and not in boot window)
+
+**Preflight regression guard:** `scripts/preflight.sh` includes a `startup_poll_sequential` check that fails if `pollAll(POLL_DEVICE.concat(livePaths), 1` does not appear in both `dashboard.js` and `dashboard.html`.
+
+#### Part B: ESPHome `AsyncWebHandler` registration order determines which handler answers a request
+
+The `AsyncWebServer` (used by ESPHome's `web_server` component) iterates handlers in registration order and returns the first one where `canHandle()` returns `true`. ESPHome's built-in `web_server` (version 3) acts as a catch-all handler — its `canHandle()` returns `true` for any request it doesn't recognize, and its `handleRequest()` returns HTTP 500 for those routes.
+
+The `HistoryWebHandler` is registered in an `on_boot` lambda (which runs after all component `setup()` calls). ESPHome's `web_server` component registers its handler during its own `setup()`. Therefore ESPHome's handler is at position 0 in the handler list and `HistoryWebHandler` is at position 1.
+
+**Consequence:** For any route that ESPHome's handler intercepts (including `/favicon.ico`), `HistoryWebHandler::handleRequest()` is never called. Our `HistoryWebHandler` can only handle routes that ESPHome's handler does NOT claim.
+
+**The observed symptom:** `/favicon.ico` returns HTTP 500 even though `HistoryWebHandler::canHandle()` returns `true` and `handleRequest()` would return 204 — ESPHome's catch-all gets there first.
+
+**The fix (not yet implemented):** Change `register_history_handler()` to run before ESPHome's web_server setup — e.g., by creating a custom `esphome::Component` with a `setup_priority` that fires between `web_server_base::setup()` and `web_server::setup()`. This is a larger change requiring firmware/YAML modifications beyond the scope of this dashboard-hardening PR.
+
+Related: BUG-043
+
+---
+
 ### LESSON-OPS-052: History endpoint NVS scan is a blocking operation — dashboard must never fetch history metrics concurrently (v7.5.3.5)
 
 Each `/history/{id}/temp` or `/history/{id}/hum` request in the firmware (`sensor_history_multi.h`) triggers a **synchronous NVS scan loop** that reads up to 1080 NVS blobs without yielding to other tasks. This blocks the HTTP server task for 0.5–2 seconds per request.
@@ -473,7 +519,7 @@ Using `Promise.all` in `fetchDeviceHistory()` caused both temp and hum requests 
 **Mandatory rules for dashboard code:**
 1. **`fetchDeviceHistory()` must fetch metrics sequentially**, never via `Promise.all`. Use a promise chain with a 300ms delay between each request to give the firmware breathing room.
 2. **`loadHistory()` must have an in-flight guard** (`_historyInFlight`) to prevent concurrent history load chains from F5 refresh or button click during boot.
-3. **History loading must be deferred long enough** for all other boot requests to complete first. The bootstrap timer must be ≥8s (storage stats at t+3s, initial poll at ~t+3.5s, both must finish before history begins).
+3. **History loading must be deferred long enough** for all other boot requests to complete first. The bootstrap timer must be ≥10s (sequential poll finishes ~t+8s, storage stats at t+5s, both must finish before history begins).
 4. **Firmware fix (implemented):** `maybe_yield_nvs_scan_()` in `sensor_history_multi.h` calls `vTaskDelay(pdMS_TO_TICKS(1))` every 4 blob reads, yielding the CPU between batch reads. This eliminates the firmware root cause.
 5. **Preflight enforces this rule:** `scripts/preflight.sh` includes a `no_concurrent_history_fetch` check that fails if `Promise.all(.*historyMeasurements` appears in either `dashboard.js` or `dashboard.html`.
 
