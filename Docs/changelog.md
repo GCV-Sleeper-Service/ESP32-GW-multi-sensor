@@ -4,22 +4,44 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
-## v7.5.3.3-postmerge-dashboard-investigation (2026-03-16)
+## v7.5.3.3-hotfix — Dashboard Stability Remediation Plan (2026-03-16)
 
-### Investigation summary
-- **INVESTIGATION**: Post-merge real-device validation showed that the primary instability is **dashboard-triggered**, not direct `/api/v2/live` access alone.
-- **CONFIRMED**: `GET /api/v2/live` is not yet implemented in the current phase line and belongs to later planned work (`v7.5.3.4`), so empty reply behavior is not the main regression.
-- **OBSERVED**: Local dashboard access at `/dashboard.html` can trigger panic/reboot shortly after page load; remote hosted dashboard in polling mode is worse and can trigger repeated resets on polling cadence.
-- **EVIDENCE**: Browser network traces showed repeated `/api/status` and `/api/storage-stats` requests alongside EventSource / startup traffic; device logs showed `httpd_accept_conn: error in accept (23)`, ESPHome API disconnects, and component blocking warnings.
-- **STATUS**: `v7.5.3.3` remains compile-valid and dual-write behavior was merged, but dashboard stability is unresolved and requires remediation before advancing to the next feature milestone.
+**BUG-037 root cause confirmed and remediation plan created.**
+
+Dashboard JavaScript overwhelms the ESP32-C3 HTTP server (~4-7 concurrent connections) with excessive concurrent and overlapping requests, causing `httpd_accept_conn: error in accept (23)` and panic/reboot.
+
+### Root cause (6 issues identified)
+1. SSE `ping` handler fires `loadStatusSnapshot()` on every ping — 10-20+ redundant requests/minute
+2. SSE `onopen` handler fires duplicate `loadStatusSnapshot()` at boot
+3. Double status polling in polling mode — 15s AND 30s intervals both call `loadStatusSnapshot()`
+4. No in-flight guard on `loadStatusSnapshot()` — unlimited concurrent stacking
+5. No in-flight guard on `loadStorageStats()` — unlimited concurrent stacking with retry cascade
+6. Startup request burst — 8-12+ HTTP requests within ~2 seconds, no staggering
+
+### Remediation plan (8 fixes)
+- **FIX 1**: In-flight guard on `loadStatusSnapshot()` — max 1 concurrent request
+- **FIX 2**: In-flight guard on `loadStorageStats()` — max 1 concurrent request (retries allowed)
+- **FIX 3**: Remove `loadStatusSnapshot()` from SSE `ping` handler
+- **FIX 4**: Remove `loadStatusSnapshot()` from SSE `onopen` handler
+- **FIX 5**: Make 30s `statusSnapshotIntervalId` conditional — polling mode only
+- **FIX 6**: Remove `loadStatusSnapshot()` from `startPolling()` 15s interval
+- **FIX 7**: Stagger startup requests over 5s instead of firing all at once
+- **FIX 8**: Increase storage stats interval from 60s to 120s
 
 ### Documentation added
+- `Docs/dashboard-stability-remediation-plan.md` — detailed step-by-step fix plan with code, acceptance criteria, and device validation checklist
+- `Docs/bugs-and-lessons-learned.md` — BUG-037 updated with confirmed root cause; LESSON-OPS-050 and LESSON-OPS-051 added
+
+### Previous investigation documentation
 - `Docs/session-log-2026-03-16-v7.5.3.3-dashboard-instability.md`
 - `Docs/handoff-2026-03-16-v7.5.3.3-dashboard-instability.md`
 - `Docs/dashboard-instability-investigation-2026-03-16.md`
+- `Docs/session-log-2026-03-16-v7.5.3.3-dashboard-instability_Version2`
+- `Docs/handoff-2026-03-16-v7.5.3.3-dashboard-instability_Version2`
+- `Docs/dashboard-instability-investigation-2026-03-16_Version2`
 
 ### Next action
-- **NEXT**: Focus next session on dashboard request scheduling / polling stability, not `/api/v2/live` feature implementation.
+- **NEXT**: Implement fixes 1-8 per the remediation plan, regenerate dashboard artifacts, run preflight and Playwright tests, then validate on real device.
 
 ---
 
