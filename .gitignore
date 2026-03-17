@@ -15,3 +15,5 @@ scripts/__pycache__
 tests/playwright-report/data/
 tests/playwright-report/trace/
 tests/playwright-results/dashboard-*/
+tests/playwright-results/sensor-count-*/
+tests/playwright-results/.playwright-artifacts-*/
