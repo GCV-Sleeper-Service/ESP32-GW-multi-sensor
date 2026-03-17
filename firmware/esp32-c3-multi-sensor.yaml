@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.5.3.3
+# ESP32-C3 Multi-Sensor Gateway - v7.5.3.4
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -15,6 +15,8 @@
 # - Adds lightweight GET /api/status for version/health checks
 # - Dashboard management actions: reboot and delete retained history remain protected by Basic auth
 # - Dashboard minification pipeline: html-minifier-terser + terser (~40KB flash savings)
+# - v7.5.3.4: raise CONFIG_LWIP_MAX_SOCKETS 13→16 to fix ENFILE crash when dashboard
+#             opens SSE + concurrent history/status fetches (httpd_accept_conn error 23)
 #
 # Required files
 # - firmware/esp32-c3-multi-sensor.yaml
@@ -50,15 +52,28 @@ esphome:
     priority: -100
     then:
       - lambda: |-
-          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.3.3");
+          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.3.4");
           id(dashboard_link).publish_state(
             "Open /dashboard or /dashboard.html for the live dashboard. v7.5.0.1: multi-sensor BLE gateway with 45-day history, CSV export/import, dark/light mode, real-time and averaged charts, and ESP management. /dashboard-download provides a standalone copy. "
             "The ESPHome v3 built-in web page shows text sensor states as plain text, so clickable HTML links are not rendered here.");
 
 # ─── Chip and framework ─────────────────────────────────────────
 # ESP-IDF (not Arduino) for better BLE + WiFi coexistence.
-# 13 sockets required for ESP32-C3 init sequence:
-# WiFi + BLE/NimBLE + mDNS + SNTP + web server + API + OTA
+# Socket budget (CONFIG_LWIP_MAX_SOCKETS):
+#   Base system (~8): WiFi/DHCP + mDNS(2) + SNTP + API listener +
+#                     web listener + 1–2 misc
+#   Dashboard open (~5): SSE /events + /api/status + /api/storage-stats
+#                        + 2× history (Promise.all temp+hum per sensor)
+#   Peak total: ~13.  16 gives headroom so SNTP sync or a second browser
+#   tab doesn't trigger ENFILE (httpd_accept_conn error 23) and crash.
+#   Cost: ~600 bytes of lwIP RAM per extra socket.
+#
+# NOTE: the history handler (sensor_history_multi.h) reads up to 1080
+# NVS blobs synchronously per /history/* request (PERSIST_SLOTS = 45d×24).
+# This blocks the async_tcp task for ~0.5–2 s and causes 300 ms+ component
+# warnings when the device has accumulated a full 45 days of history.
+# A proper fix requires yielding between NVS reads (deferred task or chunked
+# streaming) — tracked as a separate issue.
 esp32:
   variant: esp32c3
   flash_size: 4MB
@@ -66,7 +81,7 @@ esp32:
   framework:
     type: esp-idf
     sdkconfig_options:
-      CONFIG_LWIP_MAX_SOCKETS: "13"
+      CONFIG_LWIP_MAX_SOCKETS: "16"
 
 logger:
   level: INFO
