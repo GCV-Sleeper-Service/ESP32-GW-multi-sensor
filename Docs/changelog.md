@@ -4,6 +4,53 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## BUG-043 Dashboard Hardening (no version bump) — 2026-03-17
+
+**BUG-043 dashboard-side stability finish (PR2).** After the firmware NVS-yield fix in PR #40 reduced blocking duration, dashboard-induced crashes still occurred because the startup request sequence still sent concurrent connections during the fragile SSE open window (initial open) and during F5 reload (polling burst). This PR completes the BUG-043 resolution by fully serializing the startup request schedule.
+
+### Root causes addressed
+
+- **SSE initial open crash**: `loadStatusSnapshot()` fired immediately before `connectSSE()`, creating two simultaneous requests during the most fragile window (SSE setup + status fetch concurrent)
+- **Polling F5 crash**: initial `pollAll` used batch=2 with `Promise.all`, still producing 2 concurrent connections per batch with only 120ms inter-batch gaps — insufficient breathing room for a just-rebooted device
+- **History NVS overlap**: `loadHistory()` chained to the next sensor immediately on success/failure, giving zero recovery time between NVS scan loops on the ESP32-C3
+- **Startup overlap**: storage stats (t+3s) and history (t+8s) could overlap with a batch-2 poll still in flight or wrapping up
+
+### Fixes implemented
+
+- **Fix A (SSE startup)**: In SSE mode, `connectSSE()` now fires first; `loadStatusSnapshot()` is deferred 2s. SSE `state` events carry initial live state, so the immediate snapshot was unnecessary overhead during the connection-open window.
+- **Fix B (polling startup)**: Initial poll in `startPolling()` changed from batch=2/120ms to **batch=1/200ms** — fully sequential, one request at a time with 200ms gaps. `Promise.all` with batch=1 is equivalent to a plain sequential call but uses the existing batching infrastructure.
+- **Fix C (history inter-sensor gap)**: `loadHistory()` now waits **500ms** between sensors instead of chaining immediately. This lets the ESP32-C3 complete BLE/WiFi/API work between back-to-back NVS scan loops.
+- **Fix D (storage stats defer)**: Storage stats deferred from **3s → 5s** to avoid overlapping with the sequential initial poll (which now takes ~7-8s to complete 30+ paths at batch=1).
+- **Fix E (history bootstrap defer)**: History bootstrap deferred from **8s → 10s** to ensure the sequential poll and storage stats both complete before NVS-heavy history scans begin.
+- **Fix F (preflight guard)**: Added `startup_poll_sequential` check to `scripts/preflight.sh` — fails if the initial `pollAll` in `startPolling()` is ever changed back to a batch size > 1.
+- **Fix G (dashboard.h regen)**: `dashboard/dashboard.h` regenerated from updated `dashboard/dashboard.html`.
+
+### Startup request budget (after this PR)
+
+| Time | Request(s) | Mode | Notes |
+|------|-----------|------|-------|
+| t=0ms | `GET /api/manifest` | both | single manifest fetch |
+| t=~200ms | `GET /events` | SSE | stream opened first |
+| t=~1000ms | first poll path | polling | batch=1, sequential |
+| t=2000ms | `GET /api/status` | SSE | deferred 2s after SSE open |
+| t=~8s | last poll path | polling | ~30 paths × 250ms each |
+| t=~8s | `GET /api/status` | polling | after initial poll completes |
+| t=5000ms | `GET /api/storage-stats` | both | deferred 5s |
+| t=10000ms | `GET /history/s1/temp` | both | first history request |
+| t=~10.3s | `GET /history/s1/hum` | both | 300ms gap (fetchDeviceHistory) |
+| t=~10.8s | `GET /history/s2/temp` | both | 500ms inter-sensor gap |
+| … | … | | |
+
+**Peak concurrent at any point: 1 request at a time** (after manifest fetch completes)
+
+### Favicon/routing note
+
+`/favicon.ico` already has a correct handler in `sensor_history_multi.h` returning HTTP 204. The observed HTTP 500 on real devices is caused by **handler registration order**: ESPHome's built-in `web_server` component registers its `AsyncWebHandler` during component `setup()` (which runs before `on_boot` lambdas). Our `HistoryWebHandler` is registered in `on_boot`, so it appears after ESPHome's handler in the `AsyncWebServer` handler list. ESPHome's web_server v3 acts as a catch-all handler (returns 500 for routes it does not recognize), intercepting `/favicon.ico` before our handler is reached. The code is correct; the fix requires changing when `register_history_handler()` is called (from `on_boot` to an earlier hook that runs before ESPHome's web_server setup). This is a separate, larger change outside the scope of this dashboard-hardening PR.
+
+**Related:** BUG-043, PRs #39–#40, LESSON-OPS-050, LESSON-OPS-051, LESSON-OPS-052, LESSON-OPS-053
+
+---
+
 ## BUG-043 Firmware Fix (no version bump) — 2026-03-17
 
 **BUG-043 firmware root-cause fix.** Post-merge validation after PR #39 (v7.5.3.5 dashboard-side mitigations) showed the ESP32-C3 still disconnects during dashboard history loads. Even a single history request blocks the HTTP task long enough to starve BLE/WiFi/API/watchdog work. The root cause is that long NVS iteration loops in `sensor_history_multi.h` scan up to 1080 persisted segment blobs without ever yielding to the FreeRTOS scheduler.

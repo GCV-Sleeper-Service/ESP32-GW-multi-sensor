@@ -165,6 +165,16 @@ else
   echo "no_concurrent_history_fetch: OK"
 fi
 
+# BUG-043-cont (PR2): prevent regression — initial poll in startPolling() must use batchSize=1
+# for fully sequential startup. Promise.all with batchSize>1 creates concurrent connections
+# that can destabilize the ESP32-C3 during the critical startup window.
+if grep -Eq 'pollAll\(POLL_DEVICE\.concat\(livePaths\),\s*1' dashboard/dashboard.js dashboard/dashboard.html; then
+  echo "startup_poll_sequential: OK"
+else
+  echo "✗ startup_poll_sequential: FAIL — initial pollAll in startPolling() must use batchSize=1"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+
 echo "→ Validating ESPHome YAML configuration..."
 
 # Check if esphome is available

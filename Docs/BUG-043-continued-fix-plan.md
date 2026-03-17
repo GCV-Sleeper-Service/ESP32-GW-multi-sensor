@@ -256,9 +256,22 @@ With 1080 max segments at 4 blobs per yield, this adds at most ~270 voluntary yi
 
 **See also:** LESSON-OPS-053 in `Docs/bugs-and-lessons-learned.md`
 
+### Dashboard hardening (PR 2 — implemented)
+
+Dashboard request-scheduling improvements implemented in follow-up PR:
+- **Fix A (SSE startup)**: `connectSSE()` fires first; `loadStatusSnapshot()` deferred 2s
+- **Fix B (polling startup)**: Initial `pollAll` changed from batch=2/120ms to batch=1/200ms (fully sequential)
+- **Fix C (history inter-sensor gap)**: `loadHistory()` waits 500ms between sensors
+- **Fix D (storage stats defer)**: 3s → 5s
+- **Fix E (history bootstrap defer)**: 8s → 10s
+- **Fix F (preflight guard)**: `startup_poll_sequential` check added
+
+**See also:** LESSON-OPS-054 in `Docs/bugs-and-lessons-learned.md`
+
+**Favicon/routing**: The `/favicon.ico` HTTP 500 is caused by ESPHome's web_server handler being registered before our `HistoryWebHandler`. The code is correct; the fix requires a firmware-side registration-order change. See LESSON-OPS-054 Part B.
+
 ---
 
-## Future Work (dashboard hardening — PR 2, pending)
+## Status
 
-- Dashboard request-scheduling improvements: fully sequential initial poll (batch size 1), larger inter-sensor gaps in history fetches, SSE boot status snapshot deferred/removed, storage stats deferred further
-- These changes are intentionally excluded from the firmware PR to allow clean validation of the firmware fix independently
+BUG-043 is considered **FIXED** pending real-device validation after the merge of this dashboard-hardening PR. See `Docs/session-log-2026-03-17-BUG-043-dashboard-hardening-PR2.md` for the full post-merge validation checklist.
