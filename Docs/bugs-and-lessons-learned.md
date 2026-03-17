@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-17 — v7.5.3.5 (BUG-043 continued root cause; LESSON-OPS-052 added)_
+_Last updated: 2026-03-17 — v7.5.3.5 (BUG-043 firmware root-cause fix; LESSON-OPS-053 added)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -13,11 +13,11 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 ## BUG-043 — Dashboard request fanout / polling destabilizes ESP32-C3 (CONFIRMED)
 
-**Date:** 2026-03-16 / continued 2026-03-17
-**Version observed:** `v7.5.3.3` post-merge validation; crash persists through `v7.5.3.4`
-**Status:** FIXED — all 8 original remediation steps + 5 continued fixes implemented in v7.5.3.5
+**Date:** 2026-03-16 / continued 2026-03-17 / firmware fix 2026-03-17
+**Version observed:** `v7.5.3.3` post-merge validation; crash persists through `v7.5.3.4`, partial mitigation in `v7.5.3.5`
+**Status:** PARTIALLY FIXED — dashboard-side mitigations in v7.5.3.5 (PR #39); firmware-side root-cause fix applied (NVS yield); dashboard hardening follow-up PR pending
 **Remediation:** `Docs/dashboard-stability-remediation-plan.md`, `Docs/BUG-043-continued-fix-plan.md`
-**Fix PRs:** PRs #36–#38 (v7.5.3.3-hotfix); continued fix in v7.5.3.5
+**Fix PRs:** PRs #36–#38 (v7.5.3.3-hotfix); continued fix in v7.5.3.5 (PR #39); firmware NVS yield fix (this PR)
 
 ### Symptom (continued, post-hotfix)
 Despite the v7.5.3.3-hotfix implementing all 8 remediation steps, the ESP32-C3 still crashed when the dashboard was opened in SSE or polling mode:
@@ -66,6 +66,20 @@ See `Docs/BUG-043-continued-fix-plan.md`:
 5. History bootstrap timer increased from 5s to 8s
 6. `no_concurrent_history_fetch` preflight check added
 
+**Note:** v7.5.3.5 mitigated dashboard-side concurrency but did **not** eliminate firmware-side blocking. Even a single serialized history request can block the HTTP task long enough to starve BLE/WiFi/API/watchdog work when history is large. The firmware-side root cause is addressed in the split follow-up PR below.
+
+### Fix (firmware root-cause — NVS yield)
+Implements the "Future Work" item from `Docs/BUG-043-continued-fix-plan.md`. Split-PR strategy: firmware-only fix first, dashboard hardening in a separate follow-up PR.
+
+1. Added `maybe_yield_nvs_scan_(int iteration)` static helper in `dashboard/sensor_history_multi.h`
+   - Calls `vTaskDelay(pdMS_TO_TICKS(1))` every 4 NVS blob reads (`NVS_SCAN_YIELD_INTERVAL = 4`)
+   - Gives FreeRTOS scheduler a timeslice between blob reads without per-blob overhead
+2. Applied yield to **all three** long NVS iteration loops:
+   - `restore_from_nvs()` — boot-time RAM restore (up to RAM_SEGMENTS blobs)
+   - `build_import_epoch_map_()` — import epoch-map scan (up to PERSIST_SLOTS blobs)
+   - `handle_history_()` — per-request history streaming loop (up to `meta.valid_segments` blobs, max 1080)
+3. No dashboard JS changes in this PR — dashboard request-scheduling hardening is a separate follow-up PR
+
 ### Fix (original — v7.5.3.3-hotfix)
 See `Docs/dashboard-stability-remediation-plan.md`:
 1. In-flight guard on `loadStatusSnapshot()`
@@ -84,6 +98,7 @@ When debugging real-device crashes involving the dashboard:
 3. Check for duplicate interval creation and startup request storms
 4. Count concurrent connections at boot — must not exceed ~4
 5. Check for blocking firmware operations triggered by HTTP requests (e.g., NVS scans)
+6. **Even a single serialized history request can block the HTTP task** if the firmware loops over many NVS blobs without yielding — always add `vTaskDelay` in long NVS scan loops
 
 ### Prevention
 - **In-flight guards are mandatory** on all interval-driven fetch functions (LESSON-OPS-050)
@@ -92,8 +107,9 @@ When debugging real-device crashes involving the dashboard:
 - Only one polling interval per endpoint category
 - Stagger startup requests across 3-8 seconds
 - **Real-device validation with dashboard open** required before merge (LESSON-OPS-051)
+- **NVS scan loops must yield** — any loop over persisted segments must call `vTaskDelay(pdMS_TO_TICKS(1))` periodically (LESSON-OPS-053)
 
-Related: LESSON-OPS-050, LESSON-OPS-051, LESSON-OPS-052
+Related: LESSON-OPS-050, LESSON-OPS-051, LESSON-OPS-052, LESSON-OPS-053
 
 ---
 
@@ -458,8 +474,49 @@ Using `Promise.all` in `fetchDeviceHistory()` caused both temp and hum requests 
 1. **`fetchDeviceHistory()` must fetch metrics sequentially**, never via `Promise.all`. Use a promise chain with a 300ms delay between each request to give the firmware breathing room.
 2. **`loadHistory()` must have an in-flight guard** (`_historyInFlight`) to prevent concurrent history load chains from F5 refresh or button click during boot.
 3. **History loading must be deferred long enough** for all other boot requests to complete first. The bootstrap timer must be ≥8s (storage stats at t+3s, initial poll at ~t+3.5s, both must finish before history begins).
-4. **Future firmware work:** Add `vTaskDelay(1)` or `vTaskDelay(pdMS_TO_TICKS(10))` inside the NVS scan loop in `sensor_history_multi.h` to yield the CPU between blob reads. This would eliminate the root cause at the firmware level.
+4. **Firmware fix (implemented):** `maybe_yield_nvs_scan_()` in `sensor_history_multi.h` calls `vTaskDelay(pdMS_TO_TICKS(1))` every 4 blob reads, yielding the CPU between batch reads. This eliminates the firmware root cause.
 5. **Preflight enforces this rule:** `scripts/preflight.sh` includes a `no_concurrent_history_fetch` check that fails if `Promise.all(.*historyMeasurements` appears in either `dashboard.js` or `dashboard.html`.
+
+Related: BUG-043
+
+---
+
+### LESSON-OPS-053: NVS scan loops in firmware must yield to the FreeRTOS scheduler (firmware root-cause fix)
+
+Any firmware loop that iterates over persisted NVS segment blobs (e.g., by calling `nvs_get_blob()` in a `for` loop) blocks the calling task for the full duration of the scan. On the ESP32-C3, this means the HTTP server task can block for 0.5–2 seconds (or more with large history), starving:
+
+- BLE scanning / BLE task
+- WiFi stack
+- ESPHome API heartbeat (causes "unexpected disconnect" in ESPHome logs)
+- FreeRTOS task watchdog (causes `component took a long time` warnings and eventually resets)
+
+**Rule:** Any loop in `sensor_history_multi.h` (or any other firmware file) that reads more than a handful of NVS blobs must call `vTaskDelay(pdMS_TO_TICKS(1))` periodically to yield to the scheduler.
+
+**Pattern to follow:**
+```cpp
+// In sensor_history_multi.h — apply to all NVS segment iteration loops.
+static void maybe_yield_nvs_scan_(int iteration) {
+  if (iteration > 0 && (iteration % NVS_SCAN_YIELD_INTERVAL == 0)) {
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
+// Usage inside loop:
+for (int n = 0; n < meta.valid_segments; n++) {
+  maybe_yield_nvs_scan_(n);  // BUG-043: yield every 4 blobs
+  int slot = ...;
+  load_snapshot_from_handle_(handle, slot, snapshot);
+  ...
+}
+```
+
+The yield interval of 4 is a balance between low overhead and meaningful CPU relief. A 1ms yield every 4 blobs adds at most ~270ms of voluntary sleep over a 1080-blob scan, which is modest compared to the NVS read time itself.
+
+This applies to **all** NVS iteration loops in the project, not just the three fixed in the BUG-043 follow-up:
+- `restore_from_nvs()` — now fixed
+- `build_import_epoch_map_()` — now fixed
+- `handle_history_()` — now fixed
+- Any future NVS iteration loop must follow the same pattern
 
 Related: BUG-043
 
