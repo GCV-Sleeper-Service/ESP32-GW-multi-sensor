@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-16 — v7.5.3.3-hotfix (BUG-043 confirmed root cause; LESSON-OPS-050, LESSON-OPS-051 added)_
+_Last updated: 2026-03-17 — v7.5.3.5 (BUG-043 continued root cause; LESSON-OPS-052 added)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -13,73 +13,87 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 ## BUG-043 — Dashboard request fanout / polling destabilizes ESP32-C3 (CONFIRMED)
 
-**Date:** 2026-03-16
-**Version observed:** `v7.5.3.3` post-merge validation
-**Status:** FIXED — all 8 remediation steps implemented
-**Remediation:** `Docs/dashboard-stability-remediation-plan.md`
-**Fix PR:** Implements fixes 1-8; pending real-device validation
+**Date:** 2026-03-16 / continued 2026-03-17
+**Version observed:** `v7.5.3.3` post-merge validation; crash persists through `v7.5.3.4`
+**Status:** FIXED — all 8 original remediation steps + 5 continued fixes implemented in v7.5.3.5
+**Remediation:** `Docs/dashboard-stability-remediation-plan.md`, `Docs/BUG-043-continued-fix-plan.md`
+**Fix PRs:** PRs #36–#38 (v7.5.3.3-hotfix); continued fix in v7.5.3.5
 
-### Symptom
-Opening the dashboard on the real device triggers panic/reboot shortly after page load.
+### Symptom (continued, post-hotfix)
+Despite the v7.5.3.3-hotfix implementing all 8 remediation steps, the ESP32-C3 still crashed when the dashboard was opened in SSE or polling mode:
 
-Most reproducible cases:
-- local dashboard: `http://<device-ip>/dashboard.html`
-- remote hosted dashboard in polling mode: `https://esp32-2.high-lands.online/dashboard.html`
+- **SSE mode**: Dashboard loads ~1 minute then crashes during history loading. Device logs show a 2-second component blocking warning followed by API disconnect.
+- **Polling mode**: Initial crash on open, then stabilization with oscillating heap (53K–73K).
+- **F5 refresh** after 3 min uptime crashes again.
+- **Untouched**: Device runs stable at 72.1 KB free heap — confirms crash is dashboard-triggered.
+- **No `httpd_accept_conn: error in accept (23)`** — socket exhaustion (the original root cause) is fixed; new root causes identified below.
 
-Remote hosted polling mode is worse and can repeatedly retrigger resets on polling cadence.
+### Continued root causes (v7.5.3.5)
 
-### Initial false lead
-Initial investigation focused on `/api/v2/live`. Later isolation showed:
-- direct curl requests to `/`, `/api/status`, and `/api/v2/live` do not consistently trigger the crash
-- the more reliable trigger is **dashboard access itself**
-- `/api/v2/live` is not yet implemented (`v7.5.3.4`) — empty reply is expected
+#### RC1: Concurrent temp+hum history fetches block the HTTP server task (PRIMARY)
+`fetchDeviceHistory()` used `Promise.all` for all history measurements. Each `/history/{id}/temp` or `/history/{id}/hum` request triggers a **synchronous NVS scan loop** in `sensor_history_multi.h` that reads up to 1080 NVS blobs without yielding. With `Promise.all`, both requests fire simultaneously, doubling the blocking window to 1–4 seconds. During that window, BLE scanning, WiFi, the ESPHome API, and the task watchdog are all starved.
 
-### Confirmed root cause
-The dashboard JavaScript overwhelms the ESP32-C3 HTTP server (ESP-IDF `httpd`, ~4-7 concurrent connections) through six independent issues acting together:
+#### RC2: Double manifest fetch at boot
+`loadManifestV2()` fetches `/api/manifest`, then `loadSensorManifest()` fetches it again. 2 redundant HTTP requests during the most constrained startup window. Introduced in v7.5.2.0 when `loadManifestV2()` was added alongside `loadSensorManifest()` without consolidating them.
 
-1. **SSE `ping` handler fires `loadStatusSnapshot()` on every ping** (`dashboard.js:2891`) — 10-20+ redundant `/api/status` requests per minute while SSE is connected. SSE already delivers state via `state` events.
-2. **SSE `onopen` handler fires `loadStatusSnapshot()`** (`dashboard.js:2892`) — creates a duplicate `/api/status` request at boot, concurrent with the explicit call at line 2999.
-3. **Double status polling in polling mode** — `startPolling()` calls `loadStatusSnapshot()` every 15s (line 2926), AND the boot sequence creates a separate 30s `statusSnapshotIntervalId` (line 3007). Both fire simultaneously every 30s.
-4. **No in-flight guard on `loadStatusSnapshot()`** (`dashboard.js:698`) — concurrent calls stack up when the ESP is slow to respond, holding multiple HTTP connection slots.
-5. **No in-flight guard on `loadStorageStats()`** (`dashboard.js:1530`) — same stacking issue, compounded by built-in retry logic (up to 3 recursive attempts on failure).
-6. **Startup request burst with no staggering** (`dashboard.js:2999-3014`) — 8-12+ HTTP requests within ~2 seconds of boot: `loadStatusSnapshot()` + `connectSSE()`/`startPolling()` + `loadStorageStats()` + 6 history CSV fetches at t+2s.
+#### RC3: Polling mode initial burst fires 33+ paths immediately
+`startPolling()` fired `pollAll(POLL_DEVICE.concat(livePaths))` with no initial defer, concurrent with `loadStatusSnapshot()` — 5 concurrent connections in the first 120ms.
 
-**Combined effect:** Peak concurrent connections at boot: 8-12+. Sustained concurrent connections: 3-6. Both exceed the ESP-IDF HTTP server's capacity (~4-7 slots), causing `httpd_accept_conn: error in accept (23)` followed by panic/reboot.
+#### RC4: No in-flight guard on loadHistory()
+Unlike `loadStatusSnapshot()` and `loadStorageStats()` (which got in-flight guards in the hotfix), `loadHistory()` had no guard — rapid close/reopen or F5 during boot could run two history chains in parallel.
 
-### Evidence
-- browser network tab: repeated `status` and `storage-stats` fetches, EventSource, startup burst
-- device logs: `httpd_accept_conn: error in accept (23)`, ESPHome API disconnect/reconnect, component blocking warnings
-- dashboard UI: reset reason `exception/panic`
-- free heap during dashboard activity: ~69.7 KB (limited headroom)
+#### RC5: History bootstrap timer too short (5s)
+Storage stats deferred to t+3s and the initial poll taking ~3.5s total meant history could start before both completed.
 
-### Fix
-See `Docs/dashboard-stability-remediation-plan.md` for the complete step-by-step fix plan:
-1. In-flight guard on `loadStatusSnapshot()` — max 1 concurrent request
-2. In-flight guard on `loadStorageStats()` — max 1 concurrent request (retries allowed)
+### Original root causes (v7.5.3.3-hotfix)
+The dashboard JavaScript overwhelmed the ESP32-C3 HTTP server through six independent issues:
+
+1. **SSE `ping` handler fires `loadStatusSnapshot()` on every ping** — 10-20+ redundant `/api/status` requests per minute.
+2. **SSE `onopen` handler fires `loadStatusSnapshot()`** — duplicate `/api/status` at boot.
+3. **Double status polling in polling mode** — 15s interval + 30s interval firing simultaneously.
+4. **No in-flight guard on `loadStatusSnapshot()`** — concurrent calls stack up when ESP is slow.
+5. **No in-flight guard on `loadStorageStats()`** — same stacking, compounded by retry logic.
+6. **Startup request burst with no staggering** — 8-12+ HTTP requests within ~2 seconds of boot.
+
+**Combined effect (original):** Peak concurrent connections at boot: 8-12+. Caused `httpd_accept_conn: error in accept (23)` followed by panic/reboot.
+
+### Fix (continued — v7.5.3.5)
+See `Docs/BUG-043-continued-fix-plan.md`:
+1. `fetchDeviceHistory()` now fetches metrics **sequentially** with 300ms gap (replaces `Promise.all`)
+2. `loadHistory()` has `_historyInFlight` in-flight guard
+3. `App.Boot.start()` reuses `window._manifest.sensors` — eliminates second `/api/manifest` fetch
+4. `startPolling()` defers initial poll by 1s, uses batch size 2, handles `loadStatusSnapshot()` internally
+5. History bootstrap timer increased from 5s to 8s
+6. `no_concurrent_history_fetch` preflight check added
+
+### Fix (original — v7.5.3.3-hotfix)
+See `Docs/dashboard-stability-remediation-plan.md`:
+1. In-flight guard on `loadStatusSnapshot()`
+2. In-flight guard on `loadStorageStats()`
 3. Remove `loadStatusSnapshot()` from SSE `ping` handler
 4. Remove `loadStatusSnapshot()` from SSE `onopen` handler
 5. Make 30s `statusSnapshotIntervalId` conditional — polling mode only
 6. Remove `loadStatusSnapshot()` from `startPolling()` 15s interval
-7. Stagger startup requests over 5s instead of firing all within ~200ms
-8. Increase storage stats interval from 60s to 120s
+7. Stagger startup requests over 5s
+8. Increase storage stats interval to 120s
 
 ### Rule
 When debugging real-device crashes involving the dashboard:
-1. isolate single-endpoint behavior from full dashboard behavior
-2. inspect the browser Network tab before blaming one route
-3. verify whether polling and SSE are both active or partially overlapping
-4. check for duplicate interval creation and startup request storms
-5. count concurrent connections at boot — must not exceed ~4
+1. Isolate single-endpoint behavior from full dashboard behavior
+2. Inspect the browser Network tab before blaming one route
+3. Check for duplicate interval creation and startup request storms
+4. Count concurrent connections at boot — must not exceed ~4
+5. Check for blocking firmware operations triggered by HTTP requests (e.g., NVS scans)
 
 ### Prevention
 - **In-flight guards are mandatory** on all interval-driven fetch functions (LESSON-OPS-050)
+- **History fetches must be sequential** — never use `Promise.all` for history endpoints (LESSON-OPS-052)
 - Never fire HTTP requests from SSE event handlers (`ping`, `onopen`)
 - Only one polling interval per endpoint category
-- Stagger startup requests across 3-5 seconds
-- Reduce polling cadence to match data change rate (not faster than needed)
-- **Real-device validation with dashboard open** required before merge for any dashboard network code change (LESSON-OPS-051)
+- Stagger startup requests across 3-8 seconds
+- **Real-device validation with dashboard open** required before merge (LESSON-OPS-051)
 
-Related: LESSON-OPS-050, LESSON-OPS-051
+Related: LESSON-OPS-050, LESSON-OPS-051, LESSON-OPS-052
 
 ---
 
@@ -433,6 +447,23 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-052: History endpoint NVS scan is a blocking operation — dashboard must never fetch history metrics concurrently (v7.5.3.5)
+
+Each `/history/{id}/temp` or `/history/{id}/hum` request in the firmware (`sensor_history_multi.h`) triggers a **synchronous NVS scan loop** that reads up to 1080 NVS blobs without yielding to other tasks. This blocks the HTTP server task for 0.5–2 seconds per request.
+
+Using `Promise.all` in `fetchDeviceHistory()` caused both temp and hum requests to fire simultaneously, doubling the blocking window to 1–4 seconds per sensor. During that window, BLE scanning, WiFi, the ESPHome API, and the FreeRTOS task watchdog are all starved — causing the crash.
+
+**Mandatory rules for dashboard code:**
+1. **`fetchDeviceHistory()` must fetch metrics sequentially**, never via `Promise.all`. Use a promise chain with a 300ms delay between each request to give the firmware breathing room.
+2. **`loadHistory()` must have an in-flight guard** (`_historyInFlight`) to prevent concurrent history load chains from F5 refresh or button click during boot.
+3. **History loading must be deferred long enough** for all other boot requests to complete first. The bootstrap timer must be ≥8s (storage stats at t+3s, initial poll at ~t+3.5s, both must finish before history begins).
+4. **Future firmware work:** Add `vTaskDelay(1)` or `vTaskDelay(pdMS_TO_TICKS(10))` inside the NVS scan loop in `sensor_history_multi.h` to yield the CPU between blob reads. This would eliminate the root cause at the firmware level.
+5. **Preflight enforces this rule:** `scripts/preflight.sh` includes a `no_concurrent_history_fetch` check that fails if `Promise.all(.*historyMeasurements` appears in either `dashboard.js` or `dashboard.html`.
+
+Related: BUG-043
+
+---
 
 ### LESSON-OPS-051: Dashboard code changes that affect network behavior require real-device validation with dashboard open (v7.5.3.3-hotfix)
 

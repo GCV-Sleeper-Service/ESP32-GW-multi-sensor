@@ -4,7 +4,45 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## v7.5.3.5 — BUG-043 Continued: Dashboard Startup Crash Fix (2026-03-17)
+
+**BUG-043-cont fix.** Three additional root causes identified and fixed after the v7.5.3.3-hotfix failed to prevent dashboard-induced ESP32-C3 crashes on open.
+
+### Root causes addressed
+
+- **RC1**: `loadManifestV2()` and `loadSensorManifest()` both fetched `/api/manifest` — double manifest fetch during startup burst
+- **RC2**: `fetchDeviceHistory()` used `Promise.all` for temp+hum fetches — concurrent NVS scan loops blocked the HTTP server task for 1–4 seconds per sensor
+- **RC3**: `loadHistory()` had no in-flight guard — F5 refresh / button click during boot could spawn two overlapping history chains
+- **RC4**: `startPolling()` fired 33+ paths immediately with no delay, concurrent with `loadStatusSnapshot()` — 5 concurrent connections in first 120ms
+- **RC5**: History fetch deferred only 5s — not enough for storage stats (t+3s) and initial poll (~3.5s) to clear
+
+### Fixes implemented
+
+- **FIX 1**: Eliminated double manifest fetch — `App.Boot.start()` now reuses `window._manifest.sensors` from `loadManifestV2()` and only falls back to `loadSensorManifest()` if the v2 manifest had no sensor entries
+- **FIX 2** (CRITICAL): `fetchDeviceHistory()` now fetches metrics **sequentially** with a 300ms gap between requests instead of using `Promise.all`. This is the primary crash mechanism fix — prevents concurrent NVS scan blocking
+- **FIX 3**: Added `_historyInFlight` in-flight guard to `loadHistory()` — prevents concurrent history loading from F5 refresh or button click during boot
+- **FIX 4**: `startPolling()` now defers initial poll by 1 second and uses batch size 2 (not 4). `loadStatusSnapshot()` moved inside `startPolling()` so it fires after the deferred poll, not simultaneously with it
+- **FIX 5**: History bootstrap timer increased from 5s to 8s — ensures storage stats and initial poll both complete before NVS-heavy history requests begin
+- **FIX 6**: All JS changes mirrored to `dashboard/dashboard.html` (source of truth per LESSON-OPS-043)
+- **FIX 7**: `dashboard/dashboard.h` regenerated via `scripts/generate-header.sh`
+- **FIX 8**: Added `no_concurrent_history_fetch` check to `scripts/preflight.sh` — fails if `fetchDeviceHistory()` is ever changed back to use `Promise.all`
+
+### Peak concurrent connections (startup window, after fix)
+
+| t=0ms | t=1s | t=3s | t=8s |
+|-------|------|------|------|
+| manifest fetch (1) | poll batch-2 starts | storage stats | history seq fetch 1 |
+| SSE or poll init | | | 300ms gap |
+| | | | history seq fetch 2 |
+| **max: 2** | **max: 2** | **max: 1** | **max: 1** |
+
+**Related:** BUG-043, PRs #36–#38, LESSON-OPS-050, LESSON-OPS-051, LESSON-OPS-052
+
+---
+
 ## v7.5.3.3-hotfix — Dashboard Stability Remediation (2026-03-17)
+
+
 
 **BUG-043 fix implemented.** Dashboard request scheduling rewritten to eliminate ESP32-C3 HTTP server overload.
 

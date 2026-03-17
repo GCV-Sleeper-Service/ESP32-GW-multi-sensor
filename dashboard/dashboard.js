@@ -39,7 +39,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.3.4';
+App.version = 'v7.5.3.5';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -436,11 +436,20 @@ function fetchDeviceHistory(sensor, manifest) {
     ];
   }
 
-  return Promise.all(historyMeasurements.map(function(m) {
-    return fetch(ESP_HOST + m.url, {cache:'no-store'})
-      .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-      .then(function(text) { return { key: m.key, raw: text }; });
-  }));
+  // BUG-043-cont Fix 2: fetch metrics sequentially with a 300ms gap between requests.
+  // Concurrent fetches via Promise.all trigger simultaneous NVS scan loops in the firmware
+  // that each block the HTTP server task for 0.5–2 seconds, starving BLE/WiFi/watchdog.
+  var results = [];
+  var chain = Promise.resolve();
+  historyMeasurements.forEach(function(m) {
+    chain = chain.then(function() {
+      return fetch(ESP_HOST + m.url, {cache:'no-store'})
+        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(function(raw) { results.push({key: m.key, raw: raw}); })
+        .then(function() { return new Promise(function(res) { setTimeout(res, 300); }); });
+    });
+  });
+  return chain.then(function() { return results; });
 }
 
 function fetchSensorHistoryRows(sensor) {
@@ -2744,8 +2753,15 @@ function parseCompactHistory(text) {
   return points;
 }
 
+// BUG-043-cont Fix 3: in-flight guard prevents concurrent history loads (F5 refresh / button
+// click during boot). Without this, two loadHistory() chains run simultaneously and double
+// the NVS blocking time, compounding the crash risk.
+var _historyInFlight = false;
+
 function loadHistory() {
   if (isImportActive()) return Promise.resolve(false);
+  if (_historyInFlight) { dlog('History load already in flight — skipping', 'warn'); return Promise.resolve(false); } // BUG-043-cont Fix 3
+  _historyInFlight = true; // BUG-043-cont Fix 3
   var badge = document.getElementById('histBadge');
   badge.textContent = 'loading...'; badge.classList.add('empty');
   var loaded = 0, sensorIdx = 0;
@@ -2769,6 +2785,7 @@ function loadHistory() {
         badge.classList.add('empty');
         applyHistoryRange();
       }
+      _historyInFlight = false; // BUG-043-cont Fix 3: release guard on completion
       return;
     }
 
@@ -2941,7 +2958,15 @@ function startPolling() {
   dlog('Starting REST polling (batched)...');
   var livePaths = POLL_SHARED.slice();
   SENSORS.forEach(function(s) { livePaths = livePaths.concat(s.restPaths); });
-  Promise.all([pollAll(POLL_DEVICE.concat(livePaths)), loadStatusSnapshot()]).then(function() { dlog('Initial poll done', 'ok'); });
+  // BUG-043-cont Fix 4: defer initial poll by 1s and reduce batch size from 4 to 2 to
+  // lower peak concurrent connections during the critical startup window.
+  // loadStatusSnapshot() moved here from boot sequence so polling mode only triggers it once.
+  setTimeout(function() {
+    pollAll(POLL_DEVICE.concat(livePaths), 2).then(function() {
+      dlog('Initial poll done', 'ok');
+      loadStatusSnapshot().catch(function(){});
+    });
+  }, 1000);
   // BUG-037 Fix 6: removed loadStatusSnapshot() from 15s interval — the 30s
   // statusSnapshotIntervalId (created in boot sequence) handles status refresh
   pollingLiveIntervalId = setInterval(function() {
@@ -3014,6 +3039,15 @@ App.Boot.start = function() {
     dlog('[manifest] loadManifestV2 failed: ' + e.message, 'err');
     window._manifest = null;
   }).then(function() {
+    // BUG-043-cont Fix 1: if v2 manifest already has sensor data, skip the second
+    // /api/manifest fetch that loadSensorManifest() would issue. Fall back to
+    // loadSensorManifest() only when the v2 manifest returned no sensor entries.
+    if (window._manifest && window._manifest.sensors && window._manifest.sensors.length) {
+      var meta = normalizeManifestSensors(window._manifest);
+      applySensorMeta(meta);
+      dlog('[manifest] Sensors loaded from v2 manifest cache (' + meta.length + ' sensors, no second fetch)', 'ok');
+      return Promise.resolve();
+    }
     return loadSensorManifest();
   }).then(function() {
     dlog('init - ' + SENSORS.length + ' sensors, transport=' + TRANSPORT + ', host=' + (ESP_HOST || '(same-origin)'));
@@ -3023,10 +3057,15 @@ App.Boot.start = function() {
     // to avoid overwhelming the ESP32-C3 HTTP server (~4-7 concurrent connections).
     // See Docs/dashboard-stability-remediation-plan.md for full rationale.
 
-    // Immediate: status snapshot + transport connection (needed for initial UI render)
-    loadStatusSnapshot().catch(function(){});
-    if (TRANSPORT === 'sse') { try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); } }
-    else { try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); } }
+    // BUG-043-cont Fix 4: in SSE mode, fire status snapshot immediately (SSE has no initial
+    // poll burst, so one extra connection is safe); in polling mode, startPolling() fires
+    // loadStatusSnapshot() after the deferred 1-second initial poll to avoid a concurrent burst.
+    if (TRANSPORT === 'sse') {
+      loadStatusSnapshot().catch(function(){});
+      try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); }
+    } else {
+      try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); }
+    }
 
     // BUG-037 Fix 7: Defer storage stats by 3s (displayed below the fold, not urgent)
     setTimeout(function() {
@@ -3049,11 +3088,13 @@ App.Boot.start = function() {
       }, 30000);
     }
 
-    // BUG-037 Fix 7: History deferred from 2s to 5s (gives storage stats time to complete)
+    // BUG-043-cont Fix 5: History deferred from 5s to 8s — ensures the storage stats
+    // request (t+3s) and the deferred initial poll (~3.5s total) both complete before
+    // the NVS-heavy sequential history fetches begin.
     historyBootstrapTimerId = setTimeout(function() {
       if (isImportActive()) return;
       loadHistory();
-    }, 5000);
+    }, 8000);
   });
 };
 
