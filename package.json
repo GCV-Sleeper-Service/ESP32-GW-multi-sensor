@@ -11,6 +11,6 @@
     "fixtures": "node tests/fixtures/generate-fixtures.js"
   },
   "devDependencies": {
-    "@playwright/test": "^1.42.1"
+    "@playwright/test": "^1.56.0"
   }
 }
