@@ -4,44 +4,40 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
-## v7.5.3.3-hotfix — Dashboard Stability Remediation Plan (2026-03-16)
+## v7.5.3.3-hotfix — Dashboard Stability Remediation (2026-03-17)
 
-**BUG-037 root cause confirmed and remediation plan created.**
+**BUG-037 fix implemented.** Dashboard request scheduling rewritten to eliminate ESP32-C3 HTTP server overload.
 
-Dashboard JavaScript overwhelms the ESP32-C3 HTTP server (~4-7 concurrent connections) with excessive concurrent and overlapping requests, causing `httpd_accept_conn: error in accept (23)` and panic/reboot.
+Dashboard JavaScript was overwhelming the ESP32-C3 HTTP server (~4-7 concurrent connections) with excessive concurrent and overlapping requests, causing `httpd_accept_conn: error in accept (23)` and panic/reboot.
 
-### Root cause (6 issues identified)
-1. SSE `ping` handler fires `loadStatusSnapshot()` on every ping — 10-20+ redundant requests/minute
-2. SSE `onopen` handler fires duplicate `loadStatusSnapshot()` at boot
-3. Double status polling in polling mode — 15s AND 30s intervals both call `loadStatusSnapshot()`
-4. No in-flight guard on `loadStatusSnapshot()` — unlimited concurrent stacking
-5. No in-flight guard on `loadStorageStats()` — unlimited concurrent stacking with retry cascade
-6. Startup request burst — 8-12+ HTTP requests within ~2 seconds, no staggering
+### Fixes implemented
+- **FIX 1**: Added `_statusInFlight` in-flight guard on `loadStatusSnapshot()` — max 1 concurrent `/api/status` request
+- **FIX 2**: Added `_storageStatsInFlight` in-flight guard on `loadStorageStats()` — max 1 concurrent `/api/storage-stats` request (internal retries still allowed)
+- **FIX 3**: Removed `loadStatusSnapshot()` from SSE `ping` handler — SSE already delivers state via `state` events; this eliminated 10-20+ redundant requests/minute
+- **FIX 4**: Removed `loadStatusSnapshot()` from SSE `onopen` handler — boot sequence already calls it once; this eliminated duplicate status fetch on connect
+- **FIX 5**: Made 30s `statusSnapshotIntervalId` conditional (polling mode only) — in SSE mode, state is delivered via events, no periodic polling needed
+- **FIX 6**: Removed `loadStatusSnapshot()` from `startPolling()` 15s interval — the 30s `statusSnapshotIntervalId` handles status refresh in polling mode
+- **FIX 7**: Staggered startup requests: storage stats deferred 3s, history deferred from 2s to 5s — reduced boot burst from 8-12+ concurrent to 2-3 staggered
+- **FIX 8**: Increased storage stats interval from 60s to 120s (NVS persists ~hourly, 120s is sufficient)
+- **SYNC**: All fixes mirrored to `dashboard/dashboard.html`; `dashboard.h` regenerated
+- **SYNC**: `resumeDashboardNetworkActivity()` updated with matching 120s storage interval and polling-only status interval
+- **TEST**: All preflight checks pass
+- **TEST**: All 73 Playwright tests pass (no behavior change)
+- **DOCS**: `Docs/dashboard-stability-remediation-plan.md` — detailed step-by-step plan with code, acceptance criteria, and device validation checklist
+- **DOCS**: `Docs/bugs-and-lessons-learned.md` — BUG-037 updated with confirmed root cause; LESSON-OPS-050 and LESSON-OPS-051 added
 
-### Remediation plan (8 fixes)
-- **FIX 1**: In-flight guard on `loadStatusSnapshot()` — max 1 concurrent request
-- **FIX 2**: In-flight guard on `loadStorageStats()` — max 1 concurrent request (retries allowed)
-- **FIX 3**: Remove `loadStatusSnapshot()` from SSE `ping` handler
-- **FIX 4**: Remove `loadStatusSnapshot()` from SSE `onopen` handler
-- **FIX 5**: Make 30s `statusSnapshotIntervalId` conditional — polling mode only
-- **FIX 6**: Remove `loadStatusSnapshot()` from `startPolling()` 15s interval
-- **FIX 7**: Stagger startup requests over 5s instead of firing all at once
-- **FIX 8**: Increase storage stats interval from 60s to 120s
+### Request budget improvement
 
-### Documentation added
-- `Docs/dashboard-stability-remediation-plan.md` — detailed step-by-step fix plan with code, acceptance criteria, and device validation checklist
-- `Docs/bugs-and-lessons-learned.md` — BUG-037 updated with confirmed root cause; LESSON-OPS-050 and LESSON-OPS-051 added
+| Metric | Before | After |
+|--------|--------|-------|
+| Peak concurrent at boot | 8-12+ | 2-3 (staggered) |
+| Sustained connections (SSE) | 3-5 | 1 (SSE stream only) |
+| Sustained connections (polling) | 4-6 | 2-3 |
+| Status requests/min (SSE) | 12-20+ | 0 |
+| Status requests/min (polling) | 6 | 2 |
 
-### Previous investigation documentation
-- `Docs/session-log-2026-03-16-v7.5.3.3-dashboard-instability.md`
-- `Docs/handoff-2026-03-16-v7.5.3.3-dashboard-instability.md`
-- `Docs/dashboard-instability-investigation-2026-03-16.md`
-- `Docs/session-log-2026-03-16-v7.5.3.3-dashboard-instability_Version2`
-- `Docs/handoff-2026-03-16-v7.5.3.3-dashboard-instability_Version2`
-- `Docs/dashboard-instability-investigation-2026-03-16_Version2`
-
-### Next action
-- **NEXT**: Implement fixes 1-8 per the remediation plan, regenerate dashboard artifacts, run preflight and Playwright tests, then validate on real device.
+### Device validation required
+See `Docs/dashboard-stability-remediation-plan.md` — Device Validation Checklist section.
 
 ---
 

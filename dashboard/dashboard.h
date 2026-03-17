@@ -1571,15 +1571,23 @@ function applyStatusSnapshot(status) {
   return touched;
 }
 
+// BUG-037: in-flight guard prevents concurrent /api/status requests from stacking up
+// on the ESP32-C3 HTTP server (LESSON-OPS-050)
+var _statusInFlight = false;
+
 function loadStatusSnapshot() {
   if (isImportActive()) return Promise.resolve(false);
+  if (_statusInFlight) return Promise.resolve(false);
+  _statusInFlight = true;
   return fetch(ESP_HOST + '/api/status', {cache:'no-store'})
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(status) { return applyStatusSnapshot(status); })
     .catch(function(err) {
       dlog('Status snapshot failed: ' + err.message, 'err');
       return false;
-    });
+    })
+    .then(function(result) { _statusInFlight = false; return result; },
+          function(err) { _statusInFlight = false; throw err; });
 }
 
 // ╔════════════════════════════════════════════════════════════════╗
@@ -2403,10 +2411,16 @@ function applyStorageStats(data) {
   }
 }
 
+// BUG-037: in-flight guard prevents concurrent /api/storage-stats requests;
+// internal retries (attempt > 0) bypass the guard since they are sequential (LESSON-OPS-050)
+var _storageStatsInFlight = false;
+
 function loadStorageStats(attempt) {
   if (isImportActive()) return Promise.resolve(null);
-  var statusEl = document.getElementById('storage-status');
   var tryNum = Number(attempt || 0);
+  if (_storageStatsInFlight && tryNum === 0) return Promise.resolve(null);
+  _storageStatsInFlight = true;
+  var statusEl = document.getElementById('storage-status');
   if (statusEl) {
     statusEl.textContent = tryNum === 0
       ? 'Refreshing storage statistics...'
@@ -2414,7 +2428,7 @@ function loadStorageStats(attempt) {
   }
   return fetch(ESP_HOST + '/api/storage-stats', {cache:'no-store'})
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function(data) { applyStorageStats(data); return data; })
+    .then(function(data) { _storageStatsInFlight = false; applyStorageStats(data); return data; })
     .catch(function(err) {
       if (tryNum < 2) {
         return new Promise(function(resolve) {
@@ -2423,6 +2437,7 @@ function loadStorageStats(attempt) {
           return loadStorageStats(tryNum + 1);
         });
       }
+      _storageStatsInFlight = false;
       if (statusEl) {
         var hint = (window.location.protocol === 'file:')
           ? ' Check fallback host and CORS headers.'
@@ -2500,13 +2515,15 @@ function resumeDashboardNetworkActivity() {
   } else {
     try { startPolling(); } catch (e2) { logNonFatal('resume polling after import', e2); }
   }
+  // BUG-037 Fix 8: storage stats interval 120s (matching boot sequence)
   if (!storageStatsIntervalId) {
     storageStatsIntervalId = setInterval(function() {
       if (isImportActive()) return;
       loadStorageStats().catch(function(){});
-    }, 60000);
+    }, 120000);
   }
-  if (!statusSnapshotIntervalId) {
+  // BUG-037 Fix 5: status interval only in polling mode (matching boot sequence)
+  if (!statusSnapshotIntervalId && TRANSPORT !== 'sse') {
     statusSnapshotIntervalId = setInterval(function() {
       if (isImportActive()) return;
       loadStatusSnapshot().catch(function(){});
@@ -3764,8 +3781,12 @@ function connectSSE() {
   dlog('SSE connecting to ' + (ESP_HOST || '(same-origin)') + '/events');
   evtSource = new EventSource(ESP_HOST + '/events');
   evtSource.addEventListener('state', function(e) { try { handleState(JSON.parse(e.data)); } catch(err) { dlog('SSE parse: ' + err.message, 'err'); } });
-  evtSource.addEventListener('ping', function() { document.getElementById('statusDot').classList.add('connected'); document.getElementById('statusText').textContent = 'connected (SSE)'; loadStatusSnapshot().catch(function(){}); });
-  evtSource.onopen = function() { document.getElementById('statusDot').classList.add('connected'); document.getElementById('statusText').textContent = 'connected (SSE)'; dlog('SSE connected', 'ok'); loadStatusSnapshot().catch(function(){}); };
+  // BUG-037: ping handler must NOT call loadStatusSnapshot() — SSE already delivers state
+  // via 'state' events; firing /api/status on every ping caused 10-20+ redundant requests/min
+  evtSource.addEventListener('ping', function() { document.getElementById('statusDot').classList.add('connected'); document.getElementById('statusText').textContent = 'connected (SSE)'; });
+  // BUG-037: onopen must NOT call loadStatusSnapshot() — boot sequence already calls it once;
+  // firing again here created duplicate concurrent /api/status requests at connect time
+  evtSource.onopen = function() { document.getElementById('statusDot').classList.add('connected'); document.getElementById('statusText').textContent = 'connected (SSE)'; dlog('SSE connected', 'ok'); };
   evtSource.onerror = function() { document.getElementById('statusDot').classList.remove('connected'); document.getElementById('statusText').textContent = 'reconnecting...'; };
 }
 
@@ -3797,9 +3818,11 @@ function startPolling() {
   var livePaths = POLL_SHARED.slice();
   SENSORS.forEach(function(s) { livePaths = livePaths.concat(s.restPaths); });
   Promise.all([pollAll(POLL_DEVICE.concat(livePaths)), loadStatusSnapshot()]).then(function() { dlog('Initial poll done', 'ok'); });
+  // BUG-037 Fix 6: removed loadStatusSnapshot() from 15s interval — the 30s
+  // statusSnapshotIntervalId (created in boot sequence) handles status refresh
   pollingLiveIntervalId = setInterval(function() {
     if (isImportActive()) return;
-    Promise.all([pollAll(livePaths), loadStatusSnapshot()]).catch(function(){});
+    pollAll(livePaths).catch(function(){});
   }, 15000);
   pollingDeviceIntervalId = setInterval(function() {
     if (isImportActive()) return;
@@ -3872,22 +3895,41 @@ App.Boot.start = function() {
     dlog('init - ' + SENSORS.length + ' sensors, transport=' + TRANSPORT + ', host=' + (ESP_HOST || '(same-origin)'));
     buildSensorCards();
     try { initCharts(); setHistoryRange(24); } catch(e) { dlog('initCharts: ' + e.message, 'err'); showError('Chart init failed'); }
+    // BUG-037: Startup request staggering — spread non-critical requests across 5s
+    // to avoid overwhelming the ESP32-C3 HTTP server (~4-7 concurrent connections).
+    // See Docs/dashboard-stability-remediation-plan.md for full rationale.
+
+    // Immediate: status snapshot + transport connection (needed for initial UI render)
     loadStatusSnapshot().catch(function(){});
     if (TRANSPORT === 'sse') { try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); } }
     else { try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); } }
-    loadStorageStats().catch(function(){});
-    storageStatsIntervalId = setInterval(function() {
+
+    // BUG-037 Fix 7: Defer storage stats by 3s (displayed below the fold, not urgent)
+    setTimeout(function() {
       if (isImportActive()) return;
       loadStorageStats().catch(function(){});
-    }, 60000);
-    statusSnapshotIntervalId = setInterval(function() {
-      if (isImportActive()) return;
-      loadStatusSnapshot().catch(function(){});
-    }, 30000);
+      // BUG-037 Fix 8: storage stats interval increased from 60s to 120s
+      // (storage stats change only on NVS persist cycles, roughly every 60 minutes)
+      storageStatsIntervalId = setInterval(function() {
+        if (isImportActive()) return;
+        loadStorageStats().catch(function(){});
+      }, 120000);
+    }, 3000);
+
+    // BUG-037 Fix 5: 30s status interval only in polling mode — in SSE mode,
+    // state is delivered via SSE events, so periodic /api/status polling is unnecessary
+    if (TRANSPORT !== 'sse') {
+      statusSnapshotIntervalId = setInterval(function() {
+        if (isImportActive()) return;
+        loadStatusSnapshot().catch(function(){});
+      }, 30000);
+    }
+
+    // BUG-037 Fix 7: History deferred from 2s to 5s (gives storage stats time to complete)
     historyBootstrapTimerId = setTimeout(function() {
       if (isImportActive()) return;
       loadHistory();
-    }, 2000);
+    }, 5000);
   });
 };
 

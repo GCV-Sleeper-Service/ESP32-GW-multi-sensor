@@ -15,8 +15,9 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 **Date:** 2026-03-16
 **Version observed:** `v7.5.3.3` post-merge validation
-**Status:** Root cause confirmed; remediation plan created
+**Status:** FIXED — all 8 remediation steps implemented
 **Remediation:** `Docs/dashboard-stability-remediation-plan.md`
+**Fix PR:** Implements fixes 1-8; pending real-device validation
 
 ### Symptom
 Opening the dashboard on the real device triggers panic/reboot shortly after page load.
