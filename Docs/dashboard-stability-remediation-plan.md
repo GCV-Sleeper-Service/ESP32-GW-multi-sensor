@@ -1,10 +1,10 @@
-# Dashboard Stability Remediation Plan — BUG-037
+# Dashboard Stability Remediation Plan — BUG-043
 
 _Remediation Plan for v7.5.3.3-hotfix_
 _Date: 2026-03-16_
 _Prerequisite: v7.5.3.3 merged on `main`; dashboard instability confirmed on real device_
 _Repo: [GCV-Sleeper-Service/ESP32-GW-multi-sensor](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor)_
-_Related: BUG-037, LESSON-OPS-050, LESSON-OPS-051_
+_Related: BUG-043, LESSON-OPS-050, LESSON-OPS-051_
 
 ---
 
@@ -21,7 +21,7 @@ Eliminate the dashboard-triggered ESP32-C3 crash/reboot observed during post-mer
 - `Docs/dashboard-instability-investigation-2026-03-16_Version2` — observed behavior, evidence, and root cause hypothesis
 - `Docs/session-log-2026-03-16-v7.5.3.3-dashboard-instability_Version2` — session log with device validation details
 - `Docs/handoff-2026-03-16-v7.5.3.3-dashboard-instability_Version2` — handoff notes
-- `Docs/bugs-and-lessons-learned.md` — BUG-037 entry
+- `Docs/bugs-and-lessons-learned.md` — BUG-043 entry
 - `Docs/phase3-implementation-plan.md` — confirms `/api/v2/live` is `v7.5.3.4`, not current scope
 
 ---
@@ -426,7 +426,7 @@ if (TRANSPORT === 'sse') { try { connectSSE(); } catch(e) { ... } }
 else { try { startPolling(); } catch(e) { ... } }
 
 // Stagger non-critical requests to avoid overwhelming the ESP32-C3 HTTP server
-// (BUG-037: startup request burst caused httpd_accept_conn failures and panic/reboot)
+// (BUG-043: startup request burst caused httpd_accept_conn failures and panic/reboot)
 setTimeout(function() {
   if (isImportActive()) return;
   loadStorageStats().catch(function(){});
@@ -534,10 +534,10 @@ bash scripts/preflight.sh
 **Scope:** Update project documentation to reflect the fix and prevent recurrence.
 
 **Files modified:**
-- `Docs/bugs-and-lessons-learned.md` — Update BUG-037 with confirmed root cause; add LESSON-OPS-050 and LESSON-OPS-051
+- `Docs/bugs-and-lessons-learned.md` — Update BUG-043 with confirmed root cause; add LESSON-OPS-050 and LESSON-OPS-051
 - `Docs/changelog.md` — Add hotfix entry
 
-**BUG-037 update:** Replace "Root cause hypothesis" with "Confirmed root cause" detailing all six issues and their fixes.
+**BUG-043 update:** Replace "Root cause hypothesis" with "Confirmed root cause" detailing all six issues and their fixes.
 
 **New lessons:**
 - **LESSON-OPS-050:** Dashboard HTTP request budgeting — ESP32-C3 guardrails
@@ -623,7 +623,7 @@ Playwright tests validate rendering and data flow against a mock server with unl
 | `dashboard/dashboard.html` | Mirror all JS changes | 9 |
 | `dashboard/dashboard.min.html` | Regenerated | 10 |
 | `dashboard/dashboard.h` | Regenerated | 10 |
-| `Docs/bugs-and-lessons-learned.md` | BUG-037 confirmed root cause, LESSON-OPS-050, LESSON-OPS-051 | 11 |
+| `Docs/bugs-and-lessons-learned.md` | BUG-043 confirmed root cause, LESSON-OPS-050, LESSON-OPS-051 | 11 |
 | `Docs/changelog.md` | Hotfix entry | 11 |
 | `Docs/dashboard-stability-remediation-plan.md` | New: this document | — |
 
