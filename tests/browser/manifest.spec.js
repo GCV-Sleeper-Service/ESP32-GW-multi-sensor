@@ -1,5 +1,21 @@
 const { test, expect } = require('@playwright/test');
 
+// Stub external CDN resources (Chart.js, Google Fonts) so page.goto resolves
+// in offline / sandboxed CI environments.  The dashboard wraps initCharts()
+// in try/catch so a missing Chart global is handled gracefully; sensor-load
+// logic (loadManifestV2 / loadSensorManifest) runs independently of charts.
+async function stubCdn(page) {
+  await page.route('https://cdn.jsdelivr.net/**', route =>
+    route.fulfill({ status: 200, contentType: 'application/javascript', body: '/* cdn stub */' })
+  );
+  await page.route('https://fonts.googleapis.com/**', route =>
+    route.fulfill({ status: 200, contentType: 'text/css', body: '' })
+  );
+  await page.route('https://fonts.gstatic.com/**', route =>
+    route.fulfill({ status: 200, contentType: 'font/woff2', body: '' })
+  );
+}
+
 test.describe('manifest boot flow', () => {
   test('api manifest endpoint returns schema v2 metadata', async ({ request }) => {
     const response = await request.get('/api/manifest');
@@ -28,6 +44,7 @@ test.describe('manifest boot flow', () => {
   });
 
   test('dashboard boots from /api/manifest', async ({ page }) => {
+    await stubCdn(page);
     await page.goto('/dashboard.html');
     await page.waitForFunction(() => window.App && App.State && App.State.getSensors().length === 3);
     const sensors = await page.evaluate(() => App.State.getSensors().map(s => ({ id: s.id, name: s.name })));
@@ -39,6 +56,7 @@ test.describe('manifest boot flow', () => {
   });
 
   test('dashboard falls back to /sensors.json when /api/manifest is unavailable', async ({ page }) => {
+    await stubCdn(page);
     await page.route('**/api/manifest', async route => {
       await route.fulfill({
         status: 404,
