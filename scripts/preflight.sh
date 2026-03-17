@@ -156,6 +156,15 @@ else
   fi
 fi
 
+# BUG-043-cont Fix 8: prevent regression — fetchDeviceHistory must fetch sequentially,
+# never via Promise.all (concurrent NVS scans block the HTTP server task for 1-4 seconds)
+if grep -Eq 'Promise\.all\(.*historyMeasurements' dashboard/dashboard.js dashboard/dashboard.html; then
+  echo "✗ no_concurrent_history_fetch: FAIL — fetchDeviceHistory must NOT use Promise.all"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+else
+  echo "no_concurrent_history_fetch: OK"
+fi
+
 echo "→ Validating ESPHome YAML configuration..."
 
 # Check if esphome is available
