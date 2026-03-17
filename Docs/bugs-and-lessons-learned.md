@@ -11,7 +11,7 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 ---
 
-## BUG-037 — Dashboard request fanout / polling destabilizes ESP32-C3 (CONFIRMED)
+## BUG-043 — Dashboard request fanout / polling destabilizes ESP32-C3 (CONFIRMED)
 
 **Date:** 2026-03-16
 **Version observed:** `v7.5.3.3` post-merge validation
