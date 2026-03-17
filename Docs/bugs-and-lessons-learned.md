@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-16 — v7.5.3.3-hotfix (BUG-037 confirmed root cause; LESSON-OPS-050, LESSON-OPS-051 added)_
+_Last updated: 2026-03-16 — v7.5.3.3-hotfix (BUG-043 confirmed root cause; LESSON-OPS-050, LESSON-OPS-051 added)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -447,7 +447,7 @@ Playwright tests validate rendering and data flow against a mock server with unl
 4. Check browser Network tab — no request storms or duplicate fetches
 5. Check device logs — no `httpd_accept_conn: error in accept` warnings
 
-Related: BUG-037
+Related: BUG-043
 
 ---
 
@@ -463,7 +463,7 @@ The ESP32-C3 HTTP server (ESP-IDF `httpd`) supports approximately 4-7 concurrent
 5. **Polling cadence should match data change rate** — storage stats change hourly (poll every 120s max), status changes every ~15 minutes (poll every 30s max).
 6. **Verify with browser DevTools Network tab** — before any dashboard PR is merged, verify the request pattern. There should be no request storms, no duplicate concurrent fetches, and no unbounded request stacking.
 
-Related: BUG-037
+Related: BUG-043
 
 ---
 
