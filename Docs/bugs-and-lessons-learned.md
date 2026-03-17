@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-16 — v7.5.3.3-hotfix (BUG-037 confirmed root cause; LESSON-OPS-050, LESSON-OPS-051 added)_
+_Last updated: 2026-03-17 — v7.5.3.4 (BUG-043 reassigned from duplicate BUG-037; LESSON-OPS-050, LESSON-OPS-051 updated to reference BUG-043)_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -11,7 +11,7 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 ---
 
-## BUG-037 — Dashboard request fanout / polling destabilizes ESP32-C3 (CONFIRMED)
+## BUG-043 — Dashboard request fanout / polling destabilizes ESP32-C3 (CONFIRMED)
 
 **Date:** 2026-03-16
 **Version observed:** `v7.5.3.3` post-merge validation
@@ -436,7 +436,7 @@ The original validation helper silently normalized MAC addresses inside the call
 
 ### LESSON-OPS-051: Dashboard code changes that affect network behavior require real-device validation with dashboard open (v7.5.3.3-hotfix)
 
-Playwright tests validate rendering and data flow against a mock server with unlimited HTTP capacity. They do **NOT** validate HTTP connection pressure on a real ESP32-C3 (~4-7 concurrent connections). BUG-037 passed all 73 Playwright tests but crashed the real device within seconds of opening the dashboard.
+Playwright tests validate rendering and data flow against a mock server with unlimited HTTP capacity. They do **NOT** validate HTTP connection pressure on a real ESP32-C3 (~4-7 concurrent connections). BUG-043 passed all 73 Playwright tests but crashed the real device within seconds of opening the dashboard.
 
 **Rule:** Any dashboard change that modifies `setInterval()` / `setTimeout()` scheduling, `fetch()` call sites, SSE event handlers, boot sequence request ordering, or polling/refresh cadence **must** be validated on a real device with the dashboard open before the PR is merged.
 
@@ -447,7 +447,7 @@ Playwright tests validate rendering and data flow against a mock server with unl
 4. Check browser Network tab — no request storms or duplicate fetches
 5. Check device logs — no `httpd_accept_conn: error in accept` warnings
 
-Related: BUG-037
+Related: BUG-043
 
 ---
 
@@ -463,7 +463,7 @@ The ESP32-C3 HTTP server (ESP-IDF `httpd`) supports approximately 4-7 concurrent
 5. **Polling cadence should match data change rate** — storage stats change hourly (poll every 120s max), status changes every ~15 minutes (poll every 30s max).
 6. **Verify with browser DevTools Network tab** — before any dashboard PR is merged, verify the request pattern. There should be no request storms, no duplicate concurrent fetches, and no unbounded request stacking.
 
-Related: BUG-037
+Related: BUG-043
 
 ---
 
