@@ -6,7 +6,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ## v7.5.3.3-hotfix — Dashboard Stability Remediation (2026-03-17)
 
-**BUG-037 fix implemented.** Dashboard request scheduling rewritten to eliminate ESP32-C3 HTTP server overload.
+**BUG-043 fix implemented.** Dashboard request scheduling rewritten to eliminate ESP32-C3 HTTP server overload.
 
 Dashboard JavaScript was overwhelming the ESP32-C3 HTTP server (~4-7 concurrent connections) with excessive concurrent and overlapping requests, causing `httpd_accept_conn: error in accept (23)` and panic/reboot.
 
