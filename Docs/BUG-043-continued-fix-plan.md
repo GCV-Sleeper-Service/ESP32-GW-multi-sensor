@@ -234,6 +234,31 @@ After flashing v7.5.3.5 firmware:
 
 ---
 
-## Future Work
+## Split-PR Strategy (post-v7.5.3.5 follow-up)
 
-- Add `vTaskDelay(pdMS_TO_TICKS(1))` inside the NVS scan loop in `sensor_history_multi.h` to yield the CPU between blob reads. This would eliminate the root cause at the firmware level and remove the need for the 300ms browser-side delay.
+Post-merge validation after PR #39 (v7.5.3.5) showed that even a **single** serialized history request can still block the HTTP task long enough to cause API disconnects and 500/502 errors. The v7.5.3.5 dashboard-side mitigations reduced concurrency but did not eliminate firmware-side blocking.
+
+The follow-up work was split into two PRs:
+
+1. **PR (firmware-only — this is the first follow-up):** Adds cooperative yielding in long NVS iteration loops in `sensor_history_multi.h`. Does NOT change dashboard JS, polling schedules, or boot sequencing.
+2. **PR (dashboard hardening — separate follow-up):** Dashboard request-scheduling improvements (poll throttling, SSE boot sequencing, inter-sensor gaps). Separate PR to keep scope clean and allow firmware fix to be validated independently.
+
+### Firmware fix (PR 1 — implemented)
+
+Added `maybe_yield_nvs_scan_(int iteration)` static helper in `sensor_history_multi.h`:
+- Calls `vTaskDelay(pdMS_TO_TICKS(1))` every `NVS_SCAN_YIELD_INTERVAL` (4) NVS blob reads
+- Applied to all three long NVS iteration loops:
+  - `restore_from_nvs()` — boot-time RAM restore
+  - `build_import_epoch_map_()` — import epoch-map scan
+  - `handle_history_()` — per-request history streaming
+
+With 1080 max segments at 4 blobs per yield, this adds at most ~270 voluntary yield-ms per full scan — small compared to actual NVS read time, but sufficient to give BLE/WiFi/API tasks CPU time between batches.
+
+**See also:** LESSON-OPS-053 in `Docs/bugs-and-lessons-learned.md`
+
+---
+
+## Future Work (dashboard hardening — PR 2, pending)
+
+- Dashboard request-scheduling improvements: fully sequential initial poll (batch size 1), larger inter-sensor gaps in history fetches, SSE boot status snapshot deferred/removed, storage stats deferred further
+- These changes are intentionally excluded from the firmware PR to allow clean validation of the firmware fix independently

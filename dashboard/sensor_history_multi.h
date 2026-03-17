@@ -703,6 +703,19 @@ static bool clear_persisted_history_() {
   return true;
 }
 
+// BUG-043 firmware fix: long NVS scan loops can block the ESP32-C3 HTTP task
+// for hundreds of milliseconds, starving BLE/WiFi/API/watchdog-sensitive work.
+// Yield to the FreeRTOS scheduler every NVS_SCAN_YIELD_INTERVAL iterations so
+// other tasks (BLE, WiFi, ESPHome API) get CPU time during history reads.
+// Using every 4th blob is a balance: low per-call overhead but frequent enough
+// to keep single-history responses well under the 30ms component-block limit.
+static constexpr int NVS_SCAN_YIELD_INTERVAL = 4;
+static void maybe_yield_nvs_scan_(int iteration) {
+  if (iteration > 0 && (iteration % NVS_SCAN_YIELD_INTERVAL == 0)) {
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
 static bool load_snapshot_from_handle_(nvs_handle_t handle, int slot,
                                        SegmentSnapshot *snapshot) {
   if (snapshot == nullptr) return false;
@@ -871,6 +884,7 @@ static bool restore_from_nvs() {
 
   int restored = 0;
   for (int n = 0; n < restore_segments; n++) {
+    maybe_yield_nvs_scan_(n);  // BUG-043: yield every 4 blobs to avoid HTTP task starvation
     int slot = (first_restore_slot + n) % PERSIST_SLOTS;
     if (!load_snapshot_from_handle_(handle, slot, snapshot)) continue;
     append_snapshot_to_ram_(*snapshot);
@@ -1398,6 +1412,7 @@ class HistoryWebHandler : public AsyncWebHandler {
 
     int oldest_slot = (meta.next_slot + PERSIST_SLOTS - meta.valid_segments) % PERSIST_SLOTS;
     for (int i = 0; i < meta.valid_segments; i++) {
+      maybe_yield_nvs_scan_(i);  // BUG-043: yield every 4 blobs to avoid HTTP task starvation
       int slot = (oldest_slot + i) % PERSIST_SLOTS;
       if (load_snapshot_from_handle_(handle, slot, temp)) {
         uint32_t hour_epoch = 0;
@@ -2001,6 +2016,7 @@ class HistoryWebHandler : public AsyncWebHandler {
               (meta.next_slot + PERSIST_SLOTS - meta.valid_segments) % PERSIST_SLOTS;
 
           for (int n = 0; n < meta.valid_segments; n++) {
+            maybe_yield_nvs_scan_(n);  // BUG-043: yield every 4 blobs to avoid HTTP task starvation
             int slot = (oldest_slot + n) % PERSIST_SLOTS;
             if (!load_snapshot_from_handle_(handle, slot, snapshot)) continue;
             stream_snapshot_series_(resp, *snapshot, sensor_idx, series_kind);

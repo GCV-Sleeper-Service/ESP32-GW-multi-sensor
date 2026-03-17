@@ -4,6 +4,32 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
 
+## BUG-043 Firmware Fix (no version bump) — 2026-03-17
+
+**BUG-043 firmware root-cause fix.** Post-merge validation after PR #39 (v7.5.3.5 dashboard-side mitigations) showed the ESP32-C3 still disconnects during dashboard history loads. Even a single history request blocks the HTTP task long enough to starve BLE/WiFi/API/watchdog work. The root cause is that long NVS iteration loops in `sensor_history_multi.h` scan up to 1080 persisted segment blobs without ever yielding to the FreeRTOS scheduler.
+
+This firmware-only PR adds cooperative yielding inside every heavy NVS scan loop. Dashboard request-scheduling hardening is handled separately in a follow-up PR.
+
+### Root cause addressed
+
+- **Firmware blocking (PRIMARY):** `handle_history_()`, `restore_from_nvs()`, and `build_import_epoch_map_()` all iterate up to `meta.valid_segments` NVS blobs in a tight loop with no `vTaskDelay()` between blob reads. With 1080 segments and accumulated history, a single `/history/{id}/temp` or `/history/{id}/hum` request blocks the HTTP server task for 0.5–2 seconds. During that window, BLE scanning, WiFi, the ESPHome API, and the task watchdog are all starved, causing the observed API disconnects, 500/502 responses, and ERR_CONNECTION_RESET crashes in the browser.
+
+### Fix implemented
+
+- Added `maybe_yield_nvs_scan_(int iteration)` static helper in `dashboard/sensor_history_multi.h`. Calls `vTaskDelay(pdMS_TO_TICKS(1))` every `NVS_SCAN_YIELD_INTERVAL` (4) iterations to give the FreeRTOS scheduler a timeslice between blob reads without introducing per-blob overhead.
+- Applied to **all three** long NVS iteration loops:
+  - `restore_from_nvs()` — boot-time restore loop
+  - `build_import_epoch_map_()` — import epoch-map scan loop
+  - `handle_history_()` — history streaming loop (per-sensor HTTP response)
+
+### Scope
+
+No dashboard JS changes in this PR. No version bump (firmware-only code fix and docs). Dashboard request-scheduling hardening (sequential poll throttling, SSE boot sequencing improvements) will be addressed in a separate follow-up PR.
+
+**Related:** BUG-043, PR #39 (v7.5.3.5 dashboard mitigations), LESSON-OPS-050, LESSON-OPS-051, LESSON-OPS-052
+
+---
+
 ## v7.5.3.5 — BUG-043 Continued: Dashboard Startup Crash Fix (2026-03-17)
 
 **BUG-043-cont fix.** Three additional root causes identified and fixed after the v7.5.3.3-hotfix failed to prevent dashboard-induced ESP32-C3 crashes on open.
