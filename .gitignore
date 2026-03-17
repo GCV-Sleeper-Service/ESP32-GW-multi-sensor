@@ -12,8 +12,8 @@ dashboard/dashboard.min.html
 node_modules/
 scripts/__pycache__
 # Playwright test artifacts
-tests/playwright-report/data/
-tests/playwright-report/trace/
+tests/playwright-report/
+
 tests/playwright-results/dashboard-*/
 tests/playwright-results/sensor-count-*/
 tests/playwright-results/.playwright-artifacts-*/
