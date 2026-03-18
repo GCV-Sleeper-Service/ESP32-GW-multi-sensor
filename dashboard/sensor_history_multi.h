@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.3.5.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.3.6.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -469,7 +469,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.3.5) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.3.6) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //
@@ -1067,6 +1067,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (strcmp(p, "/dashboard-download") == 0) return true;
       if (strcmp(p, "/api/storage-stats") == 0) return true;
       if (strcmp(p, "/api/status") == 0) return true;
+      if (strcmp(p, "/api/v2/live") == 0) return true;
       if (strcmp(p, "/favicon.ico") == 0) return true;
       return false;
     }
@@ -1154,6 +1155,10 @@ class HistoryWebHandler : public AsyncWebHandler {
       handle_status_(request);
       return;
     } if (strcmp(p, "/api/manifest") == 0) { handle_api_manifest_(request); return; }
+    if (strcmp(p, "/api/v2/live") == 0) {
+      handle_api_v2_live_(request);
+      return;
+    }
     if (strcmp(p, "/sensors.json") == 0) {
       handle_manifest_(request);
       return;
@@ -1355,6 +1360,31 @@ class HistoryWebHandler : public AsyncWebHandler {
     resp->print("]");
     request->send(resp);
   } void handle_api_manifest_(AsyncWebServerRequest *request) const { auto *resp = request->beginResponseStream("application/json"); add_common_headers_(resp); resp->print(GATEWAY_MANIFEST_JSON); request->send(resp); }
+
+  void handle_api_v2_live_(AsyncWebServerRequest *request) const {
+    auto *resp = request->beginResponseStream("application/json");
+    add_common_headers_(resp);
+    resp->print("{\"timestamp\":");
+    resp->print((unsigned long)::time(nullptr));
+    resp->print(",\"devices\":{");
+    for (int d = 0; d < NUM_DEVICES; d++) {
+      if (d > 0) resp->print(",");
+      resp->printf("\"%s\":{", devices[d].id);
+      for (int m = 0; m < devices[d].metric_count; m++) {
+        if (m > 0) resp->print(",");
+        resp->printf("\"%s\":", devices[d].metric_defs[m].key);
+        if (devices[d].metric_states[m].valid) {
+          resp->printf("%.1f", devices[d].metric_states[m].current_value);
+        } else {
+          resp->print("null");
+        }
+      }
+      resp->printf(",\"last_seen\":%lu", (unsigned long)devices[d].last_seen_epoch);
+      resp->print("}");
+    }
+    resp->print("}}");
+    request->send(resp);
+  }
 
   void handle_reboot_(AsyncWebServerRequest *request) const {
     if (!authenticate_management_(request)) return;
