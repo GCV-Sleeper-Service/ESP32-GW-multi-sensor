@@ -274,6 +274,16 @@ if [[ "$SENSORS_V2" == "yes" ]]; then
   fi
 fi
 
+# BUG-045: Mixed-category persistence regression guards.
+# NUM_ENV_SENSORS must be a separate constant (not aliased to NUM_DEVICES) so that
+# persisted environmental history schema remains 3-wide even when RAM-only devices are added.
+check_contains "num_env_sensors_constant_present" dashboard/sensor_history_multi.h \
+  "static constexpr int NUM_ENV_SENSORS ="
+check_contains "num_sensors_aliases_env_sensors" dashboard/sensor_history_multi.h \
+  "static constexpr int NUM_SENSORS = NUM_ENV_SENSORS;"
+check_not_contains "num_sensors_not_aliased_to_num_devices" dashboard/sensor_history_multi.h \
+  "static constexpr int NUM_SENSORS = NUM_DEVICES;"
+
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   echo "✗ Preflight failed with $FAIL_COUNT error(s)"
   exit 1

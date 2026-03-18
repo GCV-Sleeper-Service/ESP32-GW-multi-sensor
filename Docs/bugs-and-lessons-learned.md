@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-18 — BUG-044 implementation gap, BUG-043 preflight/browser-test delivery, LESSON-OPS-057/058 added_
+_Last updated: 2026-03-18 — BUG-045 mixed-category persistence regression, LESSON-OPS-059 added_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,47 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-045 — Mixed-category device count accidentally changed persisted history schema (2026-03-18)
+
+**Date:** 2026-03-18 (discovered post-flash via ESPHome logs)
+**Version observed:** v7.5.4.0
+**Status:** FIXED
+
+**Symptom:** After flashing v7.5.4.0 firmware, ESPHome output repeatedly logged:
+
+```
+[W][history:672][httpd]: history meta invalid or schema mismatch — resetting
+```
+
+All history cards on the dashboard showed no data. Previously retained ThermoPro temperature and
+humidity history was silently discarded on every boot.
+
+**Root cause:** `scripts/render_sensor_config.py` `render_entity_block()` aliased
+`NUM_SENSORS = NUM_DEVICES`. Adding the RAM-only `wan_ping` network device increased
+`NUM_DEVICES` from 3 to 4, which propagated to `NUM_SENSORS`. The persistence validation code
+in `sensor_history_multi.h` checks `meta->num_sensors == NUM_SENSORS` (and likewise for
+`SegmentSnapshotHeader`). A retained 3-sensor schema would fail `3 == 4`, triggering a full
+history reset on every boot.
+
+**Fix:**
+- In `render_entity_block()`, generate a separate `NUM_ENV_SENSORS` constant equal to the count
+  of environmental (ThermoPro/BLE) devices, and alias `NUM_SENSORS = NUM_ENV_SENSORS` instead
+  of `NUM_DEVICES`. This keeps persisted schema 3-wide regardless of how many RAM-only devices
+  are added.
+- Update `render_header_block()` comments to clearly distinguish `NUM_DEVICES` (all runtime
+  devices) from `NUM_SENSORS` (persisted environmental count).
+- Update the static comment in `sensor_history_multi.h` to reflect the corrected aliasing.
+- Add 3 preflight regression guards to `scripts/preflight.sh`:
+  - `num_env_sensors_constant_present` — generated header must contain `NUM_ENV_SENSORS =`
+  - `num_sensors_aliases_env_sensors` — `NUM_SENSORS` must alias `NUM_ENV_SENSORS`
+  - `num_sensors_not_aliased_to_num_devices` — `NUM_SENSORS = NUM_DEVICES` must not appear
+
+**Prevention:** LESSON-OPS-059 (see below). Preflight guards prevent this class of regression.
+
+Related: LESSON-OPS-059
+
+---
 
 ### BUG-044 — BUG-043 preflight enhancements and browser regression tests specified but never implemented (2026-03-18)
 
@@ -525,6 +566,30 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-059: Runtime device count and persisted-history count are different concepts in mixed-category firmware (2026-03-18)
+
+**Date:** 2026-03-18
+
+In mixed-category firmware (environmental BLE sensors + RAM-only network probes), the total
+number of runtime `SensorEntity` devices (`NUM_DEVICES`) is not the same as the number of
+devices whose history is written to flash (`NUM_SENSORS`). Aliasing `NUM_SENSORS = NUM_DEVICES`
+appears harmless until a second device category is introduced — at that point the persisted
+schema widens and all previously retained environmental history fails schema validation.
+
+**Rule:** `NUM_SENSORS` (or any constant used to dimension flash-backed arrays) must always equal
+the count of *environmentally persisted* devices only. A separate `NUM_ENV_SENSORS` constant
+must be generated for this count. `NUM_SENSORS = NUM_ENV_SENSORS` must be the alias. Adding a
+RAM-only device to the manifest must never silently widen the persisted schema.
+
+**Preflight enforcement:** `scripts/preflight.sh` must contain:
+- `num_env_sensors_constant_present` — `NUM_ENV_SENSORS =` present in generated header
+- `num_sensors_aliases_env_sensors` — `NUM_SENSORS = NUM_ENV_SENSORS;` present in generated header
+- `num_sensors_not_aliased_to_num_devices` — `NUM_SENSORS = NUM_DEVICES;` must **not** appear
+
+Related: BUG-045
+
+---
 
 ### LESSON-OPS-058: Prompt template device testing sections must include full local workflow (2026-03-18)
 
