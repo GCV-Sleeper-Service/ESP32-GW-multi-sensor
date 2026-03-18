@@ -14,7 +14,7 @@
 //   fullyParallel: true — the mock server is stateless (fixture reads only, no
 //   mutations), so concurrent workers sharing port 3737 is safe. page.route()
 //   intercepts in BUG-043 tests are per-browser-context, not server-level.
-//   Workers default to half the CPU cores. Override with --workers=N.
+//   Workers default to all CPU cores. Override with: npx playwright test --workers=2
 //
 // Container / Linux sandbox note:
 //   Chromium's default sandbox requires kernel features (user namespaces) that
@@ -61,8 +61,9 @@ module.exports = defineConfig({
   // Each test gets its own browser context so page.route intercepts don't leak.
   fullyParallel: true,
 
-  // Half the CPU cores by default. Override: npx playwright test --workers=4
-  workers: undefined,
+  // Use all CPU cores. Playwright accepts '100%' as "all cores".
+  // Override from CLI: npx playwright test --workers=2
+  workers: '100%',
 
   // Fail fast on CI; locally allow retries
   retries: process.env.CI ? 1 : 0,
