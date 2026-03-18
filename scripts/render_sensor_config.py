@@ -62,8 +62,9 @@ def unwrap_marker_body(block: str, begin: str, end: str) -> str:
 
 def render_header_block(sensors: List[Dict[str, str]]) -> str:
     lines = [
-        "// SensorSlot removed in v7.5.3.8 — all state in SensorEntity devices[].",
-        "// NUM_SENSORS alias preserved for SegmentSnapshot backward compatibility.",
+        "// SensorSlot removed in v7.5.3.8 — all runtime state in SensorEntity devices[].",
+        "// NUM_DEVICES = all logical devices in manifest.",
+        "// NUM_SENSORS = persisted environmental sensor count only (backward-compat alias for SegmentSnapshot / HistoryMeta).",
     ]
     return "\n".join(lines)
 
@@ -108,7 +109,8 @@ def render_entity_block(sensors: List[Dict]) -> str:
     lines.extend([
         "",
         f"static constexpr int NUM_DEVICES = {len(sensors)};",
-        f"static constexpr int NUM_SENSORS = NUM_DEVICES;  // backward compat alias for SegmentSnapshot",
+        f"static constexpr int NUM_ENV_SENSORS = {len(thermopro)};",
+        "static constexpr int NUM_SENSORS = NUM_ENV_SENSORS;  // backward compat alias for persisted environmental history",
         "",
         "static SensorEntity devices[NUM_DEVICES] = {",
     ])

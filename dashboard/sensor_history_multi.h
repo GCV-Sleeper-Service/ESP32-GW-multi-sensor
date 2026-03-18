@@ -366,8 +366,9 @@ struct SensorEntity {
 // ═══════════════════════════════════════════════════════════════════
 
 // <<< SENSOR_MANIFEST:HEADER_BEGIN >>>
-// SensorSlot removed in v7.5.3.8 — all state in SensorEntity devices[].
-// NUM_SENSORS alias preserved for SegmentSnapshot backward compatibility.
+// SensorSlot removed in v7.5.3.8 — all runtime state in SensorEntity devices[].
+// NUM_DEVICES = all logical devices in manifest.
+// NUM_SENSORS = persisted environmental sensor count only (backward-compat alias for SegmentSnapshot / HistoryMeta).
 // <<< SENSOR_MANIFEST:HEADER_END >>>
 
 // <<< SENSOR_MANIFEST:ENTITY_BEGIN >>>
@@ -397,7 +398,8 @@ static HistoryBuffer entity_hbuf_wan_ping_ping_ms;
 static HistoryBuffer entity_hbuf_wan_ping_success_pct;
 
 static constexpr int NUM_DEVICES = 4;
-static constexpr int NUM_SENSORS = NUM_DEVICES;  // backward compat alias for SegmentSnapshot
+static constexpr int NUM_ENV_SENSORS = 3;
+static constexpr int NUM_SENSORS = NUM_ENV_SENSORS;  // backward compat alias for persisted environmental history
 
 static SensorEntity devices[NUM_DEVICES] = {
   {
@@ -476,7 +478,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 //
 // See Docs/configuring-sensors.md for the full procedure and manual fallback.
 // NUM_DEVICES is set in the ENTITY_BEGIN block above; NUM_SENSORS is aliased
-// to NUM_DEVICES for SegmentSnapshot backward compatibility.
+// to NUM_ENV_SENSORS (environmental-only count) for persisted-history backward compatibility.
 // ═══════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════
