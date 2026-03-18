@@ -3,6 +3,32 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.3.7 — Add `/api/v2/history/{device}/{metric}` Endpoint (RAM-only) — 2026-03-18
+
+**Phase 3 milestone:** New `/api/v2/history/{device_id}/{metric_key}` endpoint reads from `SensorEntity` history buffers (RAM ring buffer only — no NVS reads).
+
+### Changes
+
+- **New endpoint `GET /api/v2/history/{device_id}/{metric_key}`** — Returns CSV (`epoch,value\n`) from the SensorEntity's `metric_states[].history` HistoryBuffer. RAM-only: contains only post-boot data. Full NVS integration comes in v7.5.3.8.
+- **URL parsing** — Extracts `device_id` and `metric_key` from path after `/api/v2/history/`. Returns 404 for unknown device, unknown metric, or metrics with `history_enabled == false`.
+- **Pre-reserved string pattern (LESSON-OPS-056)** — Uses `std::string` with `reserve()` and zero-copy `beginResponse()` instead of `beginResponseStream`, establishing the correct pattern for NVS integration.
+- **Route registration** — Added to `canHandle()` and `handleRequest()` in `HistoryWebHandler`.
+- **Preflight check** — Added `history_handler_has_api_v2_history_route` to `scripts/preflight.sh`.
+- **Version bump** — All canonical locations updated to `7.5.3.7`.
+
+### Response format
+
+Same `epoch,value\n` CSV format as legacy `/history/{id}/{metric}` endpoints:
+```
+1710260000,23.40
+1710263600,23.20
+```
+
+**Key difference from legacy:** The legacy `/history/{id}/temp` reads NVS + RAM (up to 1080 blob reads). The v2 endpoint reads RAM ring buffer ONLY. During dual-write, both should produce identical data for the post-boot window.
+
+**Related:** Phase 3 implementation plan (v7.5.3.7 section), LESSON-OPS-056
+
+---
 ## v7.5.3.6 — Add `/api/v2/live` Endpoint from SensorEntity — 2026-03-18
 
 **Phase 3 milestone:** New `/api/v2/live` endpoint reads current values from `SensorEntity devices[]` (populated via dual-write since v7.5.3.3).

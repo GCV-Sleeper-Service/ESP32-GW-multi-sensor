@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.3.6.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.3.7.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -469,7 +469,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.3.6) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.3.7) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //
@@ -1068,6 +1068,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (strcmp(p, "/api/storage-stats") == 0) return true;
       if (strcmp(p, "/api/status") == 0) return true;
       if (strcmp(p, "/api/v2/live") == 0) return true;
+      if (len >= 20 && strncmp(p, "/api/v2/history/", 16) == 0) return true;
       if (strcmp(p, "/favicon.ico") == 0) return true;
       return false;
     }
@@ -1157,6 +1158,10 @@ class HistoryWebHandler : public AsyncWebHandler {
     } if (strcmp(p, "/api/manifest") == 0) { handle_api_manifest_(request); return; }
     if (strcmp(p, "/api/v2/live") == 0) {
       handle_api_v2_live_(request);
+      return;
+    }
+    if (strncmp(p, "/api/v2/history/", 16) == 0) {
+      handle_api_v2_history_(request, p + 16);
       return;
     }
     if (strcmp(p, "/sensors.json") == 0) {
@@ -1383,6 +1388,65 @@ class HistoryWebHandler : public AsyncWebHandler {
       resp->print("}");
     }
     resp->print("}}");
+    request->send(resp);
+  }
+
+  void handle_api_v2_history_(AsyncWebServerRequest *request, const char *rest) const {
+    // Parse: rest = "device_id/metric_key"
+    const char *slash = strchr(rest, '/');
+    if (slash == nullptr) {
+      request->send(404);
+      return;
+    }
+
+    size_t id_len = slash - rest;
+    const char *metric_key = slash + 1;
+
+    // Look up device by id
+    int dev_idx = -1;
+    for (int d = 0; d < NUM_DEVICES; d++) {
+      if (strlen(devices[d].id) == id_len &&
+          strncmp(devices[d].id, rest, id_len) == 0) {
+        dev_idx = d;
+        break;
+      }
+    }
+    if (dev_idx < 0) {
+      request->send(404);
+      return;
+    }
+
+    // Find metric index by matching metric_defs[].key
+    int metric_idx = -1;
+    for (int m = 0; m < devices[dev_idx].metric_count; m++) {
+      if (strcmp(devices[dev_idx].metric_defs[m].key, metric_key) == 0) {
+        metric_idx = m;
+        break;
+      }
+    }
+    if (metric_idx < 0) {
+      request->send(404);
+      return;
+    }
+
+    // Check history_enabled and history buffer
+    if (!devices[dev_idx].metric_defs[metric_idx].history_enabled ||
+        devices[dev_idx].metric_states[metric_idx].history == nullptr) {
+      request->send(404);
+      return;
+    }
+
+    HistoryBuffer *buf = devices[dev_idx].metric_states[metric_idx].history;
+
+    // Use pre-reserved string pattern (LESSON-OPS-056)
+    std::string csv;
+    csv.reserve(buf->count() * 20 + 64);
+    buf->append_csv_to(csv);
+
+    auto *resp = request->beginResponse(
+        200, "text/plain",
+        reinterpret_cast<const uint8_t *>(csv.data()), csv.size());
+    resp->addHeader("Cache-Control", "no-store");
     request->send(resp);
   }
 
