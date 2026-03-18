@@ -8,13 +8,13 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
   "ok": true,
   "schema_version": 2,
   "source": "active-manifest",
-  "version": "v7.5.3.9",
+  "version": "v7.5.4.0",
   "gateway": {
     "id": "gw-main",
     "name": "Main Gateway",
     "role": "satellite",
     "hardware": "ESP32-C3",
-    "firmware_version": "v7.5.3.9",
+    "firmware_version": "v7.5.4.0",
     "api_version": "v2"
   },
   "history": {
@@ -23,7 +23,7 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
     "ram_window_hours": 24,
     "sample_interval_seconds": 900
   },
-  "sensor_count": 3,
+  "sensor_count": 4,
   "metrics": [
     {
       "key": "temp",
@@ -117,6 +117,25 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
         {
           "key": "hum",
           "history_url": "/history/outside/hum"
+        }
+      ]
+    },
+    {
+      "id": "wan_ping",
+      "name": "WAN Latency",
+      "category": "network",
+      "adapter": "icmp_ping",
+      "source": {
+        "target": "8.8.8.8"
+      },
+      "measurements": [
+        {
+          "key": "ping_ms",
+          "history_url": "/api/v2/history/wan_ping/ping_ms"
+        },
+        {
+          "key": "success_pct",
+          "history_url": "/api/v2/history/wan_ping/success_pct"
         }
       ]
     }

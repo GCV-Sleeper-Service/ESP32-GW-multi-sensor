@@ -1,20 +1,33 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "sensors": [
     {
       "id": "office",
       "name": "Office",
-      "mac": "DB:06:2C:58:8A:59"
+      "mac": "DB:06:2C:58:8A:59",
+      "category": "environmental",
+      "adapter": "thermopro_ble"
     },
     {
       "id": "first_floor",
       "name": "First Floor",
-      "mac": "D5:D8:4C:25:06:49"
+      "mac": "D5:D8:4C:25:06:49",
+      "category": "environmental",
+      "adapter": "thermopro_ble"
     },
     {
       "id": "outside",
       "name": "Outside",
-      "mac": "DF:EB:DE:19:11:6C"
+      "mac": "DF:EB:DE:19:11:6C",
+      "category": "environmental",
+      "adapter": "thermopro_ble"
+    },
+    {
+      "id": "wan_ping",
+      "name": "WAN Latency",
+      "category": "network",
+      "adapter": "icmp_ping",
+      "source": { "target": "8.8.8.8" }
     }
   ]
 }

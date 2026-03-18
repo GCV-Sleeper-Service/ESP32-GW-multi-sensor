@@ -66,7 +66,7 @@ check_contains "dashboard_prefers_api_manifest" dashboard/dashboard.js "fetch(ES
 check_contains "dashboard_legacy_manifest_fallback" dashboard/dashboard.js "fetch(ESP_HOST + '/sensors.json'"
 check_contains "mock_server_serves_api_manifest" tests/mock-server/server.js "pathname === '/api/manifest'"
 check_contains "fixture_manifest_schema_v2" tests/fixtures/manifest.json '"schema_version": 2'
-check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"sensor_count": 3'
+check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"sensor_count": 4'
 check_contains "browser_spec_present" tests/browser/manifest.spec.js "dashboard falls back to /sensors.json"
 check_not_contains "no_old_dashboard_version" dashboard/dashboard.js "App.version = 'v7.4.5.1'"
 check_not_contains "no_old_firmware_version" firmware/esp32-c3-multi-sensor.yaml "v7.4.5.1"
@@ -261,6 +261,23 @@ fi
 python3 scripts/render_sensor_config.py --check
 node tests/fixtures/generate-fixtures.js --manifest config/sensors.json --overwrite-baseline >/dev/null
 check_contains "fixture_baseline_manifest_regenerated" tests/fixtures/manifest.json '"schema_version": 2'
+
+# Phase 4 check: v2 manifest with sensors.json must contain at least one network-category device
+SENSORS_V2="$(python3 -c "import json,sys; d=json.load(open('config/sensors.json')); sys.exit(0 if d.get('schema_version',1)==2 else 1)" 2>/dev/null && echo "yes" || echo "no")"
+if [[ "$SENSORS_V2" == "yes" ]]; then
+  NETWORK_DEVICE_COUNT="$(python3 -c "import json; d=json.load(open('config/sensors.json')); print(sum(1 for s in d.get('sensors',[]) if s.get('category')=='network'))")"
+  if [[ "$NETWORK_DEVICE_COUNT" -ge 1 ]]; then
+    echo "manifest_has_network_device: OK (${NETWORK_DEVICE_COUNT} network device(s))"
+  else
+    echo "✗ manifest_has_network_device: FAIL — v2 manifest has no network-category devices"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+fi
+
+if [[ "$FAIL_COUNT" -gt 0 ]]; then
+  echo "✗ Preflight failed with $FAIL_COUNT error(s)"
+  exit 1
+fi
 
 if command -v node >/dev/null 2>&1; then
   if [[ -d node_modules/@playwright/test ]]; then

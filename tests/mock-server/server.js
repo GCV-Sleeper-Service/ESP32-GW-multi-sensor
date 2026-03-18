@@ -145,13 +145,21 @@ const server = http.createServer(function(req, res) {
     const manifest = loadFixtureJson('manifest.json', { sensors: [] });
     const devices = {};
     (manifest.sensors || []).forEach(function(s, idx) {
-      devices[s.id] = {
-        temp: parseFloat((20.0 + idx * 1.7).toFixed(1)),
-        hum: parseFloat((45 + idx * 6).toFixed(0)),
-        batt: null,
-        rssi: null,
-        last_seen: 1741694400 + idx * 10
-      };
+      if (!s.adapter || s.adapter === 'thermopro_ble') {
+        devices[s.id] = {
+          temp: parseFloat((20.0 + idx * 1.7).toFixed(1)),
+          hum: parseFloat((45 + idx * 6).toFixed(0)),
+          batt: null,
+          rssi: null,
+          last_seen: 1741694400 + idx * 10
+        };
+      } else if (s.adapter === 'icmp_ping') {
+        devices[s.id] = {
+          ping_ms: null,
+          success_pct: null,
+          last_seen: 0
+        };
+      }
     });
     return json(res, { timestamp: 1741694400, devices: devices });
   }

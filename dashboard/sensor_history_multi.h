@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.3.9.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.4.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -382,14 +382,21 @@ static const MetricDef metrics_thermopro[] = {
   {"rssi",  "RSSI",        "dBm",          3, false}
 };
 
+static const MetricDef metrics_ping[] = {
+  {"ping_ms",     "Latency", "ms", 0, true},
+  {"success_pct", "Success", "%",  0, true}
+};
+
 static HistoryBuffer entity_hbuf_office_temp;
 static HistoryBuffer entity_hbuf_office_hum;
 static HistoryBuffer entity_hbuf_first_floor_temp;
 static HistoryBuffer entity_hbuf_first_floor_hum;
 static HistoryBuffer entity_hbuf_outside_temp;
 static HistoryBuffer entity_hbuf_outside_hum;
+static HistoryBuffer entity_hbuf_wan_ping_ping_ms;
+static HistoryBuffer entity_hbuf_wan_ping_success_pct;
 
-static constexpr int NUM_DEVICES = 3;
+static constexpr int NUM_DEVICES = 4;
 static constexpr int NUM_SENSORS = NUM_DEVICES;  // backward compat alias for SegmentSnapshot
 
 static SensorEntity devices[NUM_DEVICES] = {
@@ -435,11 +442,25 @@ static SensorEntity devices[NUM_DEVICES] = {
     .mac = "DF:EB:DE:19:11:6C",
     .last_rssi = 0, .last_seen_epoch = 0
   },
+  {
+    .id = "wan_ping", .name = "WAN Latency",
+    .category_id = 2, .adapter = "icmp_ping",
+    .metric_defs = metrics_ping,
+    .metric_states = {
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_wan_ping_ping_ms},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_wan_ping_success_pct},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}
+    },
+    .metric_count = 2,
+    .mac = "",
+    .last_rssi = 0, .last_seen_epoch = 0
+  },
 };
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.3.9) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.4.0) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //

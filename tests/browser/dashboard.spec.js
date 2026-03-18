@@ -352,7 +352,11 @@ test.describe('9. Manifest v2 loader', () => {
     await loadDashboard(page);
     await page.waitForFunction(() => window._manifest && Array.isArray(window._manifest.sensors), { timeout: 10000 });
     const sensors = await page.evaluate(() => window._manifest.sensors.map(s => s.id));
-    expect(sensors).toEqual(['office', 'first_floor', 'outside']);
+    // manifest.sensors includes all devices (environmental + network)
+    expect(sensors).toContain('office');
+    expect(sensors).toContain('first_floor');
+    expect(sensors).toContain('outside');
+    expect(sensors).toContain('wan_ping');
   });
 
   test('window._manifest contains gateway block', async ({ page }) => {
@@ -686,12 +690,13 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
   test('scenario 4: environmental card renderer dispatches correctly for all sensors', async ({ page }) => {
     await loadDashboard(page);
     await page.waitForFunction(() => window._manifest && window._manifest.sensors, { timeout: 10000 });
-    // All manifest sensors must have category='environmental' and map to CARD_RENDERERS.environmental
-    const allEnvironmental = await page.evaluate(() => {
-      return window._manifest.sensors.every(function(s) { return s.category === 'environmental'; });
+    // Environmental manifest sensors must map to CARD_RENDERERS.environmental
+    const envSensors = await page.evaluate(() => {
+      return window._manifest.sensors.filter(function(s) { return !s.category || s.category === 'environmental'; });
     });
-    expect(allEnvironmental).toBe(true);
-    // Rebuild cards and confirm full card structure for each card
+    expect(envSensors.length).toBe(3);
+    expect(envSensors.every(s => s.category === 'environmental')).toBe(true);
+    // Rebuild cards and confirm full card structure for each environmental card
     await page.evaluate(() => buildDeviceCards());
     await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout: 5000 });
     const cards = page.locator('.sensor-card');
@@ -818,8 +823,16 @@ test.describe('15. Phase 3 Closure — v2 API Regression', () => {
       const resp = await fetch('/api/v2/live');
       return resp.json();
     });
+    // manifest.metrics contains the environmental (BLE) metric keys.
+    // Only check environmental sensors — network devices use per-device metrics.
     const metricKeys = manifest.metrics.map(m => m.key);
+    const envSensorIds = new Set(
+      (manifest.sensors || [])
+        .filter(s => !s.category || s.category === 'environmental')
+        .map(s => s.id)
+    );
     for (const sensorId of Object.keys(live.devices)) {
+      if (!envSensorIds.has(sensorId)) continue;
       for (const key of metricKeys) {
         expect(live.devices[sensorId]).toHaveProperty(key);
       }

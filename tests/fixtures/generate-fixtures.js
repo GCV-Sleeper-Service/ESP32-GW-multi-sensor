@@ -12,7 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
-const VERSION = 'v7.5.3.9';
+const VERSION = 'v7.5.4.0';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },
@@ -46,6 +46,9 @@ function materializeSensors(sensors) {
     id: sensor.id,
     name: sensor.name,
     mac: sensor.mac || null,
+    category: sensor.category || 'environmental',
+    adapter: sensor.adapter || 'thermopro_ble',
+    source: sensor.source || null,
     tempBase: typeof sensor.tempBase === 'number' ? sensor.tempBase : (18.0 + idx * 2.1),
     humBase: typeof sensor.humBase === 'number' ? sensor.humBase : (42 + idx * 7),
   }));
@@ -62,11 +65,41 @@ function readManifestSensors(manifestPath) {
 }
 
 function fixtureManifestV1(sensors) {
-  return sensors.map(({ id, name }) => ({ id, name }));
+  // Legacy v1 format: only environmental (BLE) sensors, id/name only
+  return sensors
+    .filter(s => !s.adapter || s.adapter === 'thermopro_ble')
+    .map(({ id, name }) => ({ id, name }));
 }
 
+const PING_METRICS = [
+  {
+    key: 'ping_ms',
+    name: 'Latency',
+    unit: 'ms',
+    unit_symbol: 'ms',
+    class: 'analog_numeric',
+    data_type: 'float',
+    bounds: { min: 0, max: 10000 },
+    history: true,
+    history_suffix: 'ping_ms',
+    display: { precision: 0, chart: true },
+  },
+  {
+    key: 'success_pct',
+    name: 'Success Rate',
+    unit: 'percent',
+    unit_symbol: '%',
+    class: 'analog_numeric',
+    data_type: 'float',
+    bounds: { min: 0, max: 100 },
+    history: true,
+    history_suffix: 'success_pct',
+    display: { precision: 0, chart: true },
+  },
+];
+
 function fixtureManifestV2(sensors, tag) {
-  const metrics = [
+  const envMetrics = [
     {
       key: 'temp',
       name: 'Temperature',
@@ -93,6 +126,43 @@ function fixtureManifestV2(sensors, tag) {
     },
   ];
   const source = tag || 'mock';
+
+  const sensorEntries = sensors.map(s => {
+    if (!s.adapter || s.adapter === 'thermopro_ble') {
+      return {
+        id: s.id,
+        name: s.name,
+        category: s.category || 'environmental',
+        adapter: 'thermopro_ble',
+        source: { mac: s.mac || null },
+        measurements: envMetrics.map(m => ({
+          key: m.key,
+          history_url: `/history/${s.id}/${m.history_suffix}`,
+        })),
+      };
+    }
+    if (s.adapter === 'icmp_ping') {
+      return {
+        id: s.id,
+        name: s.name,
+        category: s.category || 'network',
+        adapter: 'icmp_ping',
+        source: s.source || {},
+        measurements: PING_METRICS.map(m => ({
+          key: m.key,
+          history_url: `/api/v2/history/${s.id}/${m.history_suffix}`,
+        })),
+      };
+    }
+    return {
+      id: s.id,
+      name: s.name,
+      category: s.category || 'unknown',
+      adapter: s.adapter,
+      measurements: [],
+    };
+  });
+
   return {
     ok: true,
     schema_version: 2,
@@ -113,18 +183,8 @@ function fixtureManifestV2(sensors, tag) {
       sample_interval_seconds: 900,
     },
     sensor_count: sensors.length,
-    metrics: metrics,
-    sensors: sensors.map(({ id, name, mac }) => ({
-      id,
-      name,
-      category: 'environmental',
-      adapter: 'thermopro_ble',
-      source: { mac: mac || null },
-      measurements: metrics.map(m => ({
-        key: m.key,
-        history_url: `/history/${id}/${m.history_suffix}`,
-      })),
-    })),
+    metrics: envMetrics,
+    sensors: sensorEntries,
   };
 }
 
@@ -132,6 +192,8 @@ function writeFixtureSet(targetDir, sensors, tag) {
   fs.mkdirSync(targetDir, { recursive: true });
   const legacyManifest = fixtureManifestV1(sensors);
   const v2Manifest = fixtureManifestV2(sensors, tag || 'mock');
+  // env-only sensor count for storage-stats (BLE sensors with NVS persistence)
+  const envCount = sensors.filter(s => !s.adapter || s.adapter === 'thermopro_ble').length;
 
   fs.writeFileSync(path.join(targetDir, 'sensors.json'), JSON.stringify(legacyManifest, null, 2) + '\n');
   fs.writeFileSync(path.join(targetDir, 'manifest.json'), JSON.stringify(v2Manifest, null, 2) + '\n');
@@ -147,8 +209,8 @@ function writeFixtureSet(targetDir, sensors, tag) {
     ok: true,
     partition: 'history',
     total_bytes: 524288,
-    used_bytes: Math.round(184320 * Math.max(1, sensors.length) / 3),
-    free_bytes: Math.max(0, 524288 - Math.round(184320 * Math.max(1, sensors.length) / 3)),
+    used_bytes: Math.round(184320 * Math.max(1, envCount) / 3),
+    free_bytes: Math.max(0, 524288 - Math.round(184320 * Math.max(1, envCount) / 3)),
     retention_days: 45,
     retention_oldest_epoch: ANCHOR_EPOCH_SEC - POINTS * INTERVAL_SEC,
     retention_newest_epoch: ANCHOR_EPOCH_SEC,
@@ -157,8 +219,14 @@ function writeFixtureSet(targetDir, sensors, tag) {
   }, null, 2) + '\n');
 
   sensors.forEach((sensor, idx) => {
-    fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-temp.csv`), buildCsvLines(idx, 'temp', sensor.tempBase));
-    fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-hum.csv`), buildCsvLines(idx, 'hum', sensor.humBase));
+    if (!sensor.adapter || sensor.adapter === 'thermopro_ble') {
+      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-temp.csv`), buildCsvLines(idx, 'temp', sensor.tempBase));
+      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-hum.csv`), buildCsvLines(idx, 'hum', sensor.humBase));
+    } else if (sensor.adapter === 'icmp_ping') {
+      // Stub history files for ping device (RAM-only, no data at this phase)
+      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-ping_ms.csv`), '');
+      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-success_pct.csv`), '');
+    }
   });
 }
 
