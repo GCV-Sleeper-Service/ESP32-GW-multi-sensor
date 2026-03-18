@@ -54,8 +54,7 @@ esphome:
       - lambda: |-
           register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.3.5");
           id(dashboard_link).publish_state(
-            "Open /dashboard or /dashboard.html for the live dashboard. v7.5.0.1: multi-sensor BLE gateway with 45-day history, CSV export/import, dark/light mode, real-time and averaged charts, and ESP management. /dashboard-download provides a standalone copy. "
-            "The ESPHome v3 built-in web page shows text sensor states as plain text, so clickable HTML links are not rendered here.");
+            "Dashboard: /dashboard or /dashboard.html — Download: /dashboard-download");
 
 # ─── Chip and framework ─────────────────────────────────────────
 # ESP-IDF (not Arduino) for better BLE + WiFi coexistence.
@@ -941,10 +940,8 @@ interval:
           static bool published = false;
           if (!published) {
             id(about_description).publish_state(
-              "Multi-sensor BLE gateway. "
-              "3x ThermoPro: Office, First Floor, Outside. "
-              "15-minute averages, 24h RAM history plus about 45 days of hourly flash history via /history/* endpoints in a dedicated history partition. "
-              "Embedded dashboard served via /dashboard and /dashboard.html, with /dashboard-download for file export. "
-              "Features: 24h/7d/30d/45d min/max, RSSI signal bars, dew point, comfort estimate, management actions, and CSV export. ");
+              "ESP32-C3 BLE gateway — 3x ThermoPro TP357 (Office, First Floor, Outside). "
+              "15-min averages, 24h RAM + 45-day flash history. "
+              "Embedded dashboard with charts, CSV export/import, and device management.");
             published = true;
           }

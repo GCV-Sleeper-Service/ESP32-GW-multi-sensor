@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <!--
-  dashboard-v7.5.0.1.html
-  Source-editable dashboard file for the ESP32-C3 Multi-Sensor Gateway v7.5.0.1.
+  dashboard.html
+  Source-editable dashboard file for the ESP32-C3 Multi-Sensor Gateway.
+  Version is set in App.version inside the script block.
 
   Notes:
     This standalone HTML is kept as the editable source version of the UI.
-    The ESP-hosted copy is embedded into dashboard.h and served by
+    The ESP-hosted copy is gzip-compressed into dashboard.h and served by
     sensor_history_multi.h through /dashboard, /dashboard.html, and
-    /dashboard-download. If you edit this file, regenerate the matching header.
+    /dashboard-download. If you edit this file, regenerate the matching header
+    via scripts/generate-header.sh.
 -->
 <html lang="en">
 <head>
@@ -451,11 +453,8 @@
     <div class="status-bar"><button class="theme-toggle" id="themeBtn" data-action="toggle-theme" title="Toggle light/dark mode">&#9788;</button><div class="status-dot" id="statusDot"></div><span id="statusText">connecting...</span></div>
   </div>
   <div class="about-bar">
-    Multi-sensor BLE dashboard for an ESP32-C3 SuperMini gateway.
-    Receives ThermoPro TP357 broadcasts, displays live temperature (&deg;C/&deg;F) and humidity,
-    and plots 24h RAM history plus up to 45 days of hourly persisted history.
-    Features: 24h/7d/30d/45d Min/Max, dew point, comfort estimate, RSSI, dark/light mode,
-    CSV export and import, storage statistics, and ESP management &mdash; all served from the device. v7.5.0.1
+    ESP32-C3 SuperMini BLE gateway &mdash; receives ThermoPro TP357 broadcasts, computes 15-minute averages, retains 24h in RAM plus up to 45 days of hourly history in flash.
+    Live temperature (&deg;C/&deg;F), humidity, dew point, comfort estimate, RSSI, 24h/7d/30d/45d charts with min/max, CSV export/import, dark/light mode, and device management.
     <span id="modeLabel" style="color:var(--accent-green)"></span>
   </div>
 
