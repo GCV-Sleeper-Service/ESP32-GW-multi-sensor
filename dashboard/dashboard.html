@@ -897,7 +897,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.3.9';
+App.version = 'v7.5.4.0';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -1436,9 +1436,14 @@ function normalizeManifestSensors(payload) {
     return {
       id: String(sensor && sensor.id || '').trim(),
       name: String(sensor && sensor.name || '').trim(),
+      category: String(sensor && sensor.category || 'environmental').trim(),
       metrics: Array.isArray(sensor && sensor.metrics) ? sensor.metrics : []
     };
-  }).filter(function(sensor) { return sensor.id && sensor.name; });
+  }).filter(function(sensor) {
+    // Only include environmental sensors in SENSORS — network/system devices have
+    // no card renderer until their respective phase (v7.5.4.2+).
+    return sensor.id && sensor.name && (!sensor.category || sensor.category === 'environmental');
+  });
 }
 
 function loadSensorManifest() {

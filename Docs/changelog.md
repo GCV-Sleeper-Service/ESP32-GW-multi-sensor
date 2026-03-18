@@ -3,6 +3,76 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.4.0 — Phase 4 Step 0: Add Ping Probe Device to Manifest and Generator — 2026-03-18
+
+### Phase 4 begins: First non-climate sensor category (network / ping probe)
+
+This step adds a `wan_ping` device to the data model and manifest. The ping device exists in the
+C++ SensorEntity model and is included in the v2 manifest but produces no data at runtime — the
+ICMP adapter is added in v7.5.4.1.
+
+### Changes
+
+- **`config/sensors.json` upgraded to v2 schema** — Added `schema_version: 2`, `category`, and
+  `adapter` fields to all sensors. The three ThermoPro sensors are `category: environmental`,
+  `adapter: thermopro_ble`. New `wan_ping` device: `category: network`, `adapter: icmp_ping`,
+  `source: { target: "8.8.8.8" }`.
+
+- **`scripts/sensor_manifest_lib.py` — v2 schema support** — `canonicalize_sensors()` now:
+  - Validates `category` (environmental / network / system)
+  - Requires `mac` only for `thermopro_ble` adapter
+  - Requires `source.target` for `icmp_ping` adapter
+  - Skips name→slug check for non-BLE adapters (e.g. `wan_ping` ≠ slug of "WAN Latency")
+  - `fixture_manifest()` filters to environmental sensors only (legacy `/sensors.json`)
+  - `manifest_v2()` generates per-adapter measurement entries (ping_ms / success_pct for network)
+
+- **`scripts/render_sensor_config.py` — mixed-category generation** — `render_entity_block()`
+  now produces a separate `metrics_ping[]` MetricDef array and a `SensorEntity` for the ping
+  device (`category_id = 2`, `metric_count = 2`, RAM-only history buffers). YAML rendering
+  functions receive only ThermoPro sensors (filtered internally). `render_js_block()` generates
+  `DEFAULT_SENSOR_META` for environmental sensors only.
+
+- **`dashboard/sensor_history_multi.h` — regenerated** — `NUM_DEVICES = 4` (3 ThermoPro + 1
+  ping). `metrics_ping[]` added. `entity_hbuf_wan_ping_ping_ms` and
+  `entity_hbuf_wan_ping_success_pct` HistoryBuffer instances added. `devices[3]` = wan_ping
+  SensorEntity with RAM-only history, `category_id = 2`, `adapter = "icmp_ping"`.
+
+- **`src/gateway_manifest.h` — regenerated** — v2 manifest JSON includes `wan_ping` with
+  `category: network`, `adapter: icmp_ping`, `source: { target: "8.8.8.8" }`.
+
+- **`dashboard/dashboard.js` + `dashboard.html` — SENSORS filter** — `normalizeManifestSensors()`
+  now filters out non-environmental devices from the `SENSORS` array. Network/system devices are
+  present in `window._manifest` but not rendered as cards until their respective phase card
+  renderer is added (v7.5.4.2 for network).
+
+- **`tests/fixtures/generate-fixtures.js` — mixed-category manifest** — `fixtureManifestV2()`
+  generates category-appropriate sensor entries (ThermoPro: temp/hum; ping: ping_ms/success_pct).
+  `fixtureManifestV1()` / `sensors.json` filtered to environmental only. Stub history CSV files
+  created for `wan_ping` (empty, RAM-only).
+
+- **`tests/mock-server/server.js` — category-aware `/api/v2/live`** — ThermoPro sensors get
+  `{temp, hum, batt, rssi, last_seen}`. Ping device gets `{ping_ms: null, success_pct: null,
+  last_seen: 0}`.
+
+- **`scripts/preflight.sh`** — Added `manifest_has_network_device` check: when `sensors.json`
+  is v2 schema, validates at least one `category: network` device is present. Updated
+  `fixture_manifest_sensor_count` to 4.
+
+- **Test updates** — 4 existing tests updated to support mixed-category manifest (sensor count,
+  sensors array, Phase 3 metric-key check, Phase 2 environmental renderer check).
+
+### Acceptance criteria met
+
+- [x] `config/sensors.json` upgraded to v2 with 3 ThermoPro + 1 ping device
+- [x] Generator produces `SensorEntity devices[4]` with correct metric arrays
+- [x] Manifest fixture includes `wan_ping` device with `category: network`
+- [x] All existing Playwright tests pass (88 / 88 on Chromium)
+- [x] Version is `7.5.4.0` everywhere
+
+**Device testing required:** compile + flash to verify ping device in `/api/manifest` and
+`/api/v2/live` (null values expected).
+
+---
 ## BUG-044: Implement BUG-043 Regression Guards + Multi-Browser Playwright Suite — 2026-03-18
 
 Post-Phase-3 codebase audit discovered that two BUG-043 instruction documents specified concrete deliverables (5 preflight checks, 8 browser regression tests) but none of the specified code was ever written (BUG-044 — LESSON-OPS-057). This entry covers the full implementation, plus multi-browser expansion and prompt template improvements.
