@@ -16,11 +16,37 @@ async function stubCdn(page) {
   );
 }
 
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close().
-// Wrapped in try/catch so a page that is already closed or in a finished-test state
-// does not cause a spurious afterEach failure.
+async function waitForDashboardReady(page, expectedSensorCount, timeout = 10000) {
+  await page.waitForFunction((expected) => {
+    if (typeof window._manifest === 'undefined') return false;
+    if (!window.App || !App.State || typeof App.State.getSensors !== 'function') return false;
+    var sensors = App.State.getSensors();
+    if (!Array.isArray(sensors) || sensors.length !== expected) return false;
+    var cards = Array.from(document.querySelectorAll('.sensor-card'));
+    if (cards.length !== expected) return false;
+    return cards.every(function(card) {
+      return !!card.querySelector('.sensor-card-header');
+    });
+  }, expectedSensorCount, { timeout });
+}
+
+async function stopDashboardNetwork(page) {
+  try {
+    await page.evaluate(() => {
+      if (typeof suspendDashboardNetworkActivity === 'function') {
+        suspendDashboardNetworkActivity();
+        return;
+      }
+      if (window.evtSource && typeof window.evtSource.close === 'function') {
+        try { window.evtSource.close(); } catch (_) {}
+        window.evtSource = null;
+      }
+    });
+  } catch (_) { /* page may already be closed */ }
+}
+
 test.afterEach(async ({ page }) => {
-  try { await page.goto('about:blank'); } catch (_) { /* page may already be closing */ }
+  await stopDashboardNetwork(page);
 });
 
 test.describe('manifest boot flow', () => {
@@ -53,7 +79,7 @@ test.describe('manifest boot flow', () => {
   test('dashboard boots from /api/manifest', async ({ page }) => {
     await stubCdn(page);
     await page.goto('/dashboard.html');
-    await page.waitForFunction(() => window.App && App.State && App.State.getSensors().length === 3);
+    await waitForDashboardReady(page, 3);
     const sensors = await page.evaluate(() => App.State.getSensors().map(s => ({ id: s.id, name: s.name })));
     expect(sensors).toEqual([
       { id: 'office', name: 'Office' },
@@ -72,7 +98,7 @@ test.describe('manifest boot flow', () => {
       });
     });
     await page.goto('/dashboard.html');
-    await page.waitForFunction(() => window.App && App.State && App.State.getSensors().length === 3);
+    await waitForDashboardReady(page, 3);
     const sensors = await page.evaluate(() => App.State.getSensors().map(s => s.id));
     expect(sensors).toEqual(['office', 'first_floor', 'outside']);
   });

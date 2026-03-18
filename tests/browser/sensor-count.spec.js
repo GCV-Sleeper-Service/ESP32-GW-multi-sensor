@@ -21,6 +21,36 @@
 const { test, expect } = require('@playwright/test');
 
 // ── Helpers ──────────────────────────────────────────────────────
+async function waitForDashboardReady(page, timeout) {
+  await page.waitForFunction(() => {
+    if (typeof window._manifest === 'undefined') return false;
+    if (!window.App || !App.State || typeof App.State.getSensors !== 'function') return false;
+    var sensors = App.State.getSensors();
+    if (!Array.isArray(sensors) || sensors.length === 0) return false;
+    var cards = Array.from(document.querySelectorAll('.sensor-card'));
+    if (cards.length !== sensors.length) return false;
+    return cards.every(function(card) {
+      return !!card.querySelector('.sensor-card-header');
+    });
+  }, { timeout: timeout });
+  await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout: timeout });
+}
+
+async function stopDashboardNetwork(page) {
+  try {
+    await page.evaluate(() => {
+      if (typeof suspendDashboardNetworkActivity === 'function') {
+        suspendDashboardNetworkActivity();
+        return;
+      }
+      if (window.evtSource && typeof window.evtSource.close === 'function') {
+        try { window.evtSource.close(); } catch (_) {}
+        window.evtSource = null;
+      }
+    });
+  } catch (_) { /* page may already be closed */ }
+}
+
 async function loadDashboard(page, timeout) {
   timeout = timeout || 15000;
   page._consoleErrors = [];
@@ -28,7 +58,7 @@ async function loadDashboard(page, timeout) {
     if (msg.type() === 'error') page._consoleErrors.push(msg.text());
   });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout: timeout });
+  await waitForDashboardReady(page, timeout);
 }
 
 // Fetch the active sensor manifest from the mock server at runtime
@@ -40,11 +70,8 @@ async function getManifest(page) {
 }
 
 // ── Suite ────────────────────────────────────────────────────────
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close().
-// Wrapped in try/catch so a page that is already closed or in a finished-test state
-// does not cause a spurious afterEach failure.
 test.afterEach(async ({ page }) => {
-  try { await page.goto('about:blank'); } catch (_) { /* page may already be closing */ }
+  await stopDashboardNetwork(page);
 });
 
 test.describe('sensor-count: card and control counts match manifest', function() {
@@ -80,13 +107,6 @@ test.describe('sensor-count: card and control counts match manifest', function()
 
 });
 
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close().
-// Wrapped in try/catch so a page that is already closed or in a finished-test state
-// does not cause a spurious afterEach failure.
-test.afterEach(async ({ page }) => {
-  try { await page.goto('about:blank'); } catch (_) { /* page may already be closing */ }
-});
-
 test.describe('sensor-count: status and charts render correctly', function() {
 
   test('status dot becomes connected', async function({ page }) {
@@ -107,13 +127,6 @@ test.describe('sensor-count: status and charts render correctly', function() {
     expect(page._consoleErrors || []).toEqual([]);
   });
 
-});
-
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close().
-// Wrapped in try/catch so a page that is already closed or in a finished-test state
-// does not cause a spurious afterEach failure.
-test.afterEach(async ({ page }) => {
-  try { await page.goto('about:blank'); } catch (_) { /* page may already be closing */ }
 });
 
 test.describe('sensor-count: interactive controls', function() {
