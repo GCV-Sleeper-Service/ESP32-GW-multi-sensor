@@ -351,12 +351,20 @@ test.describe('9. Manifest v2 loader', () => {
   test('window._manifest contains sensors array', async ({ page }) => {
     await loadDashboard(page);
     await page.waitForFunction(() => window._manifest && Array.isArray(window._manifest.sensors), { timeout: 10000 });
-    const sensors = await page.evaluate(() => window._manifest.sensors.map(s => s.id));
-    // manifest.sensors includes all devices (environmental + network)
-    expect(sensors).toContain('office');
-    expect(sensors).toContain('first_floor');
-    expect(sensors).toContain('outside');
-    expect(sensors).toContain('wan_ping');
+    // Compare against the active fixture — fixture-agnostic so all FIXTURE_SET variants pass
+    const result = await page.evaluate(async () => {
+      const resp = await fetch('/api/manifest');
+      const m = await resp.json();
+      return {
+        expected: m.sensors.map(function(s) { return s.id; }),
+        actual: window._manifest.sensors.map(function(s) { return s.id; }),
+      };
+    });
+    expect(result.actual.length).toBeGreaterThan(0);
+    expect(result.actual.length).toBe(result.expected.length);
+    for (const id of result.expected) {
+      expect(result.actual).toContain(id);
+    }
   });
 
   test('window._manifest contains gateway block', async ({ page }) => {
