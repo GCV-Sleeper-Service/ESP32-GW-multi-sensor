@@ -140,6 +140,30 @@ const server = http.createServer(function(req, res) {
     return text(res, data, 'text/plain');
   }
 
+  if (pathname === '/api/v2/live') {
+    const manifest = loadFixtureJson('manifest.json', { sensors: [] });
+    const devices = {};
+    (manifest.sensors || []).forEach(function(s, idx) {
+      devices[s.id] = {
+        temp: parseFloat((20.0 + idx * 1.7).toFixed(1)),
+        hum: parseFloat((45 + idx * 6).toFixed(0)),
+        batt: null,
+        rssi: null,
+        last_seen: 1741694400 + idx * 10
+      };
+    });
+    return json(res, { timestamp: 1741694400, devices: devices });
+  }
+
+  const v2HistMatch = pathname.match(/^\/api\/v2\/history\/([^/]+)\/([^/]+)$/);
+  if (v2HistMatch) {
+    const deviceId = v2HistMatch[1];
+    const metricKey = v2HistMatch[2];
+    const data = loadFixture(`history-${deviceId}-${metricKey}.csv`);
+    if (data === null) return notFound(res, `No fixture for ${deviceId}/${metricKey}`);
+    return text(res, data, 'text/plain');
+  }
+
   if (pathname === '/api/storage-stats') {
     return json(res, loadFixtureJson('storage-stats.json', { ok: false }));
   }

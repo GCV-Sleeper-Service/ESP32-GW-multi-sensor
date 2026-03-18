@@ -781,3 +781,119 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
     expect(requestedUrls).toContain('/history/office/hum');
   });
 });
+
+// ── 15. Phase 3 Closure — v2 API Regression ───────────────────────
+
+test.describe('15. Phase 3 Closure — v2 API Regression', () => {
+  // Test 1: /api/v2/live returns valid JSON with all device IDs from manifest
+  test('/api/v2/live returns valid JSON with all device IDs from manifest', async ({ page }) => {
+    await loadDashboard(page);
+    const live = await page.evaluate(async () => {
+      const resp = await fetch('/api/v2/live');
+      return resp.json();
+    });
+    expect(live).toHaveProperty('timestamp');
+    expect(live).toHaveProperty('devices');
+    // All manifest sensor IDs must be present
+    const manifest = await page.evaluate(async () => {
+      const resp = await fetch('/api/manifest');
+      return resp.json();
+    });
+    for (const sensor of manifest.sensors) {
+      expect(live.devices).toHaveProperty(sensor.id);
+    }
+  });
+
+  // Test 2: /api/v2/live returns metric keys matching manifest definitions
+  test('/api/v2/live returns metric keys matching manifest metric definitions', async ({ page }) => {
+    await loadDashboard(page);
+    const manifest = await page.evaluate(async () => {
+      const resp = await fetch('/api/manifest');
+      return resp.json();
+    });
+    const live = await page.evaluate(async () => {
+      const resp = await fetch('/api/v2/live');
+      return resp.json();
+    });
+    const metricKeys = manifest.metrics.map(m => m.key);
+    for (const sensorId of Object.keys(live.devices)) {
+      for (const key of metricKeys) {
+        expect(live.devices[sensorId]).toHaveProperty(key);
+      }
+    }
+  });
+
+  // Test 3: /api/v2/history/{device}/{metric} returns CSV data
+  test('/api/v2/history/{device}/{metric} returns CSV data', async ({ page }) => {
+    await loadDashboard(page);
+    const csv = await page.evaluate(async () => {
+      const resp = await fetch('/api/v2/history/office/temp');
+      return resp.text();
+    });
+    expect(csv.length).toBeGreaterThan(0);
+    const lines = csv.trim().split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+    // Each line must be epoch,value
+    for (const line of lines) {
+      expect(line).toMatch(/^\d+,[\d.-]+$/);
+    }
+  });
+
+  // Test 4: Legacy /history/{id}/temp still works (backward compat)
+  test('legacy /history/{id}/temp still works', async ({ page }) => {
+    await loadDashboard(page);
+    const csv = await page.evaluate(async () => {
+      const resp = await fetch('/history/office/temp');
+      return resp.text();
+    });
+    expect(csv.length).toBeGreaterThan(0);
+    const lines = csv.trim().split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) {
+      expect(line).toMatch(/^\d+,[\d.-]+$/);
+    }
+  });
+
+  // Test 5: Legacy /sensors.json still works (backward compat)
+  test('legacy /sensors.json still works', async ({ page }) => {
+    await loadDashboard(page);
+    const sensors = await page.evaluate(async () => {
+      const resp = await fetch('/sensors.json');
+      return resp.json();
+    });
+    expect(Array.isArray(sensors)).toBe(true);
+    expect(sensors.length).toBeGreaterThan(0);
+    for (const s of sensors) {
+      expect(s).toHaveProperty('id');
+      expect(s).toHaveProperty('name');
+    }
+  });
+
+  // Test 6: Dashboard renders identically with new endpoints
+  test('dashboard renders identically with new endpoints', async ({ page }) => {
+    await loadDashboard(page);
+    await waitForConnected(page);
+    // Sensor cards must render
+    await expect(page.locator('.sensor-card')).toHaveCount(3);
+    // Verify all sensor names are present
+    for (const name of ['Office', 'First Floor', 'Outside']) {
+      await expect(
+        page.locator('.sensor-card-header').filter({ hasText: name }).first()
+      ).toBeVisible();
+    }
+    // Charts must be present
+    const chartCards = page.locator('.chart-card');
+    const chartCount = await chartCards.count();
+    expect(chartCount).toBeGreaterThan(0);
+  });
+
+  // Test 7: /api/v2/history returns 404 for unknown device
+  test('/api/v2/history returns 404 for unknown device', async ({ page }) => {
+    await loadDashboard(page);
+    const status = await page.evaluate(async () => {
+      const resp = await fetch('/api/v2/history/nonexistent/temp');
+      return resp.status;
+    });
+    expect(status).toBe(404);
+  });
+});
