@@ -51,8 +51,12 @@ done
 
 check_contains "version_file_present" VERSION "${VER_RAW}"
 check_contains "dashboard_js_version_matches" dashboard/dashboard.js "App.version = '${VER_TAG}'"
-# dashboard.h is generated from minified source (quotes and spacing may differ) — use regex
-check_contains_regex "dashboard_h_version_matches" dashboard/dashboard.h "App\.version[[:space:]]*=[[:space:]]*['\"]${VER_TAG}['\"]"
+# dashboard.h is now gzip-compressed binary data; version appears in the header comment
+# as "Dashboard version: App.version = 'vX.Y.Z.W'"
+check_contains_regex "dashboard_h_version_matches" dashboard/dashboard.h "Dashboard version:.*${VER_TAG}"
+# BUG-043: verify dashboard.h uses gzip format (not raw string literal)
+check_contains "dashboard_h_gzip_format" dashboard/dashboard.h "DASHBOARD_HTML_GZ"
+check_not_contains "dashboard_h_no_raw_literal" dashboard/dashboard.h "R\"DASH64("
 check_contains "firmware_version_matches" firmware/esp32-c3-multi-sensor.yaml "${VER_TAG}"
 check_contains "history_header_version_matches" dashboard/sensor_history_multi.h "sensor_history_multi-${VER_TAG}.h"
 check_contains "history_handler_has_api_manifest_route" dashboard/sensor_history_multi.h "/api/manifest"
@@ -93,7 +97,24 @@ fi
 check_contains "gateway_manifest_json_used" dashboard/sensor_history_multi.h "GATEWAY_MANIFEST_JSON"
 check_contains "gateway_manifest_yaml_includes" firmware/esp32-c3-multi-sensor.yaml "../src/gateway_manifest.h"
 
+# BUG-043: verify dashboard.html has inline favicon to prevent browser /favicon.ico request
+check_contains "dashboard_inline_favicon" dashboard/dashboard.html 'rel="icon" href="data:,'
+# BUG-043: verify firmware serves gzip with Content-Encoding header
+check_contains "firmware_gzip_content_encoding" dashboard/sensor_history_multi.h 'Content-Encoding", "gzip'
+
 FAIL_COUNT=0
+
+# BUG-043: dashboard.h size guard — gzip format should produce <300KB C source
+# (which embeds ~45KB of gzip data). If this exceeds 400KB, someone likely
+# reverted to the raw string literal format.
+DASH_H_SIZE=$(wc -c < dashboard/dashboard.h)
+if [[ "$DASH_H_SIZE" -gt 400000 ]]; then
+  echo "✗ dashboard_h_size_guard: FAIL — dashboard.h is ${DASH_H_SIZE} bytes (max 400000)"
+  echo "  This likely means generate-header.sh reverted to uncompressed format."
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+else
+  echo "dashboard_h_size_guard: OK (${DASH_H_SIZE} bytes)"
+fi
 
 echo "→ Validating manifest v2 schema structure..."
 

@@ -61,13 +61,19 @@
 #include "esphome/components/web_server_base/web_server_base.h"
 
 // ── Dashboard payload ────────────────────────────────────────────
-// DASHBOARD_HTML[] is defined in a separate dashboard header file
-// (e.g. dashboard.h) which MUST be listed BEFORE this file
-// in the YAML includes: block.  Keeping the dashboard as a separate
-// include avoids duplicate-symbol errors when the dashboard version
-// is bumped independently of the history backend.
+// DASHBOARD_HTML_GZ[] (gzip-compressed) is defined in a separate
+// dashboard header file (e.g. dashboard.h) which MUST be listed
+// BEFORE this file in the YAML includes: block.  Keeping the
+// dashboard as a separate include avoids duplicate-symbol errors
+// when the dashboard version is bumped independently of the history
+// backend.
 //
-// If the build fails with "undefined reference to DASHBOARD_HTML",
+// The dashboard is served with Content-Encoding: gzip — the browser
+// decompresses transparently.  This reduces the HTTP transfer from
+// ~190KB to ~45KB, cutting the transfer time from 2-4s to <1s and
+// eliminating the primary BUG-043 crash trigger.
+//
+// If the build fails with "undefined reference to DASHBOARD_HTML_GZ",
 // ensure the YAML includes the dashboard header before this file.
 
 #include <esp_err.h>
@@ -185,6 +191,29 @@ class HistoryBuffer {
                        (unsigned) entry.epoch, entry.value);
       }
       if (len > 0 && len < (int) sizeof(line)) stream->print(line);
+    }
+  }
+
+  // BUG-043 rev2: Append CSV to pre-reserved std::string instead of response stream.
+  // This avoids the std::string reallocation cascade in beginResponseStream that
+  // caused heap exhaustion when building large history responses (~24KB+ for 336 segments).
+  void append_csv_to(std::string &csv,
+                     uint32_t min_epoch_exclusive = 0) const {
+    char line[48];
+
+    for (int i = 0; i < count_; i++) {
+      HistEntry entry = at_logical(i);
+      if (entry.epoch == 0 || entry.epoch <= min_epoch_exclusive) continue;
+
+      int len;
+      if (std::isnan(entry.value)) {
+        len = snprintf(line, sizeof(line), "%u,\n",
+                       (unsigned) entry.epoch);
+      } else {
+        len = snprintf(line, sizeof(line), "%u,%.2f\n",
+                       (unsigned) entry.epoch, entry.value);
+      }
+      if (len > 0 && len < (int) sizeof(line)) csv.append(line, len);
     }
   }
 
@@ -707,12 +736,13 @@ static bool clear_persisted_history_() {
 // for hundreds of milliseconds, starving BLE/WiFi/API/watchdog-sensitive work.
 // Yield to the FreeRTOS scheduler every NVS_SCAN_YIELD_INTERVAL iterations so
 // other tasks (BLE, WiFi, ESPHome API) get CPU time during history reads.
-// Using every 4th blob is a balance: low per-call overhead but frequent enough
-// to keep single-history responses well under the 30ms component-block limit.
-static constexpr int NVS_SCAN_YIELD_INTERVAL = 4;
+// BUG-043 rev2: increased from 4-iteration/1ms to 2-iteration/5ms after
+// observing continued crashes — the ESP32-C3 single core needs more breathing
+// room for BLE/WiFi/API between NVS flash reads.
+static constexpr int NVS_SCAN_YIELD_INTERVAL = 2;
 static void maybe_yield_nvs_scan_(int iteration) {
   if (iteration > 0 && (iteration % NVS_SCAN_YIELD_INTERVAL == 0)) {
-    vTaskDelay(pdMS_TO_TICKS(1));
+    vTaskDelay(pdMS_TO_TICKS(5));
   }
 }
 
@@ -850,6 +880,42 @@ static void stream_snapshot_series_(AsyncResponseStream *stream,
                      (unsigned) entry.epoch, entry.value);
     }
     if (len > 0 && len < (int) sizeof(line)) stream->print(line);
+  }
+}
+
+// BUG-043 rev2: Append snapshot series CSV to pre-reserved std::string.
+// Same logic as stream_snapshot_series_ but writes to a string buffer
+// instead of an AsyncResponseStream — avoids the heap-killing reallocation
+// cascade of beginResponseStream for large history responses.
+static void append_snapshot_series_csv_(std::string &csv,
+                                        const SegmentSnapshot &snapshot,
+                                        int sensor_idx,
+                                        int series_kind) {
+  if (sensor_idx < 0 || sensor_idx >= NUM_SENSORS) return;
+
+  const HistEntry *entries = nullptr;
+  int count = 0;
+  if (series_kind == HISTORY_SERIES_TEMP) {
+    entries = snapshot.temp[sensor_idx];
+    count = snapshot.temp_counts[sensor_idx];
+  } else {
+    entries = snapshot.hum[sensor_idx];
+    count = snapshot.hum_counts[sensor_idx];
+  }
+
+  char line[48];
+  for (int i = 0; i < count; i++) {
+    const HistEntry &entry = entries[i];
+    if (entry.epoch == 0) continue;
+
+    int len;
+    if (std::isnan(entry.value)) {
+      len = snprintf(line, sizeof(line), "%u,\n", (unsigned) entry.epoch);
+    } else {
+      len = snprintf(line, sizeof(line), "%u,%.2f\n",
+                     (unsigned) entry.epoch, entry.value);
+    }
+    if (len > 0 && len < (int) sizeof(line)) csv.append(line, len);
   }
 }
 
@@ -1258,15 +1324,15 @@ class HistoryWebHandler : public AsyncWebHandler {
 
   void handle_dashboard_(AsyncWebServerRequest *request,
                          bool as_attachment) const {
-    const size_t dashboard_len = sizeof(DASHBOARD_HTML) - 1;
-    const auto *dashboard_bytes =
-        reinterpret_cast<const uint8_t *>(DASHBOARD_HTML);
-
+    // BUG-043 fix: serve gzip-compressed dashboard (~45KB vs ~190KB raw).
+    // Reduces HTTP task blocking from 2-4s to <1s, eliminating the primary
+    // crash trigger on ESP32-C3.  Content-Encoding: gzip tells the browser
+    // to decompress transparently — both viewing and "Save As" work correctly.
     auto *resp = request->beginResponse(
-        200, "text/html; charset=utf-8", dashboard_bytes, dashboard_len);
+        200, "text/html; charset=utf-8", DASHBOARD_HTML_GZ, DASHBOARD_HTML_GZ_LEN);
 
     resp->addHeader("Cache-Control", "no-store");
-    resp->addHeader("Content-Encoding", "identity");
+    resp->addHeader("Content-Encoding", "gzip");
     if (as_attachment) {
       resp->addHeader("Content-Disposition",
                       "attachment; filename=\"dashboard.html\"");
@@ -2001,36 +2067,70 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    auto *resp = request->beginResponseStream("text/plain");
-    resp->addHeader("Cache-Control", "no-store");
+    // BUG-043 rev2: Build the CSV into a pre-reserved std::string instead of
+    // using beginResponseStream().  The streaming approach grows its internal
+    // std::string through many reallocations — when going from 16KB to 32KB,
+    // it temporarily holds BOTH the old and new buffer (48KB).  With SSE active
+    // and TCP buffers allocated, this exceeds the ESP32-C3's ~70KB free heap
+    // and causes the crash.
+    //
+    // Pre-reserving to the estimated size makes a single allocation upfront.
+    // Each CSV line is at most ~20 bytes ("1773766800,25.50\n").
+    // Upper bound: (NVS segments × points_per_segment + RAM buffer count) × 20.
 
+    int nvs_segments = 0;
     uint32_t latest_flash_epoch = 0;
     nvs_handle_t handle;
-    SegmentSnapshot *snapshot = nullptr;
-    if (open_history_nvs_(&handle, NVS_READONLY)) {
-      HistoryMeta meta;
+    bool have_nvs = open_history_nvs_(&handle, NVS_READONLY);
+    HistoryMeta meta = {};
+    if (have_nvs) {
       if (load_history_meta_(handle, &meta) && meta.valid_segments > 0) {
-        snapshot = allocate_snapshot_();
-        if (snapshot != nullptr) {
-          int oldest_slot =
-              (meta.next_slot + PERSIST_SLOTS - meta.valid_segments) % PERSIST_SLOTS;
+        nvs_segments = meta.valid_segments;
+      }
+    }
 
-          for (int n = 0; n < meta.valid_segments; n++) {
-            maybe_yield_nvs_scan_(n);  // BUG-043: yield every 4 blobs to avoid HTTP task starvation
-            int slot = (oldest_slot + n) % PERSIST_SLOTS;
-            if (!load_snapshot_from_handle_(handle, slot, snapshot)) continue;
-            stream_snapshot_series_(resp, *snapshot, sensor_idx, series_kind);
-            if (snapshot->header.last_epoch > latest_flash_epoch) {
-              latest_flash_epoch = snapshot->header.last_epoch;
-            }
+    size_t est_points = (size_t)nvs_segments * PERSIST_POINTS_PER_SEGMENT
+                      + (size_t)buf->count();
+    size_t est_bytes  = est_points * 20 + 128;  // 20 bytes/line + margin
+
+    std::string csv;
+    csv.reserve(est_bytes);
+
+    // Read persisted NVS segments into the pre-reserved string
+    SegmentSnapshot *snapshot = nullptr;
+    if (have_nvs && nvs_segments > 0) {
+      snapshot = allocate_snapshot_();
+      if (snapshot != nullptr) {
+        int oldest_slot =
+            (meta.next_slot + PERSIST_SLOTS - meta.valid_segments) % PERSIST_SLOTS;
+
+        for (int n = 0; n < nvs_segments; n++) {
+          maybe_yield_nvs_scan_(n);
+          int slot = (oldest_slot + n) % PERSIST_SLOTS;
+          if (!load_snapshot_from_handle_(handle, slot, snapshot)) continue;
+          append_snapshot_series_csv_(csv, *snapshot, sensor_idx, series_kind);
+          if (snapshot->header.last_epoch > latest_flash_epoch) {
+            latest_flash_epoch = snapshot->header.last_epoch;
           }
         }
       }
-      nvs_close(handle);
     }
+    if (have_nvs) nvs_close(handle);
     if (snapshot != nullptr) delete snapshot;
 
-    buf->stream_to(resp, latest_flash_epoch);
+    // Append RAM ring buffer entries (newer than persisted data)
+    buf->append_csv_to(csv, latest_flash_epoch);
+
+    ESP_LOGD(TAG, "History response for sensor %d/%s: %u bytes, est %u",
+             sensor_idx, type, (unsigned)csv.size(), (unsigned)est_bytes);
+
+    // Send as a complete response using the raw-bytes overload (same pattern as
+    // gzip dashboard serving).  This avoids the string-copy overhead of the
+    // const char* overload — csv.data() stays valid until send() returns.
+    auto *resp = request->beginResponse(
+        200, "text/plain",
+        reinterpret_cast<const uint8_t *>(csv.data()), csv.size());
+    resp->addHeader("Cache-Control", "no-store");
     request->send(resp);
   }
 };
