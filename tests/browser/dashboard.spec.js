@@ -33,6 +33,9 @@ async function waitForConnected(page, timeout = 10000) {
   await page.locator('#statusDot.connected').waitFor({ state: 'attached', timeout });
 }
 
+// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
+test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
+
 // ── 1. Boot and structure ─────────────────────────────────────────
 
 test.describe('1. Boot and structure', () => {
