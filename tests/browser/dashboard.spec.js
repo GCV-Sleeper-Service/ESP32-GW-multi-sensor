@@ -19,6 +19,39 @@
 
 const { test, expect } = require('@playwright/test');
 
+async function waitForDashboardReady(page, opts = {}) {
+  const timeout = opts.timeout || 15000;
+  const expectedSensorCount = Number.isInteger(opts.expectedSensorCount) ? opts.expectedSensorCount : null;
+  await page.waitForFunction((expected) => {
+    if (typeof window._manifest === 'undefined') return false;
+    if (!window.App || !App.State || typeof App.State.getSensors !== 'function') return false;
+    var sensors = App.State.getSensors();
+    if (!Array.isArray(sensors) || sensors.length === 0) return false;
+    if (expected !== null && sensors.length !== expected) return false;
+    var cards = Array.from(document.querySelectorAll('.sensor-card'));
+    if (cards.length !== sensors.length) return false;
+    return cards.every(function(card) {
+      return !!card.querySelector('.sensor-card-header');
+    });
+  }, expectedSensorCount, { timeout });
+  await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout });
+}
+
+async function stopDashboardNetwork(page) {
+  try {
+    await page.evaluate(() => {
+      if (typeof suspendDashboardNetworkActivity === 'function') {
+        suspendDashboardNetworkActivity();
+        return;
+      }
+      if (window.evtSource && typeof window.evtSource.close === 'function') {
+        try { window.evtSource.close(); } catch (_) {}
+        window.evtSource = null;
+      }
+    });
+  } catch (_) { /* page may already be closed */ }
+}
+
 async function loadDashboard(page, opts = {}) {
   const timeout = opts.timeout || 15000;
   page._consoleErrors = [];
@@ -26,23 +59,15 @@ async function loadDashboard(page, opts = {}) {
     if (msg.type() === 'error') page._consoleErrors.push(msg.text());
   });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  // Wait for the async manifest-loading chain to settle (window._manifest is assigned
-  // after the loadManifestV2() promise chain resolves — either to the manifest object
-  // or null on error). This prevents a race in Firefox where .sensor-card appears
-  // before the manifest branch that drives card building has finished.
-  await page.waitForFunction(() => typeof window._manifest !== 'undefined', { timeout });
-  await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout });
+  await waitForDashboardReady(page, opts);
 }
 
 async function waitForConnected(page, timeout = 10000) {
   await page.locator('#statusDot.connected').waitFor({ state: 'attached', timeout });
 }
 
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close().
-// Wrapped in try/catch so a page that is already closed or in a finished-test state
-// does not cause a spurious afterEach failure.
 test.afterEach(async ({ page }) => {
-  try { await page.goto('about:blank'); } catch (_) { /* page may already be closing */ }
+  await stopDashboardNetwork(page);
 });
 
 // ── 1. Boot and structure ─────────────────────────────────────────
@@ -694,11 +719,19 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
     await page.route('**/sensors.json', route => {
       route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not found' });
     });
-    await loadDashboard(page);
+    await loadDashboard(page, { expectedSensorCount: 3 });
     // Must still get a v2 manifest (from DEFAULT_SENSOR_META via autoPromoteV1ToV2)
-    await page.waitForFunction(() => window._manifest && window._manifest.schema_version === 2, { timeout: 10000 });
+    await page.waitForFunction(() => {
+      if (!window._manifest || window._manifest.schema_version !== 2 || window._manifest.source !== 'auto-promoted') return false;
+      if (!window.App || !App.State || typeof App.State.getSensors !== 'function') return false;
+      var sensorIds = App.State.getSensors().map(function(sensor) { return sensor.id; });
+      return sensorIds.join(',') === 'office,first_floor,outside'
+        && document.querySelectorAll('.sensor-card').length === sensorIds.length;
+    }, { timeout: 10000 });
     const source = await page.evaluate(() => window._manifest.source);
     expect(source).toBe('auto-promoted');
+    const sensorIds = await page.evaluate(() => App.State.getSensors().map(sensor => sensor.id));
+    expect(sensorIds).toEqual(['office', 'first_floor', 'outside']);
     // Sensor cards must still render using hardcoded DEFAULT_SENSOR_META (office, first_floor, outside)
     await expect(page.locator('.sensor-card')).toHaveCount(3);
     // DEFAULT_SENSOR_META contains office, first_floor, outside
@@ -711,8 +744,17 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
 
   // Scenario 4: environmental card renderer dispatches correctly
   test('scenario 4: environmental card renderer dispatches correctly for all sensors', async ({ page }) => {
-    await loadDashboard(page);
-    await page.waitForFunction(() => window._manifest && window._manifest.sensors, { timeout: 10000 });
+    await loadDashboard(page, { expectedSensorCount: 3 });
+    await page.waitForFunction(() => {
+      if (!window._manifest || !Array.isArray(window._manifest.sensors)) return false;
+      if (!window.App || !App.State || typeof App.State.getSensors !== 'function') return false;
+      var envSensors = window._manifest.sensors.filter(function(sensor) {
+        return !sensor.category || sensor.category === 'environmental';
+      });
+      return envSensors.length > 0
+        && App.State.getSensors().length === envSensors.length
+        && document.querySelectorAll('.sensor-card').length === envSensors.length;
+    }, { timeout: 10000 });
     // Environmental manifest sensors must map to CARD_RENDERERS.environmental
     const envSensors = await page.evaluate(() => {
       return window._manifest.sensors.filter(function(s) { return !s.category || s.category === 'environmental'; });
@@ -721,7 +763,15 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
     expect(envSensors.every(s => s.category === 'environmental')).toBe(true);
     // Rebuild cards and confirm full card structure for each environmental card
     await page.evaluate(() => buildDeviceCards());
-    await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout: 5000 });
+    await page.waitForFunction(() => {
+      if (!window.App || !App.State || typeof App.State.getSensors !== 'function') return false;
+      var sensors = App.State.getSensors();
+      var cards = Array.from(document.querySelectorAll('.sensor-card'));
+      if (cards.length !== sensors.length) return false;
+      return cards.every(function(card) {
+        return card.querySelector('.sensor-card-header') && card.querySelector('.sensor-readings');
+      });
+    }, { timeout: 5000 });
     const cards = page.locator('.sensor-card');
     const count = await cards.count();
     expect(count).toBe(3);
