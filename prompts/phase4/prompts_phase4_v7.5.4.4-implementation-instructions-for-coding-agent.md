@@ -1,0 +1,290 @@
+# v7.5.4.4 — Phase 4 Closure (Coding Agent Prompt)
+
+_Full self-contained implementation instructions for the coding agent_
+_Date: 2026-03-18_
+
+---
+
+## 1. Repository & Setup
+
+```
+Clone https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
+```
+
+---
+
+## 2. Required Reading (MUST complete before any changes)
+
+Read these files **completely**:
+
+1. `Docs/phase4-implementation-plan.md` — v7.5.4.4 section and all acceptance criteria
+2. `Docs/bugs-and-lessons-learned.md` — ALL entries. Add any new entries from Phase 4 work
+3. `Docs/changelog.md` — ALL Phase 4 entries (v7.5.4.0 through v7.5.4.3)
+4. `Docs/v7.5-v7.6-architecture-plan.md` — Phase 4 task list (Section 11), to verify all items complete
+5. `prompts/phase3-prompt-templates-updated.md` — Step Index for Phase 4
+6. `tests/browser/dashboard.spec.js` — verify `loadDashboard()` pattern, `afterEach` pattern, all test groups
+7. `tests/browser/manifest.spec.js` — verify teardown pattern is correct
+8. `tests/browser/sensor-count.spec.js` — verify teardown pattern is correct (no duplicates)
+
+---
+
+## 3. Current Status
+
+- v7.5.4.3 complete and merged (mixed-category Playwright tests pass)
+- ALL root baseline + mixed-category tests pass on Chromium AND Firefox (confirm)
+- Device tested: dashboard shows environmental + network cards, stable (confirm)
+- Moving to Phase 4 closure
+- Current date: <INSERT_DATE>
+
+**⚠️ PRE-CONDITION CHECK**: Before making ANY changes:
+1. Run `npx playwright test --project=chromium` — all must pass
+2. Run `npx playwright test --project=firefox` — all must pass
+3. Run `FIXTURE_SET=mixed npx playwright test --project=chromium` — all must pass
+4. Run `FIXTURE_SET=mixed npx playwright test --project=firefox` — all must pass
+5. Run `bash scripts/preflight.sh` — all must pass
+
+If ANY of these fail, STOP and fix before proceeding with closure.
+
+---
+
+## 4. Exact Scope — Phase 4 Closure
+
+Phase 4 closure — final validation, documentation, and phase close.
+
+### Step-by-step:
+
+#### 4a. Final test validation
+
+Run ALL tests and record results:
+
+```bash
+# Root baseline:
+npx playwright test --project=chromium
+npx playwright test --project=firefox
+
+# Mixed-category:
+FIXTURE_SET=mixed npx playwright test --project=chromium
+FIXTURE_SET=mixed npx playwright test --project=firefox
+
+# Preflight:
+bash scripts/preflight.sh
+```
+
+Record exact test counts and pass/fail status.
+
+#### 4b. Audit all spec files for Firefox safety
+
+Verify across ALL three spec files (`dashboard.spec.js`, `manifest.spec.js`, `sensor-count.spec.js`):
+
+1. **`loadDashboard()` (or equivalent)** uses `App.State.getSensors().length > 0` — NOT `typeof window._manifest !== 'undefined'`
+2. **`afterEach`** does NOT use `page.goto('about:blank')` — uses safe EventSource-close-only or is removed
+3. **No duplicate `afterEach`** hooks in any file
+4. **All `page.waitForFunction()` calls** use robust conditions (not just truthy checks on globals)
+
+If any of these are wrong (i.e., the v7.5.4.1 fixes were not properly applied), fix them now.
+
+#### 4c. Update `Docs/v7.5-v7.6-architecture-plan.md`
+
+Add Phase 4 status section (find the appropriate location, matching Phase 2/3 pattern):
+
+```markdown
+### Phase 4 — First Non-Climate Sensor (Ping Probe) ✅ COMPLETE
+
+| Step | Scope | Date |
+|------|-------|------|
+| v7.5.4.0 | Add ping device to manifest and generator | 2026-03-18 |
+| v7.5.4.1 | Implement ICMP ping adapter + Firefox Playwright stabilization | <DATE> |
+| v7.5.4.2 | Add network card renderer to dashboard | <DATE> |
+| v7.5.4.3 | Mixed-category test fixtures and Playwright tests | <DATE> |
+| v7.5.4.4 | Phase 4 closure | <DATE> |
+
+**Key validation result:** The generalized SensorEntity model correctly supports a second
+device category (network/ping) alongside environmental (ThermoPro). Adding the ping probe
+required: one manifest entry, one RTOS task (adapter), one dashboard card renderer, and
+zero changes to the core data model or persistence engine — confirming the Phase 1–3
+architecture design.
+
+**Firefox Playwright stabilization:** As part of Phase 4, the Playwright test suite was
+hardened for cross-browser reliability. The `loadDashboard()` helper now waits for true
+application-ready state (`App.State.getSensors().length > 0`), and the `afterEach`
+teardown no longer navigates to `about:blank` (which caused Firefox lifecycle interference).
+```
+
+#### 4d. Update `Docs/changelog.md`
+
+Add v7.5.4.4 entry:
+
+```markdown
+## v7.5.4.4 — Phase 4 Closure — <DATE>
+
+### Phase 4 Complete ✅
+
+Phase 4 validates the generalized SensorEntity architecture by successfully adding a
+non-climate sensor category (network/ping probe) to the gateway.
+
+### Phase 4 summary
+
+| Step | Scope |
+|------|-------|
+| v7.5.4.0 | Add ping device to manifest and generator (BUG-045 fix) |
+| v7.5.4.1 | Implement ICMP ping adapter + Firefox Playwright stabilization |
+| v7.5.4.2 | Add network card renderer to dashboard |
+| v7.5.4.3 | Mixed-category test fixtures and Playwright tests |
+| v7.5.4.4 | Phase 4 closure (this step) |
+
+### Architecture validation result
+
+The Phase 1–3 abstraction held: adding a ping probe required one manifest entry, one
+RTOS task, one card renderer, and zero changes to the core data model or persistence
+engine. Environmental cards and ThermoPro history are completely unchanged.
+
+### Firefox Playwright stabilization
+
+- `loadDashboard()` helpers hardened to wait for `App.State.getSensors().length > 0`
+- `afterEach` teardown changed from `page.goto('about:blank')` to safe EventSource cleanup
+- All Group 14 Firefox failures resolved
+- Full suite passes on Chromium, Firefox, and WebKit
+
+### Test coverage
+
+- Root baseline: XX tests (Chromium: pass, Firefox: pass)
+- Mixed-category: XX tests (Chromium: pass, Firefox: pass)
+- Preflight: all checks pass
+```
+
+#### 4e. Update `Docs/bugs-and-lessons-learned.md`
+
+Add any new bugs or lessons discovered during Phase 4. At minimum, verify:
+- BUG-045 entry is accurate and complete
+- If a Firefox Playwright BUG entry was added in v7.5.4.1, verify it's accurate
+- Add any new LESSON-OPS entries from Phase 4 work
+
+#### 4f. Update `prompts/phase3-prompt-templates-updated.md`
+
+Update the Step Index to mark all Phase 4 steps as complete:
+
+```markdown
+### Phase 4 — First Non-Climate Sensor (Ping Probe) ✅ COMPLETE
+
+| Version | Scope | Status |
+|---|---|---|
+| v7.5.4.0 | Add ping device to manifest | ✅ Complete |
+| v7.5.4.1 | Implement ICMP ping adapter + Firefox fix | ✅ Complete |
+| v7.5.4.2 | Add network card renderer | ✅ Complete |
+| v7.5.4.3 | Mixed-category test fixtures | ✅ Complete |
+| v7.5.4.4 | Phase 4 closure | ✅ Complete |
+```
+
+#### 4g. Version bump and regeneration
+
+```bash
+bash scripts/bump-version.sh 7.5.4.4
+python3 scripts/render_sensor_config.py --write
+bash scripts/generate-header.sh
+bash scripts/preflight.sh
+```
+
+---
+
+## 5. Do NOT
+
+- Begin Phase 5 work
+- Change any firmware logic
+- Change any dashboard rendering logic
+- Modify test assertions (only add documentation/closure items)
+- Use `page.goto('about:blank')` in any test cleanup
+
+---
+
+## 6. Critical Rules
+
+1. Use `bash scripts/bump-version.sh 7.5.4.4` for version bump
+2. Regenerate all artifacts
+3. **Run full test suite on BOTH browsers + BOTH fixture sets:**
+   - `npx playwright test --project=chromium` — all pass
+   - `npx playwright test --project=firefox` — all pass
+   - `FIXTURE_SET=mixed npx playwright test --project=chromium` — all pass
+   - `FIXTURE_SET=mixed npx playwright test --project=firefox` — all pass
+4. `bash scripts/preflight.sh` — all pass
+5. Phase 4 summary in changelog must list each step and its scope
+6. Architecture plan status update must match the Phase 2/3 pattern
+
+---
+
+## 7. Review Checklist (verify before creating PR)
+
+- [ ] All 5 pre-condition checks pass (Section 3)
+- [ ] Spec file audit complete — all 3 files have correct patterns (Section 4b)
+- [ ] `loadDashboard()` uses `App.State.getSensors().length > 0` in ALL spec files
+- [ ] `afterEach` does NOT use `about:blank` navigation in ANY spec file
+- [ ] No duplicate `afterEach` hooks in any spec file
+- [ ] `Docs/v7.5-v7.6-architecture-plan.md` updated with Phase 4 COMPLETE status
+- [ ] `Docs/changelog.md` has v7.5.4.4 entry with Phase 4 summary table
+- [ ] `Docs/bugs-and-lessons-learned.md` reviewed and updated
+- [ ] `prompts/phase3-prompt-templates-updated.md` Step Index updated
+- [ ] `npx playwright test --project=chromium` — all pass (record count)
+- [ ] `npx playwright test --project=firefox` — all pass (record count)
+- [ ] `FIXTURE_SET=mixed npx playwright test --project=chromium` — all pass (record count)
+- [ ] `FIXTURE_SET=mixed npx playwright test --project=firefox` — all pass (record count)
+- [ ] `bash scripts/preflight.sh` — all pass
+- [ ] Version is `7.5.4.4` everywhere
+
+---
+
+## 8. Device Testing (for human, after merge)
+
+### Prerequisites — pull, compile, flash
+
+```bash
+cd /config/ESP32-GW-multi-sensor
+git pull origin main
+
+cat VERSION
+# Expected: 7.5.4.4
+
+# Final compile + flash:
+esphome compile firmware/esp32-c3-multi-sensor.yaml
+esphome run firmware/esp32-c3-multi-sensor.yaml
+```
+
+### Final Phase 4 verification
+
+```bash
+# 1. Verify all API endpoints:
+curl -s http://192.168.120.189/api/manifest | python3 -m json.tool
+# Expected: v2 manifest with 3 ThermoPro + 1 wan_ping
+
+curl -s http://192.168.120.189/api/v2/live | python3 -m json.tool
+# Expected: All 4 devices with current values (ThermoPro: temp/hum, wan_ping: ping_ms/success_pct)
+
+curl -s http://192.168.120.189/api/status | python3 -m json.tool
+# Expected: Version 7.5.4.4, heap stable
+
+curl -s http://192.168.120.189/sensors.json | python3 -m json.tool
+# Expected: 3 environmental sensors only (legacy v1 projection)
+
+# 2. Open dashboard — verify both card types render, stable operation
+# Take screenshot for Phase 4 completion record
+
+# 3. Record final heap baseline for Phase 5 comparison:
+curl -s http://192.168.120.189/api/status | grep free_heap
+# Record this value — it's the Phase 4 baseline for Phase 5 comparison
+
+# 4. Verify ping history has accumulated:
+curl -s http://192.168.120.189/api/v2/history/wan_ping/ping_ms | head -10
+# Expected: Multiple data points
+
+# 5. Verify ThermoPro history is intact:
+curl -s http://192.168.120.189/history/office/temp | head -5
+# Expected: Normal ThermoPro history data — not reset (BUG-045 prevention)
+```
+
+---
+
+## 9. Post-merge tag
+
+```bash
+git pull origin main
+git tag -a v7.5.4.4 -m "Phase 4 Complete: First non-climate sensor (ping probe) fully operational"
+git push origin v7.5.4.4
+```

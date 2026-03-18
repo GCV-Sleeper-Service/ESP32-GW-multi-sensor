@@ -1,0 +1,271 @@
+# v7.5.4.3 — Mixed-Category Test Fixtures and Playwright Tests (Coding Agent Prompt)
+
+_Full self-contained implementation instructions for the coding agent_
+_Date: 2026-03-18_
+
+---
+
+## 1. Repository & Setup
+
+```
+Clone https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
+```
+
+---
+
+## 2. Required Reading (MUST complete before any changes)
+
+Read these files **completely**:
+
+1. `Docs/phase4-implementation-plan.md` — v7.5.4.3 section
+2. `Docs/bugs-and-lessons-learned.md` — ALL entries, especially:
+   - **BUG-045** — persistence schema mismatch lesson
+   - **BUG-044** — "specified tests never implemented" lesson (LESSON-OPS-057)
+   - **BUG-043** — all request scheduling and single-core lessons
+   - LESSON-OPS-060 (if added in v7.5.4.1) — Playwright readiness check pattern
+3. `Docs/changelog.md` — entries for v7.5.4.0 through v7.5.4.2
+4. `tests/browser/dashboard.spec.js` — understand ALL test groups (1–16+), `loadDashboard()` helper, `afterEach` pattern, Group 14 regression tests
+5. `tests/mock-server/server.js` — understand mock routes, fixture loading, `FIXTURE_SET` env var, `/api/v2/live` response building, history endpoint patterns
+6. `tests/fixtures/` — understand structure: root fixtures, `variants/` subdirectories, `generate-fixtures.js`
+7. `tests/fixtures/variants/` — existing variant fixture sets (1sensor, 2sensor, 4sensor if they exist)
+8. `tests/browser/manifest.spec.js` — understand test patterns and teardown
+9. `tests/browser/sensor-count.spec.js` — understand test patterns and teardown
+10. `config/sensors.json` — current v2 manifest
+11. `dashboard/dashboard.js` — understand `buildDeviceCards()`, `CARD_RENDERERS`, `normalizeManifestSensors()`, `buildNetworkCard()` (added in v7.5.4.2)
+
+---
+
+## 3. Current Status
+
+- v7.5.4.2 complete and merged (network card renderer on dashboard, both card types visible)
+- Device test: dashboard shows 3 environmental + 1 network card, F5 stable, heap stable (confirm)
+- ALL Playwright tests pass on both Chromium AND Firefox (confirm before starting)
+- main is green
+- Current date: <INSERT_DATE>
+
+**⚠️ PRE-CONDITION CHECK**: Before making ANY changes:
+1. Run `npx playwright test --project=chromium` — all must pass
+2. Run `npx playwright test --project=firefox` — all must pass
+3. Verify `loadDashboard()` uses `App.State.getSensors().length > 0` pattern
+4. Verify `afterEach` does NOT use `page.goto('about:blank')`
+
+---
+
+## 4. Exact Scope — Mixed-Category Test Fixtures + Playwright Tests
+
+Create mixed-category test fixtures and add Playwright tests validating that the dashboard correctly renders both environmental and network device categories simultaneously.
+
+### Step-by-step implementation:
+
+#### 4a. Create `tests/fixtures/variants/mixed/` directory
+
+Create fixture files for a mixed-category deployment:
+
+| File | Content |
+|------|---------|
+| `sensors.json` | v1 projection: 2 ThermoPro sensors only (legacy compat — `[{id:'office',name:'Office'},{id:'first_floor',name:'First Floor'}]`) |
+| `manifest.json` | v2 manifest: 2 ThermoPro + 1 wan_ping device (full v2 structure with `schema_version`, `gateway`, `history`, `metrics`, `sensors`) |
+| `api-status.json` | Gateway status (same structure as root fixture, version bumped) |
+| `storage-stats.json` | Storage stats (same structure as root fixture) |
+| `history-office-temp.csv` | ThermoPro temp history (10+ data points) |
+| `history-office-hum.csv` | ThermoPro humidity history (10+ data points) |
+| `history-first_floor-temp.csv` | ThermoPro temp history |
+| `history-first_floor-hum.csv` | ThermoPro humidity history |
+| `history-wan_ping-ping_ms.csv` | Ping latency history (10-20 data points, realistic values 5-50ms) |
+| `history-wan_ping-success_pct.csv` | Ping success history (10-20 data points, 95-100%) |
+
+**Important**: The manifest.json must include:
+- `schema_version: 2`
+- Both environmental metrics (temp, hum) and network metrics (ping_ms, success_pct) in the `metrics` array
+- Environmental sensors with `category: "environmental"`, `adapter: "thermopro_ble"`
+- Network sensor with `category: "network"`, `adapter: "icmp_ping"`, `source: { target: "8.8.8.8" }`
+
+#### 4b. Extend `tests/fixtures/generate-fixtures.js`
+
+Add a `generateMixedFixtures()` function (or extend the existing generator) to produce the mixed variant from a 2-ThermoPro + 1-ping manifest. Ensure:
+- The v1 `sensors.json` projection contains only environmental sensors
+- The v2 `manifest.json` contains all devices
+- History CSV files are generated with realistic timestamps and values
+
+#### 4c. Extend `tests/mock-server/server.js`
+
+Verify and extend if needed:
+- `/api/v2/live` builds response correctly for mixed categories (ThermoPro gets temp/hum/batt/rssi, ping gets ping_ms/success_pct)
+- `/api/v2/history/{id}/{metric}` serves ping metric history fixtures
+- `/history/{id}/{metric}` legacy endpoints serve correctly
+- `FIXTURE_SET=mixed` loads variant fixtures from `tests/fixtures/variants/mixed/`
+- The mock server does NOT break when serving mixed-category data
+
+#### 4d. Add Playwright test Group 17: Mixed-Category Rendering
+
+Add to `tests/browser/dashboard.spec.js`:
+
+```js
+// ── 17. Mixed-Category Rendering (Phase 4) ─────────────────────
+test.describe('17. Mixed-Category Rendering', () => {
+  // Test 1: Correct total card count
+  test('mixed manifest renders correct number of cards (environmental + network)', async ({ page }) => {
+    // Assert total card count matches expected (2 environmental + 1 network = 3 for mixed fixture)
+    // OR (3 environmental + 0 network = 3 for root fixture depending on FIXTURE_SET)
+  });
+
+  // Test 2: Environmental cards have ThermoPro layout
+  test('environmental cards render with expected ThermoPro layout elements', async ({ page }) => {
+    // Assert temp, hum, dew point, comfort elements exist in environmental cards
+  });
+
+  // Test 3: Network card renders
+  test('network card renders with latency and success rate elements', async ({ page }) => {
+    // Assert network card exists, has latency and success rate elements
+  });
+
+  // Test 4: Renderer dispatch
+  test('CARD_RENDERERS dispatches correctly by category', async ({ page }) => {
+    // Assert that environmental and network cards use different renderers
+  });
+
+  // Test 5: Environmental charts
+  test('chart rendering works for environmental devices', async ({ page }) => {
+    // Assert chart canvases exist for environmental sensors
+  });
+
+  // Test 6: API data
+  test('/api/v2/live returns data for both device categories', async ({ page }) => {
+    // Fetch /api/v2/live and verify both environmental and network data present
+  });
+
+  // Test 7: Manifest structure
+  test('manifest v2 contains both environmental and network devices', async ({ page }) => {
+    // Verify window._manifest has both categories
+  });
+});
+```
+
+### Firefox compatibility requirements for ALL new tests:
+
+Every new test MUST follow these patterns:
+1. Use the shared `loadDashboard()` helper which waits for `App.State.getSensors().length > 0`
+2. Do NOT add any new `afterEach` hooks — use the existing file-level one
+3. Do NOT use `page.goto('about:blank')` anywhere in tests
+4. Wait for DOM elements before asserting counts (use `await expect(...).toHaveCount(N)` which auto-retries)
+5. For `page.evaluate()` calls, ensure the function checks for null/undefined before accessing properties
+6. Use explicit `waitForFunction()` when testing async state like `window._manifest`
+
+### Test execution plan:
+
+```bash
+# Run mixed-category tests with mixed fixture set:
+FIXTURE_SET=mixed npx playwright test --project=chromium --grep "Mixed-Category"
+FIXTURE_SET=mixed npx playwright test --project=firefox --grep "Mixed-Category"
+
+# Run the full suite with root baseline (must still pass):
+npx playwright test --project=chromium
+npx playwright test --project=firefox
+
+# ALL FOUR commands must pass.
+```
+
+---
+
+## 5. Do NOT
+
+- Modify firmware code or `sensor_history_multi.h`
+- Change dashboard rendering logic (test-only step — no code changes to `dashboard.js` or `dashboard.html`)
+- Add aggregator test fixtures (that's Phase 5)
+- Weaken existing assertions
+- Add `page.goto('about:blank')` to any test teardown
+- Proceed to v7.5.4.4
+
+---
+
+## 6. Critical Rules
+
+1. Use `bash scripts/bump-version.sh 7.5.4.3` for version bump
+2. Run `bash scripts/preflight.sh` — must pass
+3. **Run full Playwright suite on BOTH browsers with BOTH fixture sets:**
+   - `npx playwright test --project=chromium` — all pass (root baseline)
+   - `npx playwright test --project=firefox` — all pass (root baseline)
+   - `FIXTURE_SET=mixed npx playwright test --project=chromium` — all pass
+   - `FIXTURE_SET=mixed npx playwright test --project=firefox` — all pass
+4. Root baseline tests must NOT depend on mixed fixtures
+5. Mixed fixture tests should be self-contained (not break root baseline)
+6. ALL tests must use the robust `loadDashboard()` with `App.State.getSensors().length > 0`
+7. NO `page.goto('about:blank')` in any teardown
+
+---
+
+## 7. Documentation Updates (mandatory)
+
+1. **`Docs/changelog.md`** — Add v7.5.4.3 entry covering:
+   - Mixed-category fixture creation
+   - Mock server extensions
+   - Group 17 Playwright tests (list each test)
+   - All files changed
+2. **`Docs/bugs-and-lessons-learned.md`** — Add entries for any issues discovered
+3. **`prompts/phase3-prompt-templates-updated.md`** — Update Step Index: mark v7.5.4.3 as complete
+
+---
+
+## 8. Review Checklist (verify before creating PR)
+
+- [ ] `tests/fixtures/variants/mixed/` directory exists with all required files
+- [ ] Mixed `sensors.json` has only environmental sensors (v1 legacy)
+- [ ] Mixed `manifest.json` has both environmental and network devices (v2)
+- [ ] Mixed history CSVs have realistic data (timestamps, values in expected ranges)
+- [ ] `generate-fixtures.js` can produce mixed variant
+- [ ] Mock server serves mixed fixtures when `FIXTURE_SET=mixed`
+- [ ] `/api/v2/live` mock returns correct data for both categories
+- [ ] Group 17 tests are complete (7 tests)
+- [ ] All Group 17 tests use `loadDashboard()` with robust readiness check
+- [ ] No `page.goto('about:blank')` in any new code
+- [ ] No duplicate `afterEach` hooks added
+- [ ] `npx playwright test --project=chromium` — all pass (root baseline)
+- [ ] `npx playwright test --project=firefox` — all pass (root baseline)
+- [ ] `FIXTURE_SET=mixed npx playwright test --project=chromium` — all pass
+- [ ] `FIXTURE_SET=mixed npx playwright test --project=firefox` — all pass
+- [ ] `bash scripts/preflight.sh` — all pass
+- [ ] `Docs/changelog.md` updated
+- [ ] Version is `7.5.4.3` everywhere
+
+---
+
+## 9. Device Testing
+
+This step does not require device testing — it's Playwright tests only. However, verify locally:
+
+```bash
+cd /config/ESP32-GW-multi-sensor    # or your local clone
+git pull origin main
+
+cat VERSION
+# Expected: 7.5.4.3
+
+npm ci
+npx playwright install --with-deps chromium firefox
+
+# Root baseline tests (must all pass):
+npx playwright test --project=chromium
+npx playwright test --project=firefox
+# Expected: All tests pass (88+ tests per browser)
+
+# Mixed-category tests:
+FIXTURE_SET=mixed npx playwright test --project=chromium
+FIXTURE_SET=mixed npx playwright test --project=firefox
+# Expected: Group 17 tests pass
+
+# Preflight:
+bash scripts/preflight.sh
+# Expected: All checks pass
+```
+
+Record test counts for all four runs.
+
+---
+
+## 10. Post-merge tag
+
+```bash
+git pull origin main
+git tag -a v7.5.4.3 -m "Phase 4 Step 3: Mixed-category test fixtures and Playwright tests"
+git push origin v7.5.4.3
+```

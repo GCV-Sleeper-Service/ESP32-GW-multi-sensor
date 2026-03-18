@@ -1,0 +1,350 @@
+# v7.5.4.1 — Implement ICMP Ping Adapter (Coding Agent Prompt)
+
+_Full self-contained implementation instructions for the coding agent_
+_Date: 2026-03-18_
+
+**⚠️ HIGH RISK — new RTOS task on single-core ESP32-C3. Must not disrupt BLE/WiFi/HTTP.**
+
+---
+
+## 1. Repository & Setup
+
+```
+Clone https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
+```
+
+---
+
+## 2. Required Reading (MUST complete before any changes)
+
+Read these files **completely** — do not skim:
+
+1. `Docs/phase4-implementation-plan.md` — v7.5.4.1 section (ICMP ping adapter scope)
+2. `Docs/bugs-and-lessons-learned.md` — ALL entries, especially:
+   - **BUG-045** — `NUM_SENSORS = NUM_DEVICES` alias broke persistence. `NUM_SENSORS` must always alias `NUM_ENV_SENSORS`, never `NUM_DEVICES`. Preflight guards enforce this.
+   - **BUG-043** — dashboard request fanout / task blocking lessons for single-core ESP32-C3
+   - All `LESSON-OPS-050` through `LESSON-OPS-059` entries
+3. `Docs/changelog.md` — recent entries for v7.5.4.0 and BUG-044/BUG-045 context
+4. `Docs/v7.5-v7.6-architecture-plan.md` — Section 6.4 (Adapter integration / ping probe example)
+5. `dashboard/sensor_history_multi.h` — understand `SensorEntity`, `MetricDef`, `MetricState`, `add_sample()`, `mark_seen()`, `compute_averages()`, `HistoryBuffer`, and the `devices[]` array structure
+6. `firmware/esp32-c3-multi-sensor.yaml` — understand existing lambda patterns, `on_boot:`, `interval:` timers, and how ESPHome C++ lambdas reference the header
+7. `scripts/render_sensor_config.py` — understand the `render_entity_block()` function, marker blocks, and how `PING_DEVICE_INDEX` should be generated
+8. `scripts/sensor_manifest_lib.py` — understand adapter-specific validation and `icmp_ping` entry shape
+9. `config/sensors.json` — current v2 manifest (3 ThermoPro + 1 wan_ping)
+10. `tests/browser/dashboard.spec.js` — understand current test structure, `loadDashboard()` helper, and Group 14 tests
+11. `tests/browser/manifest.spec.js` — understand `afterEach` patterns
+12. `tests/browser/sensor-count.spec.js` — understand `afterEach` and `loadDashboard()` patterns
+
+---
+
+## 3. Current Status
+
+- v7.5.4.0 complete and merged (ping device in manifest, null values in `/api/v2/live`)
+- BUG-045 fixed (NUM_SENSORS aliases NUM_ENV_SENSORS, not NUM_DEVICES)
+- PR #51 merged (Firefox Group 13 fix) but **Group 14 Firefox regressions remain** (see Section 5)
+- main is green on Chromium; Firefox has 2 known failures
+- Current date: <INSERT_DATE>
+
+---
+
+## 4. Exact Scope — ICMP Ping Adapter
+
+Implement ICMP ping adapter as a periodic RTOS task that feeds data into the `wan_ping` SensorEntity.
+
+### Step-by-step implementation:
+
+#### 4a. Add ping adapter code
+
+Add a `PingAdapter` class to `dashboard/sensor_history_multi.h` (or a new `src/ping_adapter.h` included by it):
+
+- Use ESP-IDF `ping/ping_sock.h` API (not raw ICMP sockets — the ping API handles LWIP integration)
+- Create a FreeRTOS task that runs every 60 seconds
+- Per cycle: send 3 ICMP pings to configured target (default: 8.8.8.8), 200ms spacing
+- Compute average RTT (ms) and success rate (%)
+- Call `devices[PING_DEVICE_INDEX].add_sample(0, avg_rtt)` for ping_ms
+- Call `devices[PING_DEVICE_INDEX].add_sample(1, success_pct)` for success_pct
+- Call `devices[PING_DEVICE_INDEX].mark_seen(::time(nullptr))`
+- Handle DNS resolution failure gracefully — mark metrics invalid, don't crash
+- Handle WiFi-down gracefully — skip ping cycle, log warning
+
+#### 4b. Compile-time ping device index
+
+The generator (`render_sensor_config.py`) must produce a `#define PING_DEVICE_INDEX N` constant based on the position of the `icmp_ping` device in the `sensors` array. The adapter uses this, NOT a runtime search.
+
+Also generate `#define PING_TARGET "8.8.8.8"` (or whatever `source.target` is configured).
+
+#### 4c. YAML adapter initialization
+
+Add adapter initialization in the YAML `setup:` or `on_boot:` lambda:
+- Start the ping task **after WiFi is connected**
+- Use `xTaskCreate()` with stack size 4096 bytes and priority `tskIDLE_PRIORITY + 1`
+- The task function should be a static method of PingAdapter
+
+#### 4d. Generator support
+
+In `render_sensor_config.py`, extend `render_entity_block()`:
+- Add `#define PING_DEVICE_INDEX N` where N is the 0-based index of the `icmp_ping` device in the `devices[]` array
+- Add `#define PING_TARGET "X.X.X.X"` from the manifest `source.target` field
+- Only generate these defines if an `icmp_ping` device exists
+
+### Critical single-core constraints (from BUG-043 lessons):
+
+- The ESP32-C3 is **single-core**. The ping task MUST `vTaskDelay()` between pings to yield to BLE/WiFi/HTTP
+- Total ping cycle execution: ~600ms (3 pings × 200ms). Acceptable if it yields between pings
+- Do NOT run pings from the main loop or a timer lambda — use a dedicated low-priority RTOS task
+- Stack size: 4096 bytes minimum for the ping task (LWIP needs buffer space)
+- Priority: `tskIDLE_PRIORITY + 1` (lowest non-idle) or `tskIDLE_PRIORITY + 2` max
+- The task must NOT hold mutexes during ping waits
+
+### Error handling:
+
+- If DNS resolution fails: log once, set metrics to `NAN`, mark `valid = false`, retry next cycle
+- If WiFi is down: skip cycle entirely, `vTaskDelay(60000 / portTICK_PERIOD_MS)`, try again next cycle
+- If ping times out (>3000ms): count as failure for success_pct, exclude from avg_rtt
+- If all 3 pings fail: set `ping_ms = NAN` (invalid), `success_pct = 0.0`
+
+---
+
+## 5. MANDATORY — Fix Firefox Playwright Regressions (from PR #51)
+
+**This is NOT optional.** PR #51 fixed Group 13 Firefox failures but left Group 14 broken. You MUST fix these as part of this step.
+
+### Remaining failures (Firefox only):
+
+1. **Group 14, scenario 3**: `sensor cards render correctly when both /api/manifest and /sensors.json fail (hardcoded defaults)`
+   - Error: expected `.sensor-card` count 3, received 0
+   - Root cause: `loadDashboard()` navigates away to `about:blank` in `afterEach` while assertions are still pending in Firefox. Also, `loadDashboard()` readiness check (`typeof window._manifest !== 'undefined'`) is too weak — in the hardcoded-defaults fallback path, `_manifest` may be set to `null` or a fallback value that doesn't guarantee cards have rendered.
+
+2. **Group 14, scenario 4**: `environmental card renderer dispatches correctly for all sensors`
+   - Error: timeout in `loadDashboard()`
+   - Root cause: `waitForFunction(() => typeof window._manifest !== 'undefined')` does not guarantee the fallback path has completed, sensor state is ready, or cards have rendered.
+
+### Required fixes:
+
+#### 5a. Fix `loadDashboard()` in `dashboard.spec.js`
+
+Replace the current weak readiness check:
+```js
+// CURRENT (too weak):
+await page.waitForFunction(() => typeof window._manifest !== 'undefined', { timeout });
+await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout });
+```
+
+With a robust application-ready check:
+```js
+// FIXED — wait for App.State.getSensors() to be populated (proves manifest/fallback
+// path completed AND applySensorMeta() ran AND cards can render):
+await page.waitForFunction(
+  () => window.App && App.State && App.State.getSensors().length > 0,
+  { timeout }
+);
+await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout });
+```
+
+This works because:
+- `App.State.getSensors().length > 0` proves the full boot chain completed: `loadManifestV2()` → `applySensorMeta()` → `App.State.setSensors()` → `buildSensorCards()`
+- It works for ALL three manifest paths: real manifest, `/sensors.json` fallback, AND hardcoded `DEFAULT_SENSOR_META` fallback
+- It's stronger than checking `_manifest` which can be `undefined`, `null`, or a valid object depending on path
+
+#### 5b. Remove or redesign `page.goto('about:blank')` teardown
+
+The `about:blank` navigation in `afterEach` interferes with Firefox's page lifecycle — it can fire while assertions from the test body are still executing.
+
+**Replace the navigation-based teardown** across ALL spec files with a safe non-navigation approach:
+
+In `dashboard.spec.js`, `manifest.spec.js`, and `sensor-count.spec.js`:
+```js
+// BEFORE (causes Firefox interference):
+test.afterEach(async ({ page }) => {
+  try { await page.goto('about:blank'); } catch (_) { /* page may already be closing */ }
+});
+
+// AFTER (safe — close EventSource without navigation):
+test.afterEach(async ({ page }) => {
+  try {
+    await page.evaluate(() => {
+      // Close any open EventSource connections to prevent Firefox SSE teardown issues
+      if (window._sse) { try { window._sse.close(); } catch(_) {} }
+    });
+  } catch (_) { /* page may already be closing */ }
+});
+```
+
+If `window._sse` is not the actual global reference to the EventSource, find the correct reference in `dashboard.js` and use it. The key requirement: **do NOT navigate the page during teardown**. Only close open connections.
+
+If EventSource cleanup without navigation is not feasible (e.g., the SSE reference is not globally accessible), then simply remove the `afterEach` entirely and rely on Playwright's built-in page cleanup. Test this across both Chromium and Firefox.
+
+#### 5c. Fix `sensor-count.spec.js` loadDashboard()
+
+The `loadDashboard()` in `sensor-count.spec.js` is ALSO missing the robust readiness check:
+
+```js
+// CURRENT (line 30-31, too weak):
+await page.goto('/', { waitUntil: 'domcontentloaded' });
+await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout: timeout });
+
+// FIXED — add application-ready wait:
+await page.goto('/', { waitUntil: 'domcontentloaded' });
+await page.waitForFunction(
+  () => window.App && App.State && App.State.getSensors().length > 0,
+  { timeout }
+);
+await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout });
+```
+
+Also fix the **triple-duplicated `afterEach`** hooks (lines 46-48, 83-88, 112-117). There should be exactly ONE `afterEach` at the file's top level, and it should use the safe non-navigation approach from 5b.
+
+#### 5d. Fix `manifest.spec.js` teardown
+
+Apply the same `afterEach` fix as 5b.
+
+#### 5e. Fix Group 14 scenarios 3 and 4 specifically
+
+**Scenario 3** (hardcoded defaults): After routing both `/api/manifest` and `/sensors.json` to return errors, the test must wait for the dashboard to complete its fallback chain. The `loadDashboard()` fix in 5a should handle this, but additionally verify:
+- After `loadDashboard()` returns, explicitly wait for `App.State.getSensors().length === 3` (the hardcoded default count)
+- Then assert `.sensor-card` count
+
+**Scenario 4** (environmental card renderer dispatch): Same root cause — use the fixed `loadDashboard()` which waits for `App.State.getSensors().length > 0`.
+
+---
+
+## 6. Do NOT
+
+- Add dashboard network card renderer (that's v7.5.4.2)
+- Modify `SegmentSnapshot` or NVS persistence
+- Add flash persistence for ping metrics (RAM-only per architecture plan Section 10.2)
+- Change any ThermoPro behavior
+- Use `beginResponseStream` for any new response (LESSON-OPS-056)
+- Change `NUM_SENSORS` aliasing (it must remain `NUM_SENSORS = NUM_ENV_SENSORS`)
+- Weaken test assertions unnecessarily
+- Proceed to v7.5.4.2
+
+---
+
+## 7. Critical Rules
+
+1. Use `::time(nullptr)` not `time(nullptr)` (ESPHome convention)
+2. Use `bash scripts/bump-version.sh 7.5.4.1` for version bump
+3. Run `python3 scripts/render_sensor_config.py --write` to regenerate
+4. Run `bash scripts/generate-header.sh` to regenerate dashboard.h
+5. Run `bash scripts/preflight.sh` — must pass
+6. Mirror all `dashboard.js` changes to `dashboard.html` (LESSON-OPS-043)
+7. Keep ping task brief (~600ms per cycle) and yield-friendly
+8. **Run full Playwright suite on BOTH browsers:**
+   - `npx playwright test --project=chromium` — ALL tests must pass
+   - `npx playwright test --project=firefox` — ALL tests must pass (including Group 14)
+9. Never alias `NUM_SENSORS = NUM_DEVICES` (BUG-045 prevention)
+10. Never use `beginResponseStream` for responses >10KB (LESSON-OPS-056)
+11. Dashboard.h must be gzip-compressed (LESSON-OPS-055)
+12. Device testing sections must include full pull/compile/flash/verify workflow (LESSON-OPS-058)
+
+---
+
+## 8. Documentation Updates (mandatory — no drift allowed)
+
+1. **`Docs/changelog.md`** — Add v7.5.4.1 entry covering:
+   - ICMP ping adapter implementation (task, error handling, generator changes)
+   - Firefox Playwright stabilization follow-up (loadDashboard fix, teardown fix, Group 14 fix)
+   - List all files changed
+2. **`Docs/bugs-and-lessons-learned.md`** — If the Firefox fix warrants a BUG entry, add it. At minimum add a lesson about robust Playwright readiness checks (e.g., LESSON-OPS-060: "Playwright `loadDashboard()` helpers must wait for application-level ready state like `App.State.getSensors().length > 0`, not just `window._manifest` existence")
+3. **`prompts/phase3-prompt-templates-updated.md`** — Update Step Index: mark v7.5.4.1 as complete with date
+
+---
+
+## 9. Review Checklist (verify before creating PR)
+
+- [ ] `PING_DEVICE_INDEX` define is generated and correct (matches wan_ping position in `devices[]`)
+- [ ] `PING_TARGET` define is generated from `source.target` in manifest
+- [ ] PingAdapter task uses `vTaskDelay()` between each ping (yields to other tasks)
+- [ ] PingAdapter task priority is ≤ `tskIDLE_PRIORITY + 2`
+- [ ] PingAdapter stack size is ≥ 4096
+- [ ] WiFi-down check skips cycle gracefully (no crash, no stall)
+- [ ] DNS failure sets metrics to NAN and retries next cycle
+- [ ] All-pings-timeout sets ping_ms=NAN, success_pct=0.0
+- [ ] `NUM_SENSORS` still aliases `NUM_ENV_SENSORS` (not `NUM_DEVICES`) — check generated header
+- [ ] `NUM_ENV_SENSORS = 3`, `NUM_DEVICES = 4` in generated header
+- [ ] `loadDashboard()` in `dashboard.spec.js` waits for `App.State.getSensors().length > 0`
+- [ ] `loadDashboard()` in `sensor-count.spec.js` waits for `App.State.getSensors().length > 0`
+- [ ] `afterEach` in ALL spec files uses safe non-navigation teardown (no `about:blank`)
+- [ ] `sensor-count.spec.js` has exactly ONE `afterEach` (no duplicates)
+- [ ] Group 14 scenarios 3 and 4 pass in Firefox
+- [ ] `npx playwright test --project=chromium` — all pass
+- [ ] `npx playwright test --project=firefox` — all pass
+- [ ] `bash scripts/preflight.sh` — all pass
+- [ ] `dashboard.js` changes mirrored to `dashboard.html`
+- [ ] `dashboard.h` regenerated (gzip)
+- [ ] `Docs/changelog.md` updated
+- [ ] `Docs/bugs-and-lessons-learned.md` updated if needed
+- [ ] Version is `7.5.4.1` everywhere
+
+---
+
+## 10. Device Testing (for human, after merge)
+
+### Prerequisites — pull, compile, flash
+
+```bash
+# On your ESPHome LXC container:
+cd /config/ESP32-GW-multi-sensor
+git pull origin main
+
+# Verify version:
+cat VERSION
+# Expected: 7.5.4.1
+
+# Compile:
+esphome compile firmware/esp32-c3-multi-sensor.yaml
+# Expected: Compilation successful. Watch for any warnings about ping/LWIP.
+
+# OTA flash:
+esphome run firmware/esp32-c3-multi-sensor.yaml
+# Wait for reboot.
+```
+
+### Verification
+
+```bash
+# 1. Wait 2 minutes for at least one ping cycle to complete, then:
+
+# 2. Verify /api/v2/live shows real ping data:
+curl -s http://192.168.120.189/api/v2/live | python3 -m json.tool
+# Expected: "wan_ping": {"ping_ms": <number>, "success_pct": 100.0, "last_seen": <recent_epoch>}
+# ping_ms should be a reasonable value (1-100ms for 8.8.8.8)
+
+# 3. Verify environmental sensors unaffected:
+curl -s http://192.168.120.189/api/v2/live | python3 -m json.tool
+# Expected: ThermoPro devices still show valid temp/hum values
+
+# 4. Verify heap stability — ping task should not leak memory:
+curl -s http://192.168.120.189/api/status | grep free_heap
+# Expected: Similar to v7.5.4.0 baseline. Repeat after 5 minutes — should be stable.
+
+# 5. Open dashboard in browser:
+# Expected: 3 ThermoPro cards render normally. No crash. (Network card not yet added.)
+
+# 6. Wait 15+ minutes, verify ping history accumulates in RAM:
+curl -s http://192.168.120.189/api/v2/history/wan_ping/ping_ms
+# Expected: CSV data with epoch,value lines (one per 15-minute average)
+
+# 7. Verify legacy endpoints unchanged:
+curl -s http://192.168.120.189/history/office/temp | head -5
+# Expected: Normal ThermoPro history data
+
+# 8. Stress test — open dashboard, let it run 10 minutes, check for crashes:
+curl -s http://192.168.120.189/api/status | grep free_heap
+# Expected: Heap stable, no significant drift (>5KB = blocker)
+```
+
+### Report results
+
+Record ALL results including heap values (initial and after 10 min). ANY failure or heap drift >5KB is a blocker for v7.5.4.2.
+
+---
+
+## 11. Post-merge tag
+
+```bash
+git pull origin main
+git tag -a v7.5.4.1 -m "Phase 4 Step 1: Implement ICMP ping adapter + Firefox Playwright stabilization"
+git push origin v7.5.4.1
+```
