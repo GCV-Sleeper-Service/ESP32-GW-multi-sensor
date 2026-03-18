@@ -3,6 +3,40 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## BUG-043 Final Fix: Gzip Dashboard + Pre-Reserved History Response (no version bump) — 2026-03-17
+
+**Root cause identification and elimination of the actual BUG-043 crash mechanism.** After PRs #39–#41 resolved request scheduling issues, the dashboard still crashed the ESP32-C3 on page open and F5 refresh. Two firmware-level root causes were identified and fixed:
+
+### Root causes addressed
+
+1. **190KB uncompressed dashboard HTML transfer blocked HTTP task 2–4s per page load.** Every browser page load or F5 triggered a `GET /dashboard.html` that transferred 194,533 bytes of raw HTML. On the ESP32-C3 single core, this monopolized the HTTP server task, starving BLE/WiFi/API and triggering watchdog resets. Gzip compression reduces the transfer to ~45KB (77% reduction), cutting blocking to <1s.
+
+2. **`beginResponseStream` reallocation cascade in `handle_history_()` caused heap exhaustion.** The history CSV response used `beginResponseStream("text/plain")` which grows its internal `std::string` through repeated `resp->print()` calls. With 336 NVS segments, the string grows through 128→256→…→16K→32K, and at the 16K→32K transition, **both old and new buffers exist simultaneously (48KB)**. With SSE/polling connections consuming ~12KB of heap, the total exceeded available ~60KB free heap. Replaced with a pre-reserved `std::string` (single allocation, zero reallocations) sent via zero-copy `beginResponse`.
+
+### Fixes implemented
+
+- **Gzip dashboard** — `scripts/generate-header.sh` now gzip-compresses the HTML and outputs a C `uint8_t[]` byte array. Firmware serves with `Content-Encoding: gzip`. Browser decompresses transparently.
+- **Inline favicon** — Added `<link rel="icon" href="data:,">` to `dashboard.html`, eliminating browser `/favicon.ico` request entirely (was returning 500 due to handler ordering).
+- **Pre-reserved history response** — `handle_history_()` calculates expected CSV size upfront, calls `csv.reserve(est_bytes)`, builds CSV into that buffer, sends with zero-copy `beginResponse(200, type, data, len)`.
+- **String-based CSV builders** — New `HistoryBuffer::append_csv_to()` and `append_snapshot_series_csv_()` methods write to pre-reserved string.
+- **Aggressive NVS yielding** — Changed from 1ms/4-reads to 5ms/2-reads, giving BLE/WiFi/API 2.5× more CPU time between NVS flash reads.
+- **Preflight guards** — Added `dashboard_h_gzip_format`, `dashboard_h_no_raw_literal`, `dashboard_inline_favicon`, `firmware_gzip_content_encoding`, and `dashboard_h_size_guard` checks.
+
+### Why PRs #39–#41 didn't fix the problem
+
+The earlier PRs correctly identified and fixed **request scheduling** problems (concurrent history fetches, in-flight guard gaps, polling burst, SSE redundant requests). These were genuine issues. However, the fixes treated **request count** as the bottleneck while missing the **response size** and **heap allocation** bottlenecks:
+
+- Manual curl worked fine because individual API endpoints return small payloads (<5KB)
+- The dashboard crash was triggered by the 190KB HTML transfer (not caught by request scheduling fixes)
+- The history response crash was triggered by std::string reallocation patterns (not caught by sequential fetching — even one sequential request crashed the device when SSE/polling connections consumed enough heap)
+
+### Lesson
+
+When debugging ESP32-C3 instability, always check: (1) transfer sizes of large responses, (2) heap allocation patterns during response building, (3) peak concurrent heap usage including TCP/SSE buffers. Request scheduling is necessary but not sufficient — the response construction itself can be the crash trigger.
+
+**Related:** BUG-043, LESSON-OPS-055, LESSON-OPS-056
+
+---
 
 ## BUG-043 Dashboard Hardening (no version bump) — 2026-03-17
 

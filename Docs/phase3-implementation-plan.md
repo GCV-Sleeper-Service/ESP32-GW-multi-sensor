@@ -380,15 +380,23 @@ This dual-write ensures the existing dashboard polling (which reads from `Sensor
 
 ---
 
-### v7.5.3.4 — Add `/api/v2/live` endpoint from SensorEntity
+### v7.5.3.4 — BUG-043 hotfix + LWIP sockets (status: COMPLETE)
+
+---
+
+### v7.5.3.5 — BUG-043 continued fix` (status: COMPLETE)
+
+---
+
+### v7.5.3.6 — Add `/api/v2/live` endpoint from SensorEntity
 
 **Scope:** Add the new `/api/v2/live` endpoint that reads current values from `SensorEntity.metric_states[]` instead of `SensorSlot`.
 
 **Files modified:**
 - `dashboard/sensor_history_multi.h` — add `handle_api_v2_live_()` method, add route to `canHandle()` and `handleRequest()`
 - `scripts/preflight.sh` — add check for `/api/v2/live` route
-- `Docs/changelog.md` — v7.5.3.4 entry
-- Version bump: ALL locations to `7.5.3.4`
+- `Docs/changelog.md` — v7.5.3.6 entry
+- Version bump: ALL locations to `7.5.3.6`
 
 **Implementation details:**
 
@@ -444,7 +452,7 @@ void handle_api_v2_live_(AsyncWebServerRequest *request) const {
 - [ ] Preflight includes `/api/v2/live` route check
 - [ ] Firmware compiles and runs
 - [ ] All 73 Playwright tests pass
-- [ ] Version is `7.5.3.4` everywhere
+- [ ] Version is `7.5.3.6` everywhere
 
 **Risk:** Low-Medium. New endpoint only, reads from `SensorEntity` which is already receiving data via dual-write.  
 **Estimated effort:** 1 session.
@@ -453,15 +461,15 @@ void handle_api_v2_live_(AsyncWebServerRequest *request) const {
 
 ---
 
-### v7.5.3.5 — Add `/api/v2/history/{device}/{metric}` endpoint
+### v7.5.3.7 — Add `/api/v2/history/{device}/{metric}` endpoint
 
 **Scope:** Add the per-device per-metric history endpoint that reads from `SensorEntity` history buffers.
 
 **Files modified:**
 - `dashboard/sensor_history_multi.h` — add `handle_api_v2_history_()` method, add route
 - `scripts/preflight.sh` — add route check
-- `Docs/changelog.md` — v7.5.3.5 entry
-- Version bump: ALL locations to `7.5.3.5`
+- `Docs/changelog.md` — v7.5.3.7 entry
+- Version bump: ALL locations to `7.5.3.7`
 
 **Implementation details:**
 
@@ -484,7 +492,7 @@ For ThermoPro sensors, the response from `/api/v2/history/office/temp` should be
 - [ ] `GET /api/v2/history/office/hum` returns same data as `GET /history/office/hum`
 - [ ] 404 for non-existent device or metric
 - [ ] Legacy endpoints still work unchanged
-- [ ] Version is `7.5.3.5` everywhere
+- [ ] Version is `7.5.3.7` everywhere
 
 **Risk:** Low-Medium. Reads from the same HistoryBuffer ring buffer.  
 **Estimated effort:** 1 session.
@@ -496,7 +504,7 @@ diff <(curl -s http://192.168.120.189/history/office/temp) <(curl -s http://192.
 
 ---
 
-### v7.5.3.6 — Remove SensorSlot, switch all paths to SensorEntity
+### v7.5.3.8 — Remove SensorSlot, switch all paths to SensorEntity
 
 **Scope:** Remove the dual-write. `SensorSlot` arrays are deleted. All runtime code uses `SensorEntity`. Flash persistence shims bridge `SensorEntity` to the existing `SegmentSnapshot` format.
 
@@ -505,8 +513,8 @@ diff <(curl -s http://192.168.120.189/history/office/temp) <(curl -s http://192.
 - `scripts/render_sensor_config.py` — stop generating `SensorSlot` arrays, only generate `SensorEntity` arrays
 - `firmware/esp32-c3-multi-sensor.yaml` — remove `sensors[i].add_temp/hum()` calls from lambdas
 - `dashboard/dashboard.js` — no changes (already reads from manifest-driven endpoints)
-- `Docs/changelog.md` — v7.5.3.6 entry
-- Version bump: ALL locations to `7.5.3.6`
+- `Docs/changelog.md` — v7.5.3.8 entry
+- Version bump: ALL locations to `7.5.3.8`
 
 **Implementation details — persistence shims:**
 
@@ -581,18 +589,18 @@ curl http://192.168.120.189/api/v2/history/office/temp  # v2 history
 
 ---
 
-### v7.5.3.7 — Full Playwright regression + Phase 3 closure
+### v7.5.3.9 — Full Playwright regression + Phase 3 closure
 
 **Scope:** Final validation, comprehensive test coverage for the new model, documentation update, phase closure.
 
 **Files modified:**
 - `tests/browser/dashboard.spec.js` — add Group 15: Phase 3 closure tests
 - `tests/mock-server/server.js` — add `/api/v2/live` and `/api/v2/history/{device}/{metric}` mock routes
-- `Docs/changelog.md` — v7.5.3.7 entry with Phase 3 Complete callout
+- `Docs/changelog.md` — v7.5.3.9 entry with Phase 3 Complete callout
 - `Docs/v7.5-v7.6-architecture-plan.md` — Phase 3 Status: COMPLETE
-- `Docs/session-log-2026-XX-XX-v7.5.3.7.md` — session log (created)
+- `Docs/session-log-2026-XX-XX-v7.5.3.9.md` — session log (created)
 - `Docs/bugs-and-lessons-learned.md` — new entries if bugs found
-- Version bump: ALL locations to `7.5.3.7`
+- Version bump: ALL locations to `7.5.3.9`
 
 **New Playwright tests (Group 15):**
 1. `/api/v2/live` returns valid JSON with all device IDs from manifest

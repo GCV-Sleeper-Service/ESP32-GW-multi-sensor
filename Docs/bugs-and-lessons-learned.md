@@ -9,6 +9,29 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 ## Bug Fixes
 
+### Fix (final — gzip dashboard + pre-reserved history response)
+
+Post-PR#41 device validation showed the ESP32-C3 still crashed on dashboard open and F5 despite all request scheduling fixes. Two firmware-level root causes:
+
+**RC-GZIP: 190KB uncompressed dashboard HTML blocked HTTP task 2–4s per page load.**
+Every `GET /dashboard.html` transferred 194,533 bytes of raw HTML. On the single-core ESP32-C3, this monopolized the HTTP server task, starving BLE/WiFi/API and causing watchdog resets.
+
+**Fix:** Gzip-compress dashboard in build pipeline (194KB → 45KB, 77% reduction). Serve with `Content-Encoding: gzip`. Added inline favicon (`<link rel="icon" href="data:,">`) to eliminate browser `/favicon.ico` request.
+
+**RC-HEAPALLOC: `beginResponseStream` reallocation cascade in `handle_history_()` caused heap exhaustion.**
+With 336 NVS segments, the response string grew through 128→256→…→16K→32K via `resp->print()`. At the 16K→32K transition, both old (16K) and new (32K) buffers exist simultaneously = 48KB. With SSE/polling holding ~12KB of buffers, total exceeded available ~60KB free heap.
+
+**Fix:** Pre-reserved `std::string` with `csv.reserve(estimated_bytes)` — single allocation, zero reallocations. Sent via zero-copy `beginResponse(200, type, data, len)` instead of `beginResponseStream`. Added string-based CSV builders `append_csv_to()` and `append_snapshot_series_csv_()`. Increased NVS yield from 1ms/4-reads to 5ms/2-reads.
+
+### Updated Prevention rules
+
+Add to the existing Prevention section:
+- **Gzip-compress all large embedded responses** — the ESP32-C3 HTTP task blocks proportionally to response size. Any response >50KB should be gzip-compressed at build time (LESSON-OPS-055)
+- **Never use `beginResponseStream` for responses that grow beyond ~10KB** — the std::string reallocation doubles peak heap temporarily. Use pre-reserved `std::string` + zero-copy `beginResponse(200, type, data, len)` instead (LESSON-OPS-056)
+- **Preflight must guard dashboard.h size** — a size threshold check catches accidental regression to uncompressed format (LESSON-OPS-055)
+
+Related: LESSON-OPS-055, LESSON-OPS-056
+
 ---
 
 ## BUG-043 — Dashboard request fanout / polling destabilizes ESP32-C3 (CONFIRMED)
@@ -480,6 +503,30 @@ The original validation helper silently normalized MAC addresses inside the call
 
 ## Operational Lessons
 
+### LESSON-OPS-056: Never use beginResponseStream for large HTTP responses on ESP32-C3
+
+**Date:** 2026-03-17
+
+`AsyncWebServer::beginResponseStream()` builds the response in an internal `std::string` that grows through repeated `print()` calls. Each `std::string` reallocation temporarily holds both old and new buffers. For a 24KB response (typical for 336 NVS segments × 4 points × 20 bytes/line), the growth from 16KB→32KB requires 48KB of simultaneous heap — nearly the entire free heap when SSE/polling connections are active.
+
+**Rule:** Any HTTP response that could exceed ~10KB must use pre-reserved `std::string` with `csv.reserve(estimated_size)` followed by zero-copy `beginResponse(200, content_type, reinterpret_cast<const uint8_t*>(str.data()), str.size())`. This pattern makes a single heap allocation at the estimated final size, avoiding the reallocation cascade.
+
+---
+
+### LESSON-OPS-055: Gzip-compress large embedded responses; preflight must guard compressed format
+
+**Date:** 2026-03-17
+
+The ESP32-C3 HTTP server task blocks proportionally to response transfer size. The 190KB uncompressed `dashboard.html` blocked the task for 2–4 seconds per page load, starving BLE/WiFi/API/watchdog on the single-core device. Gzip compression (194KB → 45KB) reduced blocking to <1 second.
+
+**Rules:**
+1. `scripts/generate-header.sh` must gzip-compress the dashboard HTML and output a C `uint8_t[]` byte array (not a raw string literal)
+2. `sensor_history_multi.h` must serve the dashboard with `Content-Encoding: gzip`
+3. `scripts/preflight.sh` must verify: (a) `dashboard.h` contains `DASHBOARD_HTML_GZ` (gzip format), (b) does NOT contain `R"DASH64(` (raw literal), (c) file size is below 400KB threshold
+4. `dashboard.html` must contain `<link rel="icon" href="data:,">` to prevent browser `/favicon.ico` requests (which return 500 due to ESPHome handler ordering)
+
+---
+
 ### LESSON-OPS-054: Dashboard startup polling must be fully sequential (batch=1); ESPHome handler ordering affects custom routes (dashboard hardening PR2)
 
 #### Part A: Startup polling must be fully sequential
@@ -505,23 +552,6 @@ The `HistoryWebHandler` is registered in an `on_boot` lambda (which runs after a
 **The observed symptom:** `/favicon.ico` returns HTTP 500 even though `HistoryWebHandler::canHandle()` returns `true` and `handleRequest()` would return 204 — ESPHome's catch-all gets there first.
 
 **The fix (not yet implemented):** Change `register_history_handler()` to run before ESPHome's web_server setup — e.g., by creating a custom `esphome::Component` with a `setup_priority` that fires between `web_server_base::setup()` and `web_server::setup()`. This is a larger change requiring firmware/YAML modifications beyond the scope of this dashboard-hardening PR.
-
-Related: BUG-043
-
----
-
-### LESSON-OPS-052: History endpoint NVS scan is a blocking operation — dashboard must never fetch history metrics concurrently (v7.5.3.5)
-
-Each `/history/{id}/temp` or `/history/{id}/hum` request in the firmware (`sensor_history_multi.h`) triggers a **synchronous NVS scan loop** that reads up to 1080 NVS blobs without yielding to other tasks. This blocks the HTTP server task for 0.5–2 seconds per request.
-
-Using `Promise.all` in `fetchDeviceHistory()` caused both temp and hum requests to fire simultaneously, doubling the blocking window to 1–4 seconds per sensor. During that window, BLE scanning, WiFi, the ESPHome API, and the FreeRTOS task watchdog are all starved — causing the crash.
-
-**Mandatory rules for dashboard code:**
-1. **`fetchDeviceHistory()` must fetch metrics sequentially**, never via `Promise.all`. Use a promise chain with a 300ms delay between each request to give the firmware breathing room.
-2. **`loadHistory()` must have an in-flight guard** (`_historyInFlight`) to prevent concurrent history load chains from F5 refresh or button click during boot.
-3. **History loading must be deferred long enough** for all other boot requests to complete first. The bootstrap timer must be ≥10s (sequential poll finishes ~t+8s, storage stats at t+5s, both must finish before history begins).
-4. **Firmware fix (implemented):** `maybe_yield_nvs_scan_()` in `sensor_history_multi.h` calls `vTaskDelay(pdMS_TO_TICKS(1))` every 4 blob reads, yielding the CPU between batch reads. This eliminates the firmware root cause.
-5. **Preflight enforces this rule:** `scripts/preflight.sh` includes a `no_concurrent_history_fetch` check that fails if `Promise.all(.*historyMeasurements` appears in either `dashboard.js` or `dashboard.html`.
 
 Related: BUG-043
 
@@ -563,6 +593,23 @@ This applies to **all** NVS iteration loops in the project, not just the three f
 - `build_import_epoch_map_()` — now fixed
 - `handle_history_()` — now fixed
 - Any future NVS iteration loop must follow the same pattern
+
+Related: BUG-043
+
+---
+
+### LESSON-OPS-052: History endpoint NVS scan is a blocking operation — dashboard must never fetch history metrics concurrently (v7.5.3.5)
+
+Each `/history/{id}/temp` or `/history/{id}/hum` request in the firmware (`sensor_history_multi.h`) triggers a **synchronous NVS scan loop** that reads up to 1080 NVS blobs without yielding to other tasks. This blocks the HTTP server task for 0.5–2 seconds per request.
+
+Using `Promise.all` in `fetchDeviceHistory()` caused both temp and hum requests to fire simultaneously, doubling the blocking window to 1–4 seconds per sensor. During that window, BLE scanning, WiFi, the ESPHome API, and the FreeRTOS task watchdog are all starved — causing the crash.
+
+**Mandatory rules for dashboard code:**
+1. **`fetchDeviceHistory()` must fetch metrics sequentially**, never via `Promise.all`. Use a promise chain with a 300ms delay between each request to give the firmware breathing room.
+2. **`loadHistory()` must have an in-flight guard** (`_historyInFlight`) to prevent concurrent history load chains from F5 refresh or button click during boot.
+3. **History loading must be deferred long enough** for all other boot requests to complete first. The bootstrap timer must be ≥10s (sequential poll finishes ~t+8s, storage stats at t+5s, both must finish before history begins).
+4. **Firmware fix (implemented):** `maybe_yield_nvs_scan_()` in `sensor_history_multi.h` calls `vTaskDelay(pdMS_TO_TICKS(1))` every 4 blob reads, yielding the CPU between batch reads. This eliminates the firmware root cause.
+5. **Preflight enforces this rule:** `scripts/preflight.sh` includes a `no_concurrent_history_fetch` check that fails if `Promise.all(.*historyMeasurements` appears in either `dashboard.js` or `dashboard.html`.
 
 Related: BUG-043
 
