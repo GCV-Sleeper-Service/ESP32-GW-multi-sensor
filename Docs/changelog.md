@@ -3,6 +3,26 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.3.6 — Add `/api/v2/live` Endpoint from SensorEntity — 2026-03-18
+
+**Phase 3 milestone:** New `/api/v2/live` endpoint reads current values from `SensorEntity devices[]` (populated via dual-write since v7.5.3.3).
+
+### Changes
+
+- **New endpoint `GET /api/v2/live`** — Returns JSON with current values for all devices and metrics from `SensorEntity.metric_states[]`. Invalid metrics return `null`. Includes per-device `last_seen` epoch.
+- **Route registration** — Added to `canHandle()` and `handleRequest()` in `HistoryWebHandler`.
+- **Preflight check** — Added `history_handler_has_api_v2_live_route` to `scripts/preflight.sh`.
+- **Version bump** — All canonical locations updated to `7.5.3.6`.
+
+### Response format
+
+```json
+{"timestamp":1710264000,"devices":{"office":{"temp":23.4,"hum":45.2,"batt":87.0,"rssi":-62.0,"last_seen":1710263985},...}}
+```
+
+**Related:** Phase 3 implementation plan (v7.5.3.6 section)
+
+---
 ## BUG-043 Final Fix: Gzip Dashboard + Pre-Reserved History Response (no version bump) — 2026-03-17
 
 **Root cause identification and elimination of the actual BUG-043 crash mechanism.** After PRs #39–#41 resolved request scheduling issues, the dashboard still crashed the ESP32-C3 on page open and F5 refresh. Two firmware-level root causes were identified and fixed:
