@@ -5,6 +5,7 @@
   "description": "Browser regression tests for the ESP32 gateway dashboard",
   "scripts": {
     "test:browser": "playwright test",
+    "test:browser:firefox": "playwright test --project=firefox",
     "test:browser:debug": "playwright test --debug",
     "test:browser:headed": "playwright test --headed",
     "mock-server": "node tests/mock-server/server.js",

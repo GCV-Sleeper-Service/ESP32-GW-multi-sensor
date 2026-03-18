@@ -26,6 +26,11 @@ async function loadDashboard(page, opts = {}) {
     if (msg.type() === 'error') page._consoleErrors.push(msg.text());
   });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  // Wait for the async manifest-loading chain to settle (window._manifest is assigned
+  // after the loadManifestV2() promise chain resolves — either to the manifest object
+  // or null on error). This prevents a race in Firefox where .sensor-card appears
+  // before the manifest branch that drives card building has finished.
+  await page.waitForFunction(() => typeof window._manifest !== 'undefined', { timeout });
   await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout });
 }
 
@@ -33,8 +38,12 @@ async function waitForConnected(page, timeout = 10000) {
   await page.locator('#statusDot.connected').waitFor({ state: 'attached', timeout });
 }
 
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
-test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
+// Firefox SSE teardown fix: navigate away to close EventSource before context.close().
+// Wrapped in try/catch so a page that is already closed or in a finished-test state
+// does not cause a spurious afterEach failure.
+test.afterEach(async ({ page }) => {
+  try { await page.goto('about:blank'); } catch (_) { /* page may already be closing */ }
+});
 
 // ── 1. Boot and structure ─────────────────────────────────────────
 
@@ -568,10 +577,15 @@ test.describe('13. Manifest-driven history fetching', () => {
       route.fulfill({ status: 200, contentType: 'text/plain', body: '1700000000,22.5\n' });
     });
 
-    // Call fetchDeviceHistory with a sensor that exists in window._manifest
-    await page.evaluate(() => {
-      return fetchDeviceHistory({ id: 'office', name: 'Office' }, window._manifest);
-    });
+    // Explicitly wait for both expected requests to arrive before asserting.
+    // fetchDeviceHistory() issues requests sequentially with a 300ms gap; using
+    // Promise.all + waitForRequest guarantees the route callbacks have fired in
+    // both Chromium and Firefox before we check requestedUrls.
+    await Promise.all([
+      page.waitForRequest(req => req.url().includes('/history/office/temp')),
+      page.waitForRequest(req => req.url().includes('/history/office/hum')),
+      page.evaluate(() => fetchDeviceHistory({ id: 'office', name: 'Office' }, window._manifest)),
+    ]);
 
     // Manifest has history_url: '/history/office/temp' and '/history/office/hum'
     expect(requestedUrls).toContain('/history/office/temp');
@@ -605,16 +619,17 @@ test.describe('13. Manifest-driven history fetching', () => {
       route.fulfill({ status: 200, contentType: 'text/plain', body: '' });
     });
 
-    // Call with a manifest that has no sensor matching 'test-sensor'
-    const ok = await page.evaluate(() => {
-      var sensor = { id: 'test-sensor', name: 'Test Sensor' };
-      var emptyManifest = { schema_version: 2, sensors: [], metrics: [] };
-      return fetchDeviceHistory(sensor, emptyManifest)
-        .then(function() { return true; })
-        .catch(function() { return false; });
-    });
+    // Explicitly wait for both legacy-fallback requests to arrive before asserting.
+    await Promise.all([
+      page.waitForRequest(req => req.url().includes('/history/test-sensor/temp')),
+      page.waitForRequest(req => req.url().includes('/history/test-sensor/hum')),
+      page.evaluate(() => {
+        var sensor = { id: 'test-sensor', name: 'Test Sensor' };
+        var emptyManifest = { schema_version: 2, sensors: [], metrics: [] };
+        return fetchDeviceHistory(sensor, emptyManifest);
+      }),
+    ]);
 
-    expect(ok).toBe(true);
     expect(requestedUrls).toContain('/history/test-sensor/temp');
     expect(requestedUrls).toContain('/history/test-sensor/hum');
   });
