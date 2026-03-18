@@ -566,7 +566,7 @@ function makeSensorConfig(meta, idx) {
   };
 }
 
-function normalizeManifestSensors(payload) { var sensors = []; if (Array.isArray(payload)) sensors = payload; else if (payload && Array.isArray(payload.sensors)) sensors = payload.sensors; return sensors.map(function(sensor) { return { id: String(sensor && sensor.id || '').trim(), name: String(sensor && sensor.name || '').trim(), metrics: Array.isArray(sensor && sensor.metrics) ? sensor.metrics : [] }; }).filter(function(sensor) { return sensor.id && sensor.name; }); } function applySensorMeta(meta) {
+function applySensorMeta(meta) {
   if (!Array.isArray(meta) || !meta.length) meta = DEFAULT_SENSOR_META;
   App.State.setSensors(meta.map(makeSensorConfig));
   try { App.Features.emit('onManifest', App.State.getSensors()); } catch(e) { logNonFatal('manifest hook emit', e); }

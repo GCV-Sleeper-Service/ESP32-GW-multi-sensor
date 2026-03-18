@@ -40,11 +40,12 @@ async function getManifest(page) {
 }
 
 // ── Suite ────────────────────────────────────────────────────────
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
-test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
-
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
-test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
+// Firefox SSE teardown fix: navigate away to close EventSource before context.close().
+// Wrapped in try/catch so a page that is already closed or in a finished-test state
+// does not cause a spurious afterEach failure.
+test.afterEach(async ({ page }) => {
+  try { await page.goto('about:blank'); } catch (_) { /* page may already be closing */ }
+});
 
 test.describe('sensor-count: card and control counts match manifest', function() {
 
@@ -79,11 +80,12 @@ test.describe('sensor-count: card and control counts match manifest', function()
 
 });
 
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
-test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
-
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
-test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
+// Firefox SSE teardown fix: navigate away to close EventSource before context.close().
+// Wrapped in try/catch so a page that is already closed or in a finished-test state
+// does not cause a spurious afterEach failure.
+test.afterEach(async ({ page }) => {
+  try { await page.goto('about:blank'); } catch (_) { /* page may already be closing */ }
+});
 
 test.describe('sensor-count: status and charts render correctly', function() {
 
@@ -107,11 +109,12 @@ test.describe('sensor-count: status and charts render correctly', function() {
 
 });
 
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
-test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
-
-// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
-test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
+// Firefox SSE teardown fix: navigate away to close EventSource before context.close().
+// Wrapped in try/catch so a page that is already closed or in a finished-test state
+// does not cause a spurious afterEach failure.
+test.afterEach(async ({ page }) => {
+  try { await page.goto('about:blank'); } catch (_) { /* page may already be closing */ }
+});
 
 test.describe('sensor-count: interactive controls', function() {
 
