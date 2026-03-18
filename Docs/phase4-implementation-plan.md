@@ -129,6 +129,9 @@ def canonicalize_sensors(sensors):
 **Acceptance criteria:**
 - [ ] `config/sensors.json` upgraded to v2 with 3 ThermoPro + 1 ping device
 - [ ] Generator produces `SensorEntity devices[4]` with correct metric arrays
+- [ ] `NUM_DEVICES = 4`, `NUM_ENV_SENSORS = 3`, `NUM_SENSORS = NUM_ENV_SENSORS` in generated header
+- [ ] `NUM_DEVICES` and persisted environmental sensor count remain separate constants — generator must never alias `NUM_SENSORS = NUM_DEVICES` in mixed-category firmware
+- [ ] Existing retained ThermoPro history remains schema-compatible after flashing (`meta->num_sensors == NUM_SENSORS` evaluates to `3 == 3`)
 - [ ] Manifest fixture includes `wan_ping` device with `category: network`
 - [ ] Firmware compiles (ping device exists in data model but produces no data)
 - [ ] All existing Playwright tests pass (environmental rendering unchanged)

@@ -5,6 +5,30 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 ---
 ## v7.5.4.0 — Phase 4 Step 0: Add Ping Probe Device to Manifest and Generator — 2026-03-18
 
+### Persistence compatibility fix (BUG-045)
+
+The original v7.5.4.0 merge contained a regression: `NUM_SENSORS = NUM_DEVICES` caused the
+persisted environmental history schema to change from 3 to 4 when `wan_ping` was added. This
+violated the Phase 4 requirement that flash persistence remain unchanged for environmental devices.
+
+**Root cause:** `render_entity_block()` aliased `NUM_SENSORS = NUM_DEVICES`. Because persistence
+structs (`HistoryMeta`, `SegmentSnapshotHeader`, `SegmentSnapshot`) key off `NUM_SENSORS`, any
+previously saved 3-sensor ThermoPro history would fail schema validation (`meta->num_sensors ==
+NUM_SENSORS` evaluates `3 == 4`), causing the firmware to reset retained history on every boot.
+
+**Fix:**
+- `scripts/render_sensor_config.py` — `render_entity_block()` now generates a separate
+  `NUM_ENV_SENSORS` constant (count of environmental/ThermoPro devices) and makes
+  `NUM_SENSORS = NUM_ENV_SENSORS`. `render_header_block()` updated with clarifying comments.
+- `dashboard/sensor_history_multi.h` — regenerated: `NUM_DEVICES = 4`, `NUM_ENV_SENSORS = 3`,
+  `NUM_SENSORS = NUM_ENV_SENSORS`. `devices[]` still contains 4 entries including `wan_ping`.
+  All persistence structs continue to key off `NUM_SENSORS` (unchanged). Static comment updated.
+- `scripts/preflight.sh` — 3 new BUG-045 regression guards added: `num_env_sensors_constant_present`,
+  `num_sensors_aliases_env_sensors`, `num_sensors_not_aliased_to_num_devices`.
+
+**Result:** Runtime devices = 4 (unchanged). Persisted environmental schema = 3 (unchanged).
+`wan_ping` remains RAM-only. Retained ThermoPro history is schema-compatible after flashing.
+
 ### Phase 4 begins: First non-climate sensor category (network / ping probe)
 
 This step adds a `wan_ping` device to the data model and manifest. The ping device exists in the
