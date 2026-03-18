@@ -43,7 +43,7 @@ if [[ ! -f "$INPUT" ]]; then
 fi
 
 # Extract dashboard version from source for the header comment
-DASH_VERSION=$(grep -oP "App\.version\s*=\s*'[^']+'" "$INPUT" | head -1 || echo "unknown")
+DASH_VERSION=$(grep -oP "App\.version\s*=\s*['\"][^'\"]+['\"]" "$INPUT" | head -1 || echo "unknown")
 
 # Get raw size before compression
 RAW_SIZE=$(wc -c < "$INPUT")
