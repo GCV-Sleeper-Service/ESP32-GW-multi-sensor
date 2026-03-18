@@ -61,6 +61,7 @@ check_contains "firmware_version_matches" firmware/esp32-c3-multi-sensor.yaml "$
 check_contains "history_header_version_matches" dashboard/sensor_history_multi.h "sensor_history_multi-${VER_TAG}.h"
 check_contains "history_handler_has_api_manifest_route" dashboard/sensor_history_multi.h "/api/manifest"
 check_contains "history_handler_has_api_v2_live_route" dashboard/sensor_history_multi.h "/api/v2/live"
+check_contains "history_handler_has_api_v2_history_route" dashboard/sensor_history_multi.h "/api/v2/history/"
 check_contains "dashboard_prefers_api_manifest" dashboard/dashboard.js "fetch(ESP_HOST + '/api/manifest'"
 check_contains "dashboard_legacy_manifest_fallback" dashboard/dashboard.js "fetch(ESP_HOST + '/sensors.json'"
 check_contains "mock_server_serves_api_manifest" tests/mock-server/server.js "pathname === '/api/manifest'"
