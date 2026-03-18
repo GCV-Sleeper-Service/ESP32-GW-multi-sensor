@@ -118,6 +118,43 @@ else
   echo "dashboard_h_size_guard: OK (${DASH_H_SIZE} bytes)"
 fi
 
+# ── BUG-043 Preflight Enhancements ──────────────────────────────────────────
+
+# BUG-043 / LESSON-OPS-056: history handler must use pre-reserved string, not beginResponseStream
+if grep -n 'beginResponseStream.*text/plain' dashboard/sensor_history_multi.h | grep -v '^\s*//' | grep -q .; then
+  echo "✗ no_streaming_history_response: FAIL — handle_history_ must use pre-reserved string, not beginResponseStream"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+else
+  echo "no_streaming_history_response: OK"
+fi
+
+# BUG-043 / LESSON-OPS-053: NVS scan loops must have yield calls
+NVS_YIELD_COUNT=$(grep -c 'maybe_yield_nvs_scan_' dashboard/sensor_history_multi.h || true)
+if [[ "$NVS_YIELD_COUNT" -ge 3 ]]; then
+  echo "nvs_yield_present: OK (${NVS_YIELD_COUNT} yield calls)"
+else
+  echo "✗ nvs_yield_present: FAIL — expected 3+ calls to maybe_yield_nvs_scan_ in sensor_history_multi.h (found ${NVS_YIELD_COUNT})"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+
+# BUG-043 / LESSON-OPS-050: all interval-driven fetch functions must have in-flight guards
+for guard in "_statusInFlight" "_storageStatsInFlight" "_historyInFlight"; do
+  if grep -q "var ${guard}" dashboard/dashboard.js; then
+    echo "inflight_guard_${guard}: OK"
+  else
+    echo "✗ inflight_guard_${guard}: FAIL — missing in-flight guard in dashboard.js"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+done
+
+# BUG-043 / LESSON-OPS-055: generate-header.sh must use gzip compression
+if grep -q 'gzip' scripts/generate-header.sh; then
+  echo "generate_header_uses_gzip: OK"
+else
+  echo "✗ generate_header_uses_gzip: FAIL — generate-header.sh must gzip-compress the dashboard"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+
 echo "→ Validating manifest v2 schema structure..."
 
 # Extract the JSON from gateway_manifest.h (skip C++ wrapper, get raw JSON)

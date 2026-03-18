@@ -16,6 +16,9 @@ async function stubCdn(page) {
   );
 }
 
+// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
+test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
+
 test.describe('manifest boot flow', () => {
   test('api manifest endpoint returns schema v2 metadata', async ({ request }) => {
     const response = await request.get('/api/manifest');

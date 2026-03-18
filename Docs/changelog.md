@@ -3,6 +3,41 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## BUG-044 Fix: Implement BUG-043 Preflight Enhancements + Browser Regression Tests — 2026-03-18
+
+**Post-Phase-3 codebase audit discovered that two BUG-043 instruction documents were never implemented.** Both the preflight enhancement checks and the browser regression tests specified during BUG-043 resolution existed only as documents — zero of the specified code was written.
+
+### Changes
+
+- **5 new preflight checks** added to `scripts/preflight.sh`:
+  - `no_streaming_history_response` — guards against `beginResponseStream` for `text/plain` in history handler (LESSON-OPS-056)
+  - `nvs_yield_present` — verifies 3+ calls to `maybe_yield_nvs_scan_` (LESSON-OPS-053)
+  - `inflight_guard_{_statusInFlight,_storageStatsInFlight,_historyInFlight}` — guards on all interval-driven fetch functions (LESSON-OPS-050)
+  - `generate_header_uses_gzip` — verifies gzip in build pipeline (LESSON-OPS-055)
+
+- **8 new Playwright tests** — Group 16: BUG-043 Request Scheduling Regression:
+  1. Boot fetches `/api/manifest` exactly once
+  2. History fetches are sequential (max 1 concurrent)
+  3. `loadHistory` rejects concurrent invocations
+  4. History in-flight guard resets after failure
+  5. SSE ping/onopen handlers do not fetch `/api/status`
+  6. No `/favicon.ico` request from dashboard
+  7. Manifest is first HTTP request at boot
+  8. `loadStorageStats` rejects concurrent invocations
+
+- **Mock server updated** — 50ms delay on history endpoint responses to make concurrency observable in Playwright.
+
+- **2 new bugs/lessons** — BUG-044, LESSON-OPS-057 (track specs to completion), LESSON-OPS-058 (device testing must include full workflow).
+
+- **Phase 4/5 prompt templates expanded** — All 10 instruction files (`v7.5.4.0`–`v7.5.4.4`, `v7.5.5.0`–`v7.5.5.5`) rewritten with detailed device testing sections per LESSON-OPS-058.
+
+- **Prompt templates index updated** — `phase3-prompt-templates-updated.md` now reflects Phase 3 complete, Phase 4 next, and includes BUG-044 supplementary row.
+
+### Test count: 88 (80 existing + 8 new Group 16 tests — all expected to pass)
+
+**Related:** BUG-043, BUG-044, LESSON-OPS-050–058
+
+---
 ## v7.5.3.9 — Phase 3 Complete: Playwright Regression + Closure — 2026-03-18
 
 ### 🎉 Phase 3 Complete

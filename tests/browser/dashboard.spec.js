@@ -33,6 +33,9 @@ async function waitForConnected(page, timeout = 10000) {
   await page.locator('#statusDot.connected').waitFor({ state: 'attached', timeout });
 }
 
+// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
+test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
+
 // ── 1. Boot and structure ─────────────────────────────────────────
 
 test.describe('1. Boot and structure', () => {
@@ -895,5 +898,157 @@ test.describe('15. Phase 3 Closure — v2 API Regression', () => {
       return resp.status;
     });
     expect(status).toBe(404);
+  });
+});
+
+// ── 16. BUG-043 Request Scheduling Regression ─────────────────────
+//
+// These tests catch JavaScript-level request scheduling regressions that
+// contributed to ESP32-C3 dashboard instability (BUG-043).
+// They run against the mock server and cover request ordering, concurrency
+// guards, and boot timing. They do NOT replace real-device validation —
+// transfer-size, NVS blocking, and watchdog starvation require on-device tests.
+//
+// Related: Docs/BUG-043-browser-test-implementation-instructions.md
+
+test.describe('16. BUG-043 Request Scheduling Regression', () => {
+
+  // Test 1: /api/manifest fetched exactly once during boot
+  test('boot fetches /api/manifest exactly once', async ({ page }) => {
+    const manifestRequests = [];
+    page.on('request', req => {
+      if (req.url().includes('/api/manifest')) manifestRequests.push(req);
+    });
+    await loadDashboard(page);
+    await waitForConnected(page);
+    await page.waitForTimeout(3000);
+    expect(manifestRequests.length).toBe(1);
+  });
+
+  // Test 2: History fetches are sequential (max 1 concurrent)
+  // Mock server adds 50ms delay to history responses to make concurrency observable.
+  test('history fetches are sequential — max 1 concurrent', async ({ page }) => {
+    let maxConcurrent = 0;
+    let currentInFlight = 0;
+
+    page.on('request', req => {
+      if (req.url().includes('/history/')) {
+        currentInFlight++;
+        if (currentInFlight > maxConcurrent) maxConcurrent = currentInFlight;
+      }
+    });
+    page.on('response', resp => {
+      if (resp.url().includes('/history/')) {
+        currentInFlight--;
+      }
+    });
+
+    await loadDashboard(page);
+    await waitForConnected(page);
+    // Wait for history bootstrap to complete (t+10s in production, mock is faster)
+    await page.waitForTimeout(15000);
+
+    expect(maxConcurrent).toBeLessThanOrEqual(1);
+  });
+
+  // Test 3: loadHistory in-flight guard prevents double invocation
+  test('loadHistory rejects concurrent invocations', async ({ page }) => {
+    await loadDashboard(page);
+    await waitForConnected(page);
+    // Call loadHistory twice rapidly — one should return false (skipped)
+    const results = await page.evaluate(() => {
+      return Promise.all([
+        App.API.loadHistory(),
+        App.API.loadHistory()
+      ]);
+    });
+    expect(results).toContain(false);
+  });
+
+  // Test 4: _historyInFlight guard resets after failure so retry works
+  test('history in-flight guard resets after failure', async ({ page }) => {
+    await loadDashboard(page);
+    await waitForConnected(page);
+
+    // Intercept and abort history requests to force failure
+    await page.route('**/history/**', route => route.abort());
+
+    // Trigger history load — should fail
+    await page.evaluate(() => { try { var r = App.API.loadHistory(); if (r && typeof r.catch === "function") r.catch(function() {}); } catch(e) {} });
+    await page.waitForTimeout(3000);
+
+    // Restore history endpoint
+    await page.unroute('**/history/**');
+
+    // Should be able to load again (guard must have reset)
+    const result = await page.evaluate(() => App.API.loadHistory());
+    // result should NOT be false (not blocked by stale guard)
+    expect(result).not.toBe(false);
+  });
+
+  // Test 5: SSE ping/onopen handlers do not fire /api/status
+  test('SSE ping/onopen handlers do not fetch /api/status', async ({ page }) => {
+    const statusRequests = [];
+    page.on('request', req => {
+      if (req.url().includes('/api/status')) statusRequests.push({ url: req.url(), time: Date.now() });
+    });
+
+    await loadDashboard(page);
+    await waitForConnected(page);
+
+    // Wait for SSE to send several pings (~2s interval × 7 = ~14s)
+    await page.waitForTimeout(15000);
+
+    // Should have at most 2-3 status requests (deferred boot + maybe 1 poll cycle),
+    // NOT 10+ (which would indicate ping/onopen handlers are firing loadStatusSnapshot)
+    expect(statusRequests.length).toBeLessThanOrEqual(3);
+  });
+
+  // Test 6: No /favicon.ico request from dashboard (inline favicon prevents it)
+  test('no /favicon.ico request from dashboard', async ({ page }) => {
+    const faviconRequests = [];
+    page.on('request', req => {
+      if (req.url().includes('/favicon.ico')) faviconRequests.push(req);
+    });
+
+    await loadDashboard(page);
+    await waitForConnected(page);
+    await page.waitForTimeout(3000);
+
+    expect(faviconRequests.length).toBe(0);
+  });
+
+  // Test 7: Manifest is the first API/data HTTP request at boot
+  test('manifest is first HTTP request at boot', async ({ page }) => {
+    const requests = [];
+    page.on('request', req => {
+      const u = new URL(req.url());
+      if (u.pathname.startsWith('/api/') || u.pathname.startsWith('/history/') ||
+          u.pathname.startsWith('/sensor/') || u.pathname === '/events' ||
+          u.pathname === '/sensors.json') {
+        requests.push(u.pathname);
+      }
+    });
+
+    await loadDashboard(page);
+    await page.waitForTimeout(2000);
+
+    expect(requests.length).toBeGreaterThan(0);
+    expect(requests[0]).toBe('/api/manifest');
+  });
+
+  // Test 8: loadStorageStats in-flight guard prevents concurrent calls
+  test('loadStorageStats rejects concurrent invocations', async ({ page }) => {
+    await loadDashboard(page);
+    await waitForConnected(page);
+    // Call loadStorageStats twice rapidly — second should be suppressed
+    const results = await page.evaluate(() => {
+      return Promise.all([
+        App.API.loadStorageStats(),
+        App.API.loadStorageStats()
+      ]);
+    });
+    // At least one should return null (skipped by guard)
+    expect(results).toContain(null);
   });
 });
