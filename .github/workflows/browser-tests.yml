@@ -48,6 +48,19 @@ jobs:
       - name: Generate fixture variants
         run: node tests/fixtures/generate-fixtures.js
 
+      # Cache Playwright browser binaries between runs.
+      # Key includes the Playwright version from package-lock.json — cache
+      # invalidates automatically when the dependency is upgraded.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # --with-deps always runs to ensure system libraries are present
+      # (apt packages aren't cached). Browser binaries are cached above,
+      # so Playwright skips the ~200MB download on cache hit.
       - name: Install Playwright browsers
         run: npx playwright install chromium firefox --with-deps
 
