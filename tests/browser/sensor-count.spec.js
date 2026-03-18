@@ -43,6 +43,9 @@ async function getManifest(page) {
 // Firefox SSE teardown fix: navigate away to close EventSource before context.close()
 test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
 
+// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
+test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
+
 test.describe('sensor-count: card and control counts match manifest', function() {
 
   test('correct number of sensor cards render', async function({ page }) {
@@ -79,6 +82,9 @@ test.describe('sensor-count: card and control counts match manifest', function()
 // Firefox SSE teardown fix: navigate away to close EventSource before context.close()
 test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
 
+// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
+test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
+
 test.describe('sensor-count: status and charts render correctly', function() {
 
   test('status dot becomes connected', async function({ page }) {
@@ -100,6 +106,9 @@ test.describe('sensor-count: status and charts render correctly', function() {
   });
 
 });
+
+// Firefox SSE teardown fix: navigate away to close EventSource before context.close()
+test.afterEach(async ({ page }) => { await page.goto("about:blank"); });
 
 // Firefox SSE teardown fix: navigate away to close EventSource before context.close()
 test.afterEach(async ({ page }) => { await page.goto("about:blank"); });

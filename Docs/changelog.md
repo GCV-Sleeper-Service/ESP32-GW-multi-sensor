@@ -3,37 +3,58 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
-## BUG-044 Fix: Implement BUG-043 Preflight Enhancements + Browser Regression Tests — 2026-03-18
+## BUG-044: Implement BUG-043 Regression Guards + Multi-Browser Playwright Suite — 2026-03-18
 
-**Post-Phase-3 codebase audit discovered that two BUG-043 instruction documents were never implemented.** Both the preflight enhancement checks and the browser regression tests specified during BUG-043 resolution existed only as documents — zero of the specified code was written.
+Post-Phase-3 codebase audit discovered that two BUG-043 instruction documents specified concrete deliverables (5 preflight checks, 8 browser regression tests) but none of the specified code was ever written (BUG-044 — LESSON-OPS-057). This entry covers the full implementation, plus multi-browser expansion and prompt template improvements.
 
-### Changes
+### Preflight enhancements (5 new checks)
 
-- **5 new preflight checks** added to `scripts/preflight.sh`:
-  - `no_streaming_history_response` — guards against `beginResponseStream` for `text/plain` in history handler (LESSON-OPS-056)
-  - `nvs_yield_present` — verifies 3+ calls to `maybe_yield_nvs_scan_` (LESSON-OPS-053)
-  - `inflight_guard_{_statusInFlight,_storageStatsInFlight,_historyInFlight}` — guards on all interval-driven fetch functions (LESSON-OPS-050)
-  - `generate_header_uses_gzip` — verifies gzip in build pipeline (LESSON-OPS-055)
+| Check | Guards against | Lesson |
+|-------|---------------|--------|
+| `no_streaming_history_response` | `beginResponseStream` with `text/plain` in history handler | LESSON-OPS-056 |
+| `nvs_yield_present` | NVS scan loops missing yield calls (3+ required) | LESSON-OPS-053 |
+| `inflight_guard__statusInFlight` | Missing in-flight guard on status fetch | LESSON-OPS-050 |
+| `inflight_guard__storageStatsInFlight` | Missing in-flight guard on storage stats fetch | LESSON-OPS-050 |
+| `inflight_guard__historyInFlight` | Missing in-flight guard on history fetch | LESSON-OPS-050 |
+| `generate_header_uses_gzip` | Build pipeline missing gzip compression | LESSON-OPS-055 |
 
-- **8 new Playwright tests** — Group 16: BUG-043 Request Scheduling Regression:
-  1. Boot fetches `/api/manifest` exactly once
-  2. History fetches are sequential (max 1 concurrent)
-  3. `loadHistory` rejects concurrent invocations
-  4. History in-flight guard resets after failure
-  5. SSE ping/onopen handlers do not fetch `/api/status`
-  6. No `/favicon.ico` request from dashboard
-  7. Manifest is first HTTP request at boot
-  8. `loadStorageStats` rejects concurrent invocations
+### Browser regression tests (Group 16: BUG-043 Request Scheduling)
 
-- **Mock server updated** — 50ms delay on history endpoint responses to make concurrency observable in Playwright.
+8 new Playwright tests catching JavaScript request-scheduling regressions:
 
-- **2 new bugs/lessons** — BUG-044, LESSON-OPS-057 (track specs to completion), LESSON-OPS-058 (device testing must include full workflow).
+1. Boot fetches `/api/manifest` exactly once (no duplicate)
+2. History fetches are sequential (max 1 concurrent)
+3. `loadHistory` in-flight guard prevents double invocation
+4. History in-flight guard resets after failure (allows retry)
+5. SSE ping/onopen handlers do not trigger `/api/status` fetches
+6. No `/favicon.ico` request from dashboard (inline favicon)
+7. Manifest is first HTTP request at boot (ordering)
+8. `loadStorageStats` in-flight guard prevents concurrent calls
 
-- **Phase 4/5 prompt templates expanded** — All 10 instruction files (`v7.5.4.0`–`v7.5.4.4`, `v7.5.5.0`–`v7.5.5.5`) rewritten with detailed device testing sections per LESSON-OPS-058.
+Mock server: 50ms delay added to history endpoints to make concurrency observable.
 
-- **Prompt templates index updated** — `phase3-prompt-templates-updated.md` now reflects Phase 3 complete, Phase 4 next, and includes BUG-044 supplementary row.
+### Multi-browser Playwright suite
 
-### Test count: 88 (80 existing + 8 new Group 16 tests — all expected to pass)
+- **Playwright config expanded** to 3 browser engines: Chromium, Firefox, WebKit (Safari)
+- **Parallel execution enabled** (`fullyParallel: true`) — workers default to half CPU cores
+- Edge excluded (shares Chromium's Blink engine, zero additional coverage)
+- Total test runs: 88 tests × 3 browsers = **264 test executions per suite run**
+- Firefox catches Gecko-specific issues (prior BUG-014 `crossorigin` on CDN scripts)
+- WebKit catches Safari rendering quirks and stricter JS API behavior
+
+### Prompt and documentation improvements
+
+- **Phase 4/5 prompt templates** (11 files) rewritten with full device testing workflows: pull → compile → flash → verify → report (LESSON-OPS-058)
+- **Prompt index** (`phase3-prompt-templates-updated.md`) updated: Phase 3 marked complete, BUG-044 tracked, Phase 4 next
+- **2 new bugs/lessons** — BUG-044, LESSON-OPS-057 (track specs to completion), LESSON-OPS-058 (device testing must include full workflow)
+
+### Superseded documents (safe to delete)
+
+The following instruction documents are now fully implemented and no longer needed:
+- `Docs/BUG-043-preflight-enhancement-instructions.md` — all 5 checks implemented in `scripts/preflight.sh`
+- `Docs/BUG-043-browser-test-implementation-instructions.md` — all 8 tests implemented in Group 16 of `tests/browser/dashboard.spec.js`
+
+### Test count: 88 per browser (264 total across Chromium + Firefox + WebKit)
 
 **Related:** BUG-043, BUG-044, LESSON-OPS-050–058
 

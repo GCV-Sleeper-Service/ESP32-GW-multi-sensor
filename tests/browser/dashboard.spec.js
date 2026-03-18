@@ -974,7 +974,7 @@ test.describe('16. BUG-043 Request Scheduling Regression', () => {
     await page.route('**/history/**', route => route.abort());
 
     // Trigger history load — should fail
-    await page.evaluate(() => { try { var r = App.API.loadHistory(); if (r && typeof r.catch === "function") r.catch(function() {}); } catch(e) {} });
+    await page.evaluate(() => { try { var r = App.API.loadHistory(); if (r && typeof r.catch === 'function') r.catch(function() {}); } catch(e) {} });
     await page.waitForTimeout(3000);
 
     // Restore history endpoint

@@ -185,3 +185,65 @@ BUG-044: Implement BUG-043 preflight enhancements + browser regression tests
 | **Phase 4 — Ping Probe** | **Next** | **v7.5.4.0 after BUG-044 merge** |
 | Phase 5 — Aggregator MVP | Pending | After Phase 4 |
 | Phase 6 — Data Ingest | Pending | After Phase 5 |
+
+---
+
+## Addendum — Multi-Browser Suite + Test Fix + Doc Cleanup (same session)
+
+### Test failure: Group 16 Test 4 — history in-flight guard resets after failure
+
+**Error:** `TypeError: Cannot read properties of undefined (reading 'catch')` at line 974.
+
+**Root cause:** `loadHistory()` returns `Promise.resolve(false)` on guard-blocked paths, but returns `undefined` on the normal execution path (calls internal `loadNext()` chain, no explicit `return`). When routes are aborted, the function enters the normal path and returns `undefined`, so `.catch()` fails.
+
+**Fix:** Wrapped the `page.evaluate` call to handle both return types:
+```javascript
+await page.evaluate(() => {
+  try { var r = App.API.loadHistory(); if (r && typeof r.catch === 'function') r.catch(function() {}); } catch(e) {}
+});
+```
+
+### Multi-browser Playwright expansion
+
+- `playwright.config.js` updated: added Firefox and WebKit projects alongside Chromium
+- `fullyParallel: true` enabled — mock server is stateless, safe for concurrent workers
+- Workers default to half CPU cores (Playwright default). Override with `--workers=N`.
+- Total test runs: 88 tests × 3 browsers = 264 per suite run
+
+### README update
+
+`README.md` updated to reflect:
+- Version v7.5.3.9 (was stuck at v7.5.3.5)
+- Phase 3 complete status
+- v2 API endpoints table (was missing `/api/v2/live` and `/api/v2/history`)
+- Multi-browser testing (Chromium + Firefox + WebKit)
+- Testing section with parallel execution instructions
+- Development roadmap table
+- Repository layout updated (prompts folder, ~30 preflight checks, 88 tests)
+- SensorEntity architecture summary
+
+### Changelog update + document deletion
+
+Changelog entry written to supersede and replace the two BUG-043 instruction documents:
+- `Docs/BUG-043-preflight-enhancement-instructions.md` — all 5 checks now implemented, doc safe to delete
+- `Docs/BUG-043-browser-test-implementation-instructions.md` — all 8 tests now implemented, doc safe to delete
+
+Changelog entry explicitly lists these as "Superseded documents (safe to delete)" so the deletion is traceable.
+
+### Additional files modified
+
+| File | Change |
+|------|--------|
+| `Docs/changelog.md` | BUG-044 entry with superseded doc list |
+| `README.md` | Full rewrite reflecting v7.5.3.9, v2 API, multi-browser, roadmap |
+| `playwright.config.js` | Added Firefox + WebKit, enabled parallel execution |
+| `tests/browser/dashboard.spec.js` | Fixed Test 4 (loadHistory return type handling) |
+| `Docs/session-log-2026-03-18-BUG-044-audit.md` | This addendum |
+
+### Files to delete
+
+| File | Reason |
+|------|--------|
+| `Docs/BUG-043-preflight-enhancement-instructions.md` | All 5 checks implemented in preflight.sh |
+| `Docs/BUG-043-browser-test-implementation-instructions.md` | All 8 tests implemented in Group 16 |
+
