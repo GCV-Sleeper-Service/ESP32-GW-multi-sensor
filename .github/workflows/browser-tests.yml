@@ -49,7 +49,7 @@ jobs:
         run: node tests/fixtures/generate-fixtures.js
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+        run: npx playwright install chromium firefox --with-deps
 
       - name: Run baseline suite (3sensor — 28 tests)
         if: matrix.fixture_set == '3sensor'
