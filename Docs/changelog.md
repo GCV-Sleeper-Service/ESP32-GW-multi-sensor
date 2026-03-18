@@ -3,6 +3,45 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.3.9 — Phase 3 Complete: Playwright Regression + Closure — 2026-03-18
+
+### 🎉 Phase 3 Complete
+
+Phase 3 (C++ SensorEntity Model) is now fully complete. The `SensorSlot` struct has been replaced by the generalized `SensorEntity` + `MetricDef` + `MetricState` model. All API endpoints, persistence, dashboard rendering, and history work identically to pre-Phase 3 behavior. The new internal model is extensible and ready for Phase 4 (first non-climate sensor category).
+
+### Changes
+
+- **New Playwright Group 15 tests** — 7 new tests validating Phase 3 v2 API endpoints:
+  1. `/api/v2/live` returns valid JSON with all device IDs from manifest
+  2. `/api/v2/live` returns metric keys matching manifest metric definitions
+  3. `/api/v2/history/{device}/{metric}` returns CSV data
+  4. Legacy `/history/{id}/temp` still works (backward compat)
+  5. Legacy `/sensors.json` still works (backward compat)
+  6. Dashboard renders identically with new endpoints
+  7. `/api/v2/history` returns 404 for unknown device
+- **Mock server updated** — Added `/api/v2/live` and `/api/v2/history/:device/:metric` routes to `tests/mock-server/server.js` for test coverage.
+- **Architecture plan updated** — `Docs/v7.5-v7.6-architecture-plan.md` Phase 3 status marked COMPLETE.
+- **Version bump** — All canonical locations updated to `7.5.3.9`.
+- **Total test count: 80** (73 existing + 7 new Group 15 tests — all passing).
+
+### Phase 3 Summary (v7.5.3.0–v7.5.3.9)
+
+| Step | Description |
+|------|------------|
+| v7.5.3.0 | Pre-Phase 3 cleanup, schema decision, bump-version.sh fix |
+| v7.5.3.1 | Define SensorEntity, MetricDef, MetricState C++ structs |
+| v7.5.3.2 | Extend render_sensor_config.py with entity block generation |
+| v7.5.3.3 | Wire YAML lambdas to dual-write (SensorSlot + SensorEntity) |
+| v7.5.3.4 | Add /api/manifest endpoint |
+| v7.5.3.5 | Dashboard stability fixes (BUG-043 continued) |
+| v7.5.3.6 | Add /api/v2/live endpoint from SensorEntity |
+| v7.5.3.7 | Add /api/v2/history/{device}/{metric} endpoint (RAM-only) |
+| v7.5.3.8 | Remove SensorSlot, switch all paths to SensorEntity |
+| v7.5.3.9 | Full Playwright regression + Phase 3 closure (this step) |
+
+**Related:** Phase 3 implementation plan, v7.5-v7.6 architecture plan
+
+---
 ## v7.5.3.8 — Remove SensorSlot, Switch All Paths to SensorEntity — 2026-03-18
 
 **Phase 3 milestone — THE BIG SWITCHOVER:** `SensorSlot` struct and `sensors[]` array are removed. All runtime paths now use `SensorEntity devices[]`. Dual-write removed from YAML lambdas. Persistence shims bridge `SensorEntity` ↔ `SegmentSnapshot` for NVS write and boot restore.
