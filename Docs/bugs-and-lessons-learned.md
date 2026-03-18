@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-17 — dashboard hardening PR2 (BUG-043 dashboard-side finish; LESSON-OPS-054 added)_
+_Last updated: 2026-03-18 — BUG-044 implementation gap, BUG-043 preflight/browser-test delivery, LESSON-OPS-057/058 added_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,29 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-044 — BUG-043 preflight enhancements and browser regression tests specified but never implemented (2026-03-18)
+
+**Date:** 2026-03-18 (discovered during post-Phase-3 codebase audit)
+**Version observed:** v7.5.3.9
+**Status:** FIXED
+
+**Symptom:** Two instruction documents existed — `Docs/BUG-043-preflight-enhancement-instructions.md` (5 preflight checks) and `Docs/BUG-043-browser-test-implementation-instructions.md` (8 browser regression tests) — but neither was implemented. The codebase had zero of the specified checks or tests.
+
+**Root cause:** The documents were created as part of BUG-043 resolution planning but the implementation work was never scheduled as a tracked step. The Phase 3 implementation plan (v7.5.3.4/v7.5.3.5) addressed the BUG-043 firmware and dashboard fixes but did not include these supplementary test/check deliverables as gated steps.
+
+**Fix:**
+- Added 5 preflight checks to `scripts/preflight.sh`: `no_streaming_history_response`, `nvs_yield_present`, `inflight_guard_{_statusInFlight,_storageStatsInFlight,_historyInFlight}`, `generate_header_uses_gzip`
+- Added 8 browser regression tests as Group 16 in `tests/browser/dashboard.spec.js`: manifest dedup, history sequential fetch, loadHistory in-flight guard, guard reset after failure, SSE ping/onopen no-status-fetch, no favicon.ico, manifest-first boot order, loadStorageStats guard
+- Added 50ms delay to mock server history endpoints to make concurrency observable in Playwright
+
+**Prevention:**
+- Specified implementations must be tracked in a step index with explicit "Status: Pending/Complete" tracking (LESSON-OPS-057)
+- Post-phase audits should verify that all referenced instruction documents have corresponding implementations
+
+Related: BUG-043, LESSON-OPS-057
+
+---
 
 ### Fix (final — gzip dashboard + pre-reserved history response)
 
@@ -502,6 +525,30 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-058: Prompt template device testing sections must include full local workflow (2026-03-18)
+
+**Date:** 2026-03-18
+
+Phase 3 prompt templates (e.g., v7.5.3.7) included device testing commands like `curl -s http://192.168.120.189/api/v2/history/office/temp` but did not include the prerequisite steps: pulling the repo, compiling, and flashing. An operator starting from scratch would not know the full workflow.
+
+**Rule:** Every prompt's device testing section must include the complete sequence: (1) pull latest from main, (2) compile, (3) OTA flash, (4) verification commands, (5) expected output descriptions. Assume the operator is starting from a fresh terminal. Use the v7.5.3.7 instructions as the quality bar for detail level.
+
+Related: BUG-044
+
+---
+
+### LESSON-OPS-057: Specified tests and checks must be tracked to implementation completion (2026-03-18)
+
+**Date:** 2026-03-18
+
+Two instruction documents (`BUG-043-preflight-enhancement-instructions.md` and `BUG-043-browser-test-implementation-instructions.md`) were written during BUG-043 resolution but never implemented. They fell through the cracks because they were not listed in the step index with explicit completion tracking.
+
+**Rule:** Any instruction document that specifies code to be written must appear in a tracked step index (e.g., `phase3-prompt-templates-updated.md`) with a "Status: Pending/Complete" field. Untracked specifications become dead documents. Post-phase audits should verify all referenced instruction documents have corresponding implementations.
+
+Related: BUG-044
+
+---
 
 ### LESSON-OPS-056: Never use beginResponseStream for large HTTP responses on ESP32-C3
 

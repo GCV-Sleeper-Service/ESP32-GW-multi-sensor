@@ -137,7 +137,8 @@ const server = http.createServer(function(req, res) {
     const series = histMatch[2];
     const data = loadFixture(`history-${sensorId}-${series}.csv`);
     if (data === null) return notFound(res, `No fixture for ${sensorId}/${series}`);
-    return text(res, data, 'text/plain');
+    // BUG-043: 50ms delay makes concurrency observable in Playwright tests
+    return setTimeout(function() { text(res, data, 'text/plain'); }, 50);
   }
 
   if (pathname === '/api/v2/live') {
@@ -161,7 +162,8 @@ const server = http.createServer(function(req, res) {
     const metricKey = v2HistMatch[2];
     const data = loadFixture(`history-${deviceId}-${metricKey}.csv`);
     if (data === null) return notFound(res, `No fixture for ${deviceId}/${metricKey}`);
-    return text(res, data, 'text/plain');
+    // BUG-043: 50ms delay makes concurrency observable in Playwright tests
+    return setTimeout(function() { text(res, data, 'text/plain'); }, 50);
   }
 
   if (pathname === '/api/storage-stats') {

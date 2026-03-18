@@ -1,6 +1,6 @@
-# Phase 3–5 — Assistant Prompt Templates (Revised 2026-03-17)
+# Phase 3–5 — Assistant Prompt Templates (Revised 2026-03-18)
 
-_Revised: 2026-03-17 (post-BUG-043 gzip fix)_
+_Revised: 2026-03-18 (post-Phase-3 completion, BUG-044 fix, expanded Phase 4/5 prompts)_
 _Usage: Copy the prompt for the current step into a new conversation with the assistant._
 _Each prompt is self-contained — the assistant should be able to implement the step from scratch._
 
@@ -21,7 +21,7 @@ _Each prompt is self-contained — the assistant should be able to implement the
 Clone https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
 Before making ANY changes, read these files completely:
-1. Docs/phase3-implementation-plan.md (or phase4/phase5 as appropriate)
+1. Docs/phase<N>-implementation-plan.md (where N = 3, 4, or 5)
 2. Docs/bugs-and-lessons-learned.md
 3. Docs/changelog.md
 4. The step-specific instructions: prompts/phase<N>/v<VERSION>-implementation-instructions.md
@@ -60,7 +60,7 @@ Do NOT proceed to any later step.
 
 ## Step Index
 
-### Phase 3 — C++ SensorEntity Model
+### Phase 3 — C++ SensorEntity Model ✅ COMPLETE
 
 | Version | Scope | Status |
 |---|---|---|
@@ -71,16 +71,23 @@ Do NOT proceed to any later step.
 | v7.5.3.4 | BUG-043 hotfix + LWIP sockets | ✅ Complete |
 | v7.5.3.5 | BUG-043 continued fix (sequential history) | ✅ Complete |
 | (no bump) | BUG-043 gzip + pre-reserved history response | ✅ Complete |
-| **v7.5.3.6** | **`/api/v2/live` endpoint** | **Next** |
-| v7.5.3.7 | `/api/v2/history` endpoint (RAM-only) | Pending |
-| v7.5.3.8 | Remove SensorSlot (BIG SWITCHOVER) | Pending |
-| v7.5.3.9 | Phase 3 closure | Pending |
+| v7.5.3.6 | `/api/v2/live` endpoint | ✅ Complete |
+| v7.5.3.7 | `/api/v2/history` endpoint (RAM-only) | ✅ Complete |
+| v7.5.3.8 | Remove SensorSlot (BIG SWITCHOVER) | ✅ Complete |
+| v7.5.3.9 | Phase 3 closure | ✅ Complete |
+
+### BUG-043 Supplementary (BUG-044)
+
+| Item | Scope | Status |
+|---|---|---|
+| Preflight enhancements | 5 new checks per BUG-043-preflight-enhancement-instructions.md | ✅ Complete (2026-03-18) |
+| Browser regression tests | Group 16: 8 tests per BUG-043-browser-test-implementation-instructions.md | ✅ Complete (2026-03-18) |
 
 ### Phase 4 — First Non-Climate Sensor (Ping Probe)
 
 | Version | Scope | Status |
 |---|---|---|
-| v7.5.4.0 | Add ping device to manifest | Pending |
+| **v7.5.4.0** | **Add ping device to manifest** | **Next** |
 | v7.5.4.1 | Implement ICMP ping adapter | Pending |
 | v7.5.4.2 | Add network card renderer | Pending |
 | v7.5.4.3 | Mixed-category test fixtures | Pending |
@@ -110,8 +117,10 @@ These rules were established during BUG-043 resolution and apply to every future
 | LESSON-OPS-052 | History fetches must be sequential, never concurrent |
 | LESSON-OPS-053 | NVS scan loops must yield (vTaskDelay every N blobs) |
 | LESSON-OPS-054 | Startup polling must be batch=1; ESPHome handler ordering matters |
-| **LESSON-OPS-055** | **Gzip-compress large embedded responses; preflight must guard format** |
-| **LESSON-OPS-056** | **Never use beginResponseStream for responses >10KB — use pre-reserved string** |
+| LESSON-OPS-055 | Gzip-compress large embedded responses; preflight must guard format |
+| LESSON-OPS-056 | Never use beginResponseStream for responses >10KB — use pre-reserved string |
+| **LESSON-OPS-057** | **Specified tests/checks must be tracked to implementation completion** |
+| **LESSON-OPS-058** | **Device testing sections must include full local workflow (pull, compile, flash, verify)** |
 
 ### Code rules (apply to every step)
 1. Operate autonomously, ask if anything is unclear
@@ -125,4 +134,4 @@ These rules were established during BUG-043 resolution and apply to every future
 9. Never fire concurrent history requests from dashboard JS (LESSON-OPS-052)
 10. **Never use `beginResponseStream` for responses >10KB** — use pre-reserved `std::string` + zero-copy `beginResponse` (LESSON-OPS-056)
 11. **Dashboard.h must be gzip-compressed** — `generate-header.sh` handles this (LESSON-OPS-055)
-
+12. **Device testing sections must include full pull/compile/flash/verify workflow** (LESSON-OPS-058)
