@@ -3,6 +3,29 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.3.8 — Remove SensorSlot, Switch All Paths to SensorEntity — 2026-03-18
+
+**Phase 3 milestone — THE BIG SWITCHOVER:** `SensorSlot` struct and `sensors[]` array are removed. All runtime paths now use `SensorEntity devices[]`. Dual-write removed from YAML lambdas. Persistence shims bridge `SensorEntity` ↔ `SegmentSnapshot` for NVS write and boot restore.
+
+### Changes
+
+- **Removed `SensorSlot` struct** — The legacy per-sensor struct (`SensorSlot`) with `add_temp()`, `add_hum()`, `compute_and_format()`, `set_battery()` and inline `HistoryBuffer` fields is removed. All state now lives in `SensorEntity`.
+- **Enhanced `SensorEntity`** — Added `compute_and_format()` method (computes averages, formats temp/hum strings, inserts gaps), `set_battery()`, and formatted output fields (`temp_avg_str`, `hum_avg_str`, `batt_str`, `temp_valid`, `hum_valid`, `batt_last`).
+- **Removed dual-write from YAML lambdas** — BLE `on_value` callbacks now call only `devices[i].add_sample()` and `devices[i].mark_seen()`. No more `sensors[i].add_temp()` / `sensors[i].add_hum()`.
+- **Updated 15-minute timer** — Now calls `devices[i].compute_and_format(epoch)` and publishes from `devices[i].temp_avg_str` / `devices[i].hum_avg_str` / `devices[i].batt_str`.
+- **Persistence shims** — `build_segment_snapshot_()` reads from `devices[i].metric_states[0/1].history`; `append_snapshot_to_ram_()` writes to `devices[i].metric_states[0/1].history`. `SegmentSnapshot` format is UNCHANGED.
+- **All API handlers updated** — `/sensors.json`, `/api/status`, `/history/{id}/{metric}`, import/export handlers all read from `devices[]`.
+- **`NUM_SENSORS` aliased to `NUM_DEVICES`** — `static constexpr int NUM_SENSORS = NUM_DEVICES;` preserves backward compatibility for `SegmentSnapshot`, `HistoryMeta`, and NVS key naming.
+- **`render_sensor_config.py` updated** — Generates only `SensorEntity devices[]` in ENTITY_BEGIN block. HEADER_BEGIN block now contains only a backward-compat comment. YAML lambda templates reference `devices[]` exclusively.
+- **Version bump** — All canonical locations updated to `7.5.3.8`.
+
+### Risk & testing notes
+
+This is the highest-risk step in Phase 3. All persistence, restore, import, export, and API handler paths are affected. Comprehensive device testing is required per the v7.5.3.8 implementation instructions.
+
+**Related:** Phase 3 implementation plan (v7.5.3.8 section)
+
+---
 ## v7.5.3.7 — Add `/api/v2/history/{device}/{metric}` Endpoint (RAM-only) — 2026-03-18
 
 **Phase 3 milestone:** New `/api/v2/history/{device_id}/{metric_key}` endpoint reads from `SensorEntity` history buffers (RAM ring buffer only — no NVS reads).

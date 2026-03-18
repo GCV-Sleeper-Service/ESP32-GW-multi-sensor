@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.5.3.7
+# ESP32-C3 Multi-Sensor Gateway - v7.5.3.8
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -52,7 +52,7 @@ esphome:
     priority: -100
     then:
       - lambda: |-
-          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.3.7");
+          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.3.8");
           id(dashboard_link).publish_state(
             "Dashboard: /dashboard or /dashboard.html — Download: /dashboard-download");
 
@@ -148,25 +148,22 @@ time:
               uint32_t epoch = now.timestamp;
               // <<< SENSOR_MANIFEST:AVERAGING_BEGIN >>>
               // ── Office ─────────────────────────────────────
-              sensors[0].compute_and_format(epoch);
-              devices[0].compute_averages(epoch);
-              id(avg_temp_office).publish_state(sensors[0].temp_avg_str);
-              id(avg_hum_office).publish_state(sensors[0].hum_avg_str);
-              if (sensors[0].batt_last >= 0) id(battery_office).publish_state(sensors[0].batt_str);
+              devices[0].compute_and_format(epoch);
+              id(avg_temp_office).publish_state(devices[0].temp_avg_str);
+              id(avg_hum_office).publish_state(devices[0].hum_avg_str);
+              if (devices[0].batt_last >= 0) id(battery_office).publish_state(devices[0].batt_str);
 
               // ── First Floor ─────────────────────────────────────
-              sensors[1].compute_and_format(epoch);
-              devices[1].compute_averages(epoch);
-              id(avg_temp_first_floor).publish_state(sensors[1].temp_avg_str);
-              id(avg_hum_first_floor).publish_state(sensors[1].hum_avg_str);
-              if (sensors[1].batt_last >= 0) id(battery_first_floor).publish_state(sensors[1].batt_str);
+              devices[1].compute_and_format(epoch);
+              id(avg_temp_first_floor).publish_state(devices[1].temp_avg_str);
+              id(avg_hum_first_floor).publish_state(devices[1].hum_avg_str);
+              if (devices[1].batt_last >= 0) id(battery_first_floor).publish_state(devices[1].batt_str);
 
               // ── Outside ─────────────────────────────────────
-              sensors[2].compute_and_format(epoch);
-              devices[2].compute_averages(epoch);
-              id(avg_temp_outside).publish_state(sensors[2].temp_avg_str);
-              id(avg_hum_outside).publish_state(sensors[2].hum_avg_str);
-              if (sensors[2].batt_last >= 0) id(battery_outside).publish_state(sensors[2].batt_str);
+              devices[2].compute_and_format(epoch);
+              id(avg_temp_outside).publish_state(devices[2].temp_avg_str);
+              id(avg_hum_outside).publish_state(devices[2].hum_avg_str);
+              if (devices[2].batt_last >= 0) id(battery_outside).publish_state(devices[2].batt_str);
               // <<< SENSOR_MANIFEST:AVERAGING_END >>>
 
               // ── Shared clock update ────────────────────────
@@ -231,7 +228,7 @@ esp32_ble_tracker:
 # ║  BLE Sensors — 3× ThermoPro TP357                               ║
 # ║                                                                  ║
 # ║  Each sensor callback:                                           ║
-# ║    1. Feeds value to SensorSlot accumulator (add_temp/add_hum)   ║
+# ║    1. Feeds value to SensorEntity (add_sample / set_battery)     ║
 # ║    2. Updates last_seen_epoch + publishes Last Seen text         ║
 # ║    3. Formats and publishes current reading text_sensor           ║
 # ╚══════════════════════════════════════════════════════════════════╝
@@ -251,12 +248,10 @@ sensor:
       on_value:
         then:
           - lambda: |-
-              sensors[0].add_temp(x);
               devices[0].add_sample(0, x);
               devices[0].mark_seen(::time(nullptr));
               auto now = id(sntp_time).now();
               if (now.is_valid()) {
-                sensors[0].mark_seen(now.timestamp);
                 char seen_buf[20];
                 snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_office).publish_state(seen_buf);
@@ -274,12 +269,10 @@ sensor:
       on_value:
         then:
           - lambda: |-
-              sensors[0].add_hum(x);
               devices[0].add_sample(1, x);
               devices[0].mark_seen(::time(nullptr));
               auto now = id(sntp_time).now();
               if (now.is_valid()) {
-                sensors[0].mark_seen(now.timestamp);
                 char seen_buf[20];
                 snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_office).publish_state(seen_buf);
@@ -296,15 +289,15 @@ sensor:
       on_value:
         then:
           - lambda: |-
-              sensors[0].set_battery(x);
+              devices[0].set_battery(x);
+              devices[0].mark_seen(::time(nullptr));
               auto now = id(sntp_time).now();
               if (now.is_valid()) {
-                sensors[0].mark_seen(now.timestamp);
                 char seen_buf[20];
                 snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_office).publish_state(seen_buf);
               }
-              if (sensors[0].batt_last >= 0) id(battery_office).publish_state(sensors[0].batt_str);
+              if (devices[0].batt_last >= 0) id(battery_office).publish_state(devices[0].batt_str);
 
   # ══════════════════════════════════════════════════════════════════
   # SENSOR 2: FIRST FLOOR — MAC D5:D8:4C:25:06:49
@@ -318,12 +311,10 @@ sensor:
       on_value:
         then:
           - lambda: |-
-              sensors[1].add_temp(x);
               devices[1].add_sample(0, x);
               devices[1].mark_seen(::time(nullptr));
               auto now = id(sntp_time).now();
               if (now.is_valid()) {
-                sensors[1].mark_seen(now.timestamp);
                 char seen_buf[20];
                 snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_first_floor).publish_state(seen_buf);
@@ -341,12 +332,10 @@ sensor:
       on_value:
         then:
           - lambda: |-
-              sensors[1].add_hum(x);
               devices[1].add_sample(1, x);
               devices[1].mark_seen(::time(nullptr));
               auto now = id(sntp_time).now();
               if (now.is_valid()) {
-                sensors[1].mark_seen(now.timestamp);
                 char seen_buf[20];
                 snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_first_floor).publish_state(seen_buf);
@@ -363,15 +352,15 @@ sensor:
       on_value:
         then:
           - lambda: |-
-              sensors[1].set_battery(x);
+              devices[1].set_battery(x);
+              devices[1].mark_seen(::time(nullptr));
               auto now = id(sntp_time).now();
               if (now.is_valid()) {
-                sensors[1].mark_seen(now.timestamp);
                 char seen_buf[20];
                 snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_first_floor).publish_state(seen_buf);
               }
-              if (sensors[1].batt_last >= 0) id(battery_first_floor).publish_state(sensors[1].batt_str);
+              if (devices[1].batt_last >= 0) id(battery_first_floor).publish_state(devices[1].batt_str);
 
   # ══════════════════════════════════════════════════════════════════
   # SENSOR 3: OUTSIDE — MAC DF:EB:DE:19:11:6C
@@ -385,12 +374,10 @@ sensor:
       on_value:
         then:
           - lambda: |-
-              sensors[2].add_temp(x);
               devices[2].add_sample(0, x);
               devices[2].mark_seen(::time(nullptr));
               auto now = id(sntp_time).now();
               if (now.is_valid()) {
-                sensors[2].mark_seen(now.timestamp);
                 char seen_buf[20];
                 snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_outside).publish_state(seen_buf);
@@ -408,12 +395,10 @@ sensor:
       on_value:
         then:
           - lambda: |-
-              sensors[2].add_hum(x);
               devices[2].add_sample(1, x);
               devices[2].mark_seen(::time(nullptr));
               auto now = id(sntp_time).now();
               if (now.is_valid()) {
-                sensors[2].mark_seen(now.timestamp);
                 char seen_buf[20];
                 snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_outside).publish_state(seen_buf);
@@ -430,15 +415,15 @@ sensor:
       on_value:
         then:
           - lambda: |-
-              sensors[2].set_battery(x);
+              devices[2].set_battery(x);
+              devices[2].mark_seen(::time(nullptr));
               auto now = id(sntp_time).now();
               if (now.is_valid()) {
-                sensors[2].mark_seen(now.timestamp);
                 char seen_buf[20];
                 snprintf(seen_buf, sizeof(seen_buf), "%02d:%02d:%02d %02d/%02d", now.hour, now.minute, now.second, now.month, now.day_of_month);
                 id(last_seen_outside).publish_state(seen_buf);
               }
-              if (sensors[2].batt_last >= 0) id(battery_outside).publish_state(sensors[2].batt_str);
+              if (devices[2].batt_last >= 0) id(battery_outside).publish_state(devices[2].batt_str);
   # <<< SENSOR_MANIFEST:THERMOPRO_END >>>
 
   - platform: wifi_signal

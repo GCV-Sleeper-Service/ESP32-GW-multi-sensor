@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.3.7.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.3.8.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -225,102 +225,12 @@ class HistoryBuffer {
 
 
 // ═══════════════════════════════════════════════════════════════════
-// SensorSlot — all state for one physical BLE sensor
+// SensorSlot removed in v7.5.3.8 — all runtime state now in SensorEntity.
 // ═══════════════════════════════════════════════════════════════════
 
-struct SensorSlot {
-  // ── Identity ──────────────────────────────────────────────────
-  const char* id;     // URL slug: "office", "first_floor", "outside"
-  const char* name;   // Display: "Office", "First Floor", "Outside"
-  const char* mac;    // BLE MAC
 
-  // ── 15-minute accumulators ────────────────────────────────────
-  float temp_sum   = 0.0f;
-  int   temp_count = 0;
-  float hum_sum    = 0.0f;
-  int   hum_count  = 0;
-  float batt_last  = -1.0f;
-  uint32_t last_seen_epoch = 0;
-
-  // ── Retention ring buffers ────────────────────────────────────
-  HistoryBuffer temp_history;
-  HistoryBuffer hum_history;
-
-  // ── Formatted output (set by compute_and_format / set_battery)
-  char temp_avg_str[32] = "";
-  char hum_avg_str[16]  = "";
-  char batt_str[16]     = "";
-  bool temp_valid = false;
-  bool hum_valid  = false;
-
-  void add_temp(float value) {
-    if (!std::isnan(value) && value > -50.0f && value < 80.0f) {
-      temp_sum += value;
-      temp_count++;
-    }
-  }
-
-  void add_hum(float value) {
-    if (!std::isnan(value) && value >= 0.0f && value <= 100.0f) {
-      hum_sum += value;
-      hum_count++;
-    }
-  }
-
-  void mark_seen(uint32_t epoch) {
-    if (epoch > 0) last_seen_epoch = epoch;
-  }
-
-  void set_battery(float value) {
-    if (!std::isnan(value) && value >= 0.0f && value <= 100.0f) {
-      batt_last = value;
-      snprintf(batt_str, sizeof(batt_str), "%.0f %%", value);
-    }
-  }
-
-  // Called every 15 minutes from YAML lambda.
-  void compute_and_format(uint32_t epoch) {
-    temp_valid = false;
-    hum_valid  = false;
-
-    if (temp_count > 0) {
-      float avg = temp_sum / (float) temp_count;
-      temp_history.add(epoch, avg);
-      float avg_f = avg * 9.0f / 5.0f + 32.0f;
-      snprintf(temp_avg_str, sizeof(temp_avg_str),
-               "%.1f \xC2\xB0" "C / %.1f \xC2\xB0" "F", avg, avg_f);
-      temp_valid = true;
-      ESP_LOGI(TAG, "%s temp: %.1f\xC2\xB0" "C (%d samples, buf=%d)",
-               name, avg, temp_count, temp_history.count());
-    } else {
-      temp_history.add_gap(epoch);
-      snprintf(temp_avg_str, sizeof(temp_avg_str), "NA");
-      ESP_LOGW(TAG, "%s: no temp — gap inserted", name);
-    }
-    temp_sum = 0.0f;
-    temp_count = 0;
-
-    if (hum_count > 0) {
-      float avg = hum_sum / (float) hum_count;
-      hum_history.add(epoch, avg);
-      snprintf(hum_avg_str, sizeof(hum_avg_str), "%.1f %%", avg);
-      hum_valid = true;
-      ESP_LOGI(TAG, "%s hum: %.1f%% (%d samples, buf=%d)",
-               name, avg, hum_count, hum_history.count());
-    } else {
-      hum_history.add_gap(epoch);
-      snprintf(hum_avg_str, sizeof(hum_avg_str), "NA");
-      ESP_LOGW(TAG, "%s: no hum — gap inserted", name);
-    }
-    hum_sum = 0.0f;
-    hum_count = 0;
-  }
-};
-
-
-// ── Phase 3: Generalized sensor model (v7.5.3.1) ──────────────────────
-// These structs coexist with SensorSlot during the migration.
-// SensorSlot will be removed once SensorEntity is fully wired.
+// ── Phase 3: Generalized sensor model ──────────────────────────────────
+// SensorEntity is the sole runtime model since v7.5.3.8.
 
 #define MAX_METRICS_PER_DEVICE 4
 
@@ -358,6 +268,14 @@ struct SensorEntity {
   int8_t last_rssi;
   uint32_t last_seen_epoch;
 
+  // ── Formatted output (for text_sensor publish) ────────────────
+  char temp_avg_str[32] = "";
+  char hum_avg_str[16]  = "";
+  char batt_str[16]     = "";
+  bool temp_valid = false;
+  bool hum_valid  = false;
+  float batt_last = -1.0f;
+
   // Generic methods
   void add_sample(uint8_t metric_index, float value) {
     if (metric_index >= metric_count) return;
@@ -375,9 +293,65 @@ struct SensorEntity {
       if (st.sample_count > 0 && st.history != nullptr) {
         float avg = st.accumulator / st.sample_count;
         st.history->add(epoch, avg);
+      } else if (st.history != nullptr) {
+        st.history->add_gap(epoch);
       }
       st.accumulator = 0;
       st.sample_count = 0;
+    }
+  }
+
+  void compute_and_format(uint32_t epoch) {
+    temp_valid = false;
+    hum_valid  = false;
+
+    // Temp is metric_states[0] for ThermoPro devices
+    auto& ts = metric_states[0];
+    if (ts.sample_count > 0 && ts.history != nullptr) {
+      float avg = ts.accumulator / ts.sample_count;
+      ts.history->add(epoch, avg);
+      float avg_f = avg * 9.0f / 5.0f + 32.0f;
+      snprintf(temp_avg_str, sizeof(temp_avg_str),
+               "%.1f \xC2\xB0" "C / %.1f \xC2\xB0" "F", avg, avg_f);
+      temp_valid = true;
+      ESP_LOGI(TAG, "%s temp: %.1f\xC2\xB0" "C (%d samples, buf=%d)",
+               name, avg, ts.sample_count, ts.history->count());
+    } else {
+      if (ts.history != nullptr) ts.history->add_gap(epoch);
+      snprintf(temp_avg_str, sizeof(temp_avg_str), "NA");
+      ESP_LOGW(TAG, "%s: no temp — gap inserted", name);
+    }
+    ts.accumulator = 0;
+    ts.sample_count = 0;
+
+    // Hum is metric_states[1] for ThermoPro devices
+    auto& hs = metric_states[1];
+    if (hs.sample_count > 0 && hs.history != nullptr) {
+      float avg = hs.accumulator / hs.sample_count;
+      hs.history->add(epoch, avg);
+      snprintf(hum_avg_str, sizeof(hum_avg_str), "%.1f %%", avg);
+      hum_valid = true;
+      ESP_LOGI(TAG, "%s hum: %.1f%% (%d samples, buf=%d)",
+               name, avg, hs.sample_count, hs.history->count());
+    } else {
+      if (hs.history != nullptr) hs.history->add_gap(epoch);
+      snprintf(hum_avg_str, sizeof(hum_avg_str), "NA");
+      ESP_LOGW(TAG, "%s: no hum — gap inserted", name);
+    }
+    hs.accumulator = 0;
+    hs.sample_count = 0;
+
+    // Reset remaining metric accumulators (batt, rssi)
+    for (uint8_t i = 2; i < metric_count; i++) {
+      metric_states[i].accumulator = 0;
+      metric_states[i].sample_count = 0;
+    }
+  }
+
+  void set_battery(float value) {
+    if (!std::isnan(value) && value >= 0.0f && value <= 100.0f) {
+      batt_last = value;
+      snprintf(batt_str, sizeof(batt_str), "%.0f %%", value);
     }
   }
 
@@ -392,19 +366,14 @@ struct SensorEntity {
 // ═══════════════════════════════════════════════════════════════════
 
 // <<< SENSOR_MANIFEST:HEADER_BEGIN >>>
-static constexpr int NUM_SENSORS = 3;
-
-static SensorSlot sensors[NUM_SENSORS] = {
-  { .id = "office", .name = "Office", .mac = "DB:06:2C:58:8A:59" },
-  { .id = "first_floor", .name = "First Floor", .mac = "D5:D8:4C:25:06:49" },
-  { .id = "outside", .name = "Outside", .mac = "DF:EB:DE:19:11:6C" },
-};
+// SensorSlot removed in v7.5.3.8 — all state in SensorEntity devices[].
+// NUM_SENSORS alias preserved for SegmentSnapshot backward compatibility.
 // <<< SENSOR_MANIFEST:HEADER_END >>>
 
 // <<< SENSOR_MANIFEST:ENTITY_BEGIN >>>
-// ── Generated SensorEntity arrays (Phase 3) ──────────────────────────
+// ── Generated SensorEntity arrays ──────────────────────────────────
 // Generated by render_sensor_config.py from config/sensors.json
-// COEXISTS with SensorSlot arrays during migration
+// Sole runtime model since v7.5.3.8 (SensorSlot removed)
 
 static const MetricDef metrics_thermopro[] = {
   {"temp",  "Temperature", "\xC2\xB0""C", 0, true},
@@ -421,6 +390,7 @@ static HistoryBuffer entity_hbuf_outside_temp;
 static HistoryBuffer entity_hbuf_outside_hum;
 
 static constexpr int NUM_DEVICES = 3;
+static constexpr int NUM_SENSORS = NUM_DEVICES;  // backward compat alias for SegmentSnapshot
 
 static SensorEntity devices[NUM_DEVICES] = {
   {
@@ -469,7 +439,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.3.7) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.3.8) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //
@@ -484,28 +454,8 @@ static SensorEntity devices[NUM_DEVICES] = {
 //   7. Re-import the backup through the dashboard or history_backup.py.
 //
 // See Docs/configuring-sensors.md for the full procedure and manual fallback.
-//
-// ── 1-sensor template ────────────────────────────────────────────
-// static constexpr int NUM_SENSORS = 1;
-// static SensorSlot sensors[NUM_SENSORS] = {
-//   { .id = "office", .name = "Office", .mac = "DB:06:2C:58:8A:59" },
-// };
-//
-// ── 2-sensor template ────────────────────────────────────────────
-// static constexpr int NUM_SENSORS = 2;
-// static SensorSlot sensors[NUM_SENSORS] = {
-//   { .id = "office",      .name = "Office",      .mac = "DB:06:2C:58:8A:59" },
-//   { .id = "first_floor", .name = "First Floor", .mac = "D5:D8:4C:25:06:49" },
-// };
-//
-// ── 4-sensor template ────────────────────────────────────────────
-// static constexpr int NUM_SENSORS = 4;
-// static SensorSlot sensors[NUM_SENSORS] = {
-//   { .id = "office",      .name = "Office",      .mac = "DB:06:2C:58:8A:59" },
-//   { .id = "first_floor", .name = "First Floor", .mac = "D5:D8:4C:25:06:49" },
-//   { .id = "outside",     .name = "Outside",     .mac = "DF:EB:DE:19:11:6C" },
-//   { .id = "garage",      .name = "Garage",      .mac = "XX:XX:XX:XX:XX:XX" },
-// };
+// NUM_DEVICES is set in the ENTITY_BEGIN block above; NUM_SENSORS is aliased
+// to NUM_DEVICES for SegmentSnapshot backward compatibility.
 // ═══════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════
@@ -595,17 +545,19 @@ static void make_segment_key_(int slot, char *key, size_t key_len) {
 }
 
 static void clear_runtime_histories_() {
-  for (int i = 0; i < NUM_SENSORS; i++) {
-    sensors[i].temp_history.clear();
-    sensors[i].hum_history.clear();
-    sensors[i].temp_sum = 0.0f;
-    sensors[i].temp_count = 0;
-    sensors[i].hum_sum = 0.0f;
-    sensors[i].hum_count = 0;
-    sensors[i].temp_valid = false;
-    sensors[i].hum_valid = false;
-    snprintf(sensors[i].temp_avg_str, sizeof(sensors[i].temp_avg_str), "NA");
-    snprintf(sensors[i].hum_avg_str, sizeof(sensors[i].hum_avg_str), "NA");
+  for (int i = 0; i < NUM_DEVICES; i++) {
+    for (uint8_t m = 0; m < devices[i].metric_count; m++) {
+      if (devices[i].metric_states[m].history != nullptr) {
+        devices[i].metric_states[m].history->clear();
+      }
+      devices[i].metric_states[m].accumulator = 0;
+      devices[i].metric_states[m].sample_count = 0;
+      devices[i].metric_states[m].valid = false;
+    }
+    devices[i].temp_valid = false;
+    devices[i].hum_valid = false;
+    snprintf(devices[i].temp_avg_str, sizeof(devices[i].temp_avg_str), "NA");
+    snprintf(devices[i].hum_avg_str, sizeof(devices[i].hum_avg_str), "NA");
   }
   g_history_restored_from_nvs = false;
 }
@@ -808,10 +760,14 @@ static bool build_segment_snapshot_(SegmentSnapshot *snapshot,
   uint32_t last_epoch = 0;
 
   for (int i = 0; i < NUM_SENSORS; i++) {
-    snapshot->temp_counts[i] = export_latest_entries_(
-        sensors[i].temp_history, snapshot->temp[i], PERSIST_POINTS_PER_SEGMENT);
-    snapshot->hum_counts[i] = export_latest_entries_(
-        sensors[i].hum_history, snapshot->hum[i], PERSIST_POINTS_PER_SEGMENT);
+    // Persistence shim: SensorEntity → SegmentSnapshot
+    // metric_states[0] = temp, metric_states[1] = hum (ThermoPro devices)
+    HistoryBuffer *temp_buf = devices[i].metric_states[0].history;
+    HistoryBuffer *hum_buf  = devices[i].metric_states[1].history;
+    snapshot->temp_counts[i] = temp_buf ? export_latest_entries_(
+        *temp_buf, snapshot->temp[i], PERSIST_POINTS_PER_SEGMENT) : 0;
+    snapshot->hum_counts[i] = hum_buf ? export_latest_entries_(
+        *hum_buf, snapshot->hum[i], PERSIST_POINTS_PER_SEGMENT) : 0;
 
     if (snapshot->temp_counts[i] > 0) {
       uint32_t local_first = snapshot->temp[i][0].epoch;
@@ -840,13 +796,20 @@ static bool build_segment_snapshot_(SegmentSnapshot *snapshot,
 
 static void append_snapshot_to_ram_(const SegmentSnapshot &snapshot) {
   for (int i = 0; i < NUM_SENSORS; i++) {
-    for (int n = 0; n < snapshot.temp_counts[i]; n++) {
-      const HistEntry &entry = snapshot.temp[i][n];
-      if (entry.epoch > 0) sensors[i].temp_history.add(entry.epoch, entry.value);
+    // Persistence shim: SegmentSnapshot → SensorEntity
+    HistoryBuffer *temp_buf = devices[i].metric_states[0].history;
+    HistoryBuffer *hum_buf  = devices[i].metric_states[1].history;
+    if (temp_buf) {
+      for (int n = 0; n < snapshot.temp_counts[i]; n++) {
+        const HistEntry &entry = snapshot.temp[i][n];
+        if (entry.epoch > 0) temp_buf->add(entry.epoch, entry.value);
+      }
     }
-    for (int n = 0; n < snapshot.hum_counts[i]; n++) {
-      const HistEntry &entry = snapshot.hum[i][n];
-      if (entry.epoch > 0) sensors[i].hum_history.add(entry.epoch, entry.value);
+    if (hum_buf) {
+      for (int n = 0; n < snapshot.hum_counts[i]; n++) {
+        const HistEntry &entry = snapshot.hum[i][n];
+        if (entry.epoch > 0) hum_buf->add(entry.epoch, entry.value);
+      }
     }
   }
 }
@@ -1354,12 +1317,12 @@ class HistoryWebHandler : public AsyncWebHandler {
     auto *resp = request->beginResponseStream("application/json");
     resp->addHeader("Cache-Control", "no-store");
     resp->print("[");
-    for (int i = 0; i < NUM_SENSORS; i++) {
+    for (int i = 0; i < NUM_DEVICES; i++) {
       if (i > 0) resp->print(",");
       char entry[96];
       snprintf(entry, sizeof(entry),
                "{\"id\":\"%s\",\"name\":\"%s\"}",
-               sensors[i].id, sensors[i].name);
+               devices[i].id, devices[i].name);
       resp->print(entry);
     }
     resp->print("]");
@@ -1493,8 +1456,8 @@ class HistoryWebHandler : public AsyncWebHandler {
 
   int resolve_import_sensor_index_(const char *sensor_id) const {
     if (sensor_id == nullptr || sensor_id[0] == '\0') return -1;
-    for (int i = 0; i < NUM_SENSORS; i++) {
-      if (strcmp(sensors[i].id, sensor_id) == 0) return i;
+    for (int i = 0; i < NUM_DEVICES; i++) {
+      if (strcmp(devices[i].id, sensor_id) == 0) return i;
     }
     return -1;
   }
@@ -1666,10 +1629,10 @@ class HistoryWebHandler : public AsyncWebHandler {
       snprintf(msg, sizeof(msg),
                "{\"ok\":true,\"mode\":\"single\",\"sensor\":\"%s\","
                "\"existing_segments\":%u,\"message\":\"Ready for single-sensor import\"}",
-               sensors[target_sensor].id, (unsigned) import_epoch_map_size_);
+               devices[target_sensor].id, (unsigned) import_epoch_map_size_);
       resp->print(msg);
       ESP_LOGI(TAG, "Import begun (single-sensor: %s) — %u existing segments indexed",
-               sensors[target_sensor].id, (unsigned) import_epoch_map_size_);
+               devices[target_sensor].id, (unsigned) import_epoch_map_size_);
     } else {
       resp->print("{\"ok\":true,\"mode\":\"multi\",\"message\":\"History cleared, ready for import\"}");
       ESP_LOGI(TAG, "Import begun (multi) — history partition cleared");
@@ -1734,8 +1697,8 @@ class HistoryWebHandler : public AsyncWebHandler {
 
       // Resolve sensor index.
       int sensor_idx = -1;
-      for (int i = 0; i < NUM_SENSORS; i++) {
-        if (strcmp(sensors[i].id, sid) == 0) { sensor_idx = i; break; }
+      for (int i = 0; i < NUM_DEVICES; i++) {
+        if (strcmp(devices[i].id, sid) == 0) { sensor_idx = i; break; }
       }
       if (sensor_idx < 0) { rejected++; continue; }
 
@@ -2091,21 +2054,21 @@ class HistoryWebHandler : public AsyncWebHandler {
     resp->print("\",");
 
     snprintf(num, sizeof(num), "\"uptime_seconds\":%u,\"sensor_count\":%d,",
-             (unsigned) uptime_s, NUM_SENSORS);
+             (unsigned) uptime_s, NUM_DEVICES);
     resp->print(num);
 
     resp->print("\"sensors\":[");
-    for (int i = 0; i < NUM_SENSORS; i++) {
+    for (int i = 0; i < NUM_DEVICES; i++) {
       if (i > 0) resp->print(",");
       resp->print("{\"id\":\"");
-      resp->print(sensors[i].id);
+      resp->print(devices[i].id);
       resp->print("\",\"name\":\"");
-      resp->print(sensors[i].name);
+      resp->print(devices[i].name);
       snprintf(num, sizeof(num),
                "\",\"last_seen\":%u,\"temp_valid\":%s,\"hum_valid\":%s}",
-               (unsigned) sensors[i].last_seen_epoch,
-               sensors[i].temp_valid ? "true" : "false",
-               sensors[i].hum_valid ? "true" : "false");
+               (unsigned) devices[i].last_seen_epoch,
+               devices[i].temp_valid ? "true" : "false",
+               devices[i].hum_valid ? "true" : "false");
       resp->print(num);
     }
     resp->print("],");
@@ -2136,9 +2099,9 @@ class HistoryWebHandler : public AsyncWebHandler {
     const char *type = slash + 1;
 
     int sensor_idx = -1;
-    for (int i = 0; i < NUM_SENSORS; i++) {
-      if (strlen(sensors[i].id) == id_len &&
-          strncmp(sensors[i].id, rest, id_len) == 0) {
+    for (int i = 0; i < NUM_DEVICES; i++) {
+      if (strlen(devices[i].id) == id_len &&
+          strncmp(devices[i].id, rest, id_len) == 0) {
         sensor_idx = i;
         break;
       }
@@ -2152,11 +2115,16 @@ class HistoryWebHandler : public AsyncWebHandler {
     HistoryBuffer *buf = nullptr;
     if (strcmp(type, "temp") == 0) {
       series_kind = HISTORY_SERIES_TEMP;
-      buf = &sensors[sensor_idx].temp_history;
+      buf = devices[sensor_idx].metric_states[0].history;
     } else if (strcmp(type, "hum") == 0) {
       series_kind = HISTORY_SERIES_HUM;
-      buf = &sensors[sensor_idx].hum_history;
+      buf = devices[sensor_idx].metric_states[1].history;
     } else {
+      request->send(404);
+      return;
+    }
+
+    if (buf == nullptr) {
       request->send(404);
       return;
     }
@@ -2254,13 +2222,13 @@ static void register_history_handler(
   base->add_handler(handler);
 
   ESP_LOGI(TAG,
-           "handler registered (%d sensors, %dh RAM, %d hourly slots in '%s', %d pts/segment)",
-           NUM_SENSORS, HISTORY_HOURS, PERSIST_SLOTS,
+           "handler registered (%d devices, %dh RAM, %d hourly slots in '%s', %d pts/segment)",
+           NUM_DEVICES, HISTORY_HOURS, PERSIST_SLOTS,
            HISTORY_PARTITION_LABEL,
            PERSIST_POINTS_PER_SEGMENT);
-  for (int i = 0; i < NUM_SENSORS; i++) {
+  for (int i = 0; i < NUM_DEVICES; i++) {
     ESP_LOGI(TAG, "  [%d] %s -> /history/%s/{temp,hum}",
-             i, sensors[i].name, sensors[i].id);
+             i, devices[i].name, devices[i].id);
   }
   ESP_LOGI(TAG, "  management -> POST /api/reboot, POST /api/delete-data (Basic auth)");
   ESP_LOGI(TAG, "  import     -> POST /api/import/{begin,segment,finish} (Basic auth)");
