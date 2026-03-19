@@ -1327,6 +1327,9 @@ function fetchAllSensorHistoryRowsSequentially(sensors, onProgress) {
       if (typeof onProgress === 'function') onProgress(idx, sensor, queue.length);
       return fetchSensorHistoryRows(sensor).then(function(rows) {
         results[idx] = rows;
+      }).catch(function() {
+        // BUG-046: tolerate per-sensor fetch failures (e.g. empty history after migration)
+        results[idx] = [];
       });
     });
   }, Promise.resolve()).then(function() {
@@ -1355,6 +1358,7 @@ function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
   var header = getMergedExportColumns(sensors);
   var union = {};
   sensorRowsList.forEach(function(rows, idx) {
+    if (!rows) return; // BUG-046: guard against undefined/null entries (empty [] iterates safely)
     rows.forEach(function(row) {
       if (!union[row.timestamp]) {
         union[row.timestamp] = { timestamp: row.timestamp, datetime_utc: row.datetime_utc, sensorData: {} };

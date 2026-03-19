@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-18 — BUG-045 mixed-category persistence regression, LESSON-OPS-059 added_
+_Last updated: 2026-03-19 — BUG-046 stale NVS HistoryMeta migration, LESSON-OPS-060 added_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,50 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-046 — Stale NVS `HistoryMeta` never overwritten after `num_sensors` schema correction (2026-03-19)
+
+**Date:** 2026-03-19
+**Version observed:** v7.5.4.0 (devices that received the temporary `NUM_SENSORS=4` build)
+**Status:** FIXED
+
+**Symptom:** Devices that were flashed with the temporary bad `NUM_SENSORS=4` build
+(BUG-045) continued to log on every boot:
+
+```
+[W][history:674][httpd]: history meta invalid or schema mismatch — resetting
+```
+
+Even after the BUG-045 code fix restored `NUM_SENSORS = NUM_ENV_SENSORS = 3`, devices
+with stale `hist_meta` NVS blobs (written with `num_sensors=4`) never recovered. Dashboard
+history remained empty indefinitely unless the user manually erased history.
+
+**Root cause:** `load_history_meta_()` detected the `num_sensors` mismatch and reset the
+in-memory `HistoryMeta` to defaults, but never persisted the corrected metadata back to NVS.
+`restore_from_nvs()` opened NVS read-only and exited early when `load_history_meta_()` returned
+false, so the stale blob was never overwritten. The mismatch repeated on every boot.
+
+**Fix:**
+- Modify `load_history_meta_()` to distinguish recoverable stale `num_sensors` mismatch from
+  true corruption. When `magic`, `version`, `points_per_series`, and `points_per_segment` all
+  match current expectations, only `num_sensors` differs — this is the known recoverable case
+  from BUG-045. Correct `num_sensors` in-place and preserve valid segment bookkeeping.
+- Add a `bool *needs_nvs_persist` output parameter so callers know the corrected meta must be
+  saved back to NVS.
+- In `restore_from_nvs()`, after loading meta, check `needs_nvs_persist`. If true, close the
+  read-only handle, reopen read-write, save the corrected metadata, and close. Then reopen
+  read-only for the snapshot restore loop.
+- For true corruption, also persist the default metadata to break the stale-meta loop.
+- Add explicit log messages distinguishing migration from corruption from successful persistence.
+- Dashboard: add per-sensor catch in `fetchAllSensorHistoryRowsSequentially` and guard
+  `buildMergedSensorCsv` against undefined/null row entries to prevent uncaught errors when
+  history is temporarily empty after migration.
+
+**Prevention:** LESSON-OPS-060 (see below).
+
+Related: BUG-045, LESSON-OPS-060
+
+---
 
 ### BUG-045 — Mixed-category device count accidentally changed persisted history schema (2026-03-18)
 
@@ -566,6 +610,33 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-060: Compile-time NVS schema constant changes require a firmware migration/re-save path (2026-03-19)
+
+**Date:** 2026-03-19
+
+When a compile-time constant used in an NVS-persisted struct (e.g., `NUM_SENSORS` in
+`HistoryMeta`) changes between firmware versions, validation code that compares the persisted
+value against the new constant will reject the stored blob. If the rejection only resets the
+in-memory copy without writing the corrected value back to NVS, the rejection repeats on every
+boot — an infinite stale-meta loop.
+
+**Rule:** Any validation function that detects a schema mismatch in a persisted NVS blob must
+either:
+1. Persist the corrected/default metadata back to NVS before returning, or
+2. Signal to its caller (e.g., via an output flag) that the corrected metadata needs to be
+   persisted, and the caller must do so before proceeding.
+
+Simply resetting the struct in RAM is never sufficient — the stale blob survives reboots.
+
+**Corollary:** When persisting corrected metadata, be careful about NVS handle open modes.
+`NVS_READONLY` handles cannot write. The migration path must obtain a `NVS_READWRITE` handle
+(either by reopening or by opening writable from the start), save, and close it cleanly on
+all code paths.
+
+Related: BUG-046, BUG-045
+
+---
 
 ### LESSON-OPS-059: Runtime device count and persisted-history count are different concepts in mixed-category firmware (2026-03-18)
 
