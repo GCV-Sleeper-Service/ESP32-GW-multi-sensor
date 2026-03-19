@@ -42,25 +42,30 @@ esphome:
     - ../dashboard/sensor_history_multi.h
     - ../src/gateway_manifest.h
   on_boot:
-    # Priority -100: run after web server is fully initialized.
-    # Registers custom /history/*, /sensors.json, /dashboard.html,
-    # /dashboard-download, /api/storage-stats, and /api/status via AsyncWebHandler.
-    # register_history_handler() restores the newest persisted
-    # hourly segments into RAM on boot so charts still have a recent
-    # baseline after a restart.
-    # Dashboard content remains embedded through ../dashboard/dashboard.h.
-    priority: -100
-    then:
-      - lambda: |-
-          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.4.1");
-          id(dashboard_link).publish_state(
-            "Dashboard: /dashboard or /dashboard.html — Download: /dashboard-download");
-          #ifdef PING_DEVICE_INDEX
-          {
+    - # Priority -100: run after web server is fully initialized.
+      # Registers custom /history/*, /sensors.json, /dashboard.html,
+      # /dashboard-download, /api/storage-stats, and /api/status via AsyncWebHandler.
+      # register_history_handler() restores the newest persisted
+      # hourly segments into RAM on boot so charts still have a recent
+      # baseline after a restart.
+      # Dashboard content remains embedded through ../dashboard/dashboard.h.
+      priority: -100
+      then:
+        - lambda: |-
+            register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.4.1");
+            id(dashboard_link).publish_state(
+              "Dashboard: /dashboard or /dashboard.html — Download: /dashboard-download");
+    - # Priority 600: run after WiFi and SNTP are available.
+      # Starts the PingAdapter RTOS task for icmp_ping devices.
+      priority: 600
+      then:
+        - lambda: |-
+            // <<< SENSOR_MANIFEST:PING_BOOT_BEGIN >>>
+            #ifdef PING_DEVICE_INDEX
             static PingAdapter ping_adapter;
             ping_adapter.start(PING_DEVICE_INDEX, PING_TARGET);
-          }
-          #endif
+            #endif
+            // <<< SENSOR_MANIFEST:PING_BOOT_END >>>
 
 # ─── Chip and framework ─────────────────────────────────────────
 # ESP-IDF (not Arduino) for better BLE + WiFi coexistence.

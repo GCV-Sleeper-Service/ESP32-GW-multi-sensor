@@ -36,6 +36,8 @@ YAML_RSSI_BEGIN = " # <<< SENSOR_MANIFEST:RSSI_BEGIN >>>"
 YAML_RSSI_END = " # <<< SENSOR_MANIFEST:RSSI_END >>>"
 YAML_TEXT_BEGIN = " # <<< SENSOR_MANIFEST:TEXT_SENSORS_BEGIN >>>"
 YAML_TEXT_END = " # <<< SENSOR_MANIFEST:TEXT_SENSORS_END >>>"
+YAML_PING_BOOT_BEGIN = " // <<< SENSOR_MANIFEST:PING_BOOT_BEGIN >>>"
+YAML_PING_BOOT_END = " // <<< SENSOR_MANIFEST:PING_BOOT_END >>>"
 ENTITY_BEGIN = "// <<< SENSOR_MANIFEST:ENTITY_BEGIN >>>"
 ENTITY_END = "// <<< SENSOR_MANIFEST:ENTITY_END >>>"
 
@@ -411,6 +413,22 @@ def render_yaml_text_sensors(sensors: List[Dict[str, str]]) -> str:
     return "\n".join(parts)
 
 
+def render_yaml_ping_boot(sensors: List[Dict]) -> str:
+    """Generate the on_boot priority-600 lambda body for icmp_ping adapter initialization.
+    The lambda is emitted only when an icmp_ping device is present; otherwise it is empty."""
+    ping_devices = [s for s in sensors if s.get("adapter") == "icmp_ping"]
+    lines = [YAML_PING_BOOT_BEGIN]
+    if ping_devices:
+        lines.extend([
+            " #ifdef PING_DEVICE_INDEX",
+            " static PingAdapter ping_adapter;",
+            " ping_adapter.start(PING_DEVICE_INDEX, PING_TARGET);",
+            " #endif",
+        ])
+    lines.append(YAML_PING_BOOT_END)
+    return "\n".join(lines)
+
+
 def render_header_file(path: Path, sensors: List[Dict[str, str]]) -> str:
     text = path.read_text(encoding="utf-8")
     text = re.sub(r"sensor_history_multi-v[0-9.]+\.h", f"sensor_history_multi-v{VERSION}.h", text)
@@ -474,6 +492,7 @@ def render_yaml_file(path: Path, sensors: List[Dict]) -> str:
     text = apply_yaml_marker_block(text, YAML_THERMO_BEGIN, YAML_THERMO_END, unwrap_marker_body(render_yaml_thermopro(ble_sensors), YAML_THERMO_BEGIN, YAML_THERMO_END))
     text = apply_yaml_marker_block(text, YAML_RSSI_BEGIN, YAML_RSSI_END, unwrap_marker_body(render_yaml_rssi(ble_sensors), YAML_RSSI_BEGIN, YAML_RSSI_END))
     text = apply_yaml_marker_block(text, YAML_TEXT_BEGIN, YAML_TEXT_END, unwrap_marker_body(render_yaml_text_sensors(ble_sensors), YAML_TEXT_BEGIN, YAML_TEXT_END))
+    text = apply_yaml_marker_block(text, YAML_PING_BOOT_BEGIN, YAML_PING_BOOT_END, unwrap_marker_body(render_yaml_ping_boot(sensors), YAML_PING_BOOT_BEGIN, YAML_PING_BOOT_END))
     return text
 
 

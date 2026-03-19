@@ -32,8 +32,12 @@ single-core ESP32-C3.
   averaging interval lambda — **required** for history ring buffer to accumulate data
 
 **YAML changes** (`firmware/esp32-c3-multi-sensor.yaml`):
-- `on_boot:` lambda (priority -100) gains `#ifdef PING_DEVICE_INDEX` block that creates a
-  `static PingAdapter ping_adapter` and calls `ping_adapter.start(PING_DEVICE_INDEX, PING_TARGET)`
+- `on_boot:` converted from a single mapping to a YAML list with two entries at different priorities
+- `priority: -100` entry: `register_history_handler` + `dashboard_link` (unchanged behaviour)
+- `priority: 600` entry (new, after WiFi): a generator-managed lambda containing a
+  `// <<< SENSOR_MANIFEST:PING_BOOT_BEGIN/END >>>` marker block that emits
+  `static PingAdapter ping_adapter; ping_adapter.start(PING_DEVICE_INDEX, PING_TARGET);`
+  inside `#ifdef PING_DEVICE_INDEX`
 
 **New includes** (added to `sensor_history_multi.h`):
 - `<freertos/semphr.h>` — FreeRTOS binary semaphore for ping callback sync
@@ -45,8 +49,8 @@ single-core ESP32-C3.
 ### Files changed
 
 - `dashboard/sensor_history_multi.h` — added includes, `PingAdapter` class, version bump
-- `firmware/esp32-c3-multi-sensor.yaml` — version bump, `PingAdapter` init in `on_boot:`
-- `scripts/render_sensor_config.py` — `render_entity_block()` + `render_yaml_averaging()` extended, version bump
+- `firmware/esp32-c3-multi-sensor.yaml` — version bump, `on_boot:` restructured as list with priority -100 (history handler) + priority 600 (PingAdapter, after WiFi), PING_BOOT marker block
+- `scripts/render_sensor_config.py` — `render_entity_block()` + `render_yaml_averaging()` + `render_yaml_ping_boot()` added; `YAML_PING_BOOT_BEGIN/END` markers; version bump
 - `dashboard/dashboard.js` — version bump (regenerated)
 - `dashboard/dashboard.h` — regenerated (gzip)
 - `tests/fixtures/manifest.json` — regenerated (version field)
