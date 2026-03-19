@@ -1644,6 +1644,12 @@ function suspendDashboardNetworkActivity(statusEl) {
     historyBootstrapTimerId = null;
   }
   if (evtSource) {
+    // BUG-049: Null out all callbacks BEFORE calling close(). Firefox's Gecko
+    // engine keeps the SSE TCP socket alive if callbacks are still attached,
+    // causing browserContext.close() to hang during Playwright teardown.
+    evtSource.onopen = null;
+    evtSource.onerror = null;
+    evtSource.onmessage = null;
     try { evtSource.close(); } catch (_e) {}
     evtSource = null;
   }

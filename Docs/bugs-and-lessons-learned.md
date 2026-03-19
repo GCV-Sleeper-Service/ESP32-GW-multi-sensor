@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-19 — BUG-046 stale NVS HistoryMeta migration, LESSON-OPS-060 added_
+_Last updated: 2026-03-19 — BUG-048 incompatible NVS snapshot recovery, BUG-049 Firefox SSE teardown, LESSON-OPS-061/062 added_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,105 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-049 — Firefox Playwright Group 13 tests fail: SSE teardown timeout + slow boot (2026-03-19)
+
+**Date:** 2026-03-19
+**Version observed:** v7.5.4.0
+**Status:** FIXED
+
+**Symptom:** Two Firefox-only failures in Group 13 (Manifest-driven history fetching):
+- Test 137 (`fetchDeviceHistory is a callable function`): All assertions pass. Failure occurs in
+  teardown — `browserContext.close()` hangs for 48.9s waiting for the SSE `EventSource` TCP
+  connection to close, exceeding the 30s test timeout.
+- Test 138 (`App.API.fetchDeviceHistory is exported`): `waitForDashboardReady()` times out at
+  15s waiting for `.sensor-card` to become visible. Firefox's slower event loop means the
+  dashboard boot sequence (manifest fetch → card render → DOM paint) takes longer than Chromium.
+
+**Root cause:** Firefox's Gecko engine holds SSE TCP connections open during `browserContext.close()`
+if EventSource callbacks (`onopen`, `onerror`, `onmessage`) are still attached. The existing
+`stopDashboardNetwork()` called `evtSource.close()` but did not null out the callbacks first.
+Additionally, Group 13 used the default 15s `loadDashboard()` timeout, insufficient for Firefox's
+slower rendering pipeline.
+
+**Fix:**
+- `stopDashboardNetwork()` in `dashboard.spec.js`: null out `onopen`, `onerror`, `onmessage`
+  before calling `.close()` on `EventSource`.
+- `suspendDashboardNetworkActivity()` in `dashboard.js` and `dashboard.html`: same callback-
+  nulling pattern applied to production code (LESSON-OPS-043 mirror).
+- Group 13 `test.describe()`: added `test.setTimeout(90000)` for Firefox SSE teardown headroom.
+- All Group 13 `loadDashboard()` calls: increased timeout to `{ timeout: 30000 }`.
+
+**Prevention:** LESSON-OPS-062 (see below).
+
+Related: LESSON-OPS-062, LESSON-OPS-043
+
+---
+
+### BUG-048 — NVS `SegmentSnapshot` blobs from `NUM_SENSORS=4` period physically incompatible with corrected firmware (2026-03-19)
+
+**Date:** 2026-03-19
+**Version observed:** v7.5.4.0 (post-BUG-046 fix — history loads only 36 points instead of full retained history)
+**Status:** FIXED
+
+**Symptom:** After merging the BUG-046 meta migration fix (PR #53), the dashboard loads history
+but only shows ~36 data points (approximately 9 hours of new data collected since the fix).
+Previously retained 45-day ThermoPro history is missing. The firmware no longer logs the
+"schema mismatch — resetting" loop, but the full history is not recovered.
+
+**Root cause:** The BUG-046 fix correctly migrated the `HistoryMeta` blob (correcting `num_sensors`
+from 4 to 3 and persisting it). However, the individual `SegmentSnapshot` blobs written to NVS
+during the buggy `NUM_SENSORS=4` period have a **physically different byte size** because the
+struct contains fixed-size arrays dimensioned by `NUM_SENSORS` at compile time:
+
+```
+// With NUM_SENSORS=4: sizeof(SegmentSnapshot) ≈ 298 bytes
+HistEntry temp[4][PERSIST_POINTS_PER_SEGMENT]
+HistEntry hum[4][PERSIST_POINTS_PER_SEGMENT]
+uint16_t temp_counts[4]
+uint16_t hum_counts[4]
+
+// With NUM_SENSORS=3: sizeof(SegmentSnapshot) ≈ 230 bytes
+HistEntry temp[3][PERSIST_POINTS_PER_SEGMENT]
+HistEntry hum[3][PERSIST_POINTS_PER_SEGMENT]
+uint16_t temp_counts[3]
+uint16_t hum_counts[3]
+```
+
+When `nvs_get_blob()` tries to read a 298-byte blob into a 230-byte buffer, ESP-IDF returns
+`ESP_ERR_NVS_INVALID_LENGTH`. The blob is never read, and `load_snapshot_from_handle_()` returned
+`false` silently — no log message indicated the real failure mode.
+
+The restore loop in `restore_from_nvs()` attempted to load all `meta.valid_segments` slots
+(which included ghost references to the incompatible blobs), skipped them all, and only found the
+few new segments written after the fix. The meta was never recalibrated to reflect the reduced
+valid segment count, so every subsequent boot repeated the same futile load attempts.
+
+**Fix:**
+- `load_snapshot_from_handle_()`: added diagnostic logging when `nvs_get_blob()` returns
+  `ESP_ERR_NVS_INVALID_LENGTH`, identifying the stored-vs-expected byte size and referencing
+  BUG-048.
+- `restore_from_nvs()`: after the restore loop, if `skipped_size_mismatch > 0` and
+  `restored < restore_segments`, recalibrate `meta.valid_segments` to match only the
+  actually-restorable segment count. Persist the recalibrated meta back to NVS so that:
+  - Subsequent boots don't waste time retrying unloadable slots
+  - The restore window targets only readable segments
+  - Future `persist_hourly_segment()` calls correctly grow `valid_segments` from the
+    recalibrated baseline as new compatible segments are written
+
+**Impact:** The history lost during the `NUM_SENSORS=4` period is **unrecoverable** — the blobs
+are physically a different size and cannot be deserialized into the current struct layout without
+a complex cross-schema converter. The recalibration ensures the system recovers cleanly and
+begins accumulating new history from a known-good baseline. Users who need the old data should
+use the CSV export they took before the v7.5.4.0 flash (if available) and re-import via the
+single-sensor merge import.
+
+**Prevention:** LESSON-OPS-061 (see below). Also: the v7.5.4.0 implementation prompt now includes
+an explicit acceptance criterion verifying that `sizeof(SegmentSnapshot)` has not changed.
+
+Related: BUG-046, BUG-045, LESSON-OPS-061, LESSON-OPS-060
+
+---
 
 ### BUG-046 — Stale NVS `HistoryMeta` never overwritten after `num_sensors` schema correction (2026-03-19)
 
@@ -610,6 +709,67 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-062: Firefox requires EventSource callbacks nulled before `.close()` to release the TCP connection (2026-03-19)
+
+**Date:** 2026-03-19
+
+Firefox's Gecko engine keeps SSE TCP connections alive during `browserContext.close()` if
+EventSource event callbacks (`onopen`, `onerror`, `onmessage`) are still attached when
+`.close()` is called. Chromium and WebKit release the connection immediately regardless.
+
+**Rule:** Always null out all EventSource callbacks before calling `.close()`:
+
+```javascript
+evtSource.onopen = null;
+evtSource.onerror = null;
+evtSource.onmessage = null;
+evtSource.close();
+evtSource = null;
+```
+
+This applies to both production dashboard code (`suspendDashboardNetworkActivity()`) and
+test teardown helpers (`stopDashboardNetwork()` in Playwright specs).
+
+**Corollary:** Firefox-specific timing issues in Playwright are common. When tests fail only
+on Firefox, check: (1) SSE/WebSocket teardown, (2) DOM rendering timing (Firefox's event loop
+is slower — use larger `loadDashboard()` timeouts in test groups that exercise async boot
+sequences), (3) test timeouts (add `test.setTimeout()` with headroom for Firefox teardown).
+
+Related: BUG-049, LESSON-OPS-043
+
+---
+
+### LESSON-OPS-061: Changing compile-time constants that dimension NVS-persisted structs makes ALL existing blobs physically unreadable (2026-03-19)
+
+**Date:** 2026-03-19
+
+When a compile-time constant (e.g., `NUM_SENSORS`) is used to size arrays inside a
+struct that is written to NVS as a blob (e.g., `SegmentSnapshot`), changing that constant
+changes the struct's `sizeof()`. All existing blobs become a different byte length than
+the new struct layout. `nvs_get_blob()` returns `ESP_ERR_NVS_INVALID_LENGTH` — the data
+is not just schema-invalid, it is **physically unreadable** without a cross-schema deserializer.
+
+This is worse than a schema mismatch in a metadata header (which BUG-046/LESSON-OPS-060
+addressed). Metadata can be corrected in-place because the struct layout didn't change.
+Data blobs with array dimensions baked in cannot.
+
+**Rule:**
+1. Never change a compile-time constant that dimensions a persisted struct without a migration
+   plan that accounts for the blob size change.
+2. The restore loop (`restore_from_nvs()`) must detect `ESP_ERR_NVS_INVALID_LENGTH` and
+   recalibrate `meta.valid_segments` to exclude unloadable ghost slots. The recalibrated
+   meta must be persisted back to NVS so subsequent boots don't repeat futile load attempts.
+3. Preflight should assert `sizeof(SegmentSnapshot)` hasn't changed when `NUM_SENSORS` is
+   expected to remain constant. Any prompt that touches sensor count constants must include
+   an explicit "verify `sizeof(SegmentSnapshot)` is unchanged" acceptance criterion.
+4. Data in incompatible blobs is unrecoverable without a dedicated cross-schema converter.
+   Users should be advised to CSV-export before any firmware update that might change
+   persistence-related constants.
+
+Related: BUG-048, BUG-046, BUG-045, LESSON-OPS-060
+
+---
 
 ### LESSON-OPS-060: Compile-time NVS schema constant changes require a firmware migration/re-save path (2026-03-19)
 
