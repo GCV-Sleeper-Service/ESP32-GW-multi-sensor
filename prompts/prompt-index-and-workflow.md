@@ -132,8 +132,8 @@ All steps shipped. No prompts needed.
 |---------|-------|-------------|--------|
 | v7.5.4.0 | Add ping device to manifest (BUG-045 fix) | _(completed, no expanded prompt needed)_ | ✅ Complete |
 | v7.5.4.1 | Implement ICMP ping adapter | `prompts/phase4/v7.5.4.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-19 |
-| **v7.5.4.2** | **Add network card renderer** | `prompts/phase4/v7.5.4.2-implementation-instructions-for-coding-agent.md` | **⬅️ Next** |
-| v7.5.4.3 | Mixed-category test fixtures | `prompts/phase4/v7.5.4.3-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.5.4.2 | Add network card renderer | `prompts/phase4/v7.5.4.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-19 |
+| **v7.5.4.3** | **Mixed-category test fixtures** | `prompts/phase4/v7.5.4.3-implementation-instructions-for-coding-agent.md` | **⬅️ Next** |
 | v7.5.4.4 | Phase 4 closure | `prompts/phase4/v7.5.4.4-implementation-instructions-for-coding-agent.md` | Pending |
 
 **Phase 4 device testing requirements:**

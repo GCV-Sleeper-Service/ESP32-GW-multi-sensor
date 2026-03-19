@@ -115,9 +115,9 @@ test.describe('1. Boot and structure', () => {
 // ── 2. Sensor cards ───────────────────────────────────────────────
 
 test.describe('2. Sensor cards', () => {
-  test('three sensor cards are rendered', async ({ page }) => {
+  test('four sensor cards are rendered (3 environmental + 1 network)', async ({ page }) => {
     await loadDashboard(page);
-    await expect(page.locator('.sensor-card')).toHaveCount(3);
+    await expect(page.locator('.sensor-card')).toHaveCount(4);
   });
 
   test('sensor card headers contain expected sensor names', async ({ page }) => {
@@ -130,9 +130,9 @@ test.describe('2. Sensor cards', () => {
     }
   });
 
-  test('each sensor card contains value display elements', async ({ page }) => {
+  test('each environmental sensor card contains value display elements', async ({ page }) => {
     await loadDashboard(page);
-    const cards = page.locator('.sensor-card');
+    const cards = page.locator('.sensor-card:not(.network-card)');
     const count = await cards.count();
     for (let i = 0; i < count; i++) {
       expect(await cards.nth(i).locator('[id^="val-"]').count()).toBeGreaterThan(0);
@@ -485,7 +485,8 @@ test.describe('11. Card renderer registry', () => {
     page.on('pageerror', err => { pageError = err; });
     await page.evaluate(() => buildDeviceCards());
     await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout: 5000 });
-    await expect(page.locator('.sensor-card')).toHaveCount(3);
+    // 3 environmental + 1 network = 4 total
+    await expect(page.locator('.sensor-card')).toHaveCount(4);
     expect(pageError).toBeNull();
   });
 
@@ -697,9 +698,9 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
     await page.waitForFunction(() => window._manifest && window._manifest.schema_version === 2, { timeout: 10000 });
     const source = await page.evaluate(() => window._manifest.source);
     expect(source).not.toBe('auto-promoted');
-    // Sensor cards must render
-    await expect(page.locator('.sensor-card')).toHaveCount(3);
-    // Cards must contain expected sensor names from the manifest
+    // Sensor cards must render — 3 environmental + 1 network = 4 total
+    await expect(page.locator('.sensor-card')).toHaveCount(4);
+    // Environmental cards must contain expected sensor names from the manifest
     for (const name of ['Office', 'First Floor', 'Outside']) {
       await expect(
         page.locator('.sensor-card-header').filter({ hasText: name }).first()
@@ -758,16 +759,19 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
 
   // Scenario 4: environmental card renderer dispatches correctly
   test('scenario 4: environmental card renderer dispatches correctly for all sensors', async ({ page }) => {
-    await loadDashboard(page, { expectedSensorCount: 3 });
+    // v7.5.4.2: SENSORS now includes network devices, so getSensors() returns 4.
+    // Environmental sensors are 3; network devices add 1 more.
+    await loadDashboard(page, { expectedSensorCount: 4 });
     await page.waitForFunction(() => {
       if (!window._manifest || !Array.isArray(window._manifest.sensors)) return false;
       if (!window.App || !App.State || typeof App.State.getSensors !== 'function') return false;
       var envSensors = window._manifest.sensors.filter(function(sensor) {
         return !sensor.category || sensor.category === 'environmental';
       });
+      // Total sensors = environmental + network devices
       return envSensors.length > 0
-        && App.State.getSensors().length === envSensors.length
-        && document.querySelectorAll('.sensor-card').length === envSensors.length;
+        && App.State.getSensors().length === window._manifest.sensors.length
+        && document.querySelectorAll('.sensor-card').length === window._manifest.sensors.length;
     }, { timeout: 10000 });
     // Environmental manifest sensors must map to CARD_RENDERERS.environmental
     const envSensors = await page.evaluate(() => {
@@ -775,7 +779,7 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
     });
     expect(envSensors.length).toBe(3);
     expect(envSensors.every(s => s.category === 'environmental')).toBe(true);
-    // Rebuild cards and confirm full card structure for each environmental card
+    // Rebuild cards and confirm full card structure for each card
     await page.evaluate(() => buildDeviceCards());
     await page.waitForFunction(() => {
       if (!window.App || !App.State || typeof App.State.getSensors !== 'function') return false;
@@ -788,7 +792,8 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
     }, { timeout: 5000 });
     const cards = page.locator('.sensor-card');
     const count = await cards.count();
-    expect(count).toBe(3);
+    // 3 environmental + 1 network = 4 total
+    expect(count).toBe(4);
     for (let i = 0; i < count; i++) {
       await expect(cards.nth(i).locator('.sensor-card-header')).toBeVisible();
       await expect(cards.nth(i).locator('.sensor-readings')).toBeVisible();
@@ -976,9 +981,9 @@ test.describe('15. Phase 3 Closure — v2 API Regression', () => {
   test('dashboard renders identically with new endpoints', async ({ page }) => {
     await loadDashboard(page);
     await waitForConnected(page);
-    // Sensor cards must render
-    await expect(page.locator('.sensor-card')).toHaveCount(3);
-    // Verify all sensor names are present
+    // 3 environmental + 1 network = 4 sensor cards total
+    await expect(page.locator('.sensor-card')).toHaveCount(4);
+    // Verify all environmental sensor names are present
     for (const name of ['Office', 'First Floor', 'Outside']) {
       await expect(
         page.locator('.sensor-card-header').filter({ hasText: name }).first()
@@ -1150,5 +1155,125 @@ test.describe('16. BUG-043 Request Scheduling Regression', () => {
     });
     // At least one should return null (skipped by guard)
     expect(results).toContain(null);
+  });
+});
+
+// ── 17. Phase 4 Step 2 — Network Card Renderer ───────────────────
+
+test.describe('17. Phase 4 Step 2 — Network Card Renderer', () => {
+  test('network card renders when manifest contains a network device', async ({ page }) => {
+    await loadDashboard(page);
+    // Network card should be present (wan_ping from manifest.json)
+    await expect(page.locator('.network-card')).toBeVisible();
+    await expect(page.locator('.network-card .sensor-card-header')).toBeVisible();
+  });
+
+  test('network card displays latency value element (id: net-ping-wan_ping)', async ({ page }) => {
+    await loadDashboard(page);
+    await expect(page.locator('#net-ping-wan_ping')).toBeAttached();
+  });
+
+  test('network card displays success rate element (id: net-success-wan_ping)', async ({ page }) => {
+    await loadDashboard(page);
+    await expect(page.locator('#net-success-wan_ping')).toBeAttached();
+  });
+
+  test('network card displays target element (id: net-target-wan_ping)', async ({ page }) => {
+    await loadDashboard(page);
+    const target = page.locator('#net-target-wan_ping');
+    await expect(target).toBeAttached();
+    // Target should show the host from manifest source.target
+    const text = await target.textContent();
+    expect(text).toMatch(/8\.8\.8\.8|—/);
+  });
+
+  test('environmental cards have full ThermoPro layout (unaffected by network card)', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.sensors, { timeout: 10000 });
+    const envCards = page.locator('.sensor-card:not(.network-card)');
+    const count = await envCards.count();
+    expect(count).toBe(3);
+    for (let i = 0; i < count; i++) {
+      await expect(envCards.nth(i).locator('.sensor-card-header')).toBeVisible();
+      await expect(envCards.nth(i).locator('.sensor-readings')).toBeVisible();
+      await expect(envCards.nth(i).locator('.sensor-env-grid')).toBeVisible();
+      await expect(envCards.nth(i).locator('.sensor-minmax')).toBeVisible();
+      await expect(envCards.nth(i).locator('.sensor-batt-row')).toBeVisible();
+      await expect(envCards.nth(i).locator('.sensor-rssi-row')).toBeVisible();
+    }
+  });
+
+  test('CARD_RENDERERS.network is registered and callable', async ({ page }) => {
+    await loadDashboard(page);
+    const result = await page.evaluate(() => {
+      try {
+        var html = CARD_RENDERERS.network(
+          { id: 'wan_ping', name: 'WAN Latency', color: '#4FC3F7', category: 'network' },
+          null
+        );
+        return { ok: typeof html === 'string' && html.length > 0, isNetworkCard: html.indexOf('network-card') !== -1 };
+      } catch(e) {
+        return { ok: false, error: e.message };
+      }
+    });
+    expect(result.ok).toBe(true);
+    expect(result.isNetworkCard).toBe(true);
+  });
+
+  test('METRIC_FORMATTERS.ping_latency and success_rate are registered', async ({ page }) => {
+    await loadDashboard(page);
+    const result = await page.evaluate(() => {
+      return {
+        hasPingLatency: typeof METRIC_FORMATTERS.ping_latency === 'function',
+        hasSuccessRate: typeof METRIC_FORMATTERS.success_rate === 'function',
+        pingFormat: METRIC_FORMATTERS.ping_latency(42.7),
+        successFormat: METRIC_FORMATTERS.success_rate(100)
+      };
+    });
+    expect(result.hasPingLatency).toBe(true);
+    expect(result.hasSuccessRate).toBe(true);
+    expect(result.pingFormat).toBe('43 ms');
+    expect(result.successFormat).toBe('100%');
+  });
+
+  test('makeNetworkSensorConfig produces correct config (no ThermoPro entity IDs)', async ({ page }) => {
+    await loadDashboard(page);
+    const result = await page.evaluate(() => {
+      var cfg = makeNetworkSensorConfig({ id: 'wan_ping', name: 'WAN Latency', category: 'network' }, 3);
+      return {
+        id: cfg.id,
+        name: cfg.name,
+        category: cfg.category,
+        hasTempId: 'tempId' in cfg,
+        hasRestPaths: Array.isArray(cfg.restPaths) && cfg.restPaths.length === 0
+      };
+    });
+    expect(result.id).toBe('wan_ping');
+    expect(result.category).toBe('network');
+    expect(result.hasTempId).toBe(false);
+    expect(result.hasRestPaths).toBe(true);
+  });
+
+  test('SENSORS includes network device (wan_ping) after manifest load', async ({ page }) => {
+    await loadDashboard(page);
+    const sensorIds = await page.evaluate(() => App.State.getSensors().map(s => s.id));
+    expect(sensorIds).toContain('wan_ping');
+    expect(sensorIds.length).toBe(4);
+  });
+
+  test('updateNetworkCards populates ping values from live data', async ({ page }) => {
+    await loadDashboard(page);
+    await page.evaluate(() => {
+      updateNetworkCards({
+        timestamp: 1741694400,
+        devices: {
+          wan_ping: { ping_ms: 15.3, success_pct: 100, last_seen: 1741694400 }
+        }
+      });
+    });
+    const pingText = await page.locator('#net-ping-wan_ping').textContent();
+    const successText = await page.locator('#net-success-wan_ping').textContent();
+    expect(pingText).toBe('15 ms');
+    expect(successText).toBe('100%');
   });
 });

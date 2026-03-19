@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "version": "v7.5.4.0",
-  "sensor_count": 1,
+  "version": "v7.5.4.2",
+  "sensor_count": 2,
   "sensors": [
     {
       "id": "office",

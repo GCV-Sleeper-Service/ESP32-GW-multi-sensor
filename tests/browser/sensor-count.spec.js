@@ -62,10 +62,15 @@ async function loadDashboard(page, timeout) {
 }
 
 // Fetch the active sensor manifest from the mock server at runtime
+// v7.5.4.2: Use /api/manifest (v2) as source of truth — includes all device categories.
 async function getManifest(page) {
   return page.evaluate(async function() {
-    const res = await fetch('/sensors.json');
-    return res.json();
+    const res = await fetch('/api/manifest');
+    const payload = await res.json();
+    if (payload && Array.isArray(payload.sensors)) return payload.sensors;
+    // Fallback to legacy /sensors.json
+    const legacyRes = await fetch('/sensors.json');
+    return legacyRes.json();
   });
 }
 

@@ -140,6 +140,10 @@
     .batt-pct.waiting { color:var(--text-muted)!important; }
     .batt-label { font-size:.58rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; }
 
+    /* Network card (v7.5.4.2) */
+    .network-card { border-left:3px solid var(--accent-network, #4FC3F7); }
+    .network-card .sensor-card-header { border-bottom-color:var(--accent-network, #4FC3F7); }
+
     /* Charts */
     .charts-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
     .chart-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:14px 14px 10px; }
@@ -897,7 +901,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.4.1';
+App.version = 'v7.5.4.2';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -1166,6 +1170,14 @@ var METRIC_FORMATTERS = {
   humidity: function(value) {
     return Math.round(value) + ' %';
   },
+  ping_latency: function(value, unit) {
+    if (value === null || value === undefined || isNaN(value)) return '\u2014';
+    return value.toFixed(0) + ' ' + (unit || 'ms');
+  },
+  success_rate: function(value) {
+    if (value === null || value === undefined || isNaN(value)) return '\u2014';
+    return value.toFixed(0) + '%';
+  },
   _default: function(value, unit) {
     return value.toFixed(1) + ' ' + (unit || '');
   }
@@ -1426,9 +1438,27 @@ function makeSensorConfig(meta, idx) {
   };
 }
 
+function makeNetworkSensorConfig(meta, idx) {
+  var id = meta.id, name = meta.name;
+  var color = SENSOR_COLORS[idx % SENSOR_COLORS.length];
+  try { var saved = localStorage.getItem('sensor_color_' + id); if (saved) color = saved; } catch(e) {}
+  return {
+    id: id, name: name,
+    color: color,
+    category: meta.category || 'network',
+    // No ThermoPro entity IDs — network devices use /api/v2/live polling
+    restPaths: []
+  };
+}
+
 function applySensorMeta(meta) {
   if (!Array.isArray(meta) || !meta.length) meta = DEFAULT_SENSOR_META;
-  App.State.setSensors(meta.map(makeSensorConfig));
+  App.State.setSensors(meta.map(function(m, idx) {
+    var cat = m.category || 'environmental';
+    if (cat === 'network') return makeNetworkSensorConfig(m, idx);
+    if (cat === 'system') return makeNetworkSensorConfig(m, idx); // reuse for now
+    return makeSensorConfig(m, idx); // ThermoPro path
+  }));
   try { App.Features.emit('onManifest', App.State.getSensors()); } catch(e) { logNonFatal('manifest hook emit', e); }
 }
 
@@ -1444,9 +1474,8 @@ function normalizeManifestSensors(payload) {
       metrics: Array.isArray(sensor && sensor.metrics) ? sensor.metrics : []
     };
   }).filter(function(sensor) {
-    // Only include environmental sensors in SENSORS — network/system devices have
-    // no card renderer until their respective phase (v7.5.4.2+).
-    return sensor.id && sensor.name && (!sensor.category || sensor.category === 'environmental');
+    return sensor.id && sensor.name;
+    // Removed environmental-only filter — all categories now included (v7.5.4.2+)
   });
 }
 
@@ -3190,11 +3219,13 @@ function onSensorColorPicked(sensorId, color) {
 
 // ── Card renderer registry (v7.5.2.1) ────────────────────────────
 // Dispatches card rendering by device category from the manifest.
-// Environmental (ThermoPro) is the only category for this step.
 
 var CARD_RENDERERS = {
   environmental: function(device, manifest) {
     return buildEnvironmentalCard(device, manifest);
+  },
+  network: function(device, manifest) {
+    return buildNetworkCard(device, manifest);
   },
   _default: function(device, manifest) {
     // Graceful fallback for unknown categories — simple key/value card
@@ -3283,6 +3314,41 @@ function buildEnvironmentalCard(s, manifest) {
           '<div class="rssi-bar b1"></div><div class="rssi-bar b2"></div><div class="rssi-bar b3"></div><div class="rssi-bar b4"></div>' +
         '</div>' +
         '<div class="rssi-dbm waiting" id="rssi-dbm-' + s.id + '">&mdash; dBm</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function buildNetworkCard(s, manifest) {
+  // Find source.target from manifest for display
+  var target = '\u2014';
+  if (manifest && manifest.sensors) {
+    var entry = manifest.sensors.find(function(ms) { return ms.id === s.id; });
+    if (entry && entry.source && entry.source.target) target = entry.source.target;
+  }
+  return (
+    '<div class="sensor-card network-card" data-device-id="' + s.id + '">' +
+      '<div class="sensor-card-header">' +
+        '<input class="sensor-color-picker" id="picker-' + s.id + '" type="color" value="' + (s.color || '#4FC3F7') + '" data-sensor-color="' + s.id + '">' +
+        s.name +
+      '</div>' +
+      '<div class="sensor-readings">' +
+        '<div class="sensor-reading">' +
+          '<div class="reading-label">Latency</div>' +
+          '<div class="reading-value waiting" id="net-ping-' + s.id + '" style="color:' + (s.color || '#4FC3F7') + '">&mdash;</div>' +
+        '</div>' +
+        '<div class="sensor-reading">' +
+          '<div class="reading-label">Success Rate</div>' +
+          '<div class="reading-value waiting" id="net-success-' + s.id + '">&mdash;</div>' +
+        '</div>' +
+        '<div class="sensor-reading">' +
+          '<div class="reading-label">Target</div>' +
+          '<div class="reading-value" id="net-target-' + s.id + '">' + target + '</div>' +
+        '</div>' +
+        '<div class="sensor-reading">' +
+          '<div class="reading-label">Last Seen</div>' +
+          '<div class="reading-time" id="net-lastseen-' + s.id + '">last: &mdash;</div>' +
+        '</div>' +
       '</div>' +
     '</div>'
   );
@@ -3861,6 +3927,49 @@ function startPolling() {
   }, 300000);
 }
 
+// ── Network card live data polling (/api/v2/live) ─────────────────
+// Network devices are not in the SSE state event stream — they use
+// periodic /api/v2/live polling to update card values. (v7.5.4.2)
+
+function updateNetworkCards(liveData) {
+  // liveData = response from /api/v2/live → { timestamp, devices: { wan_ping: { ping_ms, success_pct, last_seen } } }
+  if (!liveData || !liveData.devices) return;
+  SENSORS.forEach(function(s) {
+    if (s.category !== 'network') return;
+    var devData = liveData.devices[s.id];
+    if (!devData) return;
+
+    var pingEl = document.getElementById('net-ping-' + s.id);
+    if (pingEl && devData.ping_ms !== undefined && devData.ping_ms !== null) {
+      pingEl.textContent = METRIC_FORMATTERS.ping_latency(devData.ping_ms);
+      pingEl.classList.remove('waiting');
+    }
+
+    var successEl = document.getElementById('net-success-' + s.id);
+    if (successEl && devData.success_pct !== undefined && devData.success_pct !== null) {
+      successEl.textContent = METRIC_FORMATTERS.success_rate(devData.success_pct);
+      successEl.classList.remove('waiting');
+    }
+
+    var seenEl = document.getElementById('net-lastseen-' + s.id);
+    if (seenEl && devData.last_seen) {
+      var d = new Date(devData.last_seen * 1000);
+      seenEl.textContent = 'last: ' + d.toLocaleTimeString([], {hour12:false});
+    }
+  });
+}
+
+var _v2LiveInFlight = false;
+function pollV2Live() {
+  if (_v2LiveInFlight) return;
+  _v2LiveInFlight = true;
+  fetch(ESP_HOST + '/api/v2/live', {cache:'no-store'})
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(data) { updateNetworkCards(data); })
+    .catch(function(err) { dlog('v2/live poll: ' + err.message, 'err'); })
+    .then(function() { _v2LiveInFlight = false; });
+}
+
 // ╔════════════════════════════════════════════════════════════════╗
 // ║  INITIALIZATION                                                ║
 // ╚════════════════════════════════════════════════════════════════╝
@@ -3890,6 +3999,7 @@ try {
   App.Render.buildSensorCards = buildSensorCards;
   App.Render.buildDeviceCards = buildDeviceCards;
   App.Render.buildEnvironmentalCard = buildEnvironmentalCard;
+  App.Render.buildNetworkCard = buildNetworkCard;
   App.Render.bindEvents = bindEvents;
   App.Render.handleState = handleState;
   App.Charts.initCharts = initCharts;
@@ -3938,6 +4048,11 @@ App.Boot.start = function() {
     // BUG-037: Startup request staggering — spread non-critical requests across 5s
     // to avoid overwhelming the ESP32-C3 HTTP server (~4-7 concurrent connections).
     // See Docs/dashboard-stability-remediation-plan.md for full rationale.
+
+    // v7.5.4.2: Start /api/v2/live polling for network card live data updates.
+    // Network devices do not appear in SSE state events, so a periodic poll is needed.
+    setInterval(pollV2Live, 15000);
+    pollV2Live(); // initial fetch
 
     // BUG-043-cont (PR2) Fix A: In SSE mode, start the event stream first, then defer the
     // status snapshot ~2s. SSE 'state' events already carry initial live state so an
