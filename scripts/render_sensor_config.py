@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_manifest, manifest_v2
 
-VERSION = "7.5.4.0"
+VERSION = "7.5.4.1"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 MANIFEST_PATH = ROOT / "config" / "sensors.json"
@@ -112,6 +112,19 @@ def render_entity_block(sensors: List[Dict]) -> str:
         f"static constexpr int NUM_ENV_SENSORS = {len(thermopro)};",
         "static constexpr int NUM_SENSORS = NUM_ENV_SENSORS;  // backward compat alias for persisted environmental history",
         "",
+    ])
+
+    # Emit PING_DEVICE_INDEX / PING_TARGET for the first icmp_ping device
+    for i, s in enumerate(sensors):
+        if s.get("adapter") == "icmp_ping":
+            lines.extend([
+                f"#define PING_DEVICE_INDEX {i}",
+                f'#define PING_TARGET "{s["source"]["target"]}"',
+                "",
+            ])
+            break
+
+    lines.extend([
         "static SensorEntity devices[NUM_DEVICES] = {",
     ])
 
@@ -170,7 +183,7 @@ def render_js_block(sensors: List[Dict]) -> str:
     return "\n".join(lines)
 
 
-def avg_lines(sensor: Dict[str, str], idx: int) -> List[str]:
+def avg_lines(sensor: Dict, idx: int) -> List[str]:
     sid = sensor["id"]
     name = sensor["name"]
     return [
@@ -183,10 +196,24 @@ def avg_lines(sensor: Dict[str, str], idx: int) -> List[str]:
     ]
 
 
-def render_yaml_averaging(sensors: List[Dict[str, str]]) -> str:
+def render_yaml_averaging(sensors: List[Dict], all_sensors: List[Dict] = None) -> str:
+    """Generate the interval averaging lambda.
+    sensors     = ThermoPro-only list (existing behavior for compute_and_format calls).
+    all_sensors = full device list; adds compute_averages() for non-ThermoPro history devices."""
     lines = [YAML_AVG_BEGIN]
     for idx, sensor in enumerate(sensors):
         lines.extend(avg_lines(sensor, idx))
+
+    # Add compute_averages() for icmp_ping (and any future non-ThermoPro) devices
+    if all_sensors:
+        for i, s in enumerate(all_sensors):
+            if s.get("adapter") == "icmp_ping":
+                lines.extend([
+                    f" // ── {s['name']} (network) ──────────────────────────────",
+                    f" devices[{i}].compute_averages(epoch);",
+                    "",
+                ])
+
     while lines and lines[-1] == "":
         lines.pop()
     lines.append(YAML_AVG_END)
@@ -442,7 +469,7 @@ def render_yaml_file(path: Path, sensors: List[Dict]) -> str:
     text = re.sub(r"# ESP32-C3 Multi-Sensor Gateway - v[0-9.]+", f"# ESP32-C3 Multi-Sensor Gateway - v{VERSION}", text)
     text = re.sub(r'register_history_handler\((.*?), "v[0-9.]+"\);', rf'register_history_handler(\1, "v{VERSION}");', text, count=1)
     text = text.replace("v7.4.5.1", f"v{VERSION}")
-    text = apply_yaml_marker_block(text, YAML_AVG_BEGIN, YAML_AVG_END, unwrap_marker_body(render_yaml_averaging(ble_sensors), YAML_AVG_BEGIN, YAML_AVG_END))
+    text = apply_yaml_marker_block(text, YAML_AVG_BEGIN, YAML_AVG_END, unwrap_marker_body(render_yaml_averaging(ble_sensors, all_sensors=sensors), YAML_AVG_BEGIN, YAML_AVG_END))
     text = apply_yaml_marker_block(text, YAML_GROUP_BEGIN, YAML_GROUP_END, unwrap_marker_body(render_yaml_sorting_groups(ble_sensors), YAML_GROUP_BEGIN, YAML_GROUP_END))
     text = apply_yaml_marker_block(text, YAML_THERMO_BEGIN, YAML_THERMO_END, unwrap_marker_body(render_yaml_thermopro(ble_sensors), YAML_THERMO_BEGIN, YAML_THERMO_END))
     text = apply_yaml_marker_block(text, YAML_RSSI_BEGIN, YAML_RSSI_END, unwrap_marker_body(render_yaml_rssi(ble_sensors), YAML_RSSI_BEGIN, YAML_RSSI_END))

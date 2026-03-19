@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.5.4.0
+# ESP32-C3 Multi-Sensor Gateway - v7.5.4.1
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -52,9 +52,15 @@ esphome:
     priority: -100
     then:
       - lambda: |-
-          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.4.0");
+          register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.4.1");
           id(dashboard_link).publish_state(
             "Dashboard: /dashboard or /dashboard.html — Download: /dashboard-download");
+          #ifdef PING_DEVICE_INDEX
+          {
+            static PingAdapter ping_adapter;
+            ping_adapter.start(PING_DEVICE_INDEX, PING_TARGET);
+          }
+          #endif
 
 # ─── Chip and framework ─────────────────────────────────────────
 # ESP-IDF (not Arduino) for better BLE + WiFi coexistence.
@@ -164,6 +170,9 @@ time:
               id(avg_temp_outside).publish_state(devices[2].temp_avg_str);
               id(avg_hum_outside).publish_state(devices[2].hum_avg_str);
               if (devices[2].batt_last >= 0) id(battery_outside).publish_state(devices[2].batt_str);
+
+              // ── WAN Latency (network) ──────────────────────────────
+              devices[3].compute_averages(epoch);
               // <<< SENSOR_MANIFEST:AVERAGING_END >>>
 
               // ── Shared clock update ────────────────────────
