@@ -3,6 +3,98 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.4.2 — Phase 4 Step 2: Add Network Card Renderer to Dashboard — 2026-03-19
+
+### Network card renderer
+
+Adds `CARD_RENDERERS.network` to the dashboard to render the WAN ping probe as a network card.
+The `wan_ping` device now appears alongside the three ThermoPro environmental cards in the sensor
+grid. Environmental cards are pixel-identical to pre-Phase-4 — zero regression.
+
+**SENSORS filtering expanded** (`normalizeManifestSensors()`):
+- Removed `environmental`-only filter — all device categories are now included in SENSORS
+- Enables category-aware routing in `applySensorMeta()` and `buildDeviceCards()`
+
+**`makeNetworkSensorConfig(meta, idx)` (new)**:
+- Category-aware sensor config factory for non-ThermoPro devices
+- Produces `{ id, name, color, category: 'network', restPaths: [] }` — no ThermoPro entity IDs
+- Reused for both `network` and `system` categories
+
+**`applySensorMeta()` (updated)**:
+- Now dispatches by category: `network`/`system` → `makeNetworkSensorConfig()`, else → `makeSensorConfig()` (ThermoPro path)
+
+**`buildNetworkCard(s, manifest)` (new)**:
+- Renders `<div class="sensor-card network-card" data-device-id="...">` with:
+  - Color picker header (`#picker-{id}`)
+  - Latency display (`#net-ping-{id}`, styled in sensor color)
+  - Success rate display (`#net-success-{id}`)
+  - Target host display (`#net-target-{id}`, read from `manifest.sensors[i].source.target`)
+  - Last-seen timestamp (`#net-lastseen-{id}`)
+- No chart canvas (chart support is a later step per architecture plan)
+
+**`CARD_RENDERERS.network` (new)**: Registered in the card renderer registry
+
+**`METRIC_FORMATTERS.ping_latency` and `success_rate` (new)**:
+- `ping_latency(value, unit)` → `"N ms"` (or `"—"` for null/NaN)
+- `success_rate(value)` → `"N%"` (or `"—"` for null/NaN)
+
+**`updateNetworkCards(liveData)` (new)**:
+- Reads from `/api/v2/live` response, updates `#net-ping-{id}`, `#net-success-{id}`, `#net-lastseen-{id}`
+- Filters to `s.category === 'network'` sensors only
+
+**`pollV2Live()` (new)**:
+- Periodic `/api/v2/live` fetch (15 s interval) with in-flight guard (`_v2LiveInFlight`)
+- Network devices do not appear in SSE state events — polling is the correct data path
+- Started in boot flow after cards are built: `setInterval(pollV2Live, 15000); pollV2Live()`
+
+**Network card CSS** (`dashboard.html`):
+```css
+.network-card { border-left: 3px solid var(--accent-network, #4FC3F7); }
+.network-card .sensor-card-header { border-bottom-color: var(--accent-network, #4FC3F7); }
+```
+
+### Test updates
+
+- **Group 2**: "three sensor cards are rendered" → "four sensor cards are rendered (3 environmental + 1 network)"; `each sensor card contains value display elements` scoped to `.sensor-card:not(.network-card)`
+- **Group 11**: `environmental renderer dispatches correctly` count 3 → 4
+- **Group 14**: scenario 1 count 3 → 4; scenario 4 updated for 4-sensor SENSORS (network included)
+- **Group 15 test 6**: count 3 → 4
+- **`manifest.spec.js`**: `waitForDashboardReady(page, 4)` + sensors array includes `wan_ping`
+- **`sensor-count.spec.js`**: `getManifest()` updated to use `/api/manifest` v2 (includes all device categories)
+- **Group 17 (new)**: 8 tests for Phase 4 network card renderer
+  - Network card renders from manifest
+  - `#net-ping-wan_ping` and `#net-success-wan_ping` elements present
+  - `#net-target-wan_ping` shows target from manifest
+  - Environmental cards structurally identical (`.sensor-card:not(.network-card)`)
+  - `CARD_RENDERERS.network` is registered and callable
+  - `METRIC_FORMATTERS.ping_latency` / `success_rate` registered and correct
+  - `makeNetworkSensorConfig()` produces correct config (no ThermoPro entity IDs)
+  - SENSORS includes `wan_ping` with length 4
+  - `updateNetworkCards()` populates DOM values from live data
+
+### Files changed
+
+- `dashboard/dashboard.js` — `makeNetworkSensorConfig()`, `applySensorMeta()` dispatch, `normalizeManifestSensors()` filter removal, `METRIC_FORMATTERS.ping_latency/success_rate`, `CARD_RENDERERS.network`, `buildNetworkCard()`, `updateNetworkCards()`, `pollV2Live()`, `App.Render.buildNetworkCard` export, boot-flow `pollV2Live` start, version bump
+- `dashboard/dashboard.html` — mirrored all JS changes (LESSON-OPS-043), network card CSS added, version bump
+- `dashboard/dashboard.h` — regenerated (gzip)
+- `tests/browser/dashboard.spec.js` — updated Groups 2, 11, 14, 15; added Group 17
+- `tests/browser/manifest.spec.js` — updated `waitForDashboardReady` count 3→4, expected sensors include `wan_ping`
+- `tests/browser/sensor-count.spec.js` — `getManifest()` uses `/api/manifest` v2 endpoint
+- `tests/fixtures/manifest.json` — version bump (regenerated)
+- `tests/fixtures/api-status.json` — version bump (regenerated)
+- `src/gateway_manifest.h` — version bump (regenerated)
+- `firmware/esp32-c3-multi-sensor.yaml` — version bump (regenerated)
+- `dashboard/sensor_history_multi.h` — version bump (regenerated)
+- `scripts/render_sensor_config.py` — version bump
+- `VERSION` — `7.5.4.2`
+
+### Test results
+
+- 98 Playwright tests pass on Chromium (was 88 × 2 = 176 total; 10 new tests × 2 browsers = 196 total)
+- 98 Playwright tests pass on Firefox
+- `bash scripts/preflight.sh` — all checks pass
+
+---
 ## v7.5.4.1 — Phase 4 Step 1: Implement ICMP Ping Adapter — 2026-03-19
 
 ### ICMP ping adapter (PingAdapter class)
