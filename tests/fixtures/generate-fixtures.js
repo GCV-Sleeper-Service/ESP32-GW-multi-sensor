@@ -21,6 +21,16 @@ const SENSOR_LIBRARY = [
   { id: 'garage', name: 'Garage', tempBase: 12.8, humBase: 57 },
 ];
 
+// Network device always appended to every variant — reflects the real firmware
+// configuration where wan_ping is present alongside BLE environmental sensors.
+const WAN_PING_DEVICE = {
+  id: 'wan_ping',
+  name: 'WAN Latency',
+  category: 'network',
+  adapter: 'icmp_ping',
+  source: { target: '8.8.8.8' },
+};
+
 const ANCHOR_EPOCH_SEC = 1741694400; // 2025-03-11 12:00:00 UTC
 const POINTS = 96;
 const INTERVAL_SEC = 15 * 60;
@@ -231,7 +241,8 @@ function writeFixtureSet(targetDir, sensors, tag) {
 }
 
 function writeVariant(count) {
-  const sensors = materializeSensors(SENSOR_LIBRARY.slice(0, count));
+  const bleSensors = materializeSensors(SENSOR_LIBRARY.slice(0, count));
+  const sensors = [...bleSensors, materializeSensors([WAN_PING_DEVICE])[0]];
   const dir = path.join(VARIANTS_ROOT, `${count}sensor`);
   writeFixtureSet(dir, sensors, `${count}sensor`);
   console.log(`generated variant: ${count}sensor -> ${dir}`);

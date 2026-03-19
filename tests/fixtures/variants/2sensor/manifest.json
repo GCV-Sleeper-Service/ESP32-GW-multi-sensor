@@ -2,13 +2,13 @@
   "ok": true,
   "schema_version": 2,
   "source": "2sensor",
-  "version": "v7.5.4.0",
+  "version": "v7.5.4.2",
   "gateway": {
     "id": "gw-main",
     "name": "Main Gateway",
     "role": "satellite",
     "hardware": "ESP32-C3",
-    "firmware_version": "v7.5.4.0",
+    "firmware_version": "v7.5.4.2",
     "api_version": "v2"
   },
   "history": {
@@ -17,7 +17,7 @@
     "ram_window_hours": 24,
     "sample_interval_seconds": 900
   },
-  "sensor_count": 2,
+  "sensor_count": 3,
   "metrics": [
     {
       "key": "temp",
@@ -92,6 +92,25 @@
         {
           "key": "hum",
           "history_url": "/history/first_floor/hum"
+        }
+      ]
+    },
+    {
+      "id": "wan_ping",
+      "name": "WAN Latency",
+      "category": "network",
+      "adapter": "icmp_ping",
+      "source": {
+        "target": "8.8.8.8"
+      },
+      "measurements": [
+        {
+          "key": "ping_ms",
+          "history_url": "/api/v2/history/wan_ping/ping_ms"
+        },
+        {
+          "key": "success_pct",
+          "history_url": "/api/v2/history/wan_ping/success_pct"
         }
       ]
     }
