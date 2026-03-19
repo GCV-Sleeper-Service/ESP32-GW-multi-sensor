@@ -653,8 +653,10 @@ static HistoryMeta default_history_meta_() {
   return meta;
 }
 
-static bool load_history_meta_(nvs_handle_t handle, HistoryMeta *meta) {
+static bool load_history_meta_(nvs_handle_t handle, HistoryMeta *meta,
+                               bool *needs_nvs_persist = nullptr) {
   if (meta == nullptr) return false;
+  if (needs_nvs_persist) *needs_nvs_persist = false;
 
   size_t sz = sizeof(HistoryMeta);
   esp_err_t err = nvs_get_blob(handle, "hist_meta", meta, &sz);
@@ -663,6 +665,7 @@ static bool load_history_meta_(nvs_handle_t handle, HistoryMeta *meta) {
     return false;
   }
 
+  // Full schema match — meta is valid as-is.
   bool valid = meta->magic == HISTORY_META_MAGIC &&
                meta->version == HISTORY_META_VERSION &&
                meta->num_sensors == NUM_SENSORS &&
@@ -670,12 +673,38 @@ static bool load_history_meta_(nvs_handle_t handle, HistoryMeta *meta) {
                meta->points_per_segment == PERSIST_POINTS_PER_SEGMENT &&
                meta->valid_segments <= PERSIST_SLOTS &&
                meta->next_slot < PERSIST_SLOTS;
-  if (!valid) {
-    ESP_LOGW(TAG, "history meta invalid or schema mismatch — resetting");
-    *meta = default_history_meta_();
-    return false;
+  if (valid) return true;
+
+  // BUG-046: Check for recoverable stale num_sensors from the temporary
+  // NUM_SENSORS=4 build. All other schema fields must still match current
+  // expectations — only num_sensors is allowed to differ.
+  bool schema_ok = meta->magic == HISTORY_META_MAGIC &&
+                   meta->version == HISTORY_META_VERSION &&
+                   meta->points_per_series == HISTORY_POINTS_PER_SERIES &&
+                   meta->points_per_segment == PERSIST_POINTS_PER_SEGMENT;
+  if (schema_ok && meta->num_sensors != NUM_SENSORS) {
+    ESP_LOGW(TAG, "BUG-046 migration: stale hist_meta num_sensors=%u, expected %u — correcting",
+             (unsigned)meta->num_sensors, (unsigned)NUM_SENSORS);
+    meta->num_sensors = NUM_SENSORS;
+    // Preserve segment bookkeeping only if within valid bounds.
+    if (meta->valid_segments > PERSIST_SLOTS) meta->valid_segments = 0;
+    if (meta->next_slot >= PERSIST_SLOTS) meta->next_slot = 0;
+    if (meta->last_written_slot != 0xFFFF && meta->last_written_slot >= PERSIST_SLOTS)
+      meta->last_written_slot = 0xFFFF;
+    // last_persist_epoch preserved as-is.
+    if (needs_nvs_persist) *needs_nvs_persist = true;
+    return true;
   }
-  return true;
+
+  // True corruption or incompatible schema — unrecoverable, reset to default.
+  ESP_LOGW(TAG, "history meta corrupt or incompatible — resetting to default "
+           "(magic=0x%08X version=%u sensors=%u pts_series=%u pts_seg=%u)",
+           (unsigned)meta->magic, (unsigned)meta->version,
+           (unsigned)meta->num_sensors, (unsigned)meta->points_per_series,
+           (unsigned)meta->points_per_segment);
+  *meta = default_history_meta_();
+  if (needs_nvs_persist) *needs_nvs_persist = true;
+  return false;
 }
 
 static bool save_history_meta_(nvs_handle_t handle, const HistoryMeta &meta) {
@@ -910,12 +939,32 @@ static bool restore_from_nvs() {
   if (!open_history_nvs_(&handle, NVS_READONLY)) return false;
 
   HistoryMeta meta;
-  bool have_meta = load_history_meta_(handle, &meta);
+  bool needs_nvs_persist = false;
+  bool have_meta = load_history_meta_(handle, &meta, &needs_nvs_persist);
+  nvs_close(handle);
+
+  // BUG-046: persist corrected/default meta back to NVS to break the
+  // stale-meta loop where an old num_sensors=4 blob was never overwritten.
+  if (needs_nvs_persist) {
+    nvs_handle_t wh;
+    if (open_history_nvs_(&wh, NVS_READWRITE)) {
+      if (save_history_meta_(wh, meta)) {
+        ESP_LOGI(TAG, "Persisted %s history meta to NVS",
+                 have_meta ? "migrated" : "default");
+      } else {
+        ESP_LOGE(TAG, "Failed to persist corrected history meta to NVS");
+      }
+      nvs_close(wh);
+    }
+  }
+
   if (!have_meta || meta.valid_segments == 0) {
-    nvs_close(handle);
     ESP_LOGI(TAG, "No persisted history segments to restore");
     return false;
   }
+
+  // Re-open read-only for snapshot restore loop.
+  if (!open_history_nvs_(&handle, NVS_READONLY)) return false;
 
   SegmentSnapshot *snapshot = allocate_snapshot_();
   if (snapshot == nullptr) {
