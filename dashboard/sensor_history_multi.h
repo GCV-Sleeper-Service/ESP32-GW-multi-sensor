@@ -1233,8 +1233,7 @@ class PingAdapter {
         continue;
       }
       auto* sa = reinterpret_cast<struct sockaddr_in*>(res->ai_addr);
-      target_addr.type           = IPADDR_TYPE_V4;
-      target_addr.u_addr.ip4.addr = sa->sin_addr.s_addr;
+      ip4_addr_set_u32(&target_addr, sa->sin_addr.s_addr);
       lwip_freeaddrinfo(res);
 
       // ── 3. Configure and run ping session ───────────────────────
