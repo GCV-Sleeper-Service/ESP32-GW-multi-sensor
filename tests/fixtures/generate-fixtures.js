@@ -12,7 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
-const VERSION = 'v7.5.4.2';
+const VERSION = 'v7.5.4.3';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },
@@ -248,6 +248,50 @@ function writeVariant(count) {
   console.log(`generated variant: ${count}sensor -> ${dir}`);
 }
 
+function buildPingCsvLines(metricKey, pointCount) {
+  // Anchor 24h in the past so timestamps are within last 24h
+  const anchor = ANCHOR_EPOCH_SEC;
+  const lines = [];
+  for (let i = 0; i < pointCount; i++) {
+    const ts = anchor - (pointCount - 1 - i) * INTERVAL_SEC;
+    let val;
+    if (metricKey === 'ping_ms') {
+      // Realistic ping latency 5–50 ms with slight variation
+      const noise = (pseudoRand(i * 37 + 7) - 0.5) * 20.0;
+      val = Math.max(5, Math.min(50, 15 + noise)).toFixed(1);
+    } else {
+      // success_pct: 95–100%
+      const noise = pseudoRand(i * 41 + 3) * 5.0;
+      val = Math.min(100, 95 + noise).toFixed(1);
+    }
+    lines.push(`${ts},${val}`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+function generateMixedFixtures() {
+  // Mixed variant: 2 ThermoPro BLE sensors + 1 wan_ping network device
+  const bleSensors = materializeSensors(SENSOR_LIBRARY.slice(0, 2));
+  const pingSensor = materializeSensors([WAN_PING_DEVICE])[0];
+  const sensors = [...bleSensors, pingSensor];
+  const dir = path.join(VARIANTS_ROOT, 'mixed');
+
+  writeFixtureSet(dir, sensors, 'mixed');
+
+  // Overwrite stub ping CSV files with realistic data (10 points per metric)
+  const PING_POINTS = 12;
+  fs.writeFileSync(
+    path.join(dir, 'history-wan_ping-ping_ms.csv'),
+    buildPingCsvLines('ping_ms', PING_POINTS)
+  );
+  fs.writeFileSync(
+    path.join(dir, 'history-wan_ping-success_pct.csv'),
+    buildPingCsvLines('success_pct', PING_POINTS)
+  );
+
+  console.log(`generated variant: mixed -> ${dir}`);
+}
+
 (function main() {
   const args = process.argv.slice(2);
   let targetCount = null;
@@ -296,6 +340,7 @@ function writeVariant(count) {
   }
 
   [1, 2, 3, 4].forEach(writeVariant);
+  generateMixedFixtures();
   if (overwriteBaseline) {
     console.error('Warning: --overwrite-baseline requires either --count N or --manifest <path>. Skipped baseline overwrite.');
   }

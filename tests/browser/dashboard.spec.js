@@ -1277,3 +1277,75 @@ test.describe('17. Phase 4 Step 2 — Network Card Renderer', () => {
     expect(successText).toBe('100%');
   });
 });
+
+// ── 18. Mixed-Category Rendering (Phase 4 Step 3) ─────────────────────
+test.describe('18. Mixed-Category Rendering', () => {
+  test.setTimeout(90000);
+
+  test('mixed manifest renders correct total card count', async ({ page }) => {
+    await loadDashboard(page, { timeout: 30000 });
+    const expectedCount = await page.evaluate(() => {
+      return window._manifest && window._manifest.sensors ? window._manifest.sensors.length : 0;
+    });
+    const cards = page.locator('.sensor-card');
+    await expect(cards).toHaveCount(expectedCount);
+  });
+
+  test('environmental cards have full ThermoPro layout elements', async ({ page }) => {
+    await loadDashboard(page, { timeout: 30000 });
+    const envCount = await page.evaluate(() => {
+      if (!window._manifest || !window._manifest.sensors) return 0;
+      return window._manifest.sensors.filter(function(s) { return s.category === 'environmental'; }).length;
+    });
+    const envCards = page.locator('.sensor-card:not(.network-card)');
+    await expect(envCards).toHaveCount(envCount);
+    // Each should have reading-label "Temperature"
+    const tempLabels = page.locator('.sensor-card:not(.network-card) .reading-label:text("Temperature")');
+    await expect(tempLabels).toHaveCount(envCount);
+  });
+
+  test('network card renders with latency and success rate elements', async ({ page }) => {
+    await loadDashboard(page, { timeout: 30000 });
+    const netCard = page.locator('.network-card');
+    await expect(netCard).toHaveCount(1);
+    // Check for latency element
+    await expect(page.locator('#net-ping-wan_ping')).toBeVisible();
+    // Check for success rate element
+    await expect(page.locator('#net-success-wan_ping')).toBeVisible();
+  });
+
+  test('CARD_RENDERERS dispatches correctly by category', async ({ page }) => {
+    await loadDashboard(page, { timeout: 30000 });
+    const hasNetworkRenderer = await page.evaluate(() => {
+      return typeof CARD_RENDERERS.network === 'function';
+    });
+    expect(hasNetworkRenderer).toBe(true);
+  });
+
+  test('chart canvases exist for environmental devices', async ({ page }) => {
+    await loadDashboard(page, { timeout: 30000 });
+    // Environmental devices should have chart canvases
+    const tempCanvas = page.locator('#tempChart');
+    await expect(tempCanvas).toBeVisible();
+  });
+
+  test('/api/v2/live returns data for both device categories', async ({ page, request }) => {
+    const response = await request.get('/api/v2/live');
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    expect(data.devices).toBeDefined();
+    expect(data.devices.office).toBeDefined();
+    expect(data.devices.wan_ping).toBeDefined();
+    expect(data.devices.wan_ping.ping_ms).toBeDefined();
+  });
+
+  test('manifest v2 contains both environmental and network devices', async ({ page }) => {
+    await loadDashboard(page, { timeout: 30000 });
+    const categories = await page.evaluate(() => {
+      if (!window._manifest || !window._manifest.sensors) return [];
+      return window._manifest.sensors.map(function(s) { return s.category; });
+    });
+    expect(categories).toContain('environmental');
+    expect(categories).toContain('network');
+  });
+});

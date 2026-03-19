@@ -3,6 +3,73 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.4.3 — Phase 4 Step 3: Mixed-Category Test Fixtures and Playwright Tests — 2026-03-19
+
+### Mixed-category test fixtures
+
+Creates `tests/fixtures/variants/mixed/` — a new fixture variant representing a deployment with
+2 ThermoPro BLE environmental sensors (office, first_floor) plus 1 WAN ping network device.
+
+**Files created in `tests/fixtures/variants/mixed/`:**
+- `manifest.json` — v2 manifest: 2 environmental + 1 network device, `sensor_count: 3`
+- `sensors.json` — v1 legacy projection: environmental sensors only (office, first_floor)
+- `api-status.json` — gateway status fixture, version 7.5.4.3
+- `storage-stats.json` — storage stats fixture
+- `history-office-temp.csv` — Office temperature history (96 points, 15-min intervals)
+- `history-office-hum.csv` — Office humidity history
+- `history-first_floor-temp.csv` — First Floor temperature history
+- `history-first_floor-hum.csv` — First Floor humidity history
+- `history-wan_ping-ping_ms.csv` — Ping latency history (12 points, realistic 5–50 ms values)
+- `history-wan_ping-success_pct.csv` — Ping success rate history (12 points, 95–100%)
+
+### Mock server update (`tests/mock-server/server.js`)
+
+- `/api/v2/live`: `icmp_ping` devices now return realistic non-null values
+  (`ping_ms: 12.5, success_pct: 100.0`) instead of `null` — required for live-value assertions
+
+### Fixture generator update (`tests/fixtures/generate-fixtures.js`)
+
+- Version bumped to `v7.5.4.3`
+- Added `buildPingCsvLines(metricKey, pointCount)` — generates realistic ping history CSVs
+- Added `generateMixedFixtures()` — produces the `mixed` variant (2 env + 1 network)
+- `main()` now calls `generateMixedFixtures()` alongside the 1–4sensor variants
+
+### Playwright tests — Group 18: Mixed-Category Rendering
+
+Added `test.describe('18. Mixed-Category Rendering', ...)` in `tests/browser/dashboard.spec.js`
+(7 new tests, total 105 tests):
+
+1. `mixed manifest renders correct total card count` — total cards equals manifest sensor count
+2. `environmental cards have full ThermoPro layout elements` — env card count and Temperature labels match manifest
+3. `network card renders with latency and success rate elements` — exactly 1 `.network-card`, `#net-ping-wan_ping` and `#net-success-wan_ping` visible
+4. `CARD_RENDERERS dispatches correctly by category` — `CARD_RENDERERS.network` is a function
+5. `chart canvases exist for environmental devices` — `#tempChart` visible
+6. `/api/v2/live returns data for both device categories` — `devices.office` and `devices.wan_ping.ping_ms` defined
+7. `manifest v2 contains both environmental and network devices` — `_manifest.sensors` contains both categories
+
+All tests are fixture-agnostic: counts are derived dynamically from `window._manifest.sensors`
+so they pass with any fixture variant (mixed: 3 total, 3sensor/root: 4 total).
+
+### Test results
+
+| Run | Result |
+|-----|--------|
+| `FIXTURE_SET=3sensor npx playwright test --project=chromium` | 105 passed |
+| `FIXTURE_SET=3sensor npx playwright test --project=firefox` | 105 passed |
+| `npx playwright test --project=chromium` (root) | 105 passed |
+| `npx playwright test --project=firefox` (root) | 105 passed |
+| `FIXTURE_SET=mixed npx playwright test --project=chromium --grep "Mixed-Category"` | 7 passed |
+| `FIXTURE_SET=mixed npx playwright test --project=firefox --grep "Mixed-Category"` | 7 passed |
+
+### Files changed
+
+- `tests/fixtures/generate-fixtures.js`
+- `tests/fixtures/variants/mixed/` (10 new files)
+- `tests/mock-server/server.js`
+- `tests/browser/dashboard.spec.js`
+- `VERSION`, `Docs/changelog.md`, `prompts/prompt-index-and-workflow.md`
+
+---
 ## v7.5.4.2 — Phase 4 Step 2: Add Network Card Renderer to Dashboard — 2026-03-19
 
 ### Network card renderer
