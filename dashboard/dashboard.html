@@ -1358,7 +1358,7 @@ function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
   var header = getMergedExportColumns(sensors);
   var union = {};
   sensorRowsList.forEach(function(rows, idx) {
-    if (!rows) return; // BUG-046: skip sensors with no data after migration/failure
+    if (!rows) return; // BUG-046: guard against undefined/null entries (empty [] iterates safely)
     rows.forEach(function(row) {
       if (!union[row.timestamp]) {
         union[row.timestamp] = { timestamp: row.timestamp, datetime_utc: row.datetime_utc, sensorData: {} };

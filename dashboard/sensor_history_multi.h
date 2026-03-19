@@ -687,10 +687,21 @@ static bool load_history_meta_(nvs_handle_t handle, HistoryMeta *meta,
              (unsigned)meta->num_sensors, (unsigned)NUM_SENSORS);
     meta->num_sensors = NUM_SENSORS;
     // Preserve segment bookkeeping only if within valid bounds.
-    if (meta->valid_segments > PERSIST_SLOTS) meta->valid_segments = 0;
-    if (meta->next_slot >= PERSIST_SLOTS) meta->next_slot = 0;
-    if (meta->last_written_slot != 0xFFFF && meta->last_written_slot >= PERSIST_SLOTS)
+    if (meta->valid_segments > PERSIST_SLOTS) {
+      ESP_LOGW(TAG, "  valid_segments %u out of range — resetting to 0",
+               (unsigned)meta->valid_segments);
+      meta->valid_segments = 0;
+    }
+    if (meta->next_slot >= PERSIST_SLOTS) {
+      ESP_LOGW(TAG, "  next_slot %u out of range — resetting to 0",
+               (unsigned)meta->next_slot);
+      meta->next_slot = 0;
+    }
+    if (meta->last_written_slot != 0xFFFF && meta->last_written_slot >= PERSIST_SLOTS) {
+      ESP_LOGW(TAG, "  last_written_slot %u out of range — resetting to 0xFFFF",
+               (unsigned)meta->last_written_slot);
       meta->last_written_slot = 0xFFFF;
+    }
     // last_persist_epoch preserved as-is.
     if (needs_nvs_persist) *needs_nvs_persist = true;
     return true;
