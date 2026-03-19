@@ -770,7 +770,20 @@ static bool load_snapshot_from_handle_(nvs_handle_t handle, int slot,
 
   size_t sz = sizeof(SegmentSnapshot);
   esp_err_t err = nvs_get_blob(handle, key, snapshot, &sz);
-  if (err != ESP_OK) return false;
+  if (err != ESP_OK) {
+    // BUG-048: Segments written with a different NUM_SENSORS compile-time
+    // constant have a physically different blob size (e.g. NUM_SENSORS=4 →
+    // 298 bytes vs NUM_SENSORS=3 → 230 bytes).  nvs_get_blob returns
+    // ESP_ERR_NVS_INVALID_LENGTH when the stored blob doesn't match the
+    // provided buffer size.  This is unrecoverable without a complex cross-
+    // schema deserializer, so we log it clearly and skip.
+    if (err == ESP_ERR_NVS_INVALID_LENGTH) {
+      ESP_LOGW(TAG, "snapshot %s size mismatch: stored=%u expected=%u — "
+               "likely written with different NUM_SENSORS (BUG-048)",
+               key, (unsigned)sz, (unsigned)sizeof(SegmentSnapshot));
+    }
+    return false;
+  }
 
   bool valid = snapshot->header.magic == HISTORY_META_MAGIC &&
                snapshot->header.version == HISTORY_META_VERSION &&
@@ -995,15 +1008,50 @@ static bool restore_from_nvs() {
   int first_restore_slot = (oldest_valid_slot + start_offset) % PERSIST_SLOTS;
 
   int restored = 0;
+  int skipped_size_mismatch = 0;
   for (int n = 0; n < restore_segments; n++) {
     maybe_yield_nvs_scan_(n);  // BUG-043: yield every 4 blobs to avoid HTTP task starvation
     int slot = (first_restore_slot + n) % PERSIST_SLOTS;
-    if (!load_snapshot_from_handle_(handle, slot, snapshot)) continue;
+    if (!load_snapshot_from_handle_(handle, slot, snapshot)) {
+      skipped_size_mismatch++;
+      continue;
+    }
     append_snapshot_to_ram_(*snapshot);
     restored++;
   }
   nvs_close(handle);
   delete snapshot;
+
+  // BUG-048: If some segments in the restore window were unloadable (e.g.
+  // written with a different NUM_SENSORS compile-time constant and thus a
+  // different SegmentSnapshot byte size), the meta's valid_segments count is
+  // inflated — it includes ghost references to incompatible blobs.  Recalibrate
+  // valid_segments to match only the actually-restorable segments so that:
+  //   (a) subsequent boots don't waste time retrying unloadable slots
+  //   (b) the restore window calculation targets only readable segments
+  //   (c) future persist_hourly_segment() calls correctly grow valid_segments
+  //       from the recalibrated baseline as new compatible segments are written
+  if (skipped_size_mismatch > 0 && restored < restore_segments) {
+    ESP_LOGW(TAG, "BUG-048: %d of %d segments unloadable (size/schema mismatch) "
+             "— recalibrating meta from valid_segments=%u to %d",
+             skipped_size_mismatch, restore_segments,
+             (unsigned)meta.valid_segments, restored);
+    meta.valid_segments = restored;
+    // next_slot remains correct — it points to where the next write goes.
+    // The recalibrated valid_segments means the "valid window" now covers
+    // only the most recent `restored` slots behind next_slot.
+    nvs_handle_t wh;
+    if (open_history_nvs_(&wh, NVS_READWRITE)) {
+      if (save_history_meta_(wh, meta)) {
+        ESP_LOGI(TAG, "BUG-048: persisted recalibrated meta "
+                 "(valid_segments=%u, next_slot=%u)",
+                 (unsigned)meta.valid_segments, (unsigned)meta.next_slot);
+      } else {
+        ESP_LOGE(TAG, "BUG-048: failed to persist recalibrated meta");
+      }
+      nvs_close(wh);
+    }
+  }
 
   if (restored <= 0) {
     ESP_LOGW(TAG, "Persisted history exists but nothing was restorable");

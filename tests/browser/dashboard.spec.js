@@ -44,8 +44,17 @@ async function stopDashboardNetwork(page) {
         suspendDashboardNetworkActivity();
         return;
       }
+      // BUG-049: Null out EventSource callbacks BEFORE close. Firefox's Gecko
+      // engine holds the SSE TCP socket open if callbacks are still attached,
+      // causing browserContext.close() to hang for ~49s during Playwright
+      // teardown and exceeding the 30s test timeout.
       if (window.evtSource && typeof window.evtSource.close === 'function') {
-        try { window.evtSource.close(); } catch (_) {}
+        try {
+          window.evtSource.onopen = null;
+          window.evtSource.onerror = null;
+          window.evtSource.onmessage = null;
+          window.evtSource.close();
+        } catch (_) {}
         window.evtSource = null;
       }
     });
@@ -580,20 +589,25 @@ test.describe('12. Metric formatter registry', () => {
 // ── 13. Manifest-driven history fetching ─────────────────────────
 
 test.describe('13. Manifest-driven history fetching', () => {
+  // BUG-049: Firefox's slower event loop + SSE teardown requires longer
+  // timeouts.  90s test timeout accounts for ~49s worst-case SSE teardown.
+  // 30s loadDashboard timeout accounts for slower Gecko DOM rendering.
+  test.setTimeout(90000);
+
   test('fetchDeviceHistory is a callable function', async ({ page }) => {
-    await loadDashboard(page);
+    await loadDashboard(page, { timeout: 30000 });
     const ok = await page.evaluate(() => typeof fetchDeviceHistory === 'function');
     expect(ok).toBe(true);
   });
 
   test('App.API.fetchDeviceHistory is exported', async ({ page }) => {
-    await loadDashboard(page);
+    await loadDashboard(page, { timeout: 30000 });
     const ok = await page.evaluate(() => typeof App.API.fetchDeviceHistory === 'function');
     expect(ok).toBe(true);
   });
 
   test('fetchDeviceHistory uses history_url from manifest measurements', async ({ page }) => {
-    await loadDashboard(page);
+    await loadDashboard(page, { timeout: 30000 });
 
     // Intercept subsequent history requests (after initial page load)
     const requestedUrls = [];
@@ -618,7 +632,7 @@ test.describe('13. Manifest-driven history fetching', () => {
   });
 
   test('fetchDeviceHistory falls back to legacy URLs when manifest is null', async ({ page }) => {
-    await loadDashboard(page);
+    await loadDashboard(page, { timeout: 30000 });
 
     const requestedUrls = [];
     await page.route('**/history/**', (route) => {
@@ -636,7 +650,7 @@ test.describe('13. Manifest-driven history fetching', () => {
   });
 
   test('fetchDeviceHistory falls back to legacy URLs when manifest has no matching sensor', async ({ page }) => {
-    await loadDashboard(page);
+    await loadDashboard(page, { timeout: 30000 });
 
     const requestedUrls = [];
     await page.route('**/history/**', (route) => {

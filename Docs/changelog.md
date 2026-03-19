@@ -5,6 +5,36 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 ---
 ## v7.5.4.0 — Phase 4 Step 0: Add Ping Probe Device to Manifest and Generator — 2026-03-18
 
+### NVS snapshot recovery fix (BUG-048 — 2026-03-19)
+
+After the BUG-046 meta migration fix (PR #53), the dashboard loaded history but only showed ~36
+data points (approximately 9 hours of post-fix data). Full retained history was missing.
+
+**Root cause:** `SegmentSnapshot` blobs written during the `NUM_SENSORS=4` period have a physically
+different byte size than the corrected `NUM_SENSORS=3` struct. `nvs_get_blob()` returns
+`ESP_ERR_NVS_INVALID_LENGTH` when the stored blob is larger than the buffer — the data is never
+read. The restore loop silently skipped all incompatible segments but never recalibrated the meta
+to reflect the reduced valid segment count.
+
+**Fix:**
+- `load_snapshot_from_handle_()`: diagnostic logging for `ESP_ERR_NVS_INVALID_LENGTH`
+- `restore_from_nvs()`: after restore loop, recalibrate `meta.valid_segments` to match only
+  successfully restored segments when size/schema mismatches are detected; persist recalibrated
+  meta back to NVS
+
+### Firefox Playwright test fix (BUG-049 — 2026-03-19)
+
+Two Firefox-only failures in Group 13 (Manifest-driven history fetching) fixed.
+
+**Root cause:** Firefox holds SSE EventSource TCP connections open during `browserContext.close()`
+if callbacks aren't nulled before `.close()`. Group 13 used default 15s timeout insufficient for
+Firefox's slower boot sequence.
+
+**Fix:**
+- `stopDashboardNetwork()`: null out `onopen/onerror/onmessage` before `evtSource.close()`
+- `suspendDashboardNetworkActivity()` in `dashboard.js` + `dashboard.html`: same pattern
+- Group 13: `test.setTimeout(90000)`, `loadDashboard({ timeout: 30000 })`
+
 ### Persistence compatibility fix (BUG-045)
 
 The original v7.5.4.0 merge contained a regression: `NUM_SENSORS = NUM_DEVICES` caused the
