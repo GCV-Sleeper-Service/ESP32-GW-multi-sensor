@@ -248,7 +248,7 @@ function buildPingCsvLines(metricKey, pointCount) {
     const ts = anchor - (pointCount - 1 - i) * INTERVAL_SEC;
     let val;
     if (metricKey === 'ping_ms') {
-      // Realistic LAN/WAN ping: 15 ms median, ±10 ms noise, clamped to 5–50 ms.
+      // Realistic WAN ping latency: 15 ms median, ±10 ms noise, clamped to 5–50 ms.
       // Mirrors the acceptable range from the firmware ICMP adapter (ESP32-C3 to 8.8.8.8).
       const noise = (pseudoRand(i * 37 + 7) - 0.5) * 20.0;
       val = Math.max(5, Math.min(50, 15 + noise)).toFixed(1);
