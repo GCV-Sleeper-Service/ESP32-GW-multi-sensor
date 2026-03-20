@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-20 — BUG-051 11 tests fail with FIXTURE_SET=mixed (no skip guards), PR-057 implementation issues, LESSON-OPS-063 added_
+_Last updated: 2026-03-20 — v7.5.4.4 Phase 4 closure. BUG-051 and LESSON-OPS-063 remain current. No new bugs found during Phase 4 closure step._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
