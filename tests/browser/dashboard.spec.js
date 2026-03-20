@@ -116,11 +116,13 @@ test.describe('1. Boot and structure', () => {
 
 test.describe('2. Sensor cards', () => {
   test('four sensor cards are rendered (3 environmental + 1 network)', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Card count (4) is 3sensor-specific; mixed fixture has 3 sensors (2 env + 1 network).');
     await loadDashboard(page);
     await expect(page.locator('.sensor-card')).toHaveCount(4);
   });
 
   test('sensor card headers contain expected sensor names', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor name list includes Outside which is absent from the mixed fixture.');
     await loadDashboard(page);
     // Name is a raw text node inside .sensor-card-header — no dedicated title class
     for (const name of ['Office', 'First Floor', 'Outside']) {
@@ -477,6 +479,7 @@ test.describe('11. Card renderer registry', () => {
   });
 
   test('environmental renderer dispatches correctly and produces sensor cards', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Post-buildDeviceCards card count (4) is 3sensor-specific; mixed fixture has 3 sensors.');
     await loadDashboard(page);
     // Wait for manifest and cards
     await page.waitForFunction(() => window._manifest && window._manifest.sensors, { timeout: 10000 });
@@ -690,6 +693,7 @@ test.describe('13. Manifest-driven history fetching', () => {
 test.describe('14. Phase 2 Closure — Full Regression', () => {
   // Scenario 1: full v2 manifest → correct rendering
   test('scenario 1: sensor cards render correctly when /api/manifest returns full v2 manifest', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (4) and Outside name are 3sensor-specific; mixed fixture has 3 sensors (no outside).');
     // Default mock server serves full v2 manifest from /api/manifest.
     // The source field reflects the active fixture set (e.g. 'active-manifest', '3sensor') —
     // the critical assertion is that it is NOT 'auto-promoted', which would indicate the
@@ -710,6 +714,7 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
 
   // Scenario 2: /api/manifest → 404, falls back to /sensors.json → still renders
   test('scenario 2: sensor cards render correctly when /api/manifest returns 404 (fallback to /sensors.json)', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'sensors.json fallback expects outside sensor; mixed sensors.json has only 2 entries (no outside).');
     await page.route('**/api/manifest', route => {
       route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false }) });
     });
@@ -759,6 +764,7 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
 
   // Scenario 4: environmental card renderer dispatches correctly
   test('scenario 4: environmental card renderer dispatches correctly for all sensors', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'expectedSensorCount (4) and envSensors.length (3) are 3sensor-specific; mixed fixture has 2 env sensors + 1 network = 3 total.');
     // v7.5.4.2: SENSORS now includes network devices, so getSensors() returns 4.
     // Environmental sensors are 3; network devices add 1 more.
     await loadDashboard(page, { expectedSensorCount: 4 });
@@ -979,6 +985,7 @@ test.describe('15. Phase 3 Closure — v2 API Regression', () => {
 
   // Test 6: Dashboard renders identically with new endpoints
   test('dashboard renders identically with new endpoints', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (4) and Outside name are 3sensor-specific; mixed fixture has 3 sensors (no outside).');
     await loadDashboard(page);
     await waitForConnected(page);
     // 3 environmental + 1 network = 4 sensor cards total
@@ -1188,6 +1195,7 @@ test.describe('17. Phase 4 Step 2 — Network Card Renderer', () => {
   });
 
   test('environmental cards have full ThermoPro layout (unaffected by network card)', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Environmental card count (3) is 3sensor-specific; mixed fixture has 2 env sensors.');
     await loadDashboard(page);
     await page.waitForFunction(() => window._manifest && window._manifest.sensors, { timeout: 10000 });
     const envCards = page.locator('.sensor-card:not(.network-card)');
@@ -1255,6 +1263,7 @@ test.describe('17. Phase 4 Step 2 — Network Card Renderer', () => {
   });
 
   test('SENSORS includes network device (wan_ping) after manifest load', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Total sensor count (4) is 3sensor-specific; mixed fixture has 3 sensors total.');
     await loadDashboard(page);
     const sensorIds = await page.evaluate(() => App.State.getSensors().map(s => s.id));
     expect(sensorIds).toContain('wan_ping');

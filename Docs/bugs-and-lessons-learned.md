@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-20 — BUG-050 Group 18 CI fixture mismatch, LESSON-OPS-063 added_
+_Last updated: 2026-03-20 — BUG-051 11 tests fail with FIXTURE_SET=mixed (no skip guards), PR-057 implementation issues, LESSON-OPS-063 added_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,93 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-051 — 11 Playwright tests fail when running full suite with FIXTURE_SET=mixed (2026-03-20)
+
+**Date:** 2026-03-20
+**Version observed:** v7.5.4.3 (post-PR #59)
+**Status:** FIXED
+
+**Symptom:** Running `FIXTURE_SET=mixed npx playwright test --project=chromium` (full suite) fails
+with 11 test failures across `tests/browser/dashboard.spec.js` and `tests/browser/manifest.spec.js`:
+- Tests asserting exactly 4 sensor cards (`3 environmental + 1 network`) time out or fail on count
+- Tests asserting sensor name `'Outside'` fail because the mixed fixture has no `outside` sensor
+- Tests expecting `sensors.json` to contain `['office', 'first_floor', 'outside']` fail because
+  the mixed `sensors.json` only has 2 entries (`office`, `first_floor`)
+- Tests using `loadDashboard(page, { expectedSensorCount: 4 })` time out (mixed has 3 sensors)
+
+The 11 affected tests span:
+- `manifest.spec.js`: `dashboard boots from /api/manifest`, `dashboard falls back to /sensors.json`
+- `dashboard.spec.js Group 2`: `four sensor cards are rendered`, `sensor card headers contain expected sensor names`
+- `dashboard.spec.js Group 11`: `environmental renderer dispatches correctly and produces sensor cards`
+- `dashboard.spec.js Group 14`: scenarios 1, 2, and 4
+- `dashboard.spec.js Group 15`: `dashboard renders identically with new endpoints`
+- `dashboard.spec.js Group 17`: `environmental cards have full ThermoPro layout`, `SENSORS includes network device`
+
+**Root cause:** These tests were written for the `3sensor` fixture (3 env + 1 network = 4 total,
+including `outside`). The `mixed` fixture intentionally has a different shape (2 env + 1 network = 3
+total, no `outside`). When a developer runs the full suite locally with `FIXTURE_SET=mixed`, none of
+these tests had a skip guard, so they all fail. In CI, the `mixed` matrix job only runs Group 18
+via `--grep`, so CI never exposed the problem — it was only visible in full local runs.
+
+**Fix:** Added `test.skip(process.env.FIXTURE_SET === 'mixed', '<reason>')` at the start of each
+of the 11 affected tests. The skip reason includes the specific counts/names that are
+`3sensor`-specific, making the incompatibility self-documenting.
+
+**Why not caught earlier:**
+- CI matrix runs `mixed` fixture exclusively with `--grep "18\. Mixed-Category Rendering"`, so
+  only Group 18 runs in CI with `FIXTURE_SET=mixed`. All other groups are never exercised with
+  that fixture in CI.
+- Human reviewers focused on Group 18 correctness and did not run the full suite with
+  `FIXTURE_SET=mixed` locally.
+- BUG-050 was about Group 18 tests *within* CI breaking the `3sensor` job; this bug is the
+  inverse: running the full suite under the `mixed` fixture breaks non-Group-18 tests.
+
+**Prevention:** LESSON-OPS-063 — any fixture-specific test must carry a skip guard.
+When adding a new fixture variant to the CI matrix, verify that running the full suite locally
+under that fixture does not produce unexpected failures in existing test groups.
+
+Related: BUG-050, PR-057, LESSON-OPS-063
+
+---
+
+### PR-057 — Group 18 tests used wrong `loadDashboard()` signature and dynamic count assertions (2026-03-20)
+
+**Date:** 2026-03-20
+**Version observed:** v7.5.4.3 (PR #57 before correction, `copilot/implement-phase4-step-v7543`)
+**Status:** FIXED before merge
+
+**Symptom:** Code review of PR #57 (Mixed-Category Rendering — Group 18 Playwright tests) found
+two classes of implementation deviation from the specified test template in the coding agent prompt:
+
+1. `loadDashboard()` was called as `loadDashboard(page, { timeout: 30000 })` in all 6 Group-18
+   tests instead of the specified `loadDashboard(page, { expectedSensorCount: 3 })`.
+2. Count assertions (`toHaveCount()`) used dynamic `window._manifest.sensors` lookups instead of
+   hardcoded fixture-specific integers (`3` total, `2` environmental).
+
+**Root cause — Issue 1 (`timeout` vs `expectedSensorCount`):**
+The coding agent saw Group 13 using `{ timeout: 30000 }` (BUG-049 fix) and pattern-matched that
+style to the new group. It did not distinguish *why* Group 13 uses a raw timeout (Firefox SSE
+teardown headroom) versus what the new mixed fixture needs (a count-gated readiness check).
+`expectedSensorCount` causes `waitForDashboardReady()` to actively wait until exactly N sensor
+cards are present before proceeding — a stronger signal than a raw timeout. A raw timeout can pass
+vacuously if the page loads fewer cards than expected.
+
+**Root cause — Issue 2 (dynamic counts):**
+The coding agent made tests "fixture-agnostic" by reading counts from `window._manifest` at
+runtime rather than hardcoding the known fixture values. This is an anti-pattern for
+fixture-specific tests: if the manifest itself is broken and returns 0 sensors, `toHaveCount(0)`
+passes vacuously, providing no regression protection.
+
+**Fix:**
+- All 6 Group-18 `loadDashboard()` calls changed to `{ expectedSensorCount: 3 }`.
+- All dynamic count assertions replaced with hardcoded literals: `3` (total), `2` (environmental).
+
+**Prevention:** LESSON-OPS-063 (see Operational Lessons).
+
+Related: BUG-050, LESSON-OPS-063
+
+---
 
 ### BUG-050 — Group 18 Playwright tests fail in CI: `expectedSensorCount` mismatch with `3sensor` fixture (2026-03-20)
 
