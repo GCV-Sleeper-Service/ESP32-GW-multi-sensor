@@ -155,9 +155,9 @@ const server = http.createServer(function(req, res) {
         };
       } else if (s.adapter === 'icmp_ping') {
         devices[s.id] = {
-          ping_ms: null,
-          success_pct: null,
-          last_seen: 0
+          ping_ms: 12.5,
+          success_pct: 100.0,
+          last_seen: 1741694400 + idx * 10
         };
       }
     });
