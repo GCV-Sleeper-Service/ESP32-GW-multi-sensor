@@ -126,7 +126,7 @@ All steps shipped. No prompts needed.
 | Preflight enhancements | 5 new checks | ✅ Complete (2026-03-18) |
 | Browser regression tests | Group 16: 8 tests | ✅ Complete (2026-03-18) |
 
-### Phase 4 — First Non-Climate Sensor (Ping Probe)
+### Phase 4 — First Non-Climate Sensor (Ping Probe) ✅ COMPLETE
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
@@ -134,7 +134,7 @@ All steps shipped. No prompts needed.
 | v7.5.4.1 | Implement ICMP ping adapter | `prompts/phase4/v7.5.4.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-19 |
 | v7.5.4.2 | Add network card renderer | `prompts/phase4/v7.5.4.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-19 |
 | v7.5.4.3 | Mixed-category test fixtures | `prompts/phase4/v7.5.4.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-20 |
-| **v7.5.4.4** | **Phase 4 closure** | `prompts/phase4/v7.5.4.4-implementation-instructions-for-coding-agent.md` | **⬅️ Next** |
+| **v7.5.4.4** | **Phase 4 closure** | `prompts/phase4/v7.5.4.4-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-20 |
 
 **Phase 4 device testing requirements:**
 - v7.5.4.0: compile + flash, verify ping device in `/api/manifest` (null values expected)

@@ -3,6 +3,44 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.4.4 — Phase 4 Closure — 2026-03-20
+
+### Phase 4 Complete ✅
+
+Phase 4 validates the generalized SensorEntity architecture by successfully adding a
+non-climate sensor category (network/ping probe) to the gateway.
+
+### Phase 4 summary
+
+| Step | Scope |
+|------|-------|
+| v7.5.4.0 | Add ping device to manifest and generator (BUG-045 fix) |
+| v7.5.4.1 | Implement ICMP ping adapter |
+| v7.5.4.2 | Add network card renderer to dashboard |
+| v7.5.4.3 | Mixed-category test fixtures and Playwright tests |
+| v7.5.4.4 | Phase 4 closure (this step) |
+
+### Architecture validation result
+
+The Phase 1–3 abstraction held: adding a ping probe required one manifest entry, one
+RTOS task, one card renderer, and zero changes to the core data model or persistence
+engine. Environmental cards and ThermoPro history are completely unchanged.
+
+### Test coverage
+
+- Root baseline: 98 tests (Chromium: pass, Firefox: pass) + 7 skipped (Group 18 — mixed-only)
+- Mixed-category: 94 tests (Chromium: pass, Firefox: pass) + 11 skipped (3sensor-specific tests)
+- Preflight: all checks pass
+
+### Files changed
+
+- `Docs/v7.5-v7.6-architecture-plan.md` — Phase 4 COMPLETE status section added
+- `Docs/changelog.md` — this entry
+- `Docs/bugs-and-lessons-learned.md` — last-updated line reflects Phase 4 closure
+- `prompts/prompt-index-and-workflow.md` — v7.5.4.4 marked complete
+- Version bump: ALL locations to `7.5.4.4`
+
+---
 ## v7.5.4.3 — Phase 4 Step 3: Mixed-Category Test Fixtures and Playwright Group 18 — 2026-03-20
 
 ### Mixed fixture variant (`tests/fixtures/variants/mixed/`)
