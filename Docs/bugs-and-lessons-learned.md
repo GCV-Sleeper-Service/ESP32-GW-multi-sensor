@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-19 — BUG-048 incompatible NVS snapshot recovery, BUG-049 Firefox SSE teardown, LESSON-OPS-061/062 added_
+_Last updated: 2026-03-20 — BUG-050 Group 18 CI fixture mismatch, LESSON-OPS-063 added_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,57 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-050 — Group 18 Playwright tests fail in CI: `expectedSensorCount` mismatch with `3sensor` fixture (2026-03-20)
+
+**Date:** 2026-03-20
+**Version observed:** v7.5.4.3 (PR #57, `copilot/implement-phase4-step-v7543`)
+**Status:** FIXED
+
+**Symptom:** `browser-tests (3sensor)` CI job fails with `TimeoutError: page.waitForFunction: Timeout 15000ms exceeded`
+in 6 of the 7 Group 18 (`18. Mixed-Category Rendering`) Playwright tests. All other CI jobs
+(`1sensor`, `2sensor`, `4sensor`) pass. Failure occurs in `waitForDashboardReady` at the
+`sensors.length !== expected` guard.
+
+**Root cause:** Group 18 tests were written for the `mixed` fixture variant (2 environmental
+sensors + 1 `wan_ping` network device = 3 sensors total). Every test calls
+`loadDashboard(page, { expectedSensorCount: 3 })`, which makes `waitForDashboardReady` wait
+until `App.State.getSensors().length === 3`. However, the CI `browser-tests` workflow runs
+the full `dashboard.spec.js` suite only under `FIXTURE_SET=3sensor`. The `3sensor` fixture
+has 4 sensors (3 BLE environmental + 1 `wan_ping`). With 4 sensors loaded, the condition
+`sensors.length === 3` is never satisfied, causing the default 15-second timeout to expire.
+
+**The original v7.5.4.3 PR (before correction)** used `{ timeout: 30000 }` and dynamic
+`window._manifest` count reads — both identified as incorrect by post-merge review:
+`{ timeout: 30000 }` is a BUG-049 Firefox workaround reserved for Group 13 only, and dynamic
+manifest reads allow vacuous passes when the manifest is broken. The corrected tests properly
+use `{ expectedSensorCount: 3 }` and hardcoded counts, but this exposed the fixture mismatch.
+
+**Fix:**
+1. `tests/browser/dashboard.spec.js` — Group 18 `test.describe()`: added `test.beforeEach`
+   with `testInfo.skip()` when `process.env.FIXTURE_SET !== 'mixed'`. Group 18 is skipped
+   in all CI jobs except the dedicated `mixed` job.
+2. `.github/workflows/browser-tests.yml` — CI matrix: added `mixed` fixture set; added step
+   `Run mixed-category suite (mixed — Group 18)` that runs only Group 18 with
+   `--grep "18\. Mixed-Category Rendering"` and `FIXTURE_SET=mixed`; updated
+   sensor-count smoke step to skip `mixed` (uses `!= '3sensor' && != 'mixed'`).
+3. `tests/fixtures/generate-fixtures.js` — added `buildPingCsvLines()` + `generateMixedFixtures()`;
+   `main()` now calls `generateMixedFixtures()` to produce `tests/fixtures/variants/mixed/`.
+4. `tests/mock-server/server.js` — `icmp_ping` devices now return `ping_ms: 12.5,
+   success_pct: 100.0` instead of `null`, so live-value assertions in Group 18 pass.
+
+**Why not detected before merge:**
+- The coding agent ran tests locally with `FIXTURE_SET=3sensor` where Group 18 tests were
+  originally fixture-agnostic (dynamic counts) and happened to produce a passing result.
+- After the post-merge review identified issues #2/#3, the corrected PR used `expectedSensorCount: 3`
+  but was not re-validated against the CI fixture matrix (`3sensor` = 4 sensors).
+- Human review focused on test logic correctness, not CI fixture compatibility.
+
+**Prevention:** LESSON-OPS-063 (see below).
+
+Related: BUG-049, LESSON-OPS-063
+
+---
 
 ### BUG-049 — Firefox Playwright Group 13 tests fail: SSE teardown timeout + slow boot (2026-03-19)
 
@@ -740,7 +791,63 @@ Related: BUG-049, LESSON-OPS-043
 
 ---
 
-### LESSON-OPS-061: Changing compile-time constants that dimension NVS-persisted structs makes ALL existing blobs physically unreadable (2026-03-19)
+### LESSON-OPS-063: Fixture-specific Playwright test groups require a dedicated CI fixture job and a skip guard (2026-03-20)
+
+**Date:** 2026-03-20
+
+When a Playwright test group is written for a specific fixture variant (e.g., `mixed` with
+2 environmental + 1 network sensor = 3 total), it **must not run** under a different fixture
+variant in CI (e.g., `3sensor` with 4 sensors), because:
+- `loadDashboard(page, { expectedSensorCount: N })` gates on exactly N sensor cards being
+  rendered. If the active fixture has a different count, the wait never resolves and the
+  test times out.
+- Hardcoded `toHaveCount(N)` assertions are correct by design but will fail vacuously when
+  the wrong fixture is served.
+
+**Rule — three-part contract for every fixture-specific test group:**
+
+1. **Skip guard in the test file:** The `test.describe` block must include a `test.beforeEach`
+   that calls `testInfo.skip()` when `process.env.FIXTURE_SET` is not the expected value.
+   This prevents accidental execution under the wrong fixture in both CI and local runs.
+
+   ```javascript
+   test.describe('N. My Fixture-Specific Group', () => {
+     test.beforeEach(async ({}, testInfo) => {
+       if (process.env.FIXTURE_SET !== 'myfixture') testInfo.skip();
+     });
+     // ...
+   });
+   ```
+
+2. **Dedicated CI matrix job:** Add the fixture variant to the `fixture_set` matrix in
+   `browser-tests.yml` and add a step that runs only the group-specific tests:
+
+   ```yaml
+   - name: Run my-fixture suite (myfixture — Group N)
+     if: matrix.fixture_set == 'myfixture'
+     env:
+       CI: true
+       FIXTURE_SET: myfixture
+     run: npx playwright test tests/browser/dashboard.spec.js --grep "N\. My Fixture-Specific Group"
+   ```
+
+3. **Correct `loadDashboard` signature:** Use `{ expectedSensorCount: N }` (not `{ timeout: T }`).
+   `{ timeout: T }` is a BUG-049 Firefox-SSE workaround limited to Group 13. Never copy it
+   to new groups. `expectedSensorCount` gates on the exact number of sensor cards rendered,
+   which is the correct readiness signal for fixture-specific tests.
+   Use hardcoded integer literals in `toHaveCount()` — never read counts dynamically from
+   `window._manifest`, as dynamic reads pass vacuously when the manifest is broken or empty.
+
+**Anti-patterns:**
+- `loadDashboard(page, { timeout: 30000 })` — wrong; does not gate on sensor count
+- `await expect(cards).toHaveCount(await page.evaluate(() => window._manifest.sensors.length))` — wrong; vacuous if manifest broken
+- Omitting the `FIXTURE_SET` skip guard — wrong; test runs under wrong fixture in CI
+
+Related: BUG-050, BUG-049
+
+---
+
+### LESSON-OPS-062: Firefox requires EventSource callbacks nulled before `.close()` to release the TCP connection (2026-03-19)
 
 **Date:** 2026-03-19
 
