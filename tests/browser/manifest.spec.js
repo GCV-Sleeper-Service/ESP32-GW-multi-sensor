@@ -77,6 +77,7 @@ test.describe('manifest boot flow', () => {
   });
 
   test('dashboard boots from /api/manifest', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor list (office+first_floor+outside+wan_ping=4) is 3sensor-specific; mixed fixture has 3 sensors (no outside).');
     await stubCdn(page);
     await page.goto('/dashboard.html');
     // v7.5.4.2: SENSORS now includes network devices — 3 environmental + 1 network = 4
@@ -91,6 +92,7 @@ test.describe('manifest boot flow', () => {
   });
 
   test('dashboard falls back to /sensors.json when /api/manifest is unavailable', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'sensors.json fallback list (office,first_floor,outside) is 3sensor-specific; mixed sensors.json has 2 entries (no outside).');
     await stubCdn(page);
     await page.route('**/api/manifest', async route => {
       await route.fulfill({
