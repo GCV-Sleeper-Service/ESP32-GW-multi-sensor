@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-19 — BUG-048 incompatible NVS snapshot recovery, BUG-049 Firefox SSE teardown, LESSON-OPS-061/062 added_
+_Last updated: 2026-03-20 — PR-057 Group 18 test corrections: loadDashboard signature, hardcoded fixture counts; LESSON-OPS-063 added_
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,46 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### PR-057 — Group 18 tests used wrong `loadDashboard()` signature and dynamic count assertions (2026-03-20)
+
+**Date:** 2026-03-20
+**Version observed:** v7.5.4.3 (PR #57 draft)
+**Status:** FIXED before merge
+
+**Symptom:** Code review of PR #57 (Mixed-Category Rendering — Group 18 Playwright tests) found
+two classes of implementation error:
+
+1. All 6 `loadDashboard()` calls in Group 18 used `{ timeout: 30000 }` instead of
+   `{ expectedSensorCount: 3 }`.
+2. Count assertions in Tests 1 and 2 computed expected counts dynamically from
+   `window._manifest.sensors` instead of using hardcoded fixture-specific integer literals.
+
+**Root cause — Error 1 (`timeout` vs `expectedSensorCount`):**
+The coding agent saw that Group 13 uses `{ timeout: 30000 }` (BUG-049 fix) and pattern-matched
+that style to Group 18. It did not distinguish *why* Group 13 uses a raw timeout (Firefox SSE
+teardown headroom) from what Group 18 needs (a count-gated readiness check). The
+`expectedSensorCount` option causes `waitForDashboardReady()` to gate on exactly N sensor cards
+being rendered before the test proceeds — this is both stronger and more semantically correct than
+a raw timeout for a fixture-specific test group.
+
+**Root cause — Error 2 (dynamic counts):**
+The coding agent made assertions "fixture-agnostic" by reading counts from `window._manifest`
+at runtime. This is an anti-pattern for fixture-specific tests: if the manifest is broken and
+returns 0 sensors, `toHaveCount(0)` passes vacuously, providing zero regression protection.
+Fixture-specific groups must encode the fixture contract as literal integers.
+
+**Fix:**
+- All 6 Group 18 `loadDashboard()` calls changed to `{ expectedSensorCount: 3 }`.
+- Dynamic count assertions replaced with hardcoded literals: `3` (total cards), `2`
+  (environmental cards), `2` (temperature labels).
+- Inline comments added explaining the rationale.
+
+**Prevention:** LESSON-OPS-063 (see below).
+
+Related: LESSON-OPS-063, BUG-049, LESSON-OPS-062
+
+---
 
 ### BUG-049 — Firefox Playwright Group 13 tests fail: SSE teardown timeout + slow boot (2026-03-19)
 
@@ -709,6 +749,53 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-063: Fixture-specific Playwright tests must use `expectedSensorCount` and hardcoded integer counts — never dynamic manifest reads (2026-03-20)
+
+**Date:** 2026-03-20
+
+When a `test.describe()` group is written for a **specific, known fixture variant** (e.g., the
+`mixed` variant with 2 ThermoPro + 1 wan_ping = 3 total sensors), two rules apply:
+
+**Rule 1 — Always use `{ expectedSensorCount: N }` in `loadDashboard()`:**
+Pass `{ expectedSensorCount: N }` where N is the exact sensor count in the target fixture.
+This causes `waitForDashboardReady()` to actively wait until exactly N sensor cards are
+rendered before the test proceeds. It is a semantic readiness gate tied to the fixture contract.
+
+**Do NOT use `{ timeout: T }`** for new fixture-specific groups. The `{ timeout: 30000 }` pattern
+exists exclusively in Group 13 as the BUG-049 fix for Firefox's SSE teardown timing. It is NOT
+a general-purpose template. Copying it to a new group bypasses the count-based readiness check
+and allows tests to proceed even if zero cards are rendered.
+
+**Rule 2 — All count assertions must use hardcoded integer literals:**
+For a fixture-specific group, the fixture's sensor counts are known at prompt-writing time.
+Assert them as literals:
+```javascript
+await expect(page.locator('.sensor-card')).toHaveCount(3);           // total
+await expect(page.locator('.sensor-card:not(.network-card)')).toHaveCount(2); // environmental
+```
+
+**Do NOT** compute counts dynamically from `window._manifest` inside fixture-specific tests:
+```javascript
+// WRONG — passes vacuously if manifest returns 0 sensors
+const count = await page.evaluate(() => window._manifest.sensors.length);
+await expect(cards).toHaveCount(count);
+```
+If the manifest is broken, `count` evaluates to 0 and `toHaveCount(0)` passes, silently
+hiding the regression.
+
+**When dynamic reads ARE appropriate:** Fixture-agnostic tests (Groups 9, 10, 15) that are
+deliberately designed to pass across all fixture variants may read counts from the manifest.
+Fixture-specific groups (Groups 13-custom, 18, and any future fixture-locked groups) must not.
+
+**Checklist for any new fixture-specific test group:**
+- [ ] All `loadDashboard()` calls use `{ expectedSensorCount: N }` — NOT `{ timeout: T }`
+- [ ] All `.toHaveCount()` calls use integer literals — NOT `window._manifest` reads
+- [ ] Comments explain the fixture contract (e.g., `// 2 env + 1 network`)
+
+Related: PR-057, BUG-049, LESSON-OPS-062
+
+---
 
 ### LESSON-OPS-062: Firefox requires EventSource callbacks nulled before `.close()` to release the TCP connection (2026-03-19)
 

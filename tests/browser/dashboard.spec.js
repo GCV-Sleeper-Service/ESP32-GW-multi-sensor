@@ -1280,32 +1280,32 @@ test.describe('17. Phase 4 Step 2 — Network Card Renderer', () => {
 
 // ── 18. Mixed-Category Rendering (Phase 4 Step 3) ─────────────────────
 test.describe('18. Mixed-Category Rendering', () => {
+  // mixed fixture: 2 ThermoPro environmental + 1 wan_ping network = 3 total sensors.
+  // Use expectedSensorCount:3 — NOT { timeout: 30000 }.
+  // { timeout: 30000 } is a BUG-049 workaround for Group 13 (Firefox SSE teardown) and
+  // must NOT be copied to new groups. expectedSensorCount gates on exactly 3 cards
+  // being rendered, which is the correct readiness signal for this fixture.
   test.setTimeout(90000);
 
   test('mixed manifest renders correct total card count', async ({ page }) => {
-    await loadDashboard(page, { timeout: 30000 });
-    const expectedCount = await page.evaluate(() => {
-      return window._manifest && window._manifest.sensors ? window._manifest.sensors.length : 0;
-    });
-    const cards = page.locator('.sensor-card');
-    await expect(cards).toHaveCount(expectedCount);
+    await loadDashboard(page, { expectedSensorCount: 3 }); // 2 env + 1 network
+    // Hardcoded: mixed fixture always has exactly 3 sensor cards.
+    // Do NOT read count from window._manifest — dynamic reads pass vacuously when manifest is broken.
+    await expect(page.locator('.sensor-card')).toHaveCount(3);
   });
 
   test('environmental cards have full ThermoPro layout elements', async ({ page }) => {
-    await loadDashboard(page, { timeout: 30000 });
-    const envCount = await page.evaluate(() => {
-      if (!window._manifest || !window._manifest.sensors) return 0;
-      return window._manifest.sensors.filter(function(s) { return s.category === 'environmental'; }).length;
-    });
+    await loadDashboard(page, { expectedSensorCount: 3 }); // 2 env + 1 network
     const envCards = page.locator('.sensor-card:not(.network-card)');
-    await expect(envCards).toHaveCount(envCount);
+    // Hardcoded: mixed fixture always has exactly 2 environmental cards.
+    await expect(envCards).toHaveCount(2);
     // Each should have reading-label "Temperature"
     const tempLabels = page.locator('.sensor-card:not(.network-card) .reading-label:text("Temperature")');
-    await expect(tempLabels).toHaveCount(envCount);
+    await expect(tempLabels).toHaveCount(2);
   });
 
   test('network card renders with latency and success rate elements', async ({ page }) => {
-    await loadDashboard(page, { timeout: 30000 });
+    await loadDashboard(page, { expectedSensorCount: 3 }); // 2 env + 1 network
     const netCard = page.locator('.network-card');
     await expect(netCard).toHaveCount(1);
     // Check for latency element
@@ -1315,7 +1315,7 @@ test.describe('18. Mixed-Category Rendering', () => {
   });
 
   test('CARD_RENDERERS dispatches correctly by category', async ({ page }) => {
-    await loadDashboard(page, { timeout: 30000 });
+    await loadDashboard(page, { expectedSensorCount: 3 }); // 2 env + 1 network
     const hasNetworkRenderer = await page.evaluate(() => {
       return typeof CARD_RENDERERS.network === 'function';
     });
@@ -1323,7 +1323,7 @@ test.describe('18. Mixed-Category Rendering', () => {
   });
 
   test('chart canvases exist for environmental devices', async ({ page }) => {
-    await loadDashboard(page, { timeout: 30000 });
+    await loadDashboard(page, { expectedSensorCount: 3 }); // 2 env + 1 network
     // Environmental devices should have chart canvases
     const tempCanvas = page.locator('#tempChart');
     await expect(tempCanvas).toBeVisible();
@@ -1340,7 +1340,7 @@ test.describe('18. Mixed-Category Rendering', () => {
   });
 
   test('manifest v2 contains both environmental and network devices', async ({ page }) => {
-    await loadDashboard(page, { timeout: 30000 });
+    await loadDashboard(page, { expectedSensorCount: 3 }); // 2 env + 1 network
     const categories = await page.evaluate(() => {
       if (!window._manifest || !window._manifest.sensors) return [];
       return window._manifest.sensors.map(function(s) { return s.category; });
