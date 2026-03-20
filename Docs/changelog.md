@@ -3,6 +3,73 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.4.3 — Phase 4 Step 3: Mixed-Category Test Fixtures and Playwright Group 18 — 2026-03-20
+
+### Mixed fixture variant (`tests/fixtures/variants/mixed/`)
+
+Adds a `mixed` fixture variant representing the real-world mixed-category gateway configuration:
+2 ThermoPro BLE environmental sensors + 1 `wan_ping` ICMP network device = 3 sensors total.
+
+**New fixture files (10):**
+- `manifest.json` — v2 manifest, `sensor_count: 3`, 2 environmental + 1 network device
+- `sensors.json` — v1 legacy projection (environmental sensors only, for backward compat)
+- `api-status.json` — gateway status, `mode: "mixed"`
+- `storage-stats.json` — 512 KB partition, `mode: "mixed"`
+- `history-office-temp.csv`, `history-office-hum.csv` — 96 data points (15-min intervals)
+- `history-first_floor-temp.csv`, `history-first_floor-hum.csv` — 96 data points
+- `history-wan_ping-ping_ms.csv` — 12 data points, latency 5–50 ms (realistic)
+- `history-wan_ping-success_pct.csv` — 12 data points, success rate 95–100%
+
+### Fixture generator update (`tests/fixtures/generate-fixtures.js`)
+
+- Version bumped to `v7.5.4.3`
+- Added `buildPingCsvLines(metricKey, pointCount)` — generates realistic ping history CSVs
+- Added `generateMixedFixtures()` — produces the `mixed` variant (2 env + 1 network)
+- `main()` now calls `generateMixedFixtures()` alongside the 1–4sensor variants
+
+### Mock server update (`tests/mock-server/server.js`)
+
+- `/api/v2/live`: `icmp_ping` devices now return realistic non-null values
+  (`ping_ms: 12.5, success_pct: 100.0`) instead of `null` — required for live-value assertions
+
+### Playwright tests — Group 18: Mixed-Category Rendering
+
+Added `test.describe('18. Mixed-Category Rendering', ...)` in `tests/browser/dashboard.spec.js`
+(7 new tests):
+
+1. `mixed manifest renders correct total card count` — hardcoded 3 sensor cards
+2. `environmental cards have full ThermoPro layout elements` — hardcoded 2 env cards and 2 Temperature labels
+3. `network card renders with latency and success rate elements` — exactly 1 `.network-card`, `#net-ping-wan_ping` and `#net-success-wan_ping` visible
+4. `CARD_RENDERERS dispatches correctly by category` — `CARD_RENDERERS.network` is a function
+5. `chart canvases exist for environmental devices` — `#tempChart` visible
+6. `/api/v2/live returns data for both device categories` — `devices.office` and `devices.wan_ping.ping_ms` defined
+7. `manifest v2 contains both environmental and network devices` — `_manifest.sensors` categories contain both
+
+All 7 tests use `{ expectedSensorCount: 3 }` (not `{ timeout: T }`), hardcoded integer counts
+in `toHaveCount()`, and are guarded with `test.beforeEach` to skip when `FIXTURE_SET !== 'mixed'`.
+
+### CI matrix update (`.github/workflows/browser-tests.yml`)
+
+- Added `mixed` to the `fixture_set` matrix
+- New step: `Run mixed-category suite (mixed — Group 18)` — runs only Group 18 with `FIXTURE_SET=mixed`
+- Sensor-count smoke step updated: excludes `mixed` (only runs for `1sensor`, `2sensor`, `4sensor`)
+
+### Bug fixed
+
+- **BUG-050**: Group 18 CI failure (`expectedSensorCount: 3` vs `3sensor` fixture's 4 sensors).
+  Root cause: fixture-specific tests must skip under non-matching fixture sets.
+  See `Docs/bugs-and-lessons-learned.md` BUG-050 and LESSON-OPS-063.
+
+### Test results
+
+| Run | Result |
+|-----|--------|
+| `FIXTURE_SET=3sensor npx playwright test --project=chromium` | 98 passed, 7 skipped (Group 18) |
+| `FIXTURE_SET=3sensor npx playwright test --project=firefox` | 98 passed, 7 skipped (Group 18) |
+| `FIXTURE_SET=mixed npx playwright test --grep "Mixed-Category" --project=chromium` | 7 passed |
+| `FIXTURE_SET=mixed npx playwright test --grep "Mixed-Category" --project=firefox` | 7 passed |
+
+---
 ## v7.5.4.2 — Phase 4 Step 2: Add Network Card Renderer to Dashboard — 2026-03-19
 
 ### Network card renderer
