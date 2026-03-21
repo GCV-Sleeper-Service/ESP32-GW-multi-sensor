@@ -161,7 +161,7 @@ All steps shipped. No prompts needed.
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
-| v7.5.5.0 | Aggregator config schema | `prompts/phase5/v7.5.5.0-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.5.5.0 | Aggregator config schema | `prompts/phase5/v7.5.5.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-21 |
 | v7.5.5.1 | Aggregator polling task | `prompts/phase5/v7.5.5.1-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.5.5.2 | Aggregator API endpoints | `prompts/phase5/v7.5.5.2-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.5.5.3 | Aggregator dashboard UI | `prompts/phase5/v7.5.5.3-implementation-instructions-for-coding-agent.md` | Pending |

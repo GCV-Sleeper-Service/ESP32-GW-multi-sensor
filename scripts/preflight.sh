@@ -284,6 +284,55 @@ check_contains "num_sensors_aliases_env_sensors" dashboard/sensor_history_multi.
 check_not_contains "num_sensors_not_aliased_to_num_devices" dashboard/sensor_history_multi.h \
   "static constexpr int NUM_SENSORS = NUM_DEVICES;"
 
+# v7.5.5.0: Aggregator config checks
+echo "→ Checking aggregator config..."
+check_contains "aggregator_config_h_included" dashboard/sensor_history_multi.h \
+  '#include "aggregator_config.h"'
+if [[ -f "src/aggregator_config.h" ]]; then
+  if grep -q "AGGREGATOR_ENABLED" src/aggregator_config.h; then
+    pass "aggregator_config_h_has_define"
+  else
+    echo "✗ aggregator_config_h_has_define: FAIL — src/aggregator_config.h missing AGGREGATOR_ENABLED"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+else
+  echo "✗ aggregator_config_h_exists: FAIL — src/aggregator_config.h not found"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+if [[ -f "config/aggregator.json" ]]; then
+  echo "→ config/aggregator.json found — validating schema..."
+  if python3 -c "
+import sys, json
+sys.path.insert(0, 'scripts')
+from sensor_manifest_lib import load_aggregator_config, ManifestError
+from pathlib import Path
+try:
+    load_aggregator_config(Path('config/aggregator.json'))
+    print('aggregator_json_valid: PASS')
+except ManifestError as e:
+    print(f'aggregator_json_valid: FAIL — {e}')
+    sys.exit(1)
+"; then
+    true
+  else
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+  if grep -q "AGGREGATOR_ENABLED 1" src/aggregator_config.h 2>/dev/null; then
+    pass "aggregator_config_h_enabled"
+  else
+    echo "✗ aggregator_config_h_enabled: FAIL — aggregator.json present but AGGREGATOR_ENABLED != 1"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+else
+  echo "config/aggregator.json absent — satellite mode (aggregator checks skipped)"
+  if grep -q "AGGREGATOR_ENABLED 0" src/aggregator_config.h 2>/dev/null; then
+    pass "aggregator_config_h_disabled"
+  else
+    echo "✗ aggregator_config_h_disabled: FAIL — no aggregator.json but AGGREGATOR_ENABLED != 0"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+fi
+
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   echo "✗ Preflight failed with $FAIL_COUNT error(s)"
   exit 1

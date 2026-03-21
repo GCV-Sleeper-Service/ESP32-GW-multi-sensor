@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "role": "aggregator",
+  "gateway_id": "gw-aggregator-01",
+  "gateway_name": "Central Aggregator",
+  "satellites": [
+    {
+      "id": "gw-main",
+      "name": "Main Gateway",
+      "base_url": "http://192.168.10.20",
+      "poll_interval_seconds": 30
+    },
+    {
+      "id": "gw-garage",
+      "name": "Garage Sensors",
+      "base_url": "http://192.168.10.21",
+      "poll_interval_seconds": 30
+    }
+  ]
+}
