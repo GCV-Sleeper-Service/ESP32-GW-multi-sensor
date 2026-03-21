@@ -45,6 +45,15 @@ Custom Date Range modal had two styling problems:
 Added comprehensive `:root.light` overrides for `.cr-time-row input[type=date]`,
 `.cr-time-row select`, `.cr-btn`, `.cr-btn.primary`, and `.auth-*` elements.
 
+### BUG-055 — `bump-version.sh` produces stale `dashboard.h`
+
+`generate-header.sh` auto-selects `dashboard.min.html` when it exists, but
+`bump-version.sh` never re-minified after updating `dashboard.html`. The stale
+`.min.html` still contained the old `App.version`, causing preflight failure.
+
+**Fix:** `bump-version.sh` now checks for `.min.html` and either re-runs
+`minify-dashboard.sh` (if installed) or removes the stale file.
+
 ## Heap Analysis (informational — no code change)
 
 ### SSE/Hosted mode heap drop (dashboard-hosted-mode-heap-drop-1/2.png)
@@ -72,8 +81,9 @@ frequency but the pattern is fundamental.
 |------|--------|
 | `dashboard/dashboard.html` | Calendar CSS: `color-scheme:dark`, light-mode overrides for date inputs, selects, buttons |
 | `dashboard/sensor_history_multi.h` | `handle_manifest_()`: filter to environmental-only. `handle_status_()`: add category, conditional fields |
+| `scripts/bump-version.sh` | Re-minify or remove stale `.min.html` before `generate-header.sh` |
 | `Docs/changelog.md` | v7.5.4.5 entry |
-| `Docs/bugs-and-lessons-learned.md` | BUG-052, BUG-053, BUG-054, LESSON-OPS-064, LESSON-OPS-065 |
+| `Docs/bugs-and-lessons-learned.md` | BUG-052 through BUG-055, LESSON-OPS-064 through LESSON-OPS-066 |
 | `Docs/session-log-2026-03-21-v7.5.4.5-post-phase4-fixes.md` | This file |
 
 ## Prompt Quality Notes (for later discussion)

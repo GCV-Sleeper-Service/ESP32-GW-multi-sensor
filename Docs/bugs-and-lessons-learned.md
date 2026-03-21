@@ -9,6 +9,30 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 ## Bug Fixes
 
+### BUG-055 — `bump-version.sh` produces stale `dashboard.h` when `dashboard.min.html` exists (2026-03-21)
+
+**Date:** 2026-03-21
+**Version observed:** v7.5.4.5 (during deployment)
+**Status:** FIXED (v7.5.4.5)
+
+**Symptom:** `bash scripts/bump-version.sh 7.5.4.5` completes but `preflight.sh` reports
+`dashboard_h_version_matches: FAIL`. The generated `dashboard.h` still contains the old version.
+
+**Root cause:** `generate-header.sh` auto-detects `dashboard/dashboard.min.html` and prefers it
+over `dashboard.html`. `bump-version.sh` updates `dashboard.html` (via `sed`) and calls
+`render_sensor_config.py --write` (updates `dashboard.js`), but never re-minifies. The stale
+`.min.html` from the prior build still contains the old `App.version`, and `generate-header.sh`
+embeds that stale content into `dashboard.h`.
+
+**Fix:** `bump-version.sh` now checks for a stale `.min.html` after `render_sensor_config.py`.
+If `html-minifier-terser` is installed, it re-runs `minify-dashboard.sh`. If the minifier is
+not available, it removes the stale `.min.html` so `generate-header.sh` falls back to the
+freshly-updated `dashboard.html`.
+
+**Prevention:** LESSON-OPS-066.
+
+---
+
 ### BUG-054 — Calendar date picker dark/light mode CSS issues (2026-03-21)
 
 **Date:** 2026-03-21
@@ -911,6 +935,23 @@ CSS property tells the browser to render these native widgets in dark mode.
 `<select>`, and other native form elements. Add `:root.light` overrides with `color-scheme: light`.
 
 Related: BUG-054
+
+---
+
+### LESSON-OPS-066: Build pipelines with intermediate artifacts must re-derive them on version bumps (2026-03-21)
+
+**Date:** 2026-03-21
+
+When a build pipeline has a chain like `source.html → minified.min.html → header.h`, a version
+bump that only updates `source.html` leaves `minified.min.html` stale. If the next step
+(`generate-header.sh`) auto-selects the minified file, it embeds the old version.
+
+**Rule:** Any script that bumps version strings must re-derive ALL intermediate build artifacts
+in the chain before generating final outputs. If a tool in the chain is optional (e.g.,
+`html-minifier-terser` may not be installed), the script must either re-run the tool or
+delete the stale intermediate so downstream scripts fall back to the updated source.
+
+Related: BUG-055
 
 ---
 

@@ -24,6 +24,10 @@
 #
 # Generated files updated by generate-header.sh:
 #   dashboard/dashboard.h                (embedded dashboard with App.version)
+#
+# If dashboard/dashboard.min.html exists from a prior build, this script
+# re-minifies it (if html-minifier-terser is installed) or removes it
+# (to prevent generate-header.sh from embedding a stale version).
 
 set -euo pipefail
 
@@ -64,6 +68,19 @@ sed -i "s/App\.version = 'v[0-9.]*'/App.version = 'v${NEW_VER}'/" dashboard/dash
 # 2. Regenerate all generated artifacts from canonical sources
 echo "→ Running render_sensor_config.py --write..."
 python3 scripts/render_sensor_config.py --write
+
+# 2b. Re-minify dashboard.html if the minifier is available.
+#     generate-header.sh auto-selects dashboard.min.html when it exists,
+#     so a stale .min.html from a prior build would embed the OLD version.
+if [[ -f "dashboard/dashboard.min.html" ]]; then
+  if command -v html-minifier-terser &>/dev/null; then
+    echo "→ Running minify-dashboard.sh (re-minify after version bump)..."
+    bash scripts/minify-dashboard.sh
+  else
+    echo "→ Removing stale dashboard.min.html (html-minifier-terser not found)..."
+    rm -f dashboard/dashboard.min.html
+  fi
+fi
 
 echo "→ Running generate-header.sh..."
 bash scripts/generate-header.sh
