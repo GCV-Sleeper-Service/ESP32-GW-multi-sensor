@@ -23,6 +23,14 @@ was missing from date inputs and selects. Light mode: date inputs and buttons
 had hardcoded dark backgrounds. Fixed with `color-scheme` property and
 `:root.light` CSS overrides for modal elements.
 
+**BUG-056: WAN Latency ping data plotted on Temperature/Humidity charts.**
+Multi-layer failure: `mkDS()` created chart datasets for all sensors including network,
+`applyHistoryRange()` used SENSORS array index as dataset index, `fetchDeviceHistory()`
+fallback fetched ping data via legacy `/history/wan_ping/temp` path, firmware's legacy
+handler returned ping HistoryBuffer data as if it were temperature. Fixed with `chartIdx`
+mapping (environmental-only), category skip in `loadHistory()`, and firmware 404 for
+non-environmental devices on legacy history paths.
+
 **BUG-055: `bump-version.sh` produces stale `dashboard.h` when `dashboard.min.html` exists.**
 `generate-header.sh` auto-selects `.min.html` but `bump-version.sh` never re-minified it.
 Fixed: bump script now re-runs `minify-dashboard.sh` if the tool is available, or removes
@@ -30,11 +38,12 @@ the stale `.min.html` so `generate-header.sh` falls back to the updated source.
 
 ### Files changed
 
-- `dashboard/dashboard.html` — calendar/modal CSS: `color-scheme:dark`, light-mode overrides
-- `dashboard/sensor_history_multi.h` — `handle_manifest_()` environmental filter, `handle_status_()` category field
+- `dashboard/dashboard.html` — calendar CSS, chart category filtering (`chartIdx`, `mkDS`, `applyHistoryRange`, `handleState`, `loadHistory`)
+- `dashboard/dashboard.js` — chart category filtering mirrored from dashboard.html
+- `dashboard/sensor_history_multi.h` — `handle_manifest_()` environmental filter, `handle_status_()` category field, `handle_history_()` 404 for non-environmental legacy paths
 - `scripts/bump-version.sh` — re-minify or remove stale `.min.html` before `generate-header.sh`
 - `Docs/changelog.md` — this entry
-- `Docs/bugs-and-lessons-learned.md` — BUG-052 through BUG-055, LESSON-OPS-064 through LESSON-OPS-066
+- `Docs/bugs-and-lessons-learned.md` — BUG-052 through BUG-056, LESSON-OPS-064 through LESSON-OPS-066
 - `Docs/session-log-2026-03-21-v7.5.4.5-post-phase4-fixes.md` — session log
 
 ---

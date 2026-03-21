@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-21 — v7.5.4.5 post-Phase-4 review fixes (BUG-052, BUG-053, BUG-054)._
+_Last updated: 2026-03-21 — v7.5.4.5 post-Phase-4 review fixes (BUG-052 through BUG-056)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,69 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-056 — WAN Latency ping data appears on Temperature/Humidity charts (2026-03-21)
+
+**Date:** 2026-03-21
+**Version observed:** v7.5.4.4
+**Status:** FIXED (v7.5.4.5)
+
+**Symptom:** The WAN Latency device appeared as a flat line on both the real-time and
+15-minute average Temperature and Humidity charts. Ping latency (~5ms) plotted as ~5°C,
+success rate (100%) plotted as 100% humidity.
+
+**Root cause — multi-layer failure across dashboard and firmware:**
+
+1. **`mkDS()` created chart datasets for ALL sensors.** `SENSORS.map()` generated one dataset
+   per entry in SENSORS, including the `wan_ping` network device (dataset index 3). The
+   temperature/humidity charts are environmental-only — network devices should not have datasets.
+
+2. **`applyHistoryRange()` used SENSORS array index as dataset index.** With SENSORS containing
+   `[office(0), first_floor(1), outside(2), wan_ping(3)]`, `wan_ping` at `idx=3` would write
+   to `datasets[3]` which was the dataset created in step 1.
+
+3. **`fetchDeviceHistory()` fallback fetched wrong data.** The manifest's global `metrics[]`
+   only defines `temp` and `hum`. When looking up `wan_ping`'s measurements (`ping_ms`,
+   `success_pct`) against global metrics, no match was found → `historyMeasurements` was empty
+   → the fallback triggered: `[{key:'temp', url:'/history/wan_ping/temp'}, {key:'hum', url:'/history/wan_ping/hum'}]`.
+
+4. **Firmware legacy `/history/{id}/temp` handler returned ping data.** `handle_history_()`
+   matched `wan_ping` by device ID, then mapped `temp` → `metric_states[0]` (the ping_ms
+   HistoryBuffer) and `hum` → `metric_states[1]` (the success_pct HistoryBuffer). These
+   buffers contained real ping data, which was returned as if it were temperature/humidity.
+
+5. **`loadHistory()` stored this data as temp/hum.** The received CSV was stored in
+   `ensureHistoryStore('wan_ping').temp` and `.hum`, which `applyHistoryRange()` then
+   plotted on the environmental charts.
+
+**Fix — six changes across three files:**
+
+| File | Change |
+|------|--------|
+| `dashboard/dashboard.js` + `.html` | `applySensorMeta()`: assign `s.chartIdx` (0,1,2,... for environmental, -1 for others) |
+| `dashboard/dashboard.js` + `.html` | `mkDS()`: filter to `s.chartIdx >= 0` before creating datasets |
+| `dashboard/dashboard.js` + `.html` | `handleState()`: guard chart push with `s.chartIdx >= 0`, use `s.chartIdx` not `idx` |
+| `dashboard/dashboard.js` + `.html` | `applyHistoryRange()`: skip `s.chartIdx < 0`, use `s.chartIdx` not `idx` |
+| `dashboard/dashboard.js` + `.html` | `loadHistory()`: skip non-environmental sensors entirely |
+| `sensor_history_multi.h` | `handle_history_()`: 404 for non-environmental devices on legacy `/history/{id}/temp\|hum` |
+
+**Why not caught in Phase 4:**
+- The v7.5.4.2 prompt (network card renderer) correctly identified that network devices need
+  a separate data path (`/api/v2/live` polling). But it did not address the chart side — it
+  stated "chart support comes in a later step" and "chart rendering excluded for network device."
+  This prevented chart *canvases* from being added to network cards, but did not prevent the
+  existing environmental charts from including network device datasets.
+- The v7.5.4.3 prompt (tests) tested that chart canvases exist for environmental devices but
+  did not assert that chart datasets exclude non-environmental sensors.
+- The v7.5.4.2 change to include all categories in SENSORS (removing the environmental-only
+  filter) was the correct architectural direction, but the chart code was not updated to
+  account for the expanded SENSORS array.
+
+**Prevention:** LESSON-OPS-064 (endpoint audit) applies here to chart code as well.
+When expanding SENSORS to include non-environmental devices, audit ALL code that iterates
+SENSORS with index-based dataset access.
+
+---
 
 ### BUG-055 — `bump-version.sh` produces stale `dashboard.h` when `dashboard.min.html` exists (2026-03-21)
 

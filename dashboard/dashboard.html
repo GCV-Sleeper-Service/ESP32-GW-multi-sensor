@@ -1474,6 +1474,12 @@ function applySensorMeta(meta) {
     if (cat === 'system') return makeNetworkSensorConfig(m, idx); // reuse for now
     return makeSensorConfig(m, idx); // ThermoPro path
   }));
+  // Assign chart dataset indices: environmental sensors get 0,1,2,...; others get -1
+  var chartIdx = 0;
+  App.State.getSensors().forEach(function(s) {
+    var cat = s.category || 'environmental';
+    s.chartIdx = (cat === 'environmental') ? chartIdx++ : -1;
+  });
   try { App.Features.emit('onManifest', App.State.getSensors()); } catch(e) { logNonFatal('manifest hook emit', e); }
 }
 
@@ -1739,11 +1745,12 @@ function applyHistoryRange() {
   applyHistoryAxisFormatting(tempAvgChart, effHours);
   applyHistoryAxisFormatting(humAvgChart, effHours);
   SENSORS.forEach(function(s, idx) {
+    if (s.chartIdx === undefined || s.chartIdx < 0) return; // skip non-environmental
     var store = ensureHistoryStore(s.id);
     var tempPts = filterPointsForRange(store.temp);
     var humPts = filterPointsForRange(store.hum);
-    tempAvgChart.data.datasets[idx].data = tempPts;
-    humAvgChart.data.datasets[idx].data = humPts;
+    tempAvgChart.data.datasets[s.chartIdx].data = tempPts;
+    humAvgChart.data.datasets[s.chartIdx].data = humPts;
     tempVisible += tempPts.length;
     humVisible += humPts.length;
     updateMinMax(store.temp, s.id, true);
@@ -3628,7 +3635,7 @@ var tempChart, humChart, tempAvgChart, humAvgChart, telemetryChart;
 function initCharts() {
   if (typeof Chart === 'undefined') { showError('Chart.js not loaded'); return; }
   var mkDS = function(type, avg) {
-    return SENSORS.map(function(s) {
+    return SENSORS.filter(function(s) { return (s.chartIdx !== undefined && s.chartIdx >= 0); }).map(function(s) {
       return {label:s.name, data:[], borderColor:s.color, backgroundColor:s.color+'18',
         fill:true, tension:0.3, pointRadius:1.5, pointHoverRadius:4,
         pointBackgroundColor:s.color, pointBorderColor:s.color,
@@ -3751,6 +3758,13 @@ function loadHistory() {
 
     var s = SENSORS[sensorIdx];
 
+    // Skip non-environmental sensors — they don't have temp/hum history
+    if (s.category && s.category !== 'environmental') {
+      sensorIdx++;
+      setTimeout(loadNext, 0);
+      return;
+    }
+
     fetchDeviceHistory(s, window._manifest)
     .then(function(series) {
       var tempPts = [], humPts = [];
@@ -3819,7 +3833,7 @@ function handleState(d) {
       if (el) { el.textContent = d.state; el.classList.remove('waiting'); }
       updateDewPoint(s.id);
       updateComfortLevel(s.id);
-      if (chartsReady) { tempChart.data.datasets[idx].data.push({x:now,y:v}); if(tempChart.data.datasets[idx].data.length>MAX_POINTS) tempChart.data.datasets[idx].data.shift(); document.getElementById('tempNoData').classList.add('hidden'); tempChart.update('none'); totalPoints++; }
+      if (chartsReady && s.chartIdx >= 0) { tempChart.data.datasets[s.chartIdx].data.push({x:now,y:v}); if(tempChart.data.datasets[s.chartIdx].data.length>MAX_POINTS) tempChart.data.datasets[s.chartIdx].data.shift(); document.getElementById('tempNoData').classList.add('hidden'); tempChart.update('none'); totalPoints++; }
     }
     if (eid === s.humId) {
       var v = parseVal(d.state); if (v === null) return;
@@ -3828,7 +3842,7 @@ function handleState(d) {
       if (el) { el.textContent = formatMetricValue('humidity', v, getMetricDef('hum')); el.classList.remove('waiting'); }
       updateDewPoint(s.id);
       updateComfortLevel(s.id);
-      if (chartsReady) { humChart.data.datasets[idx].data.push({x:now,y:v}); if(humChart.data.datasets[idx].data.length>MAX_POINTS) humChart.data.datasets[idx].data.shift(); document.getElementById('humNoData').classList.add('hidden'); humChart.update('none'); totalPoints++; }
+      if (chartsReady && s.chartIdx >= 0) { humChart.data.datasets[s.chartIdx].data.push({x:now,y:v}); if(humChart.data.datasets[s.chartIdx].data.length>MAX_POINTS) humChart.data.datasets[s.chartIdx].data.shift(); document.getElementById('humNoData').classList.add('hidden'); humChart.update('none'); totalPoints++; }
     }
     if (eid === s.lastSeenId) {
       var t = d.state || '', te = document.getElementById('time-' + s.id);

@@ -45,6 +45,20 @@ Custom Date Range modal had two styling problems:
 Added comprehensive `:root.light` overrides for `.cr-time-row input[type=date]`,
 `.cr-time-row select`, `.cr-btn`, `.cr-btn.primary`, and `.auth-*` elements.
 
+### BUG-056 — WAN Latency data plotted on Temperature/Humidity charts
+
+Multi-layer failure: `mkDS()` created chart datasets for all sensors including
+network, `fetchDeviceHistory()` fallback fetched ping data via legacy
+`/history/wan_ping/temp` path, firmware returned ping HistoryBuffer contents.
+
+**Fix:** Six changes across dashboard.js, dashboard.html, and sensor_history_multi.h:
+- `applySensorMeta()`: assign `s.chartIdx` (environmental=0,1,2,...; others=-1)
+- `mkDS()`: filter to `chartIdx >= 0` before creating datasets
+- `handleState()`: guard chart push with `s.chartIdx >= 0`
+- `applyHistoryRange()`: skip non-environmental, use `s.chartIdx`
+- `loadHistory()`: skip non-environmental sensors
+- `handle_history_()`: 404 for non-environmental on legacy `/history/{id}/temp|hum`
+
 ### BUG-055 — `bump-version.sh` produces stale `dashboard.h`
 
 `generate-header.sh` auto-selects `dashboard.min.html` when it exists, but
@@ -79,11 +93,12 @@ frequency but the pattern is fundamental.
 
 | File | Change |
 |------|--------|
-| `dashboard/dashboard.html` | Calendar CSS: `color-scheme:dark`, light-mode overrides for date inputs, selects, buttons |
-| `dashboard/sensor_history_multi.h` | `handle_manifest_()`: filter to environmental-only. `handle_status_()`: add category, conditional fields |
+| `dashboard/dashboard.html` | Calendar CSS: `color-scheme:dark`, light-mode overrides; chart category filtering (`chartIdx`) |
+| `dashboard/dashboard.js` | Chart category filtering mirrored from dashboard.html |
+| `dashboard/sensor_history_multi.h` | `handle_manifest_()`: environmental filter. `handle_status_()`: category field. `handle_history_()`: 404 for non-environmental legacy paths |
 | `scripts/bump-version.sh` | Re-minify or remove stale `.min.html` before `generate-header.sh` |
 | `Docs/changelog.md` | v7.5.4.5 entry |
-| `Docs/bugs-and-lessons-learned.md` | BUG-052 through BUG-055, LESSON-OPS-064 through LESSON-OPS-066 |
+| `Docs/bugs-and-lessons-learned.md` | BUG-052 through BUG-056, LESSON-OPS-064 through LESSON-OPS-066 |
 | `Docs/session-log-2026-03-21-v7.5.4.5-post-phase4-fixes.md` | This file |
 
 ## Prompt Quality Notes (for later discussion)

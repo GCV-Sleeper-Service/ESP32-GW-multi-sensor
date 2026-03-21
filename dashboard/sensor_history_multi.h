@@ -2431,6 +2431,13 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
+    // Legacy /history/{id}/temp and /history/{id}/hum paths are environmental-only.
+    // Non-environmental devices use /api/v2/history/{device}/{metric} instead.
+    if (devices[sensor_idx].category_id != 0) {
+      request->send(404);
+      return;
+    }
+
     int series_kind = -1;
     HistoryBuffer *buf = nullptr;
     if (strcmp(type, "temp") == 0) {
