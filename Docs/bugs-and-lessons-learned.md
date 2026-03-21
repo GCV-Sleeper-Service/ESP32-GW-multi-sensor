@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-20 — v7.5.4.4 Phase 4 closure. BUG-051 and LESSON-OPS-063 remain current. No new bugs found during Phase 4 closure step._
+_Last updated: 2026-03-21 — v7.5.4.5 post-Phase-4 review fixes (BUG-052, BUG-053, BUG-054)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,56 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-054 — Calendar date picker dark/light mode CSS issues (2026-03-21)
+
+**Date:** 2026-03-21
+**Version observed:** v7.5.4.4
+**Status:** FIXED (v7.5.4.5)
+
+**Symptom — dark mode:** Native browser date picker calendar popup (triggered by clicking the calendar icon on `<input type=date>`) rendered with a white background. Time `<select>` dropdowns also had browser-default white backgrounds.
+
+**Symptom — light mode:** From/To date input fields and time select dropdowns had hardcoded dark backgrounds (`rgba(15,23,42,.5)`) making text unreadable. Modal buttons also dark.
+
+**Root cause:** The CSS for `.cr-time-row input[type=date]` and `.cr-time-row select` used hardcoded dark-theme colors with no `color-scheme` property and no `:root.light` overrides. The `color-scheme` CSS property tells the browser to render native widgets (date pickers, selects) in light or dark mode — without it, browsers default to their light variant regardless of page theme.
+
+**Fix:** Added `color-scheme:dark` to date/select inputs in default (dark) theme. Added `:root.light` CSS overrides that set white backgrounds, appropriate text colors, and `color-scheme:light`.
+
+---
+
+### BUG-053 — `/api/status` outputs ThermoPro-specific fields for all device categories (2026-03-21)
+
+**Date:** 2026-03-21
+**Version observed:** v7.5.4.4
+**Status:** FIXED (v7.5.4.5)
+
+**Symptom:** `curl /api/status` returned `temp_valid: false, hum_valid: false` for the `wan_ping` device. These fields are semantically meaningless for a network ping probe.
+
+**Root cause:** `handle_status_()` was written before the SensorEntity model existed. It iterated all `NUM_DEVICES` and unconditionally emitted `temp_valid`/`hum_valid` for every entry. Phase 3 (SensorEntity refactor) and Phase 4 (ping adapter) did not scope this handler for updates.
+
+**Fix:** Added `category` field to each sensor entry in the status JSON. `temp_valid`/`hum_valid` are now only emitted for environmental devices (`category_id == 0`).
+
+**Prevention:** LESSON-OPS-064.
+
+---
+
+### BUG-052 — `/sensors.json` v1 projection includes non-environmental devices (2026-03-21)
+
+**Date:** 2026-03-21
+**Version observed:** v7.5.4.4
+**Status:** FIXED (v7.5.4.5)
+
+**Symptom:** `curl /sensors.json` returned 4 entries including `wan_ping`. The architecture plan (Section 5.3) specifies `/sensors.json` as a v1 compatibility projection containing only environmental sensors.
+
+**Root cause:** `handle_manifest_()` (which serves `/sensors.json`) iterated `NUM_DEVICES` without filtering by category. When `wan_ping` was added in v7.5.4.0, `NUM_DEVICES` became 4 but the handler was not updated. The dashboard's fallback path (`/sensors.json` → auto-promote to v2 with ThermoPro defaults) would incorrectly treat `wan_ping` as a ThermoPro sensor.
+
+**Why not caught:** Phase 4 prompts focused on the new code (adapter, card renderer, tests) but did not include a checkpoint for existing endpoints like `/sensors.json`. The Playwright test fixture for `sensors.json` already had only 3 entries (correct), so tests passed even though the real firmware returned 4.
+
+**Fix:** `handle_manifest_()` now skips devices with `category_id != 0` (non-environmental).
+
+**Prevention:** LESSON-OPS-064.
+
+---
 
 ### BUG-051 — 11 Playwright tests fail when running full suite with FIXTURE_SET=mixed (2026-03-20)
 
@@ -847,6 +897,47 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-065: CSS for native browser widgets (`<input type=date>`, `<select>`) needs `color-scheme` (2026-03-21)
+
+**Date:** 2026-03-21
+
+Native HTML form elements like date pickers and select dropdowns are rendered by the browser,
+not by your CSS. Setting `background` and `color` on them changes the input field appearance
+but does NOT change the popup calendar or dropdown list appearance. The `color-scheme: dark`
+CSS property tells the browser to render these native widgets in dark mode.
+
+**Rule:** When building dark-mode UIs, always add `color-scheme: dark` to `<input type=date>`,
+`<select>`, and other native form elements. Add `:root.light` overrides with `color-scheme: light`.
+
+Related: BUG-054
+
+---
+
+### LESSON-OPS-064: Adding a new device category requires an endpoint audit (2026-03-21)
+
+**Date:** 2026-03-21
+
+When a new device category is added to the system (e.g., Phase 4 added `network` alongside
+`environmental`), ALL existing endpoints must be audited for category assumptions. Endpoints
+written before the category system existed will silently output incorrect data for new
+categories.
+
+**Specific endpoints that need audit when adding a category:**
+- `/sensors.json` — v1 projection: should only include environmental devices
+- `/api/status` — per-device fields must be category-appropriate (no `temp_valid` for ping devices)
+- `/api/v2/live` — verify non-environmental devices have correct metric keys
+- `/history/{id}/{metric}` — verify 404 for non-environmental history paths
+- `/api/storage-stats` — verify counts only reference environmental persistence
+
+**Rule for phase prompts:** When a prompt introduces a new device category, include an
+"Endpoint Audit Checklist" section that lists every existing endpoint and its expected
+behavior for the new category. Coding agents will not proactively check endpoints they
+were not told to modify.
+
+Related: BUG-052, BUG-053
+
+---
 
 ### LESSON-OPS-062: Firefox requires EventSource callbacks nulled before `.close()` to release the TCP connection (2026-03-19)
 

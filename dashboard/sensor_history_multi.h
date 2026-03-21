@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.4.4.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.4.5.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -470,7 +470,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.4.4) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.4.5) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //
@@ -1622,8 +1622,11 @@ class HistoryWebHandler : public AsyncWebHandler {
     auto *resp = request->beginResponseStream("application/json");
     resp->addHeader("Cache-Control", "no-store");
     resp->print("[");
+    bool first = true;
     for (int i = 0; i < NUM_DEVICES; i++) {
-      if (i > 0) resp->print(",");
+      if (devices[i].category_id != 0) continue;  // v1 projection: environmental only
+      if (!first) resp->print(",");
+      first = false;
       char entry[96];
       snprintf(entry, sizeof(entry),
                "{\"id\":\"%s\",\"name\":\"%s\"}",
@@ -2352,7 +2355,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     uint32_t free_heap = esp_get_free_heap_size();
 
     // Keep each snprintf well under 64 bytes to avoid silent truncation.
-    char num[64];
+    char num[96];
 
     resp->print("{\"ok\":true,\"version\":\"");
     resp->print(firmware_version_.c_str());
@@ -2369,16 +2372,28 @@ class HistoryWebHandler : public AsyncWebHandler {
       resp->print(devices[i].id);
       resp->print("\",\"name\":\"");
       resp->print(devices[i].name);
-      snprintf(num, sizeof(num),
-               "\",\"last_seen\":%u,\"temp_valid\":%s,\"hum_valid\":%s}",
-               (unsigned) devices[i].last_seen_epoch,
-               devices[i].temp_valid ? "true" : "false",
-               devices[i].hum_valid ? "true" : "false");
+      // Category label
+      const char *cat = "unknown";
+      if (devices[i].category_id == 0) cat = "environmental";
+      else if (devices[i].category_id == 1) cat = "system";
+      else if (devices[i].category_id == 2) cat = "network";
+      resp->print("\",\"category\":\"");
+      resp->print(cat);
+      snprintf(num, sizeof(num), "\",\"last_seen\":%u",
+               (unsigned) devices[i].last_seen_epoch);
       resp->print(num);
+      // Category-specific validity fields
+      if (devices[i].category_id == 0) {
+        snprintf(num, sizeof(num), ",\"temp_valid\":%s,\"hum_valid\":%s",
+                 devices[i].temp_valid ? "true" : "false",
+                 devices[i].hum_valid ? "true" : "false");
+        resp->print(num);
+      }
+      resp->print("}");
     }
     resp->print("],");
 
-    // Each field printed separately to stay within the 64-byte buffer.
+    // Each field printed separately to stay within the 96-byte buffer.
     snprintf(num, sizeof(num), "\"ram_history_points_per_series\":%d,",
              HISTORY_POINTS_PER_SERIES);
     resp->print(num);

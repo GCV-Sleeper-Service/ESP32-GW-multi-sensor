@@ -3,6 +3,35 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.4.5 — Post-Phase-4 Review Fixes — 2026-03-21
+
+### Bug fixes
+
+**BUG-052: `/sensors.json` v1 projection included non-environmental devices.**
+The legacy endpoint returned all 4 devices including `wan_ping`. Architecture plan
+Section 5.3 specifies environmental-only. Fixed: `handle_manifest_()` now filters
+to `category_id == 0`.
+
+**BUG-053: `/api/status` output ThermoPro-specific fields for all devices.**
+`temp_valid` and `hum_valid` were emitted for `wan_ping` (always `false`,
+meaningless). Fixed: added `category` field per sensor, `temp_valid`/`hum_valid`
+only emitted for environmental devices.
+
+**BUG-054: Calendar date picker dark/light mode styling.**
+Dark mode: native browser date picker rendered white because `color-scheme:dark`
+was missing from date inputs and selects. Light mode: date inputs and buttons
+had hardcoded dark backgrounds. Fixed with `color-scheme` property and
+`:root.light` CSS overrides for modal elements.
+
+### Files changed
+
+- `dashboard/dashboard.html` — calendar/modal CSS: `color-scheme:dark`, light-mode overrides
+- `dashboard/sensor_history_multi.h` — `handle_manifest_()` environmental filter, `handle_status_()` category field
+- `Docs/changelog.md` — this entry
+- `Docs/bugs-and-lessons-learned.md` — BUG-052, BUG-053, BUG-054, LESSON-OPS-064, LESSON-OPS-065
+- `Docs/session-log-2026-03-21-v7.5.4.5-post-phase4-fixes.md` — session log
+
+---
 ## v7.5.4.4 — Phase 4 Closure — 2026-03-20
 
 ### Phase 4 Complete ✅

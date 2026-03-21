@@ -176,6 +176,20 @@
     :root.light .debug-log { background:#f0f0f0; }
     :root.light .sensor-reading, :root.light .minmax-col { background:rgba(0,0,0,.03); }
     :root.light .chart-card, :root.light .telemetry-card { background:var(--bg-card); }
+    /* Light mode: custom range modal date inputs, selects, and buttons */
+    :root.light .cr-time-row input[type=date],
+    :root.light .cr-time-row select {
+      background:#ffffff; color:var(--text-primary); border-color:var(--border); color-scheme:light;
+    }
+    :root.light .cr-btn { background:rgba(0,0,0,.05); color:var(--text-primary); }
+    :root.light .cr-btn.primary { background:rgba(59,130,246,.1); color:#2563eb; border-color:rgba(59,130,246,.3); }
+    :root.light .cr-btn.primary:hover { background:rgba(59,130,246,.18); }
+    :root.light .cr-cal-cell:hover:not(.cr-unavail) { background:rgba(0,0,0,.06); }
+    :root.light .cr-preset-btn:hover { background:rgba(0,0,0,.04); }
+    /* Light mode: auth modal */
+    :root.light .auth-input-wrap { background:rgba(0,0,0,.04); }
+    :root.light .auth-btn { background:rgba(0,0,0,.05); color:var(--text-primary); }
+    :root.light .auth-btn.primary { background:rgba(59,130,246,.1); color:#2563eb; border-color:rgba(59,130,246,.3); }
 
     /* Theme toggle button */
     .theme-toggle { background:none; border:1px solid var(--border); border-radius:6px; padding:4px 8px; cursor:pointer; font-size:.85rem; line-height:1; color:var(--text-muted); transition:all .2s; }
@@ -398,7 +412,8 @@
     .cr-time-row input[type=date], .cr-time-row select {
       font-family:'JetBrains Mono',monospace; font-size:.65rem;
       background:rgba(15,23,42,.5); border:1px solid var(--border); border-radius:5px;
-      color:var(--text-main); padding:4px 6px; cursor:pointer;
+      color:var(--text-primary); padding:4px 6px; cursor:pointer;
+      color-scheme:dark;
     }
     .cr-pick-hint {
       font-family:'JetBrains Mono',monospace; font-size:.6rem;
@@ -901,7 +916,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.4.4';
+App.version = 'v7.5.4.5';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
