@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-22 — v7.5.5.0 Phase 5 Step 0 (LESSON-OPS-067)._
+_Last updated: 2026-03-22 — v7.5.5.1 Phase 5 Step 1 (aggregator polling task)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.

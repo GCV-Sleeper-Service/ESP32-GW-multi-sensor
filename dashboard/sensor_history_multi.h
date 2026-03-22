@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.5.0.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.5.1.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -471,7 +471,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.5.0) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.5.1) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //
@@ -1309,6 +1309,257 @@ class PingAdapter {
   }
 };
 #endif  // PING_DEVICE_INDEX
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Aggregator — satellite polling task and shared cache
+// ═══════════════════════════════════════════════════════════════════
+//
+// Polls configured satellites on a schedule, caches their manifest,
+// live, and status responses in RAM. Results are served by the
+// aggregator API endpoints (v7.5.5.2).
+//
+// Thread safety: SatelliteCache structs are written by the polling
+// task (RTOS context) and read by web handlers (ESPHome loop context).
+// s_cache_mutex guards all reads and writes to the cache buffers.
+// Torn-read prevention: fetch_to_buffer() writes into s_fetch_tmp
+// (no mutex held during slow network I/O), then the completed result
+// is copied into the cache under the mutex.
+// ═══════════════════════════════════════════════════════════════════
+
+#if AGGREGATOR_ENABLED
+#include <esp_http_client.h>
+
+static const char* TAG_AGG = "aggregator";
+
+struct SatelliteCache {
+  const char* id;
+  const char* name;
+  const char* base_url;
+  int poll_interval_seconds;
+
+  // Cached responses (statically allocated — no malloc)
+  char manifest_json[4096];     // cached /api/manifest response
+  char live_json[2048];         // cached /api/v2/live response
+  char status_json[512];        // cached /api/status response
+  uint16_t manifest_len;
+  uint16_t live_len;
+  uint16_t status_len;
+
+  // State
+  uint32_t last_manifest_fetch;
+  uint32_t last_live_fetch;
+  uint32_t last_status_fetch;
+  bool reachable;
+  uint32_t last_seen_epoch;
+  uint8_t consecutive_failures;
+
+  void clear_cache() {
+    manifest_json[0] = '\0'; manifest_len = 0;
+    live_json[0] = '\0'; live_len = 0;
+    status_json[0] = '\0'; status_len = 0;
+    reachable = false;
+    consecutive_failures = 0;
+    last_manifest_fetch = 0;
+    last_live_fetch = 0;
+    last_status_fetch = 0;
+    last_seen_epoch = 0;
+  }
+};
+
+static SatelliteCache satellite_caches[MAX_SATELLITES];
+
+static SemaphoreHandle_t s_cache_mutex = nullptr;
+
+// MUST be called once before starting the polling task:
+static void init_aggregator_mutex() {
+  s_cache_mutex = xSemaphoreCreateMutex();
+}
+
+// Polling task: take mutex before updating cache, give after
+#define AGG_LOCK()   xSemaphoreTake(s_cache_mutex, pdMS_TO_TICKS(200))
+#define AGG_UNLOCK() xSemaphoreGive(s_cache_mutex)
+
+// Web handlers (v7.5.5.2): take mutex before reading cache, give after
+// Use timeout of 100ms — if lock unavailable, serve stale data rather than blocking
+
+// Single static temp buffer, reused across all fetches.
+// Safe because aggregator_poll_task is the only writer and fetches are sequential.
+static char s_fetch_tmp[4096];
+
+static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint16_t* out_len) {
+  esp_http_client_config_t config = {};
+  config.url = url;
+  config.timeout_ms = 5000;
+  config.method = HTTP_METHOD_GET;
+
+  esp_http_client_handle_t client = esp_http_client_init(&config);
+  if (!client) return false;
+
+  esp_err_t err = esp_http_client_open(client, 0);
+  if (err != ESP_OK) {
+    esp_http_client_cleanup(client);
+    return false;
+  }
+
+  int content_length = esp_http_client_fetch_headers(client);
+  (void)content_length;
+  int status = esp_http_client_get_status_code(client);
+
+  // Note: content_length == -1 is valid for chunked transfer encoding.
+  // Only reject non-200 status codes.
+  if (status != 200) {
+    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
+    return false;
+  }
+
+  // For chunked responses (content_length == -1), read up to buf_size - 1.
+  // For known-length responses, also cap at buf_size - 1.
+  int max_read = buf_size - 1;
+  int read_len = esp_http_client_read(client, buf, max_read);
+  if (read_len >= 0) {
+    buf[read_len] = '\0';
+    *out_len = (uint16_t)read_len;
+  }
+
+  esp_http_client_close(client);
+  esp_http_client_cleanup(client);
+  return read_len > 0;
+}
+
+static void aggregator_poll_task(void* arg) {
+  // Initialize caches — id/name/base_url point to static string literals (safe lifetime)
+  for (int i = 0; i < MAX_SATELLITES; i++) {
+    satellite_caches[i].id = SATELLITE_IDS[i];
+    satellite_caches[i].name = SATELLITE_NAMES[i];
+    satellite_caches[i].base_url = SATELLITE_URLS[i];
+    satellite_caches[i].poll_interval_seconds = SATELLITE_POLL_INTERVALS[i];
+    satellite_caches[i].clear_cache();
+  }
+
+  // Initial delay — wait for WiFi and local boot to settle
+  vTaskDelay(pdMS_TO_TICKS(10000));
+
+  while (true) {
+    uint32_t now = (uint32_t)(esp_timer_get_time() / 1000000ULL);
+
+    for (int i = 0; i < MAX_SATELLITES; i++) {
+      SatelliteCache& sat = satellite_caches[i];
+      bool any_failed = false;
+
+      char url_buf[256];
+      uint16_t tmp_len;
+
+      // ── Fetch /api/v2/live (every poll_interval_seconds) ──
+      bool live_due = (sat.last_live_fetch == 0) ||
+                      (now - sat.last_live_fetch >= (uint32_t)sat.poll_interval_seconds);
+      if (live_due) {
+        snprintf(url_buf, sizeof(url_buf), "%s/api/v2/live", sat.base_url);
+        tmp_len = 0;
+        if (fetch_to_buffer(url_buf, s_fetch_tmp, (uint16_t)sizeof(sat.live_json), &tmp_len)
+            && tmp_len > 0) {
+          if (AGG_LOCK() == pdTRUE) {
+            memcpy(sat.live_json, s_fetch_tmp, tmp_len + 1);
+            sat.live_len = tmp_len;
+            sat.last_live_fetch = now;
+            sat.reachable = true;
+            sat.consecutive_failures = 0;
+            sat.last_seen_epoch = now;
+            AGG_UNLOCK();
+          }
+          ESP_LOGI(TAG_AGG, "[%s] live: %u bytes", sat.id, (unsigned)tmp_len);
+        } else {
+          any_failed = true;
+          ESP_LOGW(TAG_AGG, "[%s] live fetch failed", sat.id);
+        }
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      // ── Fetch /api/status (every poll_interval_seconds) ──
+      bool status_due = (sat.last_status_fetch == 0) ||
+                        (now - sat.last_status_fetch >= (uint32_t)sat.poll_interval_seconds);
+      if (status_due) {
+        snprintf(url_buf, sizeof(url_buf), "%s/api/status", sat.base_url);
+        tmp_len = 0;
+        if (fetch_to_buffer(url_buf, s_fetch_tmp, (uint16_t)sizeof(sat.status_json), &tmp_len)
+            && tmp_len > 0) {
+          if (AGG_LOCK() == pdTRUE) {
+            memcpy(sat.status_json, s_fetch_tmp, tmp_len + 1);
+            sat.status_len = tmp_len;
+            sat.last_status_fetch = now;
+            AGG_UNLOCK();
+          }
+          ESP_LOGI(TAG_AGG, "[%s] status: %u bytes", sat.id, (unsigned)tmp_len);
+        } else {
+          any_failed = true;
+          ESP_LOGW(TAG_AGG, "[%s] status fetch failed", sat.id);
+        }
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      // ── Fetch /api/manifest (every 5 minutes) ──
+      bool manifest_due = (sat.last_manifest_fetch == 0) ||
+                          (now - sat.last_manifest_fetch >= 300);
+      if (manifest_due) {
+        snprintf(url_buf, sizeof(url_buf), "%s/api/manifest", sat.base_url);
+        tmp_len = 0;
+        if (fetch_to_buffer(url_buf, s_fetch_tmp, (uint16_t)sizeof(sat.manifest_json), &tmp_len)
+            && tmp_len > 0) {
+          if (AGG_LOCK() == pdTRUE) {
+            memcpy(sat.manifest_json, s_fetch_tmp, tmp_len + 1);
+            sat.manifest_len = tmp_len;
+            sat.last_manifest_fetch = now;
+            AGG_UNLOCK();
+          }
+          ESP_LOGI(TAG_AGG, "[%s] manifest: %u bytes", sat.id, (unsigned)tmp_len);
+        } else {
+          any_failed = true;
+          ESP_LOGW(TAG_AGG, "[%s] manifest fetch failed", sat.id);
+        }
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      // ── Update reachability after fetch failures ──
+      if (any_failed) {
+        uint8_t failures = 0;
+        if (AGG_LOCK() == pdTRUE) {
+          sat.consecutive_failures++;
+          failures = sat.consecutive_failures;
+          if (failures >= 3) {
+            sat.reachable = false;
+          }
+          AGG_UNLOCK();
+        }
+        if (failures >= 3) {
+          ESP_LOGW(TAG_AGG, "[%s] unreachable (failures=%u)",
+                   sat.id, (unsigned)failures);
+        }
+      }
+
+      // Stagger between satellites to avoid simultaneous connections
+      if (i + 1 < MAX_SATELLITES) {
+        vTaskDelay(pdMS_TO_TICKS(2000));
+      }
+    }
+
+    // Sleep until next poll cycle
+    vTaskDelay(pdMS_TO_TICKS(5000));
+  }
+}
+
+static void start_aggregator_task() {
+  init_aggregator_mutex();
+  if (!s_cache_mutex) {
+    ESP_LOGE(TAG_AGG, "Failed to create aggregator mutex");
+    return;
+  }
+  xTaskCreate(aggregator_poll_task, "agg_poll", 6144, nullptr,
+              tskIDLE_PRIORITY + 1, nullptr);
+  ESP_LOGI(TAG_AGG, "Aggregator polling task started (%d satellites)", MAX_SATELLITES);
+}
+
+#endif  // AGGREGATOR_ENABLED
 
 
 // ═══════════════════════════════════════════════════════════════════
