@@ -41,6 +41,7 @@ esphome:
     - ../dashboard/dashboard.h
     - ../dashboard/sensor_history_multi.h
     - ../src/gateway_manifest.h
+    - ../src/aggregator_config.h
   on_boot:
     - # Priority -100: run after web server is fully initialized.
       # Registers custom /history/*, /sensors.json, /dashboard.html,
