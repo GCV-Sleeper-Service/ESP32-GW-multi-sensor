@@ -1554,8 +1554,8 @@ static void start_aggregator_task() {
     ESP_LOGE(TAG_AGG, "Failed to create aggregator mutex");
     return;
   }
-  xTaskCreate(aggregator_poll_task, "agg_poll", 6144, nullptr,
-              tskIDLE_PRIORITY + 1, nullptr);
+  xTaskCreate(aggregator_poll_task, "agg_poll", 10240, nullptr,
+              tskIDLE_PRIORITY + 2, nullptr);
   ESP_LOGI(TAG_AGG, "Aggregator polling task started (%d satellites)", MAX_SATELLITES);
 }
 
