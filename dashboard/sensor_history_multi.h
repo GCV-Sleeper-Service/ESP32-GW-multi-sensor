@@ -1442,10 +1442,14 @@ static void aggregator_poll_task(void* arg) {
   vTaskDelay(pdMS_TO_TICKS(10000));
 
   while (true) {
-    uint32_t now = (uint32_t)(esp_timer_get_time() / 1000000ULL);
+    uint32_t now = (uint32_t)::time(nullptr);
 
     for (int i = 0; i < MAX_SATELLITES; i++) {
       SatelliteCache& sat = satellite_caches[i];
+      // Back off unreachable satellites to 5-minute polling (saves CPU on C3)
+      uint32_t effective_interval = sat.reachable
+          ? (uint32_t)sat.poll_interval_seconds
+          : 300;  // 5 min for unreachable
       bool any_failed = false;
 
       char url_buf[256];
@@ -1453,13 +1457,14 @@ static void aggregator_poll_task(void* arg) {
 
       // ── Fetch /api/v2/live (every poll_interval_seconds) ──
       bool live_due = (sat.last_live_fetch == 0) ||
-                      (now - sat.last_live_fetch >= (uint32_t)sat.poll_interval_seconds);
+                      (now - sat.last_live_fetch >= effective_interval);
       if (live_due) {
         snprintf(url_buf, sizeof(url_buf), "%s/api/v2/live", sat.base_url);
         tmp_len = 0;
         if (fetch_to_buffer(url_buf, s_fetch_tmp, (uint16_t)sizeof(sat.live_json), &tmp_len)
             && tmp_len > 0) {
           if (AGG_LOCK() == pdTRUE) {
+            bool was_unreachable = !sat.reachable;
             memcpy(sat.live_json, s_fetch_tmp, tmp_len + 1);
             sat.live_len = tmp_len;
             sat.last_live_fetch = now;
@@ -1467,6 +1472,9 @@ static void aggregator_poll_task(void* arg) {
             sat.consecutive_failures = 0;
             sat.last_seen_epoch = now;
             AGG_UNLOCK();
+            if (was_unreachable) {
+              ESP_LOGI(TAG_AGG, "[%s] recovered (was unreachable)", sat.id);
+            }
           }
           ESP_LOGI(TAG_AGG, "[%s] live: %u bytes", sat.id, (unsigned)tmp_len);
         } else {
@@ -1478,7 +1486,7 @@ static void aggregator_poll_task(void* arg) {
 
       // ── Fetch /api/status (every poll_interval_seconds) ──
       bool status_due = (sat.last_status_fetch == 0) ||
-                        (now - sat.last_status_fetch >= (uint32_t)sat.poll_interval_seconds);
+                        (now - sat.last_status_fetch >= effective_interval);
       if (status_due) {
         snprintf(url_buf, sizeof(url_buf), "%s/api/status", sat.base_url);
         tmp_len = 0;

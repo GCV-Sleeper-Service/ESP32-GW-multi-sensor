@@ -46,6 +46,9 @@ Implemented the background RTOS task that polls satellite gateways and caches th
 | Stack size 6144 → 10240 | `xTaskCreate` stack parameter corrected per §6c |
 | Task priority +1 → +2 | `xTaskCreate` priority parameter corrected per §6c |
 | Session log missing | This file created |
+| `esp_timer_get_time()` → `::time(nullptr)` | Epoch timestamp corrected for API compatibility |
+| No reduced polling for unreachable satellites | Added `effective_interval` back-off to 300s |
+| Missing recovery log message | Added "recovered" log on unreachable → reachable transition |
 
 ## Files Changed
 
