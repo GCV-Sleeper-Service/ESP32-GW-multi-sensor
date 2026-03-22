@@ -49,7 +49,27 @@ FIXTURE_SET=3sensor playwright (node_modules absent — skipped in CI pre-check)
 
 ## Bugs Discovered / Deviations
 
-None. Clean implementation with no deviations from prompt.
+### Deviation 1: Missing ESPHome YAML `includes:` entry for `aggregator_config.h`
+
+**What happened:** The first commit added `#include "aggregator_config.h"` to
+`sensor_history_multi.h` and generated `src/aggregator_config.h`, but did not add
+`../src/aggregator_config.h` to the `includes:` list in `firmware/esp32-c3-multi-sensor.yaml`.
+CI compilation failed because ESPHome only copies explicitly listed includes into its build
+directory.
+
+**Fix:** Second commit added `../src/aggregator_config.h` to the YAML `includes:` list.
+
+**Root cause:** The v7.5.5.0 instruction prompt (§5d) specified adding the `#include` directive
+but did not mention the YAML `includes:` list. This is a prompt gap — see LESSON-OPS-067.
+
+### Deviation 2: Playwright tests not run
+
+The instruction prompt Critical Rule #5 requires running the full Playwright suite. This could
+not be completed in the coding agent environment (node_modules absent). Playwright tests must
+be verified by a human after merge or in CI.
+
+**[HUMAN MUST VERIFY]** Run `FIXTURE_SET=3sensor npx playwright test` after merge to confirm
+zero regressions.
 
 ---
 
@@ -94,7 +114,9 @@ Satellite mode:
 ```
 
 ### Playwright
-Node modules absent in this environment — CI will run full suite.
+**[HUMAN MUST VERIFY]** Node modules absent in coding agent environment — Playwright tests
+could not be executed. CI will run the full suite on PR merge. Critical Rule #5 compliance
+is deferred to CI/human validation.
 
 ---
 
