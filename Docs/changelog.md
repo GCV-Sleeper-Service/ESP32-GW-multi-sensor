@@ -52,8 +52,14 @@ New aggregator checks:
 - `src/aggregator_config.h` — generated header (aggregator mode enabled)
 - `dashboard/sensor_history_multi.h` — added #include "aggregator_config.h"
 - `scripts/preflight.sh` — aggregator validation checks
+- `firmware/esp32-c3-multi-sensor.yaml` — added `../src/aggregator_config.h` to includes list
 - `Docs/changelog.md` — this entry
 - `prompts/prompt-index-and-workflow.md` — v7.5.5.0 marked complete
+
+### Lessons learned
+- **LESSON-OPS-067**: New generated headers must also be added to the ESPHome YAML `includes:` list.
+  The `#include` directive alone is insufficient — ESPHome only copies listed files to its build directory.
+  Discovered when CI failed after the first commit; fixed in the second commit.
 
 ---
 ## v7.5.4.5 — Post-Phase-4 Review Fixes — 2026-03-21

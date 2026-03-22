@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-21 — v7.5.4.5 post-Phase-4 review fixes (BUG-052 through BUG-056)._
+_Last updated: 2026-03-22 — v7.5.5.0 Phase 5 Step 0 (LESSON-OPS-067)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -984,6 +984,30 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-067: New generated headers must be added to ESPHome YAML `includes:` list (2026-03-22)
+
+**Date:** 2026-03-22
+
+When creating a new generated header file (e.g., `src/aggregator_config.h`) that is `#include`d
+from an existing ESPHome-managed header (`sensor_history_multi.h`), the new file must ALSO be
+added to the `includes:` list in `firmware/esp32-c3-multi-sensor.yaml`. ESPHome only copies
+files listed in `includes:` into its build directory — without this entry, the compiler cannot
+find the header even though the `#include` directive is syntactically correct.
+
+**Discovered during:** v7.5.5.0 implementation. The first commit added `#include "aggregator_config.h"`
+to `sensor_history_multi.h` and generated `src/aggregator_config.h`, but did not add
+`../src/aggregator_config.h` to the YAML `includes:`. CI compilation failed. A second commit
+was required to fix it.
+
+**Rule:** When any implementation step creates a new header file under `src/` or `dashboard/`,
+immediately check `firmware/esp32-c3-multi-sensor.yaml` `includes:` and add the new file path
+there. Treat the YAML includes list as part of the same atomic change as the `#include` directive.
+
+**Prevention:** Add a preflight check in a future step that cross-references all `#include` directives
+in ESPHome-managed headers against the YAML `includes:` list.
+
+Related: v7.5.5.0 PR #62
 
 ### LESSON-OPS-065: CSS for native browser widgets (`<input type=date>`, `<select>`) needs `color-scheme` (2026-03-21)
 
