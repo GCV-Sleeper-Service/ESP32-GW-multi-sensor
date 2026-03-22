@@ -3,6 +3,65 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.5.0 — Aggregator Configuration Schema and Loader — 2026-03-21
+
+### Phase 5 Step 0 — No runtime changes
+
+**Aggregator configuration schema defined.**
+Added `config/aggregator.example.json` with the aggregator role schema: `schema_version`,
+`role`, `gateway_id`, `gateway_name`, and `satellites[]` (each with `id`, `name`,
+`base_url`, `poll_interval_seconds`).
+
+**Live aggregator config added for development.**
+`config/aggregator.json` created from the example with `base_url` pointing to actual
+satellite IP (`http://192.168.120.189`). Required so v7.5.5.1 polling task can immediately
+test against a real satellite without extra setup.
+
+**`sensor_manifest_lib.py` extended.**
+Added `validate_aggregator_config()` and `load_aggregator_config()`. Validation enforces:
+- `schema_version` must be 1
+- `role` must be `"aggregator"`
+- At least 1 satellite, max 10
+- Unique satellite IDs and `base_url` values
+- `base_url` must start with `http://` or `https://`
+- `poll_interval_seconds` must be 10–300
+
+**`render_sensor_config.py` generates `src/aggregator_config.h`.**
+Conditionally generates the header in two modes:
+- Aggregator mode (config/aggregator.json present): `AGGREGATOR_ENABLED 1`, `MAX_SATELLITES N`,
+  satellite ID/name/URL/poll arrays as C string literals.
+- Satellite mode (no aggregator.json): `AGGREGATOR_ENABLED 0` only.
+The file is always generated so `sensor_history_multi.h` can `#include` it unconditionally.
+
+**`sensor_history_multi.h` includes `aggregator_config.h`.**
+Added `#include "aggregator_config.h"` after `#include "gateway_manifest.h"`.
+No runtime behavior changes — existing satellite firmware is completely unaffected.
+
+**`scripts/preflight.sh` extended.**
+New aggregator checks:
+- `aggregator_config_h_included` — sensor_history_multi.h includes the header
+- `aggregator_config_h_has_define` — AGGREGATOR_ENABLED define present
+- If aggregator.json exists: validates schema, checks AGGREGATOR_ENABLED 1
+- If absent: checks AGGREGATOR_ENABLED 0
+
+### Files changed
+- `config/aggregator.example.json` — new
+- `config/aggregator.json` — new (live dev config)
+- `scripts/sensor_manifest_lib.py` — added aggregator validation functions
+- `scripts/render_sensor_config.py` — aggregator config header generation
+- `src/aggregator_config.h` — generated header (aggregator mode enabled)
+- `dashboard/sensor_history_multi.h` — added #include "aggregator_config.h"
+- `scripts/preflight.sh` — aggregator validation checks
+- `firmware/esp32-c3-multi-sensor.yaml` — added `../src/aggregator_config.h` to includes list
+- `Docs/changelog.md` — this entry
+- `prompts/prompt-index-and-workflow.md` — v7.5.5.0 marked complete
+
+### Lessons learned
+- **LESSON-OPS-067**: New generated headers must also be added to the ESPHome YAML `includes:` list.
+  The `#include` directive alone is insufficient — ESPHome only copies listed files to its build directory.
+  Discovered when CI failed after the first commit; fixed in the second commit.
+
+---
 ## v7.5.4.5 — Post-Phase-4 Review Fixes — 2026-03-21
 
 ### Bug fixes

@@ -9,6 +9,10 @@ from typing import Dict, List
 
 MAC_RE = re.compile(r"^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 ID_RE = re.compile(r"^[a-z0-9_]{1,32}$")
+
+AGGREGATOR_MIN_POLL = 10
+AGGREGATOR_MAX_POLL = 300
+AGGREGATOR_MAX_SATELLITES = 10
 NAME_MAX_LEN = 15
 MIN_SENSORS = 1
 MAX_SENSORS = 4
@@ -275,3 +279,60 @@ def manifest_v2(
         "metrics": env_metrics,
         "sensors": sensor_entries,
     }
+
+
+def validate_aggregator_config(config: Dict) -> Dict:
+    """Validate aggregator config. Returns normalized config or raises ManifestError."""
+    if not isinstance(config, dict):
+        raise ManifestError("Aggregator config must be an object.")
+
+    if config.get("schema_version") != 1:
+        raise ManifestError("Aggregator config schema_version must be 1.")
+
+    if config.get("role") != "aggregator":
+        raise ManifestError('Aggregator config role must be "aggregator".')
+
+    satellites = config.get("satellites", [])
+    if not isinstance(satellites, list) or len(satellites) < 1:
+        raise ManifestError("Aggregator config must have at least 1 satellite.")
+    if len(satellites) > AGGREGATOR_MAX_SATELLITES:
+        raise ManifestError(f"Aggregator config supports max {AGGREGATOR_MAX_SATELLITES} satellites.")
+
+    seen_ids: set = set()
+    seen_urls: set = set()
+    for i, sat in enumerate(satellites, start=1):
+        sid = (sat.get("id") or "").strip()
+        # Gateway IDs allow hyphens (e.g. "gw-main"); normalize hyphens to underscores
+        # before matching ID_RE which covers letters/digits/underscores only.
+        if not sid or not ID_RE.match(sid.replace("-", "_")):
+            raise ManifestError(f"Satellite #{i} has invalid id.")
+        if sid in seen_ids:
+            raise ManifestError(f"Duplicate satellite id: {sid}")
+
+        url = (sat.get("base_url") or "").strip().rstrip("/")
+        if not url.startswith("http://") and not url.startswith("https://"):
+            raise ManifestError(f'Satellite "{sid}" base_url must start with http:// or https://')
+        if url in seen_urls:
+            raise ManifestError(f"Duplicate satellite base_url: {url}")
+
+        poll = sat.get("poll_interval_seconds", 30)
+        if not isinstance(poll, int) or poll < AGGREGATOR_MIN_POLL or poll > AGGREGATOR_MAX_POLL:
+            raise ManifestError(
+                f'Satellite "{sid}" poll_interval_seconds must be {AGGREGATOR_MIN_POLL}–{AGGREGATOR_MAX_POLL}'
+            )
+
+        seen_ids.add(sid)
+        seen_urls.add(url)
+
+    return config
+
+
+def load_aggregator_config(path: Path) -> Dict | None:
+    """Load aggregator config. Returns None if file doesn't exist (satellite mode)."""
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ManifestError(f"Aggregator config is not valid JSON: {exc}") from exc
+    return validate_aggregator_config(payload)
