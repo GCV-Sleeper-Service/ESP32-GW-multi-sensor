@@ -257,13 +257,13 @@ Required fields:
 |-------|-------------|
 | `board` | Must match a board profile filename in `firmware/boards/` |
 | `esphome_name` | ESPHome device name (lowercase, hyphens, digits only) |
-| `friendly_name` | Human-readable name shown in the dashboard |
 | `wifi_address` | IP address where ESPHome OTA/API reaches the device |
 
 Optional fields:
 
 | Field | Description |
 |-------|-------------|
+| `friendly_name` | Human-readable name shown in the dashboard; if omitted, defaults to `"{board_id} Gateway"` |
 | `manual_ip` | Object with `static_ip`, `gateway`, `subnet` (and optional `dns1`) — assigns a static IP on the device |
 
 **`wifi_address` vs `manual_ip`:**
