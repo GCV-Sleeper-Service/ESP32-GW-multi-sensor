@@ -1,0 +1,21 @@
+# ESP32-S3-DevKitC-1 N16R8 — Board Profile
+# Recommended aggregator board. Dual core, 512KB RAM, 8MB PSRAM, 16MB flash.
+# Large flash allows 4MB history partition (~132 days per device).
+board_id: "esp32-s3-devkitc1-n16r8"
+chip_variant: "esp32s3"
+esphome_board: "esp32-s3-devkitc1-n16r8"
+flash_size: "16MB"
+partitions: "../partitions/esp32-s3-multi-partitions.csv"
+framework:
+  type: "esp-idf"
+sdkconfig_options:
+  CONFIG_LWIP_MAX_SOCKETS: "16"
+psram:
+  mode: "octal"
+  speed: "80MHz"
+capabilities:
+  ble: true
+  psram: true
+  dual_core: true
+  ram_kb: 512
+notes: "Recommended aggregator board. 16MB flash allows 4MB history partition."

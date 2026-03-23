@@ -1,0 +1,21 @@
+# ESP32-WROOM-32D — Board Profile
+# Original ESP32. Dual core, 520KB RAM, 4MB flash.
+# BLE 4.2 (less capable than C3/S3 BLE 5.0 but functional).
+# Good backup aggregator. Same flash budget as C3.
+board_id: "esp32-wroom-32d"
+chip_variant: "esp32"
+esphome_board: "esp32dev"
+flash_size: "4MB"
+partitions: "../partitions/esp32-wroom-multi-partitions.csv"
+framework:
+  type: "esp-idf"
+  advanced:
+    minimum_chip_revision: "3.1"
+sdkconfig_options:
+  CONFIG_LWIP_MAX_SOCKETS: "16"
+capabilities:
+  ble: true
+  psram: false
+  dual_core: true
+  ram_kb: 520
+notes: "Original ESP32. Dual core with more RAM than C3 but older BLE. 4MB flash same as C3."

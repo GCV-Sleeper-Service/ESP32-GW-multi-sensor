@@ -1,0 +1,18 @@
+# ESP32-C3 SuperMini — Board Profile
+# Default satellite gateway board. Single core, 320KB RAM, 4MB flash.
+# BLE 5.0 + WiFi coexistence is excellent on C3.
+board_id: "esp32-c3-supermini"
+chip_variant: "esp32c3"
+esphome_board: "esp32-c3-devkitm-1"
+flash_size: "4MB"
+partitions: "../partitions/esp32-c3-multi-partitions.csv"
+framework:
+  type: "esp-idf"
+sdkconfig_options:
+  CONFIG_LWIP_MAX_SOCKETS: "16"
+capabilities:
+  ble: true
+  psram: false
+  dual_core: false
+  ram_kb: 320
+notes: "Default satellite board. Not recommended for aggregation (single core, limited RAM)."

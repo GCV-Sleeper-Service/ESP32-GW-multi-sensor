@@ -1,0 +1,13 @@
+# esp32-s3-multi-partitions.csv
+# Partition layout for ESP32-S3 with 16MB flash.
+# 4MB history partition — ~8x the C3's 512KB budget.
+# Retention: ~132 days per device (3 ThermoPro + 1 ping, per-device persistence v7.7+)
+# OTA slots: 3MB each — ample for S3 binary with aggregator code + PSRAM support.
+# Name,     Type, SubType,  Offset,   Size,      Flags
+nvs,        data, nvs,      0x9000,   0x5000,
+otadata,    data, ota,      0xE000,   0x2000,
+phy_init,   data, phy,      0x10000,  0x1000,
+ota_0,      app,  ota_0,    0x20000,  0x300000,
+ota_1,      app,  ota_1,    ,         0x300000,
+history,    data, nvs,      ,         0x400000,
+coredump,   data, coredump, ,         0x10000,
