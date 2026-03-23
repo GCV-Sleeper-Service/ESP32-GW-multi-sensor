@@ -1389,6 +1389,10 @@ static void init_aggregator_mutex() {
 // Safe because aggregator_poll_task is the only writer and fetches are sequential.
 static char s_fetch_tmp[4096];
 
+// All socket operations use lwip_*() prefixed functions (not the BSD-compat
+// aliases socket()/connect()/send()/recv()/close()) to avoid namespace
+// collision with esphome::socket — see CI failure in PR #64.
+//
 // Minimal HTTP/1.0 GET using lwIP BSD sockets.
 // Avoids esp_http_client.h, which is not in ESPHome's IDF PRIV_REQUIRES.
 // Uses lwip/sockets.h and lwip/netdb.h (both already available).
@@ -1437,16 +1441,16 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   if (lwip_getaddrinfo(host, port_str, &hints, &res) != 0 || !res) return false;
 
   // ── Socket, timeout, connect ───────────────────────────────────
-  int sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  int sock = lwip_socket(res->ai_family, res->ai_socktype, res->ai_protocol);
   if (sock < 0) { lwip_freeaddrinfo(res); return false; }
 
   struct timeval tv = {};
   tv.tv_sec = 5;
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-  setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+  lwip_setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+  lwip_setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
-  if (connect(sock, res->ai_addr, res->ai_addrlen) != 0) {
-    close(sock); lwip_freeaddrinfo(res); return false;
+  if (lwip_connect(sock, res->ai_addr, res->ai_addrlen) != 0) {
+    lwip_close(sock); lwip_freeaddrinfo(res); return false;
   }
   lwip_freeaddrinfo(res);
 
@@ -1454,7 +1458,7 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   char req[512];
   int req_len = snprintf(req, sizeof(req),
       "GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", path, host);
-  if (send(sock, req, req_len, 0) < 0) { close(sock); return false; }
+  if (lwip_send(sock, req, req_len, 0) < 0) { lwip_close(sock); return false; }
 
   // ── Read response headers into small stack buffer ──────────────
   // Read one byte at a time until \r\n\r\n to find the header/body split.
@@ -1463,7 +1467,7 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   int  hdr_len = 0;
   bool hdr_done = false;
   while (!hdr_done && hdr_len < (int)(sizeof(hdr) - 1)) {
-    int n = recv(sock, hdr + hdr_len, 1, 0);
+    int n = lwip_recv(sock, hdr + hdr_len, 1, 0);
     if (n <= 0) break;
     hdr_len++;
     if (hdr_len >= 4 &&
@@ -1472,21 +1476,21 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
       hdr_done = true;
     }
   }
-  if (!hdr_done) { close(sock); return false; }
+  if (!hdr_done) { lwip_close(sock); return false; }
 
   // Check HTTP 200 status
-  if (strncmp(hdr, "HTTP/", 5) != 0) { close(sock); return false; }
+  if (strncmp(hdr, "HTTP/", 5) != 0) { lwip_close(sock); return false; }
   const char* sp = (const char*)memchr(hdr, ' ', hdr_len < 20 ? hdr_len : 20);
-  if (!sp || strncmp(sp + 1, "200", 3) != 0) { close(sock); return false; }
+  if (!sp || strncmp(sp + 1, "200", 3) != 0) { lwip_close(sock); return false; }
 
   // ── Read body directly into caller's buffer ────────────────────
   int total = 0;
   while (total < (int)(buf_size - 1)) {
-    int n = recv(sock, buf + total, buf_size - 1 - total, 0);
+    int n = lwip_recv(sock, buf + total, buf_size - 1 - total, 0);
     if (n <= 0) break;
     total += n;
   }
-  close(sock);
+  lwip_close(sock);
 
   if (total > 0) {
     buf[total] = '\0';
