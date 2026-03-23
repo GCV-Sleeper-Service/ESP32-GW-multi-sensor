@@ -1514,7 +1514,14 @@ static void aggregator_poll_task(void* arg) {
   vTaskDelay(pdMS_TO_TICKS(10000));
 
   while (true) {
-    uint32_t now = (uint32_t)::time(nullptr);
+    // Monotonic uptime for interval tracking — no SNTP dependency.
+    // ::time(nullptr) returns 0 before SNTP sync, which breaks interval
+    // math and backoff seeding (BUG-058). esp_timer_get_time() counts
+    // from boot and is always nonzero after the 10s initial delay.
+    uint32_t uptime_s = (uint32_t)(esp_timer_get_time() / 1000000ULL);
+    // Wall-clock epoch — only for last_seen_epoch (API display).
+    // May be 0 before SNTP sync; that's fine for display purposes.
+    uint32_t epoch_now = (uint32_t)::time(nullptr);
 
     for (int i = 0; i < MAX_SATELLITES; i++) {
       SatelliteCache& sat = satellite_caches[i];
@@ -1529,7 +1536,7 @@ static void aggregator_poll_task(void* arg) {
 
       // ── Fetch /api/v2/live (every poll_interval_seconds) ──
       bool live_due = (sat.last_live_fetch == 0) ||
-                      (now - sat.last_live_fetch >= effective_interval);
+                      (uptime_s - sat.last_live_fetch >= effective_interval);
       if (live_due) {
         snprintf(url_buf, sizeof(url_buf), "%s/api/v2/live", sat.base_url);
         tmp_len = 0;
@@ -1539,10 +1546,10 @@ static void aggregator_poll_task(void* arg) {
             bool was_unreachable = !sat.reachable;
             memcpy(sat.live_json, s_fetch_tmp, tmp_len + 1);
             sat.live_len = tmp_len;
-            sat.last_live_fetch = now;
+            sat.last_live_fetch = uptime_s;
             sat.reachable = true;
             sat.consecutive_failures = 0;
-            sat.last_seen_epoch = now;
+            sat.last_seen_epoch = epoch_now;
             AGG_UNLOCK();
             if (was_unreachable) {
               ESP_LOGI(TAG_AGG, "[%s] recovered (was unreachable)", sat.id);
@@ -1558,7 +1565,7 @@ static void aggregator_poll_task(void* arg) {
 
       // ── Fetch /api/status (every poll_interval_seconds) ──
       bool status_due = (sat.last_status_fetch == 0) ||
-                        (now - sat.last_status_fetch >= effective_interval);
+                        (uptime_s - sat.last_status_fetch >= effective_interval);
       if (status_due) {
         snprintf(url_buf, sizeof(url_buf), "%s/api/status", sat.base_url);
         tmp_len = 0;
@@ -1567,7 +1574,7 @@ static void aggregator_poll_task(void* arg) {
           if (AGG_LOCK() == pdTRUE) {
             memcpy(sat.status_json, s_fetch_tmp, tmp_len + 1);
             sat.status_len = tmp_len;
-            sat.last_status_fetch = now;
+            sat.last_status_fetch = uptime_s;
             AGG_UNLOCK();
           }
           ESP_LOGI(TAG_AGG, "[%s] status: %u bytes", sat.id, (unsigned)tmp_len);
@@ -1580,7 +1587,7 @@ static void aggregator_poll_task(void* arg) {
 
       // ── Fetch /api/manifest (every 5 minutes) ──
       bool manifest_due = (sat.last_manifest_fetch == 0) ||
-                          (now - sat.last_manifest_fetch >= 300);
+                          (uptime_s - sat.last_manifest_fetch >= 300);
       if (manifest_due) {
         snprintf(url_buf, sizeof(url_buf), "%s/api/manifest", sat.base_url);
         tmp_len = 0;
@@ -1589,7 +1596,7 @@ static void aggregator_poll_task(void* arg) {
           if (AGG_LOCK() == pdTRUE) {
             memcpy(sat.manifest_json, s_fetch_tmp, tmp_len + 1);
             sat.manifest_len = tmp_len;
-            sat.last_manifest_fetch = now;
+            sat.last_manifest_fetch = uptime_s;
             AGG_UNLOCK();
           }
           ESP_LOGI(TAG_AGG, "[%s] manifest: %u bytes", sat.id, (unsigned)tmp_len);
@@ -1613,9 +1620,9 @@ static void aggregator_poll_task(void* arg) {
             // (satellite declared unreachable) — not on transient failures
             // which should retry at normal frequency to handle boot-order
             // races where the satellite comes up seconds after the aggregator.
-            if (sat.last_live_fetch == 0)     sat.last_live_fetch = now;
-            if (sat.last_status_fetch == 0)   sat.last_status_fetch = now;
-            if (sat.last_manifest_fetch == 0) sat.last_manifest_fetch = now;
+            if (sat.last_live_fetch == 0)     sat.last_live_fetch = uptime_s;
+            if (sat.last_status_fetch == 0)   sat.last_status_fetch = uptime_s;
+            if (sat.last_manifest_fetch == 0) sat.last_manifest_fetch = uptime_s;
           }
           AGG_UNLOCK();
         }
