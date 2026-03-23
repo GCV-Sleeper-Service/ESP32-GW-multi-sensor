@@ -397,3 +397,16 @@ def validate_gateway_config(config: Dict) -> None:
         ipaddress.IPv4Address(config['wifi_address'])
     except ValueError:
         raise ManifestError(f"wifi_address must be a valid IPv4 address: {config['wifi_address']}")
+    # Validate optional manual_ip
+    manual_ip = config.get('manual_ip')
+    if manual_ip is not None:
+        if not isinstance(manual_ip, dict):
+            raise ManifestError("manual_ip must be an object with static_ip, gateway, subnet")
+        for field in ('static_ip', 'gateway', 'subnet'):
+            val = manual_ip.get(field)
+            if not val:
+                raise ManifestError(f"manual_ip.{field} is required when manual_ip is present")
+            try:
+                ipaddress.IPv4Address(val)
+            except ValueError:
+                raise ManifestError(f"manual_ip.{field} must be a valid IPv4 address: {val}")

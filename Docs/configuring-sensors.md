@@ -258,7 +258,20 @@ Required fields:
 | `board` | Must match a board profile filename in `firmware/boards/` |
 | `esphome_name` | ESPHome device name (lowercase, hyphens, digits only) |
 | `friendly_name` | Human-readable name shown in the dashboard |
-| `wifi_address` | Static IP address for the device |
+| `wifi_address` | IP address where ESPHome OTA/API reaches the device |
+
+Optional fields:
+
+| Field | Description |
+|-------|-------------|
+| `manual_ip` | Object with `static_ip`, `gateway`, `subnet` (and optional `dns1`) — assigns a static IP on the device |
+
+**`wifi_address` vs `manual_ip`:**
+
+- `wifi_address` is **always required** — it tells ESPHome OTA/API where to reach the device
+- `manual_ip` is **optional** — when present, the device assigns itself a static IP instead of relying on DHCP
+- Without `manual_ip`, the device gets its IP from DHCP; `wifi_address` must match a DHCP reservation on the router
+- With `manual_ip`, the device assigns the static IP directly; no DHCP reservation needed
 
 **Do NOT commit `config/gateway.json` to the repository.** It is per-device configuration. The example file (`config/gateway.example.json`) is committed as a template.
 
@@ -288,6 +301,10 @@ esphome run firmware/esp32-s3-devkitc1-n16r8-gw.yaml
 # WROOM-32D:
 esphome compile firmware/esp32-wroom-32d-gw.yaml
 esphome run firmware/esp32-wroom-32d-gw.yaml
+
+# C3 with gateway.json (e.g. esphome_name "esp32-c3-garage"):
+esphome compile firmware/esp32-c3-garage-gw.yaml
+esphome run firmware/esp32-c3-garage-gw.yaml
 
 # C3 Satellite (default — no gateway.json needed):
 esphome compile firmware/esp32-c3-multi-sensor.yaml

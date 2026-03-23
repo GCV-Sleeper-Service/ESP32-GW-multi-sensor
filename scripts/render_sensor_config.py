@@ -564,11 +564,15 @@ def generate_aggregator_config_h(aggregator_config: Dict | None) -> str:
     )
 
 
-def get_yaml_output_path(board_profile: Dict) -> Path:
+def get_yaml_output_path(board_profile: Dict, gateway_config: Dict | None) -> Path:
     """Determine the output YAML path based on the board profile."""
     board_id = board_profile['board_id']
-    if board_id == 'esp32-c3-supermini':
-        return YAML_PATH  # backward compat: firmware/esp32-c3-multi-sensor.yaml
+    if board_id == 'esp32-c3-supermini' and gateway_config is None:
+        return YAML_PATH  # backward compat: no gateway.json → modify existing C3 YAML
+    if board_id == 'esp32-c3-supermini' and gateway_config is not None:
+        # C3 with gateway.json → generate a named YAML to avoid overwriting the template
+        esphome_name = gateway_config.get('esphome_name', 'esp32-c3-gw')
+        return ROOT / "firmware" / f"{esphome_name}-gw.yaml"
     return ROOT / "firmware" / f"{board_id}-gw.yaml"
 
 
@@ -579,7 +583,7 @@ def generate_board_yaml(
     aggregator_config: Dict | None,
     version: str,
 ) -> str:
-    """Generate a complete ESPHome YAML for a non-C3 board from the board profile and sensors."""
+    """Generate a complete ESPHome YAML for a board from the board profile and sensors."""
     ble_sensors = [s for s in sensors if s.get("adapter", "thermopro_ble") == "thermopro_ble"]
     ping_sensors = [s for s in sensors if s.get("adapter") == "icmp_ping"]
     has_env_sensors = len(ble_sensors) > 0
@@ -670,6 +674,7 @@ def generate_board_yaml(
     # ─── Chip and framework ─────────────────────────────────────────
     lines.append("# ─── Chip and framework ─────────────────────────────────────────")
     lines.append("esp32:")
+    lines.append(f"  board: {esphome_board}")
     lines.append(f"  variant: {chip_variant}")
     lines.append(f"  flash_size: {flash_size}")
     lines.append(f"  partitions: {partitions}")
@@ -694,7 +699,10 @@ def generate_board_yaml(
         lines.append("")
 
     # Logger
+    logger_config = board_profile.get('logger', {})
     lines.append("logger:")
+    if 'baud_rate' in logger_config:
+        lines.append(f"  baud_rate: {logger_config['baud_rate']}")
     lines.append("  level: INFO")
     lines.append("  logs:")
     lines.append("    wifi: WARN")
@@ -726,6 +734,14 @@ def generate_board_yaml(
     lines.append("  ssid: !secret wifi_ssid")
     lines.append("  password: !secret wifi_password")
     lines.append(f"  use_address: {wifi_address}")
+    manual_ip = gateway_config.get('manual_ip')
+    if manual_ip:
+        lines.append("  manual_ip:")
+        lines.append(f"    static_ip: {manual_ip['static_ip']}")
+        lines.append(f"    gateway: {manual_ip['gateway']}")
+        lines.append(f"    subnet: {manual_ip['subnet']}")
+        if 'dns1' in manual_ip:
+            lines.append(f"    dns1: {manual_ip['dns1']}")
     lines.append("")
 
     # Time + averaging + persistence
@@ -1199,13 +1215,17 @@ def main() -> int:
     }
 
     # Determine YAML output path and content based on gateway config
-    yaml_output_path = get_yaml_output_path(board_profile)
+    yaml_output_path = get_yaml_output_path(board_profile, gateway_config)
 
-    if gateway_config and board_profile['board_id'] != 'esp32-c3-supermini':
-        # Non-C3 board: generate a fresh YAML from template
+    if gateway_config:
+        # Gateway config present — use full generation for ALL boards (including C3).
+        # This applies esphome_name, friendly_name, and wifi_address from gateway.json.
+        # Without this, a C3 gateway.json would be silently ignored and multiple C3
+        # deployments would collide on hostname/address.
         expected_yaml = generate_board_yaml(board_profile, gateway_config, sensors, aggregator_config, VERSION)
     else:
-        # C3 default: modify existing YAML in place (backward compatible)
+        # No gateway config — C3 default: modify existing YAML in place (backward compatible).
+        # This preserves all comments, formatting, and manual tweaks in the C3 YAML.
         expected_yaml = render_yaml_file(YAML_PATH, sensors)
 
     expected[yaml_output_path] = expected_yaml
