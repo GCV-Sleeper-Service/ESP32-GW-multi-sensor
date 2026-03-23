@@ -2,13 +2,19 @@
 """Helpers for the canonical sensor manifest used by the ESP32 gateway repo."""
 from __future__ import annotations
 
+import ipaddress
 import json
+import os
 import re
 from pathlib import Path
 from typing import Dict, List
 
+import yaml
+
 MAC_RE = re.compile(r"^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 ID_RE = re.compile(r"^[a-z0-9_]{1,32}$")
+
+BOARDS_DIR = os.path.join(os.path.dirname(__file__), '..', 'firmware', 'boards')
 
 AGGREGATOR_MIN_POLL = 10
 AGGREGATOR_MAX_POLL = 300
@@ -61,14 +67,15 @@ def normalize_mac(mac: str) -> str:
     return (mac or "").strip().replace("-", ":").upper()
 
 
-def canonicalize_sensors(sensors: List[Dict]) -> List[Dict]:
+def canonicalize_sensors(sensors: List[Dict], allow_empty: bool = False) -> List[Dict]:
     if not isinstance(sensors, list):
         raise ManifestError("Manifest sensors field must be a list.")
 
     count = len(sensors)
-    if count < MIN_SENSORS or count > MAX_SENSORS:
+    min_count = 0 if allow_empty else MIN_SENSORS
+    if count < min_count or count > MAX_SENSORS:
         raise ManifestError(
-            f"Sensor count must be between {MIN_SENSORS} and {MAX_SENSORS}; got {count}."
+            f"Sensor count must be between {min_count} and {MAX_SENSORS}; got {count}."
         )
 
     normalized: List[Dict] = []
@@ -147,7 +154,7 @@ def canonicalize_sensors(sensors: List[Dict]) -> List[Dict]:
     return normalized
 
 
-def load_manifest(path: Path) -> List[Dict]:
+def load_manifest(path: Path, allow_empty: bool = False) -> List[Dict]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -165,7 +172,7 @@ def load_manifest(path: Path) -> List[Dict]:
     else:
         raise ManifestError("Manifest root must be an object or an array.")
 
-    return canonicalize_sensors(sensors)
+    return canonicalize_sensors(sensors, allow_empty=allow_empty)
 
 
 def fixture_manifest(sensors: List[Dict]) -> List[Dict]:
@@ -341,3 +348,53 @@ def load_aggregator_config(path: Path) -> Dict | None:
     except json.JSONDecodeError as exc:
         raise ManifestError(f"Aggregator config is not valid JSON: {exc}") from exc
     return validate_aggregator_config(payload)
+
+
+def load_board_profile(board_id: str) -> Dict:
+    """Load a board profile from firmware/boards/{board_id}.yaml.
+    Returns dict or raises ManifestError."""
+    profile_path = os.path.join(BOARDS_DIR, f"{board_id}.yaml")
+    if not os.path.isfile(profile_path):
+        raise ManifestError(f"Board profile not found: {profile_path}")
+    with open(profile_path, 'r') as f:
+        profile = yaml.safe_load(f)
+    required_keys = ['board_id', 'chip_variant', 'esphome_board', 'flash_size',
+                     'partitions', 'framework']
+    for key in required_keys:
+        if key not in profile:
+            raise ManifestError(f"Board profile {board_id} missing required key: {key}")
+    if profile['board_id'] != board_id:
+        raise ManifestError(f"Board profile board_id mismatch: file={board_id}, content={profile['board_id']}")
+    return profile
+
+
+def load_gateway_config() -> Dict | None:
+    """Load config/gateway.json if it exists. Returns dict or None."""
+    gw_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'gateway.json')
+    if not os.path.isfile(gw_path):
+        return None
+    with open(gw_path, 'r') as f:
+        config = json.load(f)
+    validate_gateway_config(config)
+    return config
+
+
+def validate_gateway_config(config: Dict) -> None:
+    """Validate gateway config schema. Raises ManifestError on failure."""
+    if 'board' not in config:
+        raise ManifestError("gateway.json missing 'board'")
+    if 'esphome_name' not in config:
+        raise ManifestError("gateway.json missing 'esphome_name'")
+    if 'wifi_address' not in config:
+        raise ManifestError("gateway.json missing 'wifi_address'")
+    # Validate board reference
+    load_board_profile(config['board'])  # will raise if not found
+    # Validate name format (ESPHome requires lowercase, hyphens, digits)
+    name = config['esphome_name']
+    if not re.match(r'^[a-z0-9][a-z0-9-]*$', name):
+        raise ManifestError(f"esphome_name must be lowercase alphanumeric with hyphens: {name}")
+    # Validate IP format
+    try:
+        ipaddress.IPv4Address(config['wifi_address'])
+    except ValueError:
+        raise ManifestError(f"wifi_address must be a valid IPv4 address: {config['wifi_address']}")
