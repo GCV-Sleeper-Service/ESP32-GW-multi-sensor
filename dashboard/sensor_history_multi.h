@@ -1608,14 +1608,15 @@ static void aggregator_poll_task(void* arg) {
           failures = sat.consecutive_failures;
           if (failures >= 3) {
             sat.reachable = false;
+            // BUG-058: Seed timestamps for never-fetched endpoints so the
+            // 300s backoff interval starts counting. Only after 3 failures
+            // (satellite declared unreachable) — not on transient failures
+            // which should retry at normal frequency to handle boot-order
+            // races where the satellite comes up seconds after the aggregator.
+            if (sat.last_live_fetch == 0)     sat.last_live_fetch = now;
+            if (sat.last_status_fetch == 0)   sat.last_status_fetch = now;
+            if (sat.last_manifest_fetch == 0) sat.last_manifest_fetch = now;
           }
-          // BUG-058: Seed timestamp for never-fetched endpoints so the
-          // backoff interval starts counting. Without this, the == 0
-          // check in the "due" logic always returns true, bypassing the
-          // 300s unreachable backoff entirely.
-          if (sat.last_live_fetch == 0)     sat.last_live_fetch = now;
-          if (sat.last_status_fetch == 0)   sat.last_status_fetch = now;
-          if (sat.last_manifest_fetch == 0) sat.last_manifest_fetch = now;
           AGG_UNLOCK();
         }
         if (failures >= 3) {

@@ -33,7 +33,7 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 **Root cause:** The "due" check uses `(sat.last_live_fetch == 0)` to detect "never fetched" and force an immediate attempt. But on failure, `last_live_fetch` is never updated from `0`, so the check is always true on the next iteration. The `effective_interval` of 300 seconds is computed but never consulted because the `== 0` clause short-circuits it.
 
-**Fix:** After a failed fetch, if `last_*_fetch` is still `0`, set it to `now` so the interval timer starts counting. The next attempt then respects the 300-second backoff.
+**Fix:** When a satellite is declared unreachable (3+ consecutive failures), seed any still-zero `last_*_fetch` timestamps to `now` so the 300s backoff interval starts counting. The seeding is deliberately NOT applied on failures 1-2, which allows the normal retry frequency to handle transient boot-order races where the satellite comes up seconds after the aggregator.
 
 **Prevention:** LESSON-OPS-069.
 
@@ -1049,7 +1049,7 @@ Related: BUG-057, PR #64
 
 **Context:** A common pattern for periodic tasks is `bool due = (last_run == 0) || (now - last_run >= interval)`. The `== 0` clause handles the "first run" case. But if the first run FAILS and `last_run` is never set, the task retries on every loop iteration regardless of the interval — the backoff is dead code.
 
-**Rule:** When a periodic operation fails and the timestamp was never set (still 0), set it to `now` so the interval starts counting. This applies to any pattern where:
+**Rule:** When a periodic operation fails and the timestamp was never set (still 0), set it to `now` so the interval starts counting — but only after the failure threshold is crossed. Seeding too early (on first failure) prevents legitimate retries during transient conditions like boot-order races. The seeding should be coupled with the state transition (e.g., "declared unreachable"), not with every individual failure. This applies to any pattern where:
 1. A timestamp field starts at 0 (meaning "never done")
 2. The timestamp is only updated on success
 3. A backoff/interval check uses the timestamp
