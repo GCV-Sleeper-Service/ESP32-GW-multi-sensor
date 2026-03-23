@@ -270,7 +270,7 @@ Optional fields:
 
 - `wifi_address` is **always required** — it tells ESPHome OTA/API where to reach the device
 - `manual_ip` is **optional** — when present, the device assigns itself a static IP instead of relying on DHCP
-- Without `manual_ip`, the device gets its IP from DHCP; `wifi_address` must match a DHCP reservation on the router
+- Without `manual_ip`, the device gets its IP from DHCP; `wifi_address` must match the device's actual IP (typically via a DHCP reservation on the router)
 - With `manual_ip`, the device assigns the static IP directly; no DHCP reservation needed
 
 **Do NOT commit `config/gateway.json` to the repository.** It is per-device configuration. The example file (`config/gateway.example.json`) is committed as a template.
