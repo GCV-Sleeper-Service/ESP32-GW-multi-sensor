@@ -1328,7 +1328,9 @@ class PingAdapter {
 // ═══════════════════════════════════════════════════════════════════
 
 #if AGGREGATOR_ENABLED
-#include <esp_http_client.h>
+// Use lwIP BSD sockets for HTTP fetches — esp_http_client.h is not in
+// ESPHome's IDF PRIV_REQUIRES; lwip/sockets.h is already available.
+#include <lwip/sockets.h>
 
 static const char* TAG_AGG = "aggregator";
 
@@ -1387,45 +1389,111 @@ static void init_aggregator_mutex() {
 // Safe because aggregator_poll_task is the only writer and fetches are sequential.
 static char s_fetch_tmp[4096];
 
+// Minimal HTTP/1.0 GET using lwIP BSD sockets.
+// Avoids esp_http_client.h, which is not in ESPHome's IDF PRIV_REQUIRES.
+// Uses lwip/sockets.h and lwip/netdb.h (both already available).
+// Returns true and sets *out_len on HTTP 200; false otherwise.
 static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint16_t* out_len) {
-  esp_http_client_config_t config = {};
-  config.url = url;
-  config.timeout_ms = 5000;
-  config.method = HTTP_METHOD_GET;
+  *out_len = 0;
 
-  esp_http_client_handle_t client = esp_http_client_init(&config);
-  if (!client) return false;
+  // ── Parse "http://host[:port]/path" ────────────────────────────
+  if (strncmp(url, "http://", 7) != 0) return false;
+  const char* host_start = url + 7;
 
-  esp_err_t err = esp_http_client_open(client, 0);
-  if (err != ESP_OK) {
-    esp_http_client_cleanup(client);
-    return false;
+  char host[128];
+  char port_str[8];
+  const char* path = "/";
+
+  const char* slash = strchr(host_start, '/');
+  const char* colon = strchr(host_start, ':');
+
+  if (colon && (!slash || colon < slash)) {
+    // host:port[/path]
+    size_t host_len = (size_t)(colon - host_start);
+    if (host_len == 0 || host_len >= sizeof(host)) return false;
+    memcpy(host, host_start, host_len);
+    host[host_len] = '\0';
+    const char* port_end = slash ? slash : colon + strlen(colon);
+    size_t port_len = (size_t)(port_end - colon - 1);
+    if (port_len == 0 || port_len >= sizeof(port_str)) return false;
+    memcpy(port_str, colon + 1, port_len);
+    port_str[port_len] = '\0';
+  } else {
+    // host[/path]
+    const char* host_end = slash ? slash : host_start + strlen(host_start);
+    size_t host_len = (size_t)(host_end - host_start);
+    if (host_len == 0 || host_len >= sizeof(host)) return false;
+    memcpy(host, host_start, host_len);
+    host[host_len] = '\0';
+    strcpy(port_str, "80");
   }
+  if (slash) path = slash;
 
-  int content_length = esp_http_client_fetch_headers(client);
-  (void)content_length;
-  int status = esp_http_client_get_status_code(client);
+  // ── DNS resolution ─────────────────────────────────────────────
+  struct addrinfo hints = {};
+  hints.ai_family   = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  struct addrinfo* res = nullptr;
+  if (lwip_getaddrinfo(host, port_str, &hints, &res) != 0 || !res) return false;
 
-  // Note: content_length == -1 is valid for chunked transfer encoding.
-  // Only reject non-200 status codes.
-  if (status != 200) {
-    esp_http_client_close(client);
-    esp_http_client_cleanup(client);
-    return false;
+  // ── Socket, timeout, connect ───────────────────────────────────
+  int sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  if (sock < 0) { lwip_freeaddrinfo(res); return false; }
+
+  struct timeval tv = {};
+  tv.tv_sec = 5;
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+  setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
+  if (connect(sock, res->ai_addr, res->ai_addrlen) != 0) {
+    close(sock); lwip_freeaddrinfo(res); return false;
   }
+  lwip_freeaddrinfo(res);
 
-  // For chunked responses (content_length == -1), read up to buf_size - 1.
-  // For known-length responses, also cap at buf_size - 1.
-  int max_read = buf_size - 1;
-  int read_len = esp_http_client_read(client, buf, max_read);
-  if (read_len >= 0) {
-    buf[read_len] = '\0';
-    *out_len = (uint16_t)read_len;
+  // ── Send HTTP/1.0 GET (no chunked encoding) ────────────────────
+  char req[512];
+  int req_len = snprintf(req, sizeof(req),
+      "GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", path, host);
+  if (send(sock, req, req_len, 0) < 0) { close(sock); return false; }
+
+  // ── Read response headers into small stack buffer ──────────────
+  // Read one byte at a time until \r\n\r\n to find the header/body split.
+  // Typical embedded server headers are <500 bytes, so this is bounded.
+  char hdr[512];
+  int  hdr_len = 0;
+  bool hdr_done = false;
+  while (!hdr_done && hdr_len < (int)(sizeof(hdr) - 1)) {
+    int n = recv(sock, hdr + hdr_len, 1, 0);
+    if (n <= 0) break;
+    hdr_len++;
+    if (hdr_len >= 4 &&
+        hdr[hdr_len - 4] == '\r' && hdr[hdr_len - 3] == '\n' &&
+        hdr[hdr_len - 2] == '\r' && hdr[hdr_len - 1] == '\n') {
+      hdr_done = true;
+    }
   }
+  if (!hdr_done) { close(sock); return false; }
 
-  esp_http_client_close(client);
-  esp_http_client_cleanup(client);
-  return read_len > 0;
+  // Check HTTP 200 status
+  if (strncmp(hdr, "HTTP/", 5) != 0) { close(sock); return false; }
+  const char* sp = (const char*)memchr(hdr, ' ', hdr_len < 20 ? hdr_len : 20);
+  if (!sp || strncmp(sp + 1, "200", 3) != 0) { close(sock); return false; }
+
+  // ── Read body directly into caller's buffer ────────────────────
+  int total = 0;
+  while (total < (int)(buf_size - 1)) {
+    int n = recv(sock, buf + total, buf_size - 1 - total, 0);
+    if (n <= 0) break;
+    total += n;
+  }
+  close(sock);
+
+  if (total > 0) {
+    buf[total] = '\0';
+    *out_len = (uint16_t)total;
+    return true;
+  }
+  return false;
 }
 
 static void aggregator_poll_task(void* arg) {

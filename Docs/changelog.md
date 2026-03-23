@@ -27,10 +27,10 @@ Polls each satellite sequentially:
 
 Satellites are staggered (2 s gap) to avoid simultaneous connections.
 After 3 consecutive fetch failures a satellite is marked unreachable.
-The task runs at `tskIDLE_PRIORITY + 1` with a 10 s initial delay for WiFi/boot settle.
+The task runs at `tskIDLE_PRIORITY + 2` with a 10 s initial delay for WiFi/boot settle.
 
 **`start_aggregator_task()` — called from `on_boot` lambda.**
-Creates the mutex, then spawns `aggregator_poll_task` with a 6 KB stack.
+Creates the mutex, then spawns `aggregator_poll_task` with a 10 KB stack.
 
 **ESPHome YAML updated.**
 New `on_boot:` block at priority 600 conditionally calls `start_aggregator_task()`

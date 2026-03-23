@@ -19,9 +19,10 @@ Implemented the background RTOS task that polls satellite gateways and caches th
 
 2. **FreeRTOS mutex** — `s_cache_mutex` with `init_aggregator_mutex()`, `AGG_LOCK()`/`AGG_UNLOCK()` macros (200ms timeout)
 
-3. **`fetch_to_buffer()`** — ESP-IDF `esp_http_client` wrapper
-   - 5s timeout, rejects non-200
-   - Handles chunked transfer encoding (`content_length == -1`)
+3. **`fetch_to_buffer()`** — raw lwIP BSD socket HTTP/1.0 GET
+   - Parses `http://host[:port]/path`, resolves via `lwip_getaddrinfo()`
+   - 5s socket timeout (`SO_RCVTIMEO`/`SO_SNDTIMEO`), rejects non-200
+   - HTTP/1.0 (no chunked encoding); headers consumed into small stack buffer
 
 4. **Torn-read prevention** — `s_fetch_tmp[4096]` static temp buffer; fetch into temp, then `memcpy` into cache under mutex
 
@@ -49,6 +50,7 @@ Implemented the background RTOS task that polls satellite gateways and caches th
 | `esp_timer_get_time()` → `::time(nullptr)` | Epoch timestamp corrected for API compatibility |
 | No reduced polling for unreachable satellites | Added `effective_interval` back-off to 300s |
 | Missing recovery log message | Added "recovered" log on unreachable → reachable transition |
+| CI compile failure: `esp_http_client.h` not found | Replaced with raw lwIP BSD socket HTTP/1.0 (`lwip/sockets.h` already in PRIV_REQUIRES) |
 
 ## Files Changed
 
