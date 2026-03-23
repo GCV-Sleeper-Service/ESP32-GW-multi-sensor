@@ -355,8 +355,13 @@ def load_board_profile(board_id: str) -> Dict:
     profile_path = BOARDS_DIR / f"{board_id}.yaml"
     if not profile_path.is_file():
         raise ManifestError(f"Board profile not found: {profile_path}")
-    with open(profile_path, 'r', encoding='utf-8') as f:
-        profile = yaml.safe_load(f)
+    try:
+        with open(profile_path, 'r', encoding='utf-8') as f:
+            profile = yaml.safe_load(f)
+    except yaml.YAMLError as exc:
+        raise ManifestError(f"Board profile {board_id} is not valid YAML: {exc}") from exc
+    if not isinstance(profile, dict):
+        raise ManifestError(f"Board profile {board_id} must be a YAML mapping, got {type(profile).__name__}")
     required_keys = ['board_id', 'chip_variant', 'esphome_board', 'flash_size',
                      'partitions', 'framework']
     for key in required_keys:
@@ -372,8 +377,11 @@ def load_gateway_config() -> Dict | None:
     gw_path = Path(__file__).resolve().parent.parent / 'config' / 'gateway.json'
     if not gw_path.is_file():
         return None
-    with open(gw_path, 'r', encoding='utf-8') as f:
-        config = json.load(f)
+    try:
+        with open(gw_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    except json.JSONDecodeError as exc:
+        raise ManifestError(f"Gateway config is not valid JSON: {exc}") from exc
     validate_gateway_config(config)
     return config
 
@@ -406,7 +414,18 @@ def validate_gateway_config(config: Dict) -> None:
             val = manual_ip.get(field)
             if not val:
                 raise ManifestError(f"manual_ip.{field} is required when manual_ip is present")
+            if not isinstance(val, str):
+                raise ManifestError(f"manual_ip.{field} must be a string, got {type(val).__name__}")
             try:
                 ipaddress.IPv4Address(val)
             except ValueError:
                 raise ManifestError(f"manual_ip.{field} must be a valid IPv4 address: {val}")
+        # Optional dns1 field — validated if present
+        dns1 = manual_ip.get('dns1')
+        if dns1 is not None:
+            if not isinstance(dns1, str):
+                raise ManifestError(f"manual_ip.dns1 must be a string, got {type(dns1).__name__}")
+            try:
+                ipaddress.IPv4Address(dns1)
+            except ValueError:
+                raise ManifestError(f"manual_ip.dns1 must be a valid IPv4 address: {dns1}")

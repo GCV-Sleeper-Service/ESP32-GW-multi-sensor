@@ -787,10 +787,7 @@ def generate_board_yaml(
         lines.append("")
 
     if has_env_sensors:
-        if not has_any_sensors:
-            lines.append("    on_time:")
-        else:
-            pass  # on_time already opened above
+        # on_time already opened by has_any_sensors block above (has_env_sensors implies has_any_sensors)
         lines.append("      - seconds: 0")
         lines.append("        minutes: ${persist_minute}")
         lines.append("        then:")
