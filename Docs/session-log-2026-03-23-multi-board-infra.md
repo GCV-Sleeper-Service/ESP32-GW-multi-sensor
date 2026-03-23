@@ -20,7 +20,7 @@ Added:
 - `validate_gateway_config(config)` — validates board reference, ESPHome name format, IPv4 address
 - `canonicalize_sensors()` now accepts `allow_empty=True` for zero-sensor configs
 - `load_manifest()` passes through the `allow_empty` parameter
-- Added `yaml`, `os`, `ipaddress` imports
+- Added `yaml`, `ipaddress` imports
 - Added `BOARDS_DIR` constant
 
 ### 3. `scripts/render_sensor_config.py` (MODIFIED)
