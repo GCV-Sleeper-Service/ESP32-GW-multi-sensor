@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-22 — v7.5.5.1 Phase 5 Step 1 (aggregator polling task, lwIP socket fix)._
+_Last updated: 2026-03-23 — v7.5.5.1 post-merge patch (BUG-058 backoff seed, BUG-059 https:// rejection)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,34 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-059 — Validator accepts `https://` satellite URLs that firmware cannot fetch (2026-03-23)
+
+**Severity:** Config-time silent failure → runtime permanent unreachable
+**Introduced in:** v7.5.5.0 (aggregator config validator)
+**Fixed in:** v7.5.5.1 post-merge patch
+
+**Symptoms:** Aggregator config with `"base_url": "https://192.168.x.x"` passes `validate_aggregator_config()` but the satellite is permanently marked unreachable at runtime because `fetch_to_buffer()` only supports `http://`.
+
+**Root cause:** The Python validator accepted both `http://` and `https://` prefixes, but the C++ HTTP client (`fetch_to_buffer()`) uses raw lwIP sockets without TLS — it rejects any URL not starting with `http://`.
+
+**Fix:** Reject `https://` URLs in the validator with a clear error message explaining that HTTPS satellite polling is not currently supported.
+
+**Prevention:** Config validators must only accept URL schemes that the firmware can actually handle. When adding TLS support in the future, update both the validator AND the firmware simultaneously.
+
+### BUG-058 — Aggregator backoff never activates for satellites that were never reachable (2026-03-23)
+
+**Severity:** Performance degradation (C3 single-core stall)
+**Introduced in:** v7.5.5.1 (aggregator polling task)
+**Fixed in:** v7.5.5.1 post-merge patch
+
+**Symptoms:** When an aggregator boots with an offline satellite, the polling task retries all three endpoints (live, status, manifest) every 5 seconds instead of backing off to 300 seconds. Each failed `fetch_to_buffer()` blocks for the 5-second socket timeout, causing 15 seconds of blocking per loop on the single-core C3.
+
+**Root cause:** The "due" check uses `(sat.last_live_fetch == 0)` to detect "never fetched" and force an immediate attempt. But on failure, `last_live_fetch` is never updated from `0`, so the check is always true on the next iteration. The `effective_interval` of 300 seconds is computed but never consulted because the `== 0` clause short-circuits it.
+
+**Fix:** When a satellite is declared unreachable (3+ consecutive failures), seed any still-zero `last_*_fetch` timestamps to `now` so the 300s backoff interval starts counting. The seeding is deliberately NOT applied on failures 1-2, which allows the normal retry frequency to handle transient boot-order races where the satellite comes up seconds after the aggregator. Additionally, the interval tracking was switched from wall-clock (`::time(nullptr)`) to monotonic uptime (`esp_timer_get_time() / 1000000ULL`) because wall-clock returns 0 before SNTP synchronization, which would make the seeding a no-op and leave the backoff broken during the pre-SNTP window.
+
+**Prevention:** LESSON-OPS-069.
 
 ### BUG-057 — lwIP BSD socket aliases collide with `esphome::socket` namespace (2026-03-22)
 
@@ -1016,6 +1044,19 @@ The original validation helper silently normalized MAC addresses inside the call
 **Applies to:** All current and future code that uses lwIP sockets — aggregator polling, history proxy, any future HTTP client code.
 
 Related: BUG-057, PR #64
+
+### LESSON-OPS-069: Interval-based "due" checks must handle the never-succeeded case (2026-03-23)
+
+**Context:** A common pattern for periodic tasks is `bool due = (last_run == 0) || (now - last_run >= interval)`. The `== 0` clause handles the "first run" case. But if the first run FAILS and `last_run` is never set, the task retries on every loop iteration regardless of the interval — the backoff is dead code.
+
+**Rule:** When a periodic operation fails and the timestamp was never set (still 0), set it to `now` so the interval starts counting — but only after the failure threshold is crossed. Seeding too early (on first failure) prevents legitimate retries during transient conditions like boot-order races. The seeding should be coupled with the state transition (e.g., "declared unreachable"), not with every individual failure. Additionally, interval tracking should use monotonic time (e.g., `esp_timer_get_time()`), not wall-clock time (`::time(nullptr)`), because wall-clock may be 0 before SNTP sync — making any `== 0` sentinel check unreliable. This applies to any pattern where:
+1. A timestamp field starts at 0 (meaning "never done")
+2. The timestamp is only updated on success
+3. A backoff/interval check uses the timestamp
+
+**Applies to:** Aggregator polling task, any future periodic fetch/sync operations.
+
+Related: BUG-058
 
 ### LESSON-OPS-067: New generated headers must be added to ESPHome YAML `includes:` list (2026-03-22)
 
