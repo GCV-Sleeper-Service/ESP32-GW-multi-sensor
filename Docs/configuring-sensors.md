@@ -213,6 +213,124 @@ The manifest drives these files:
 
 ---
 
+---
+
+## Multi-board deployment
+
+_Added for multi-board infrastructure support._
+
+The generator supports multiple ESP32 board variants. By default (no `config/gateway.json`), it targets the ESP32-C3 SuperMini. To target a different board, create `config/gateway.json`.
+
+### Available board profiles
+
+| Board ID | Chip | Flash | PSRAM | Notes |
+|----------|------|-------|-------|-------|
+| `esp32-c3-supermini` | ESP32-C3 | 4MB | No | Default satellite board |
+| `esp32-s3-devkitc1-n16r8` | ESP32-S3 | 16MB | 8MB | Recommended aggregator board |
+| `esp32-wroom-32d` | ESP32 | 4MB | No | Original ESP32, good backup aggregator |
+
+Board profiles are defined in `firmware/boards/{board-id}.yaml`.
+
+### How to create `config/gateway.json`
+
+Copy the example and edit:
+
+```bash
+cp config/gateway.example.json config/gateway.json
+# Edit config/gateway.json with your board, name, and IP address
+```
+
+Example for an S3 aggregator:
+
+```json
+{
+  "board": "esp32-s3-devkitc1-n16r8",
+  "esphome_name": "esp32-n16r8-gw-1",
+  "friendly_name": "ESP32-S3 Aggregator",
+  "wifi_address": "192.168.120.191"
+}
+```
+
+Required fields:
+
+| Field | Description |
+|-------|-------------|
+| `board` | Must match a board profile filename in `firmware/boards/` |
+| `esphome_name` | ESPHome device name (lowercase, hyphens, digits only) |
+| `wifi_address` | IP address where ESPHome OTA/API reaches the device |
+
+Optional fields:
+
+| Field | Description |
+|-------|-------------|
+| `friendly_name` | Human-readable name shown in the dashboard; if omitted, defaults to `"{board_id} Gateway"` |
+| `manual_ip` | Object with `static_ip`, `gateway`, `subnet` (and optional `dns1`) — assigns a static IP on the device |
+
+**`wifi_address` vs `manual_ip`:**
+
+- `wifi_address` is **always required** — it tells ESPHome OTA/API where to reach the device
+- `manual_ip` is **optional** — when present, the device assigns itself a static IP instead of relying on DHCP
+- Without `manual_ip`, the device gets its IP from DHCP; `wifi_address` must match the device's actual IP (typically via a DHCP reservation on the router)
+- With `manual_ip`, the device assigns the static IP directly; no DHCP reservation needed
+
+**Do NOT commit `config/gateway.json` to the repository.** It is per-device configuration. The example file (`config/gateway.example.json`) is committed as a template.
+
+### How to generate for a non-C3 board
+
+```bash
+# 1. Create config/gateway.json (see above)
+# 2. Optionally set up aggregator config
+cp config/aggregator.example.json config/aggregator.json
+# Edit config/aggregator.json with your satellite URLs
+
+# 3. Generate the YAML
+python3 scripts/render_sensor_config.py --write
+# Output: firmware/{board-id}-gw.yaml (e.g. firmware/esp32-s3-devkitc1-n16r8-gw.yaml)
+
+# 4. Validate
+bash scripts/preflight.sh
+```
+
+### How to compile and flash for different boards
+
+```bash
+# S3 Aggregator:
+esphome compile firmware/esp32-s3-devkitc1-n16r8-gw.yaml
+esphome run firmware/esp32-s3-devkitc1-n16r8-gw.yaml
+
+# WROOM-32D:
+esphome compile firmware/esp32-wroom-32d-gw.yaml
+esphome run firmware/esp32-wroom-32d-gw.yaml
+
+# C3 with gateway.json (e.g. esphome_name "esp32-c3-garage"):
+esphome compile firmware/esp32-c3-garage-gw.yaml
+esphome run firmware/esp32-c3-garage-gw.yaml
+
+# C3 Satellite (default — no gateway.json needed):
+esphome compile firmware/esp32-c3-multi-sensor.yaml
+esphome run firmware/esp32-c3-multi-sensor.yaml
+```
+
+### Zero-sensor configurations (pure aggregator)
+
+When `config/gateway.json` is present, the sensor manifest may have zero sensors. This creates a pure aggregator that only polls satellites — no local BLE sensors.
+
+```json
+{"schema_version": 2, "sensors": []}
+```
+
+The generated YAML will omit BLE tracker and ThermoPro sections while keeping diagnostic sensors (WiFi signal, heap, uptime).
+
+### PyYAML dependency
+
+The board profile loader uses PyYAML. In the ESPHome environment, PyYAML is already available. If running outside ESPHome:
+
+```bash
+pip install pyyaml
+```
+
+---
+
 ## Notes on import behavior
 
 ### Multi-sensor import

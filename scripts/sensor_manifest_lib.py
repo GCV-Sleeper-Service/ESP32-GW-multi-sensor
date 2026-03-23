@@ -2,13 +2,18 @@
 """Helpers for the canonical sensor manifest used by the ESP32 gateway repo."""
 from __future__ import annotations
 
+import ipaddress
 import json
 import re
 from pathlib import Path
 from typing import Dict, List
 
+import yaml
+
 MAC_RE = re.compile(r"^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 ID_RE = re.compile(r"^[a-z0-9_]{1,32}$")
+
+BOARDS_DIR = Path(__file__).resolve().parent.parent / 'firmware' / 'boards'
 
 AGGREGATOR_MIN_POLL = 10
 AGGREGATOR_MAX_POLL = 300
@@ -61,14 +66,15 @@ def normalize_mac(mac: str) -> str:
     return (mac or "").strip().replace("-", ":").upper()
 
 
-def canonicalize_sensors(sensors: List[Dict]) -> List[Dict]:
+def canonicalize_sensors(sensors: List[Dict], allow_empty: bool = False) -> List[Dict]:
     if not isinstance(sensors, list):
         raise ManifestError("Manifest sensors field must be a list.")
 
     count = len(sensors)
-    if count < MIN_SENSORS or count > MAX_SENSORS:
+    min_count = 0 if allow_empty else MIN_SENSORS
+    if count < min_count or count > MAX_SENSORS:
         raise ManifestError(
-            f"Sensor count must be between {MIN_SENSORS} and {MAX_SENSORS}; got {count}."
+            f"Sensor count must be between {min_count} and {MAX_SENSORS}; got {count}."
         )
 
     normalized: List[Dict] = []
@@ -147,7 +153,7 @@ def canonicalize_sensors(sensors: List[Dict]) -> List[Dict]:
     return normalized
 
 
-def load_manifest(path: Path) -> List[Dict]:
+def load_manifest(path: Path, allow_empty: bool = False) -> List[Dict]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -165,7 +171,7 @@ def load_manifest(path: Path) -> List[Dict]:
     else:
         raise ManifestError("Manifest root must be an object or an array.")
 
-    return canonicalize_sensors(sensors)
+    return canonicalize_sensors(sensors, allow_empty=allow_empty)
 
 
 def fixture_manifest(sensors: List[Dict]) -> List[Dict]:
@@ -341,3 +347,85 @@ def load_aggregator_config(path: Path) -> Dict | None:
     except json.JSONDecodeError as exc:
         raise ManifestError(f"Aggregator config is not valid JSON: {exc}") from exc
     return validate_aggregator_config(payload)
+
+
+def load_board_profile(board_id: str) -> Dict:
+    """Load a board profile from firmware/boards/{board_id}.yaml.
+    Returns dict or raises ManifestError."""
+    profile_path = BOARDS_DIR / f"{board_id}.yaml"
+    if not profile_path.is_file():
+        raise ManifestError(f"Board profile not found: {profile_path}")
+    try:
+        with open(profile_path, 'r', encoding='utf-8') as f:
+            profile = yaml.safe_load(f)
+    except yaml.YAMLError as exc:
+        raise ManifestError(f"Board profile {board_id} is not valid YAML: {exc}") from exc
+    if not isinstance(profile, dict):
+        raise ManifestError(f"Board profile {board_id} must be a YAML mapping, got {type(profile).__name__}")
+    required_keys = ['board_id', 'chip_variant', 'esphome_board', 'flash_size',
+                     'partitions', 'framework']
+    for key in required_keys:
+        if key not in profile:
+            raise ManifestError(f"Board profile {board_id} missing required key: {key}")
+    if profile['board_id'] != board_id:
+        raise ManifestError(f"Board profile board_id mismatch: file={board_id}, content={profile['board_id']}")
+    return profile
+
+
+def load_gateway_config() -> Dict | None:
+    """Load config/gateway.json if it exists. Returns dict or None."""
+    gw_path = Path(__file__).resolve().parent.parent / 'config' / 'gateway.json'
+    if not gw_path.is_file():
+        return None
+    try:
+        with open(gw_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    except json.JSONDecodeError as exc:
+        raise ManifestError(f"Gateway config is not valid JSON: {exc}") from exc
+    validate_gateway_config(config)
+    return config
+
+
+def validate_gateway_config(config: Dict) -> None:
+    """Validate gateway config schema. Raises ManifestError on failure."""
+    if 'board' not in config:
+        raise ManifestError("gateway.json missing 'board'")
+    if 'esphome_name' not in config:
+        raise ManifestError("gateway.json missing 'esphome_name'")
+    if 'wifi_address' not in config:
+        raise ManifestError("gateway.json missing 'wifi_address'")
+    # Validate board reference
+    load_board_profile(config['board'])  # will raise if not found
+    # Validate name format (ESPHome requires lowercase, hyphens, digits)
+    name = config['esphome_name']
+    if not re.match(r'^[a-z0-9][a-z0-9-]*$', name):
+        raise ManifestError(f"esphome_name must be lowercase alphanumeric with hyphens: {name}")
+    # Validate IP format
+    try:
+        ipaddress.IPv4Address(config['wifi_address'])
+    except ValueError:
+        raise ManifestError(f"wifi_address must be a valid IPv4 address: {config['wifi_address']}")
+    # Validate optional manual_ip
+    manual_ip = config.get('manual_ip')
+    if manual_ip is not None:
+        if not isinstance(manual_ip, dict):
+            raise ManifestError("manual_ip must be an object with static_ip, gateway, subnet")
+        for field in ('static_ip', 'gateway', 'subnet'):
+            val = manual_ip.get(field)
+            if not val:
+                raise ManifestError(f"manual_ip.{field} is required when manual_ip is present")
+            if not isinstance(val, str):
+                raise ManifestError(f"manual_ip.{field} must be a string, got {type(val).__name__}")
+            try:
+                ipaddress.IPv4Address(val)
+            except ValueError:
+                raise ManifestError(f"manual_ip.{field} must be a valid IPv4 address: {val}")
+        # Optional dns1 field — validated if present
+        dns1 = manual_ip.get('dns1')
+        if dns1 is not None:
+            if not isinstance(dns1, str):
+                raise ManifestError(f"manual_ip.dns1 must be a string, got {type(dns1).__name__}")
+            try:
+                ipaddress.IPv4Address(dns1)
+            except ValueError:
+                raise ManifestError(f"manual_ip.dns1 must be a valid IPv4 address: {dns1}")

@@ -11,6 +11,10 @@ dashboard/dashboard.min.html
 # node_modules (Playwright / minification tools if installed locally)
 node_modules/
 scripts/__pycache__
+# Per-device gateway config (operator creates from gateway.example.json)
+config/gateway.json
+# Generated board-specific YAML files (non-C3)
+firmware/*-gw.yaml
 # Playwright test artifacts
 tests/playwright-report/
 

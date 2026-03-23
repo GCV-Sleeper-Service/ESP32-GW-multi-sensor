@@ -1,0 +1,11 @@
+{
+  "board": "esp32-s3-devkitc1-n16r8",
+  "esphome_name": "esp32-n16r8-gw-1",
+  "friendly_name": "ESP32-S3 Aggregator",
+  "wifi_address": "192.168.120.191",
+  "manual_ip": {
+    "static_ip": "192.168.120.191",
+    "gateway": "192.168.120.1",
+    "subnet": "255.255.255.0"
+  }
+}
