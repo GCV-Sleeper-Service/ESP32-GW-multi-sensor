@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.5.5.0
+# ESP32-C3 Multi-Sensor Gateway - v7.5.5.1
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -53,7 +53,7 @@ esphome:
       priority: -100
       then:
         - lambda: |-
-            register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.5.0");
+            register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.5.5.1");
             id(dashboard_link).publish_state(
               "Dashboard: /dashboard or /dashboard.html — Download: /dashboard-download");
     - # Priority 600: run after WiFi and SNTP are available.
@@ -67,6 +67,16 @@ esphome:
             ping_adapter.start(PING_DEVICE_INDEX, PING_TARGET);
             #endif
             // <<< SENSOR_MANIFEST:PING_BOOT_END >>>
+    - # Priority 600: run after WiFi and SNTP are available.
+      # Starts the aggregator polling task (aggregator role only).
+      # The task has an internal 10s delay to allow WiFi and local
+      # boot to fully settle before the first satellite poll.
+      priority: 600
+      then:
+        - lambda: |-
+            #if AGGREGATOR_ENABLED
+            start_aggregator_task();
+            #endif
 
 # ─── Chip and framework ─────────────────────────────────────────
 # ESP-IDF (not Arduino) for better BLE + WiFi coexistence.

@@ -3,6 +3,48 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## v7.5.5.1 — Aggregator Polling Task — 2026-03-22
+
+### Phase 5 Step 1 — Firmware only, no dashboard changes
+
+**Aggregator polling task implemented.**
+Added `SatelliteCache` struct (inside `#if AGGREGATOR_ENABLED`), one per configured satellite.
+Each cache holds statically-allocated buffers for `/api/manifest` (4096 bytes),
+`/api/v2/live` (2048 bytes), and `/api/status` (512 bytes) responses.
+
+**Thread safety: FreeRTOS mutex protects shared cache.**
+`s_cache_mutex` (created by `init_aggregator_mutex()`) guards all reads and writes to
+`SatelliteCache` buffers. Torn-read prevention: network I/O writes into `s_fetch_tmp`
+(a static 4 KB temp buffer) without holding the mutex; the completed result is copied
+under the mutex in a brief critical section. This ensures web handlers (v7.5.5.2) can
+never read a partially-written buffer.
+
+**`aggregator_poll_task()` — background RTOS task.**
+Polls each satellite sequentially:
+- `/api/v2/live` every `poll_interval_seconds` (default 30 s)
+- `/api/status` every `poll_interval_seconds`
+- `/api/manifest` every 5 minutes (cached aggressively)
+
+Satellites are staggered (2 s gap) to avoid simultaneous connections.
+After 3 consecutive fetch failures a satellite is marked unreachable.
+The task runs at `tskIDLE_PRIORITY + 2` with a 10 s initial delay for WiFi/boot settle.
+
+**`start_aggregator_task()` — called from `on_boot` lambda.**
+Creates the mutex, then spawns `aggregator_poll_task` with a 10 KB stack.
+
+**ESPHome YAML updated.**
+New `on_boot:` block at priority 600 conditionally calls `start_aggregator_task()`
+under `#if AGGREGATOR_ENABLED`. Satellite builds (no `config/aggregator.json`) are
+completely unaffected — `AGGREGATOR_ENABLED 0` compiles out the entire block.
+
+**Files modified:**
+- `dashboard/sensor_history_multi.h` — aggregator struct, mutex, task, start function
+- `firmware/esp32-c3-multi-sensor.yaml` — on_boot lambda for aggregator task start
+- `dashboard/dashboard.js`, `dashboard/dashboard.h` — version bump only
+- `src/gateway_manifest.h`, test fixtures — version bump only
+- `VERSION` → `7.5.5.1`
+
+---
 ## v7.5.5.0 — Aggregator Configuration Schema and Loader — 2026-03-21
 
 ### Phase 5 Step 0 — No runtime changes

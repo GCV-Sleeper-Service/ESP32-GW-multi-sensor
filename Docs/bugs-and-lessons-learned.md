@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-22 — v7.5.5.0 Phase 5 Step 0 (LESSON-OPS-067)._
+_Last updated: 2026-03-22 — v7.5.5.1 Phase 5 Step 1 (aggregator polling task, lwIP socket fix)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,20 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-057 — lwIP BSD socket aliases collide with `esphome::socket` namespace (2026-03-22)
+
+**Date:** 2026-03-22
+**Version observed:** v7.5.5.1
+**Status:** FIXED (v7.5.5.1, same PR)
+
+**Symptoms:** CI compilation fails with `error: reference to 'socket' is ambiguous`. The compiler cannot distinguish between lwIP's `int socket(int, int, int)` function and ESPHome's `namespace esphome::socket`.
+
+**Root cause:** The `fetch_to_buffer()` function used BSD-compatible socket function names (`socket()`, `connect()`, `send()`, `recv()`, `close()`, `setsockopt()`). These are inline convenience aliases defined in `lwip/sockets.h` that wrap the real lwIP functions. ESPHome defines a C++ namespace `esphome::socket` (in `esphome/components/socket/headers.h`) which creates a name collision.
+
+**Fix:** Replace all BSD socket aliases with their `lwip_*` prefixed equivalents (`lwip_socket()`, `lwip_connect()`, `lwip_send()`, `lwip_recv()`, `lwip_close()`, `lwip_setsockopt()`). These are the actual lwIP function names with no namespace collision.
+
+**Prevention:** LESSON-OPS-068.
 
 ### BUG-056 — WAN Latency ping data appears on Temperature/Humidity charts (2026-03-21)
 
@@ -984,6 +998,24 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-068: Use lwip_*() prefixed functions, not BSD socket aliases, in ESPHome C++ code (2026-03-22)
+
+**Context:** ESPHome defines `namespace esphome::socket` which collides with lwIP's BSD-compatible inline wrappers (`socket()`, `connect()`, `close()` etc.). This is not visible when reading lwIP documentation because the aliases work fine in standalone ESP-IDF projects — the collision only appears inside the ESPHome build environment.
+
+**Rule:** In any C++ code that runs inside ESPHome (headers included via YAML `includes:`), always use the `lwip_*` prefixed function names for socket operations:
+- `lwip_socket()` not `socket()`
+- `lwip_connect()` not `connect()`
+- `lwip_send()` not `send()`
+- `lwip_recv()` not `recv()`
+- `lwip_close()` not `close()`
+- `lwip_setsockopt()` not `setsockopt()`
+- `lwip_getaddrinfo()` not `getaddrinfo()` (already used by PingAdapter)
+- `lwip_freeaddrinfo()` not `freeaddrinfo()` (already used by PingAdapter)
+
+**Applies to:** All current and future code that uses lwIP sockets — aggregator polling, history proxy, any future HTTP client code.
+
+Related: BUG-057, PR #64
 
 ### LESSON-OPS-067: New generated headers must be added to ESPHome YAML `includes:` list (2026-03-22)
 
