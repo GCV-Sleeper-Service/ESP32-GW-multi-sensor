@@ -310,8 +310,13 @@ def validate_aggregator_config(config: Dict) -> Dict:
             raise ManifestError(f"Duplicate satellite id: {sid}")
 
         url = (sat.get("base_url") or "").strip().rstrip("/")
-        if not url.startswith("http://") and not url.startswith("https://"):
-            raise ManifestError(f'Satellite "{sid}" base_url must start with http:// or https://')
+        if not url.startswith("http://"):
+            if url.startswith("https://"):
+                raise ManifestError(
+                    f'Satellite "{sid}" base_url uses https:// which is not supported by the '
+                    f'current firmware. Use http:// for local-network satellite polling. '
+                    f'HTTPS support is planned for a future version.')
+            raise ManifestError(f'Satellite "{sid}" base_url must start with http://')
         if url in seen_urls:
             raise ManifestError(f"Duplicate satellite base_url: {url}")
 
