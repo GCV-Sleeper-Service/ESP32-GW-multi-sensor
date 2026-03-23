@@ -338,6 +338,61 @@ if [[ "$FAIL_COUNT" -gt 0 ]]; then
   exit 1
 fi
 
+# ── Multi-board infrastructure checks ─────────────────────────────────────
+echo "→ Checking board profiles..."
+if [[ -d "firmware/boards" ]]; then
+  for board_yaml in firmware/boards/*.yaml; do
+    BOARD_ID="$(basename "$board_yaml" .yaml)"
+    # Validate required fields using Python
+    if python3 -c "
+import sys, yaml
+sys.path.insert(0, 'scripts')
+from sensor_manifest_lib import load_board_profile, ManifestError
+try:
+    load_board_profile('${BOARD_ID}')
+    print('board_profile_${BOARD_ID}: PASS')
+except ManifestError as e:
+    print(f'board_profile_${BOARD_ID}: FAIL — {e}')
+    sys.exit(1)
+"; then
+      true
+    else
+      FAIL_COUNT=$((FAIL_COUNT + 1))
+    fi
+  done
+else
+  echo "firmware/boards: SKIP (directory not found)"
+fi
+
+if [[ -f "config/gateway.json" ]]; then
+  echo "→ config/gateway.json found — validating schema..."
+  if python3 -c "
+import sys
+sys.path.insert(0, 'scripts')
+from sensor_manifest_lib import load_gateway_config, ManifestError
+try:
+    config = load_gateway_config()
+    if config is None:
+        print('gateway_json_valid: FAIL — load_gateway_config returned None')
+        sys.exit(1)
+    print('gateway_json_valid: PASS')
+except ManifestError as e:
+    print(f'gateway_json_valid: FAIL — {e}')
+    sys.exit(1)
+"; then
+    true
+  else
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+else
+  echo "config/gateway.json absent — C3 default mode (gateway checks skipped)"
+fi
+
+if [[ "$FAIL_COUNT" -gt 0 ]]; then
+  echo "✗ Preflight failed with $FAIL_COUNT error(s)"
+  exit 1
+fi
+
 if command -v node >/dev/null 2>&1; then
   if [[ -d node_modules/@playwright/test ]]; then
     npx playwright test tests/browser/manifest.spec.js --project=chromium >/dev/null
