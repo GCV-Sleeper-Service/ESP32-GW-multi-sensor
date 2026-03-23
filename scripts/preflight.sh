@@ -345,7 +345,7 @@ if [[ -d "firmware/boards" ]]; then
     BOARD_ID="$(basename "$board_yaml" .yaml)"
     # Validate required fields using Python
     if python3 -c "
-import sys, yaml
+import sys
 sys.path.insert(0, 'scripts')
 from sensor_manifest_lib import load_board_profile, ManifestError
 try:

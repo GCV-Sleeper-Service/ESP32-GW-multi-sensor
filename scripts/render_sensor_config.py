@@ -622,7 +622,7 @@ def generate_board_yaml(
     lines.append("# ─── Core ESPHome configuration ─────────────────────────────────")
     lines.append("esphome:")
     lines.append(f'  name: "{esphome_name}"')
-    lines.append(f"  friendly_name: {friendly_name}")
+    lines.append(f'  friendly_name: "{friendly_name}"')
     lines.append("  min_version: 2025.11.0")
     lines.append("  name_add_mac_suffix: false")
     lines.append("  includes:")

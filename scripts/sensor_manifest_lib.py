@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ipaddress
 import json
-import os
 import re
 from pathlib import Path
 from typing import Dict, List
@@ -14,7 +13,7 @@ import yaml
 MAC_RE = re.compile(r"^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 ID_RE = re.compile(r"^[a-z0-9_]{1,32}$")
 
-BOARDS_DIR = os.path.join(os.path.dirname(__file__), '..', 'firmware', 'boards')
+BOARDS_DIR = Path(__file__).resolve().parent.parent / 'firmware' / 'boards'
 
 AGGREGATOR_MIN_POLL = 10
 AGGREGATOR_MAX_POLL = 300
@@ -353,10 +352,10 @@ def load_aggregator_config(path: Path) -> Dict | None:
 def load_board_profile(board_id: str) -> Dict:
     """Load a board profile from firmware/boards/{board_id}.yaml.
     Returns dict or raises ManifestError."""
-    profile_path = os.path.join(BOARDS_DIR, f"{board_id}.yaml")
-    if not os.path.isfile(profile_path):
+    profile_path = BOARDS_DIR / f"{board_id}.yaml"
+    if not profile_path.is_file():
         raise ManifestError(f"Board profile not found: {profile_path}")
-    with open(profile_path, 'r') as f:
+    with open(profile_path, 'r', encoding='utf-8') as f:
         profile = yaml.safe_load(f)
     required_keys = ['board_id', 'chip_variant', 'esphome_board', 'flash_size',
                      'partitions', 'framework']
@@ -370,10 +369,10 @@ def load_board_profile(board_id: str) -> Dict:
 
 def load_gateway_config() -> Dict | None:
     """Load config/gateway.json if it exists. Returns dict or None."""
-    gw_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'gateway.json')
-    if not os.path.isfile(gw_path):
+    gw_path = Path(__file__).resolve().parent.parent / 'config' / 'gateway.json'
+    if not gw_path.is_file():
         return None
-    with open(gw_path, 'r') as f:
+    with open(gw_path, 'r', encoding='utf-8') as f:
         config = json.load(f)
     validate_gateway_config(config)
     return config
