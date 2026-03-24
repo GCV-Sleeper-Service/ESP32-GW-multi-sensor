@@ -16,7 +16,6 @@ ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"
 AGGREGATOR_JSON_PATH = ROOT / "config" / "aggregator.json"
-GATEWAY_JSON_PATH = ROOT / "config" / "gateway.json"
 MANIFEST_PATH = ROOT / "config" / "sensors.json"
 HEADER_PATH = ROOT / "dashboard" / "sensor_history_multi.h"
 YAML_PATH = ROOT / "firmware" / "esp32-c3-multi-sensor.yaml"
@@ -609,7 +608,7 @@ def generate_board_yaml(
     lines.append(f"# Gateway config: config/gateway.json")
     lines.append("#")
     lines.append("# Required files")
-    lines.append(f"# - firmware/{board_id}-gw.yaml")
+    lines.append(f"# - firmware/{esphome_name}-gw.yaml")
     lines.append("# - ../dashboard/dashboard.h")
     lines.append("# - ../dashboard/sensor_history_multi.h")
     lines.append(f"# - {partitions}")
@@ -786,8 +785,8 @@ def generate_board_yaml(
         lines.append("              id(current_time).publish_state(time_buf);")
         lines.append("")
 
-    if has_env_sensors:
-        # on_time already opened by has_any_sensors block above (has_env_sensors implies has_any_sensors)
+    if has_any_sensors:
+        # on_time already opened by has_any_sensors block above
         lines.append("      - seconds: 0")
         lines.append("        minutes: ${persist_minute}")
         lines.append("        then:")

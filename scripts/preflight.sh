@@ -348,6 +348,7 @@ fi
 # ── Multi-board infrastructure checks ─────────────────────────────────────
 echo "→ Checking board profiles..."
 if [[ -d "firmware/boards" ]]; then
+  shopt -s nullglob
   for board_yaml in firmware/boards/*.yaml; do
     BOARD_ID="$(basename "$board_yaml" .yaml)"
     # Validate required fields using Python
@@ -367,6 +368,7 @@ except ManifestError as e:
       FAIL_COUNT=$((FAIL_COUNT + 1))
     fi
   done
+  shopt -u nullglob
 else
   echo "firmware/boards: SKIP (directory not found)"
 fi
