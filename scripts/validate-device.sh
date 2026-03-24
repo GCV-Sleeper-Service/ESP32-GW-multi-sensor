@@ -53,7 +53,12 @@ fi
 # ── Manifest ─────────────────────────────────────────────────────
 echo "→ Manifest"
 MANIFEST=$(curl -sf --max-time 5 "http://$DEVICE_IP/api/manifest" 2>&1 || echo "CURL_FAILED")
-check "api/manifest responds" '"schema_version":2' "$MANIFEST"
+if [[ "$MANIFEST" == "CURL_FAILED" ]]; then
+  check "api/manifest responds" '"schema_version"' "$MANIFEST"
+else
+  MANIFEST_SCHEMA_VERSION=$(echo "$MANIFEST" | python3 -c "import sys,json; print(json.load(sys.stdin).get('schema_version','?'))" 2>/dev/null || echo "?")
+  check "api/manifest schema_version==2" "2" "$MANIFEST_SCHEMA_VERSION"
+fi
 
 # ── Dashboard ────────────────────────────────────────────────────
 echo "→ Dashboard"

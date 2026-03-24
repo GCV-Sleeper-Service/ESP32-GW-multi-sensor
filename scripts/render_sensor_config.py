@@ -1179,8 +1179,10 @@ def main() -> int:
 
     # Determine sensor manifest path — gateway config can override the default
     manifest_path = MANIFEST_PATH
-    if gateway_config and 'sensors_file' in gateway_config:
-        manifest_path = ROOT / gateway_config['sensors_file']
+    if gateway_config:
+        sensors_file = gateway_config.get("sensors_file")
+        if isinstance(sensors_file, str) and sensors_file:
+            manifest_path = ROOT / sensors_file
 
     try:
         sensors = load_manifest(manifest_path, allow_empty=allow_empty)

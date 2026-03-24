@@ -429,10 +429,19 @@ def validate_gateway_config(config: Dict) -> None:
             except ValueError:
                 raise ManifestError(f"manual_ip.dns1 must be a valid IPv4 address: {dns1}")
     # Validate optional sensors_file path
-    sensors_file = config.get('sensors_file')
-    if sensors_file is not None:
+    if 'sensors_file' in config:
+        sensors_file = config['sensors_file']
+        if sensors_file is None:
+            raise ManifestError("sensors_file must not be null when present in gateway.json")
         if not isinstance(sensors_file, str):
             raise ManifestError(f"sensors_file must be a string path, got {type(sensors_file).__name__}")
-        sensors_path = Path(__file__).resolve().parent.parent / sensors_file
+        sensors_file = sensors_file.strip()
+        if not sensors_file:
+            raise ManifestError("sensors_file must not be an empty string")
+        sensors_path = Path(sensors_file)
+        # Enforce repo-root-relative paths: no absolute paths and no parent-directory components.
+        if sensors_path.is_absolute() or any(part == ".." for part in sensors_path.parts):
+            raise ManifestError(f"sensors_file must be a repository-root-relative path without '..': {sensors_file}")
+        sensors_path = Path(__file__).resolve().parent.parent / sensors_path
         if not sensors_path.is_file():
             raise ManifestError(f"sensors_file not found: {sensors_file} (resolved to {sensors_path})")

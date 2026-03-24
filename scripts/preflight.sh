@@ -391,12 +391,12 @@ fi
 # ── Partition table ota_0 offset validation ─────────────────────────
 for csv in partitions/*.csv; do
   csv_name=$(basename "$csv" .csv)
-  OTA0_LINE=$(grep "ota_0" "$csv" 2>/dev/null | grep -v "^#" || true)
+  OTA0_LINE=$(grep -E "^ota_0," "$csv" 2>/dev/null || true)
   if [[ -z "$OTA0_LINE" ]]; then
     echo "partition_ota0_${csv_name}: SKIP (no ota_0 entry)"
     continue
   fi
-  OTA0_OFFSET=$(echo "$OTA0_LINE" | awk -F',' '{print $4}' | tr -d ' ')
+  OTA0_OFFSET=$(echo "$OTA0_LINE" | head -1 | awk -F',' '{print $4}' | tr -d ' ')
   if [[ "$OTA0_OFFSET" != "0x10000" ]]; then
     echo "✗ partition_ota0_${csv_name}: FAIL — ota_0 at $OTA0_OFFSET (must be 0x10000)"
     FAIL_COUNT=$((FAIL_COUNT + 1))
