@@ -323,6 +323,13 @@ except ManifestError as e:
     echo "✗ aggregator_config_h_enabled: FAIL — aggregator.json present but AGGREGATOR_ENABLED != 1"
     FAIL_COUNT=$((FAIL_COUNT + 1))
   fi
+  # v7.5.5.2: Aggregator API route presence checks
+  check_contains "aggregator_route_gateways" dashboard/sensor_history_multi.h \
+    '"/api/aggregator/gateways"'
+  check_contains "aggregator_route_live" dashboard/sensor_history_multi.h \
+    '"/api/aggregator/live"'
+  check_contains "aggregator_route_proxy" dashboard/sensor_history_multi.h \
+    '"/api/aggregator/proxy/"'
 else
   echo "config/aggregator.json absent — satellite mode (aggregator checks skipped)"
   if grep -q "AGGREGATOR_ENABLED 0" src/aggregator_config.h 2>/dev/null; then
