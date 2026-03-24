@@ -608,7 +608,10 @@ def generate_board_yaml(
     lines.append(f"# Gateway config: config/gateway.json")
     lines.append("#")
     lines.append("# Required files")
-    lines.append(f"# - firmware/{esphome_name}-gw.yaml")
+    yaml_output_filename = (
+        f"{esphome_name}-gw.yaml" if "c3" in board_id.lower() else f"{board_id}-gw.yaml"
+    )
+    lines.append(f"# - firmware/{yaml_output_filename}")
     lines.append("# - ../dashboard/dashboard.h")
     lines.append("# - ../dashboard/sensor_history_multi.h")
     lines.append(f"# - {partitions}")
