@@ -2699,7 +2699,8 @@ class HistoryWebHandler : public AsyncWebHandler {
 
     int64_t uptime_us = esp_timer_get_time();
     uint32_t uptime_s = (uint32_t) (uptime_us / 1000000LL);
-    uint32_t free_heap = esp_get_free_heap_size();
+    uint32_t free_heap_internal = esp_get_free_internal_heap_size();
+    uint32_t free_heap_total = esp_get_free_heap_size();
 
     // Keep each snprintf well under 64 bytes to avoid silent truncation.
     char num[96];
@@ -2748,7 +2749,15 @@ class HistoryWebHandler : public AsyncWebHandler {
     snprintf(num, sizeof(num), "\"persist_days\":%d,", PERSIST_DAYS);
     resp->print(num);
 
-    snprintf(num, sizeof(num), "\"free_heap\":%u}", (unsigned) free_heap);
+    // free_heap reports internal SRAM only for cross-board comparability (BUG-062).
+    // On C3 (no PSRAM), free_heap == free_heap_internal == free_heap_total.
+    // On S3 (PSRAM), free_heap_total includes ~8MB PSRAM which distorts monitoring.
+    // free_heap is kept as internal-only for backward compatibility.
+    snprintf(num, sizeof(num), "\"free_heap\":%u,", (unsigned) free_heap_internal);
+    resp->print(num);
+    snprintf(num, sizeof(num), "\"free_heap_internal\":%u,", (unsigned) free_heap_internal);
+    resp->print(num);
+    snprintf(num, sizeof(num), "\"free_heap_total\":%u}", (unsigned) free_heap_total);
     resp->print(num);
 
     request->send(resp);

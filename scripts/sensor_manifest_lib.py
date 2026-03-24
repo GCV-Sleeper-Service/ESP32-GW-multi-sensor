@@ -428,3 +428,11 @@ def validate_gateway_config(config: Dict) -> None:
                 ipaddress.IPv4Address(dns1)
             except ValueError:
                 raise ManifestError(f"manual_ip.dns1 must be a valid IPv4 address: {dns1}")
+    # Validate optional sensors_file path
+    sensors_file = config.get('sensors_file')
+    if sensors_file is not None:
+        if not isinstance(sensors_file, str):
+            raise ManifestError(f"sensors_file must be a string path, got {type(sensors_file).__name__}")
+        sensors_path = Path(__file__).resolve().parent.parent / sensors_file
+        if not sensors_path.is_file():
+            raise ManifestError(f"sensors_file not found: {sensors_file} (resolved to {sensors_path})")

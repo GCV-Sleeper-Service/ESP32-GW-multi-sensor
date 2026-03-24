@@ -1177,8 +1177,13 @@ def main() -> int:
     # Allow empty sensors when gateway config is present (pure aggregator mode)
     allow_empty = gateway_config is not None
 
+    # Determine sensor manifest path — gateway config can override the default
+    manifest_path = MANIFEST_PATH
+    if gateway_config and 'sensors_file' in gateway_config:
+        manifest_path = ROOT / gateway_config['sensors_file']
+
     try:
-        sensors = load_manifest(MANIFEST_PATH, allow_empty=allow_empty)
+        sensors = load_manifest(manifest_path, allow_empty=allow_empty)
     except ManifestError as exc:
         print(f"Manifest error: {exc}", file=sys.stderr)
         return 2

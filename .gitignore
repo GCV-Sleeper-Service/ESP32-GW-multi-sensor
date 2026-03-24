@@ -13,6 +13,9 @@ node_modules/
 scripts/__pycache__
 # Per-device gateway config (operator creates from gateway.example.json)
 config/gateway.json
+config/aggregator.json
+# Per-deployment sensor configs (operator creates per-device)
+config/sensors-*.json
 # Generated board-specific YAML files (non-C3)
 firmware/*-gw.yaml
 # Playwright test artifacts
@@ -22,7 +25,3 @@ tests/playwright-results/dashboard-*/
 tests/playwright-results/sensor-count-*/
 tests/playwright-results/.playwright-artifacts-*/
 tests/playwright-results/.last-run.json
-config/gateway.json
-config/aggregator.json
-config/gateway.json
-config/aggregator.json
