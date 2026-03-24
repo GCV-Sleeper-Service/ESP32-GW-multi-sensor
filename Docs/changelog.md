@@ -33,6 +33,16 @@ task) and relays the response with zero-copy `beginResponse`. Returns
 handler takes the mutex only briefly to read `base_url`, then releases
 before the blocking network fetch.
 
+**Fix: proxy truncation detection** — proxy endpoint now returns 502
+with `{"error":"upstream_response_too_large","max_bytes":32768}` if the
+upstream history response exceeds the 32KB buffer, instead of silently
+serving truncated data as HTTP 200. See BUG-063.
+
+**Fix: proxy upstream URL** — proxy now fetches from
+`/api/v2/history/{device}/{metric}` (v2 endpoint, all device categories)
+instead of the legacy `/history/{device}/{metric}` (env-only). This
+enables proxying ping, RSSI, and other non-environmental metric history.
+
 **LESSON-OPS-056 compliance:** All new aggregator endpoint responses use
 pre-reserved `std::string` + `beginResponse()`. `beginResponseStream` is
 not used by these handlers.

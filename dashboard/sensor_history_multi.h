@@ -3070,9 +3070,10 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (url_too_long) { request->send(500); return; }
     if (!found) { request->send(404); return; }
 
-    // Build satellite URL and fetch on-demand into s_proxy_tmp
+    // Build satellite URL and fetch on-demand into s_proxy_tmp.
+    // Use /api/v2/history/ which handles all device categories (env, ping, RSSI, etc.)
     char url[256];
-    int url_fmt_len = snprintf(url, sizeof(url), "%s/history/%s/%s", base_url, device, metric);
+    int url_fmt_len = snprintf(url, sizeof(url), "%s/api/v2/history/%s/%s", base_url, device, metric);
     if (url_fmt_len < 0 || static_cast<size_t>(url_fmt_len) >= sizeof(url)) {
       request->send(414);
       return;
@@ -3091,11 +3092,23 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
+    // Detect truncation: if the buffer is completely full, the upstream response was
+    // likely larger than 32KB and was silently cut off by fetch_to_buffer().
+    // Return 502 rather than serving corrupted/incomplete data to the dashboard.
+    if (s_proxy_len >= sizeof(s_proxy_tmp) - 1) {
+      auto *resp = request->beginResponse(
+          502, "application/json",
+          "{\"error\":\"upstream_response_too_large\",\"max_bytes\":32768}");
+      add_common_headers_(resp);
+      request->send(resp);
+      return;
+    }
+
     // LESSON-OPS-056: zero-copy from static buffer — NEVER beginResponseStream
     auto *resp = request->beginResponse(
         200, "text/plain",
         reinterpret_cast<const uint8_t*>(s_proxy_tmp), s_proxy_len);
-    this->add_common_headers_(resp);
+    add_common_headers_(resp);
     request->send(resp);
   }
 #endif  // AGGREGATOR_ENABLED

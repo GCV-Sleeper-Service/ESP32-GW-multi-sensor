@@ -133,6 +133,25 @@ Verified before adding.
 
 ---
 
+## Post-Review Fixes (Review Round 2)
+
+### Proxy truncation detection
+- Added truncation check: if `s_proxy_len >= sizeof(s_proxy_tmp) - 1`,
+  return 502 with JSON error body instead of serving truncated data
+- Prevents clients from receiving incomplete CSV datasets as HTTP 200
+- See BUG-063
+
+### Proxy upstream URL corrected
+- Changed from `/history/{device}/{metric}` (env-only) to
+  `/api/v2/history/{device}/{metric}` (all device categories)
+- Enables proxying of network metrics (ping_ms), system metrics, etc.
+
+### `add_common_headers_()` consistency
+- Verified proxy response uses same `add_common_headers_(resp)` call as
+  gateways and live handlers (single-parameter form — no `request` arg)
+
+---
+
 ## Ready for v7.5.5.3
 
 v7.5.5.2 is complete. Next step: v7.5.5.3 — Aggregator dashboard UI.

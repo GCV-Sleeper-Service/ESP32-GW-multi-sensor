@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-24 — v7.5.5.1 multi-board infrastructure fixes (BUG-060 lazy yaml import, BUG-061 S3 partition, BUG-062 heap reporting documented)._
+_Last updated: 2026-03-24 — v7.5.5.2 post-review fix (BUG-063 proxy truncation, proxy v2 URL)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,26 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-063 — Proxy endpoint served truncated history as HTTP 200 (2026-03-24)
+
+**Severity:** Data corruption (silent truncation)
+**Introduced in:** v7.5.5.2 initial commit
+**Fixed in:** v7.5.5.2 review fix
+
+**Symptoms:** When a satellite's history response exceeded 32KB (the
+`s_proxy_tmp` buffer size), `fetch_to_buffer()` filled the buffer and
+stopped reading. The proxy returned the truncated data as HTTP 200,
+causing dashboard charts to display incomplete datasets.
+
+**Root cause:** No truncation detection after `fetch_to_buffer()`. The
+function silently stops reading at the buffer limit.
+
+**Fix:** Check `s_proxy_len >= sizeof(s_proxy_tmp) - 1` after fetch.
+If true, return 502 with `{"error":"upstream_response_too_large","max_bytes":32768}`.
+
+**Prevention:** Any proxy/relay endpoint that uses a fixed-size buffer
+must check for truncation before serving the response.
 
 ### BUG-062 — `/api/status` reports PSRAM as `free_heap` on S3, misleading monitoring (2026-03-23)
 
