@@ -1208,6 +1208,9 @@ def main() -> int:
             "sensors": fixture_manifest(sensors),
             "mode": "active-manifest",
             "connected": True,
+            "free_heap": 81920,
+            "free_heap_internal": 81920,
+            "free_heap_total": 81920,
         },
         indent=2,
     ) + "\n"

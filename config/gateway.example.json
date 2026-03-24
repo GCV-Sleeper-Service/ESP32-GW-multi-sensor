@@ -3,5 +3,10 @@
   "esphome_name": "agg-s3-16m-1",
   "friendly_name": "S3 Aggregator",
   "wifi_address": "192.168.120.191",
-  "sensors_file": "config/sensors-agg-s3-16m-1.json"
+  "sensors_file": "config/sensors-agg-s3-16m-1.json",
+  "manual_ip": {
+    "static_ip": "192.168.120.191",
+    "gateway": "192.168.120.1",
+    "subnet": "255.255.255.0"
+  }
 }

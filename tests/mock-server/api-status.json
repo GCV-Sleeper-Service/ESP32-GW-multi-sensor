@@ -28,5 +28,7 @@
   ],
   "ram_history_points_per_series": 96,
   "persist_days": 45,
-  "free_heap": 81920
+  "free_heap": 81920,
+  "free_heap_internal": 81920,
+  "free_heap_total": 81920
 }
