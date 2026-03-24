@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.5.1.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.5.2.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -471,7 +471,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.5.1) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.5.2) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //
@@ -1389,6 +1389,12 @@ static void init_aggregator_mutex() {
 // Safe because aggregator_poll_task is the only writer and fetches are sequential.
 static char s_fetch_tmp[4096];
 
+// Separate from s_fetch_tmp — the proxy runs in web handler context
+// while the polling task runs in RTOS context. They must not share buffers.
+// Only accessed by the web handler (ESPHome main loop, single-threaded).
+static char s_proxy_tmp[32768];
+static uint16_t s_proxy_len = 0;
+
 // All socket operations use lwip_*() prefixed functions (not the BSD-compat
 // aliases socket()/connect()/send()/recv()/close()) to avoid namespace
 // collision with esphome::socket — see CI failure in PR #64.
@@ -1685,6 +1691,11 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (strcmp(p, "/api/v2/live") == 0) return true;
       if (len >= 20 && strncmp(p, "/api/v2/history/", 16) == 0) return true;
       if (strcmp(p, "/favicon.ico") == 0) return true;
+#if AGGREGATOR_ENABLED
+      if (strcmp(p, "/api/aggregator/gateways") == 0) return true;
+      if (strcmp(p, "/api/aggregator/live") == 0) return true;
+      if (len > 22 && strncmp(p, "/api/aggregator/proxy/", 22) == 0) return true;
+#endif
       return false;
     }
 
@@ -1779,6 +1790,20 @@ class HistoryWebHandler : public AsyncWebHandler {
       handle_api_v2_history_(request, p + 16);
       return;
     }
+#if AGGREGATOR_ENABLED
+    if (strcmp(p, "/api/aggregator/gateways") == 0) {
+      handle_aggregator_gateways_(request);
+      return;
+    }
+    if (strcmp(p, "/api/aggregator/live") == 0) {
+      handle_aggregator_live_(request);
+      return;
+    }
+    if (strncmp(p, "/api/aggregator/proxy/", 22) == 0) {
+      handle_aggregator_proxy_(request, p + 22);
+      return;
+    }
+#endif
     if (strcmp(p, "/sensors.json") == 0) {
       handle_manifest_(request);
       return;
@@ -2878,6 +2903,215 @@ class HistoryWebHandler : public AsyncWebHandler {
     resp->addHeader("Cache-Control", "no-store");
     request->send(resp);
   }
+
+#if AGGREGATOR_ENABLED
+  // ── Aggregator API endpoints (v7.5.5.2) ──────────────────────────
+  //
+  // GET /api/aggregator/gateways — satellite list with cached status
+  // GET /api/aggregator/live     — unified live values from all satellites
+  // GET /api/aggregator/proxy/{gw_id}/history/{device}/{metric} — on-demand proxy
+  //
+  // All endpoints read from satellite_caches[] under AGG_LOCK()/AGG_UNLOCK().
+  // The proxy endpoint fetches from the satellite on-demand using fetch_to_buffer()
+  // into s_proxy_tmp (separate from s_fetch_tmp used by the polling task).
+  // ─────────────────────────────────────────────────────────────────
+
+  void handle_aggregator_gateways_(AsyncWebServerRequest *request) const {
+    if (xSemaphoreTake(s_cache_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+      request->send(503);
+      return;
+    }
+    // LESSON-OPS-056: pre-reserve string to avoid reallocation
+    std::string out;
+    out.reserve(MAX_SATELLITES * 512 + 32);
+    out += "{\"gateways\":[";
+    for (int i = 0; i < MAX_SATELLITES; i++) {
+      if (i > 0) out += ",";
+      const SatelliteCache& sat = satellite_caches[i];
+      char tmp[128];
+      out += "{\"id\":\"";   out += sat.id;
+      out += "\",\"name\":\""; out += sat.name;
+      out += "\",\"reachable\":";
+      out += sat.reachable ? "true" : "false";
+      snprintf(tmp, sizeof(tmp), ",\"last_seen\":%u,\"consecutive_failures\":%u",
+               (unsigned)sat.last_seen_epoch, (unsigned)sat.consecutive_failures);
+      out += tmp;
+      out += ",\"manifest_cached\":";
+      out += (sat.manifest_len > 0) ? "true" : "false";
+      out += ",\"live_cached\":";
+      out += (sat.live_len > 0) ? "true" : "false";
+      // Extract firmware_version from cached status_json using strstr (no JSON lib)
+      const char* ver_ptr = strstr(sat.status_json, "\"version\":\"");
+      if (ver_ptr) {
+        ver_ptr += 11;  // skip past "\"version\":\""
+        const char* ver_end = strchr(ver_ptr, '"');
+        if (ver_end && (ver_end - ver_ptr) < 32) {
+          out += ",\"firmware_version\":\"";
+          out.append(ver_ptr, (size_t)(ver_end - ver_ptr));
+          out += "\"";
+        }
+      }
+      // Extract sensor_count from cached status_json
+      const char* sc_ptr = strstr(sat.status_json, "\"sensor_count\":");
+      if (sc_ptr) {
+        sc_ptr += 15;  // skip past "\"sensor_count\":"
+        char* sc_end = nullptr;
+        long sc_val = strtol(sc_ptr, &sc_end, 10);
+        if (sc_end != sc_ptr && sc_val >= 0 && sc_val <= 1000) {
+          snprintf(tmp, sizeof(tmp), ",\"sensor_count\":%ld", sc_val);
+          out += tmp;
+        }
+      }
+      // Extract free_heap from cached status_json
+      const char* fh_ptr = strstr(sat.status_json, "\"free_heap\":");
+      if (fh_ptr) {
+        fh_ptr += 12;  // skip past "\"free_heap\":"
+        snprintf(tmp, sizeof(tmp), ",\"free_heap\":%lu",
+                 (unsigned long)strtoul(fh_ptr, nullptr, 10));
+        out += tmp;
+      }
+      out += "}";
+    }
+    out += "]}";
+    xSemaphoreGive(s_cache_mutex);
+    auto *resp = request->beginResponse(200, "application/json", out);
+    add_common_headers_(resp);
+    request->send(resp);
+  }
+
+  void handle_aggregator_live_(AsyncWebServerRequest *request) const {
+    if (xSemaphoreTake(s_cache_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+      request->send(503);
+      return;
+    }
+    // LESSON-OPS-056: pre-reserve string (MAX_SATELLITES * live_json max ~2048)
+    std::string out;
+    out.reserve(MAX_SATELLITES * 2304 + 64);
+    char tmp[64];
+    snprintf(tmp, sizeof(tmp), "{\"timestamp\":%u,\"gateways\":{",
+             (unsigned)::time(nullptr));
+    out += tmp;
+    for (int i = 0; i < MAX_SATELLITES; i++) {
+      if (i > 0) out += ",";
+      const SatelliteCache& sat = satellite_caches[i];
+      out += "\""; out += sat.id; out += "\":{";
+      out += "\"reachable\":";
+      out += sat.reachable ? "true" : "false";
+      out += ",\"live\":";
+      if (sat.live_len > 0) {
+        out.append(sat.live_json, sat.live_len);
+      } else {
+        out += "null";
+      }
+      out += "}";
+    }
+    out += "}}";
+    xSemaphoreGive(s_cache_mutex);
+    auto *resp = request->beginResponse(200, "application/json", out);
+    add_common_headers_(resp);
+    request->send(resp);
+  }
+
+  void handle_aggregator_proxy_(AsyncWebServerRequest *request,
+                                const char *rest) const {
+    // rest = "{gw_id}/history/{device}/{metric}"
+    // Extract gw_id (up to first '/')
+    const char* slash1 = strchr(rest, '/');
+    if (!slash1) { request->send(404); return; }
+    char gw_id[64];
+    size_t gw_id_len = (size_t)(slash1 - rest);
+    if (gw_id_len == 0 || gw_id_len >= sizeof(gw_id)) {
+      request->send(404);
+      return;
+    }
+    memcpy(gw_id, rest, gw_id_len);
+    gw_id[gw_id_len] = '\0';
+
+    // Verify sub-path starts with "history/"
+    const char* after_gw = slash1 + 1;
+    if (strncmp(after_gw, "history/", 8) != 0) { request->send(404); return; }
+    const char* device_start = after_gw + 8;
+    const char* slash2 = strchr(device_start, '/');
+    if (!slash2) { request->send(404); return; }
+    char device[64];
+    size_t device_len = (size_t)(slash2 - device_start);
+    if (device_len == 0 || device_len >= sizeof(device)) {
+      request->send(404);
+      return;
+    }
+    memcpy(device, device_start, device_len);
+    device[device_len] = '\0';
+
+    const char* metric = slash2 + 1;
+    if (*metric == '\0') { request->send(404); return; }
+
+    // Find the satellite by gw_id — take mutex briefly to read base_url
+    char base_url[128];
+    bool found = false;
+    if (xSemaphoreTake(s_cache_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+      request->send(503);
+      return;
+    }
+    bool url_too_long = false;
+    for (int i = 0; i < MAX_SATELLITES; i++) {
+      if (strcmp(satellite_caches[i].id, gw_id) == 0) {
+        size_t blen = strlen(satellite_caches[i].base_url);
+        if (blen < sizeof(base_url)) {
+          memcpy(base_url, satellite_caches[i].base_url, blen + 1);
+          found = true;
+        } else {
+          url_too_long = true;
+        }
+        break;
+      }
+    }
+    xSemaphoreGive(s_cache_mutex);
+
+    if (url_too_long) { request->send(500); return; }
+    if (!found) { request->send(404); return; }
+
+    // Build satellite URL and fetch on-demand into s_proxy_tmp.
+    // Use /api/v2/history/ which handles all device categories (env, ping, RSSI, etc.)
+    char url[256];
+    int url_fmt_len = snprintf(url, sizeof(url), "%s/api/v2/history/%s/%s", base_url, device, metric);
+    if (url_fmt_len < 0 || static_cast<size_t>(url_fmt_len) >= sizeof(url)) {
+      request->send(414);
+      return;
+    }
+
+    // s_proxy_tmp is only used in web handler context (single-threaded ESPHome loop)
+    // The polling task never touches s_proxy_tmp — no mutex needed here.
+    s_proxy_len = 0;
+    static_assert(sizeof(s_proxy_tmp) <= 65535,
+                  "s_proxy_tmp size must fit into uint16_t for fetch_to_buffer");
+    if (!fetch_to_buffer(url, s_proxy_tmp,
+                         static_cast<uint16_t>(sizeof(s_proxy_tmp)),
+                         &s_proxy_len)
+        || s_proxy_len == 0) {
+      request->send(502);
+      return;
+    }
+
+    // Detect truncation: if the buffer is completely full, the upstream response was
+    // likely larger than 32KB and was silently cut off by fetch_to_buffer().
+    // Return 502 rather than serving corrupted/incomplete data to the dashboard.
+    if (s_proxy_len >= sizeof(s_proxy_tmp) - 1) {
+      auto *resp = request->beginResponse(
+          502, "application/json",
+          "{\"error\":\"upstream_response_too_large\",\"max_bytes\":32768}");
+      add_common_headers_(resp);
+      request->send(resp);
+      return;
+    }
+
+    // LESSON-OPS-056: zero-copy from static buffer — NEVER beginResponseStream
+    auto *resp = request->beginResponse(
+        200, "text/plain",
+        reinterpret_cast<const uint8_t*>(s_proxy_tmp), s_proxy_len);
+    add_common_headers_(resp);
+    request->send(resp);
+  }
+#endif  // AGGREGATOR_ENABLED
 };
 
 

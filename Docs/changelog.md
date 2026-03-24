@@ -3,6 +3,75 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.5.2] — 2026-03-24 — Aggregator API Endpoints (Phase 5 Step 2)
+
+### Aggregator API endpoints (`#if AGGREGATOR_ENABLED`)
+
+Three new aggregator-only endpoints added to `HistoryWebHandler`. All are
+conditionally compiled and never present on satellite firmware
+(`AGGREGATOR_ENABLED 0`).
+
+**`GET /api/aggregator/gateways`** — returns the satellite list with
+cached status. Includes `id`, `name`, `reachable`, `last_seen`,
+`consecutive_failures`, `manifest_cached`, `live_cached`,
+`firmware_version`, `sensor_count`, and `free_heap` extracted from the
+cached `/api/status` response via `strstr()`.
+
+**`GET /api/aggregator/live`** — returns unified live values from all
+satellites. Each gateway entry contains `reachable` and the raw cached
+`/api/v2/live` JSON embedded as-is (no parsing). Timestamp is the
+current epoch from `::time(nullptr)`.
+
+**`GET /api/aggregator/proxy/{gw_id}/history/{device}/{metric}`** — on-demand
+history proxy. Fetches from the satellite using `fetch_to_buffer()` into
+`s_proxy_tmp[32768]` (separate from `s_fetch_tmp` used by the polling
+task) and relays the response with zero-copy `beginResponse`. Returns
+404 for unknown gateway IDs, 502 if the satellite fetch fails.
+
+**Thread safety:** All cache reads for gateways/live handlers take the
+`s_cache_mutex` before reading and release before sending. The proxy
+handler takes the mutex only briefly to read `base_url`, then releases
+before the blocking network fetch.
+
+**Fix: proxy truncation detection** — proxy endpoint now returns 502
+with `{"error":"upstream_response_too_large","max_bytes":32768}` if the
+upstream history response exceeds the 32KB buffer, instead of silently
+serving truncated data as HTTP 200. See BUG-063.
+
+**Fix: proxy upstream URL** — proxy now fetches from
+`/api/v2/history/{device}/{metric}` (v2 endpoint, all device categories)
+instead of the legacy `/history/{device}/{metric}` (env-only). This
+enables proxying ping, RSSI, and other non-environmental metric history.
+
+**LESSON-OPS-056 compliance:** All new aggregator endpoint responses use
+pre-reserved `std::string` + `beginResponse()`. `beginResponseStream` is
+not used by these handlers.
+
+**LESSON-OPS-068 compliance:** All socket calls in `fetch_to_buffer()` use
+`lwip_*()` prefixed names (no BSD socket aliases).
+
+### Preflight checks added
+
+`scripts/preflight.sh`: three new checks inside the
+`config/aggregator.json` conditional block verify that the three
+aggregator route patterns are present in `sensor_history_multi.h`.
+
+### Files modified
+
+- `dashboard/sensor_history_multi.h` — three new handler methods, proxy
+  static buffers `s_proxy_tmp[32768]`/`s_proxy_len`, aggregator routes
+  in `canHandle()` and `handleRequest()`; version bumped to v7.5.5.2
+- `scripts/preflight.sh` — three aggregator route checks
+- `scripts/render_sensor_config.py` — version bump to 7.5.5.2
+- `tests/fixtures/generate-fixtures.js` — version bump to 7.5.5.2
+- `dashboard/dashboard.html`, `dashboard/dashboard.js`,
+  `dashboard/dashboard.h` — version bump to v7.5.5.2
+- `firmware/esp32-c3-multi-sensor.yaml` — version bump to v7.5.5.2
+- `src/gateway_manifest.h`, `tests/fixtures/manifest.json`,
+  `tests/fixtures/api-status.json`, `tests/fixtures/variants/*/` —
+  regenerated artifacts
+
+---
 ## Infrastructure — Multi-Board Fixes and Repo Cleanup — 2026-03-24
 
 ### No version bump — build infrastructure only
