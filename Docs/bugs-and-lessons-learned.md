@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-23 — v7.5.5.1 post-merge patch (BUG-058 backoff seed, BUG-059 https:// rejection)._
+_Last updated: 2026-03-24 — v7.5.5.1 multi-board infrastructure fixes (BUG-060 lazy yaml import, BUG-061 S3 partition, BUG-062 heap reporting documented)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,56 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-062 — `/api/status` reports PSRAM as `free_heap` on S3, misleading monitoring (2026-03-23)
+
+**Severity:** Misleading diagnostics (not a crash)
+**Introduced in:** v7.5.5.1 (first S3 deployment)
+**Fixed in:** Pending (documented, fix planned for pre-v7.5.5.2 infrastructure commit)
+
+**Symptoms:** `curl /api/status` on the S3 aggregator reports `free_heap: 8847360` (8.4 MB). This is the PSRAM-inclusive value. The ESPHome debug sensor shows ~32 KB (internal SRAM only). Monitoring scripts or dashboards that compare heap values across C3 and S3 get wildly different numbers that aren't comparable.
+
+**Root cause:** `esp_get_free_heap_size()` returns total free heap including PSRAM on boards that have it. On the C3 (no PSRAM), this is internal SRAM only (~70 KB). On the S3 (8 MB PSRAM), this includes PSRAM (~8.4 MB). The values are not comparable across board types.
+
+**Fix (planned):** Report both values in `/api/status`:
+```json
+{
+  "free_heap": 32768,
+  "free_heap_internal": 32768,
+  "free_heap_total": 8847360
+}
+```
+`free_heap` stays as internal-only for backward compatibility. `free_heap_total` is additive. Use `esp_get_free_internal_heap_size()` for the internal value.
+
+**Prevention:** LESSON-OPS-072.
+
+### BUG-061 — S3 partition table placed ota_0 at wrong offset, bricking the board (2026-03-23)
+
+**Severity:** Board-bricking (requires serial recovery)
+**Introduced in:** Multi-board infrastructure (PR #66)
+**Fixed in:** a024cac (corrected partition table committed)
+
+**Symptoms:** S3 board entered boot loop after flashing. PlatformIO wrote the firmware to 0x10000 (its default app offset), but the partition table had ota_0 at 0x20000 (after oversized NVS). The bootloader looked for the app at 0x20000, found nothing, and reset.
+
+**Root cause:** The S3 partition table used a larger NVS (0x5000 = 20KB), which pushed phy_init to 0x10000 and ota_0 to 0x20000. PlatformIO ignores the partition table's ota_0 offset when writing — it always flashes to 0x10000.
+
+**Fix:** Corrected the S3 partition table to use NVS at 0x4000 (16KB, matching C3 and WROOM), placing ota_0 at 0x10000. Added documentation comments to the partition CSV explaining the 0x10000 requirement.
+
+**Prevention:** LESSON-OPS-070. Preflight must validate ota_0 offset in all partition CSVs (check not yet implemented — planned for pre-v7.5.5.2 infrastructure commit).
+
+### BUG-060 — PyYAML `import yaml` at module level breaks satellite workflow without pip install (2026-03-23)
+
+**Severity:** Build-breaking (preflight crash)
+**Introduced in:** Multi-board infrastructure (PR #66)
+**Fixed in:** eeb1a13 (lazy import inside `load_board_profile()`)
+
+**Symptoms:** `bash scripts/preflight.sh` crashes with `ModuleNotFoundError: No module named 'yaml'` even on the C3 satellite path that never uses board profiles.
+
+**Root cause:** `import yaml` at the top level of `sensor_manifest_lib.py`. The satellite workflow never calls `load_board_profile()` but the import fails before any function is called. PyYAML is available in the ESPHome environment but not guaranteed on all systems.
+
+**Fix:** Moved `import yaml` inside `load_board_profile()` as a lazy import. The module only loads when board profiles are actually needed.
+
+**Prevention:** LESSON-OPS-071.
 
 ### BUG-059 — Validator accepts `https://` satellite URLs that firmware cannot fetch (2026-03-23)
 
@@ -1058,7 +1108,41 @@ Related: BUG-057, PR #64
 
 Related: BUG-058
 
-### LESSON-OPS-067: New generated headers must be added to ESPHome YAML `includes:` list (2026-03-22)
+### LESSON-OPS-073: LXC USB passthrough requires chmod after every device reconnect (2026-03-23)
+
+**Context:** In unprivileged Proxmox LXC containers, bind-mounted USB devices (`/dev/ttyACM0`) lose permissions when the device disconnects and reconnects — which happens when entering download mode, after board reset, or after flashing. The host creates a fresh device node with default permissions that the container's unprivileged user cannot access.
+
+**Rule:** Either install a udev rule on the Proxmox host that sets `MODE="0666"` for ESP32 vendor IDs (`303a:1001` for S3 USB-JTAG, `10c4:ea60` for CP2102, `1a86:7523` for CH340), or flash directly from the host by navigating to the container's rootfs path. The udev rule is the permanent fix; manual `chmod 0666 /dev/ttyACM0` is the per-flash workaround.
+
+**Applies to:** Any LXC-based ESPHome setup with USB-connected boards.
+
+Related: BUG-061
+
+### LESSON-OPS-072: `esp_get_free_heap_size()` includes PSRAM on boards that have it (2026-03-23)
+
+**Context:** The S3 aggregator reported 8.4 MB free heap via `/api/status`, which is correct (it includes PSRAM) but misleading when compared to C3 values (~70 KB, internal SRAM only). Monitoring dashboards and health checks that threshold on free heap will behave differently across board types.
+
+**Rule:** Always report both internal and total heap separately. Use `esp_get_free_internal_heap_size()` for internal SRAM (comparable across all boards) and `esp_get_free_heap_size()` for total (includes PSRAM where available). The `/api/status` endpoint should expose `free_heap` (internal, backward-compatible), `free_heap_internal`, and `free_heap_total`.
+
+Related: BUG-062
+
+### LESSON-OPS-071: Module-level imports for optional dependencies must be lazy (2026-03-23)
+
+**Context:** `import yaml` at the top of `sensor_manifest_lib.py` crashed the satellite workflow on systems without PyYAML, even though PyYAML was only needed for the `load_board_profile()` function which satellites never call.
+
+**Rule:** If a Python module is only needed by one function (e.g., `yaml` for `load_board_profile()`), import it inside that function, not at the top of the file. Top-level imports break all callers of the module, even those that never use the optional dependency. This is especially important in ESPHome containers where pip packages beyond the standard library are not guaranteed.
+
+Related: BUG-060
+
+### LESSON-OPS-070: All ESP32 partition tables must have ota_0 at 0x10000 (2026-03-23)
+
+**Context:** PlatformIO/esptool writes the application binary to offset 0x10000 regardless of what the partition table says. The S3 partition table had ota_0 at 0x20000 (due to oversized NVS), which meant the bootloader looked for the app at the wrong address.
+
+**Rule:** In every partition table for any ESP32 variant (C3, S3, C5, C6, WROOM), `ota_0` must start at `0x10000`. This is non-negotiable. The fixed items (NVS at 0x9000/0x4000, otadata at 0xD000/0x2000, phy_init at 0xF000/0x1000) must fit before 0x10000 with no overlap. Preflight must validate: `grep ota_0 partitions/*.csv` → offset must be `0x10000` for every file.
+
+**Applies to:** All current and future partition tables.
+
+Related: BUG-061
 
 **Date:** 2026-03-22
 

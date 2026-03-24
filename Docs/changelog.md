@@ -3,6 +3,76 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## Infrastructure — Multi-Board Fixes and Repo Cleanup — 2026-03-24
+
+### No version bump — build infrastructure only
+
+**BUG-060 fixed: lazy yaml import.** Moved `import yaml` from top-level in
+`sensor_manifest_lib.py` to inside `load_board_profile()`. The satellite workflow
+(which never calls `load_board_profile()`) no longer requires PyYAML installed.
+
+**BUG-061 fixed: S3 partition table corrected.** `partitions/esp32-s3-multi-partitions.csv`
+now has `ota_0` at `0x10000` (was `0x20000`, which bricked the S3 on first flash).
+Added documentation comments explaining the 0x10000 requirement.
+
+**ThermoPro indentation fix in generator.** `generate_board_yaml()` in
+`render_sensor_config.py` now correctly shifts ThermoPro blocks by 1 space for
+non-C3 boards, producing valid ESPHome YAML.
+
+**Corrupted Phase 6 prompt headers repaired.** `v7.5.6.0` and `v7.5.6.2` instruction
+files had their first ~21 lines accidentally removed during addendum insertion. Headers
+restored from git history.
+
+**Per-deployment configs added to .gitignore.** `config/gateway.json` and
+`config/aggregator.json` are per-device configs that should not be tracked. Only the
+`.example.json` files are tracked.
+
+**BUG-062 documented (not yet fixed).** `/api/status` reports PSRAM-inclusive heap on S3.
+Fix planned for pre-v7.5.5.2 infrastructure commit.
+
+**Files modified:**
+- `scripts/sensor_manifest_lib.py` — lazy yaml import (BUG-060)
+- `scripts/render_sensor_config.py` — ThermoPro indent fix
+- `partitions/esp32-s3-multi-partitions.csv` — ota_0 at 0x10000 (BUG-061)
+- `prompts/phase6/v7.5.6.0-*`, `v7.5.6.2-*` — header repair
+- `.gitignore` — deployment config exclusions
+
+---
+## Infrastructure — Multi-Board Support — 2026-03-23
+
+### No version bump — build infrastructure only (PR #66)
+
+**Board profile system.** Three board profiles in `firmware/boards/`:
+`esp32-c3-supermini.yaml`, `esp32-s3-devkitc1-n16r8.yaml`, `esp32-wroom-32d.yaml`.
+Each defines chip variant, flash size, PSRAM, sdkconfig, and partition table path.
+
+**Gateway config (`config/gateway.json`).** Optional per-device deployment config.
+Specifies board selection, ESPHome name, WiFi address, friendly name. When absent,
+the generator uses C3 defaults (full backward compatibility).
+
+**`generate_board_yaml()` in `render_sensor_config.py`.** Generates complete ESPHome
+YAML from scratch for non-C3 boards, incorporating board profile settings, aggregator
+task, ping adapter, diagnostics, sorting groups, and text sensors.
+
+**Zero-sensor support.** Empty `sensors` array produces valid YAML without BLE tracker
+or ThermoPro blocks. `NUM_DEVICES=0` compiles correctly.
+
+**New partition tables.** `esp32-s3-multi-partitions.csv` (4MB history, 3MB OTA slots)
+and `esp32-wroom-multi-partitions.csv` (512KB history, same as C3).
+
+**Preflight extended.** Board profile validation and gateway config validation when
+optional files are present.
+
+**Files added/modified:**
+- `firmware/boards/*.yaml` — three board profiles
+- `config/gateway.example.json` — example gateway config
+- `partitions/esp32-s3-multi-partitions.csv`, `esp32-wroom-multi-partitions.csv`
+- `scripts/sensor_manifest_lib.py` — `load_board_profile()`, `load_gateway_config()`, `validate_gateway_config()`
+- `scripts/render_sensor_config.py` — `generate_board_yaml()`, gateway config loading
+- `scripts/preflight.sh` — board/gateway validation
+- `Docs/configuring-sensors.md` — multi-board deployment section
+
+---
 ## v7.5.5.1 — Aggregator Polling Task — 2026-03-22
 
 ### Phase 5 Step 1 — Firmware only, no dashboard changes

@@ -1,7 +1,7 @@
 # Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-03-21 — post-Phase-4 review revision (see Revision History at bottom)_
+_Last updated: 2026-03-24 — architecture review, infrastructure step added, critical rules 22–25_
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -163,16 +163,19 @@ All steps shipped. No prompts needed.
 |---------|-------|-------------|--------|
 | v7.5.5.0 | Aggregator config schema | `prompts/phase5/v7.5.5.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-21 |
 | v7.5.5.1 | Aggregator polling task | `prompts/phase5/v7.5.5.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-22 |
+| (no bump) | Multi-board infrastructure | PR #66 + follow-up fixes (BUG-060, BUG-061) | ✅ Complete 2026-03-24 |
+| (no bump) | Pre-v7.5.5.2 infrastructure | Config separation, ota_0 preflight, validate-device.sh, PR66 Codex fixes, BUG-062 | Pending |
 | v7.5.5.2 | Aggregator API endpoints | `prompts/phase5/v7.5.5.2-implementation-instructions-for-coding-agent.md` | Pending |
-| v7.5.5.3 | Aggregator dashboard UI | `prompts/phase5/v7.5.5.3-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.5.5.3 | Aggregator dashboard UI + settings panel groundwork | `prompts/phase5/v7.5.5.3-implementation-instructions-for-coding-agent.md` | Pending (prompt revision needed) |
 | v7.5.5.4 | Aggregator Playwright tests | `prompts/phase5/v7.5.5.4-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.5.5.5 | Phase 5 closure | `prompts/phase5/v7.5.5.5-implementation-instructions-for-coding-agent.md` | Pending |
 
 **Phase 5 device testing requirements:**
 - v7.5.5.0: compile-only (both with and without `aggregator.json`)
 - v7.5.5.1: **requires TWO devices** — satellite + aggregator. Verify polling logs, satellite unaffected, heap stable, unreachable/recovery test
+- Pre-v7.5.5.2 infra: run `validate-device.sh` on both devices, verify S3 uses its own sensor config, verify preflight catches bad ota_0
 - v7.5.5.2: verify aggregator API endpoints, history proxy, heap after proxy
-- v7.5.5.3: **requires TWO devices** — test satellite mode unchanged, test aggregator UI (gateway selector, stale indicators, per-gateway view)
+- v7.5.5.3: **requires TWO devices** — test satellite mode unchanged, test aggregator UI (gateway selector, settings panel, stale indicators, per-gateway view, board-correct About card)
 - v7.5.5.4: Playwright only — no device testing
 - v7.5.5.5: final verification, screenshot for record
 
@@ -240,6 +243,10 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 19 | Expanding a shared array (SENSORS) requires auditing ALL index-based consumers | BUG-056 |
 | 20 | Every step must produce a session log as a MANDATORY deliverable | Phase 4 review finding |
 | 21 | Every step must produce an Instruction Compliance Output table in the PR | Phase 4 review finding |
+| 22 | All partition tables must have `ota_0` at `0x10000` — verify before flashing | LESSON-OPS-070 / BUG-061 |
+| 23 | Module-level imports for optional deps (e.g. `yaml`) must be lazy (inside the function that needs them) | LESSON-OPS-071 / BUG-060 |
+| 24 | `esp_get_free_heap_size()` includes PSRAM — report both internal and total heap separately | LESSON-OPS-072 / BUG-062 |
+| 25 | LXC USB passthrough loses permissions on device reconnect — use udev rules or flash from host | LESSON-OPS-073 |
 
 ---
 
@@ -295,6 +302,20 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-03-24 — Architecture Review Revision
+
+**Context:** Comprehensive repo analysis after multi-board infrastructure push. User design principles reviewed. Architecture revision document produced.
+
+**What was updated and why:**
+
+| Change | Why |
+|--------|-----|
+| **Infrastructure step added to Phase 5 index** | Config separation, ota_0 preflight, validate-device.sh, PR66 Codex fixes, BUG-062 must be done before v7.5.5.2 |
+| **v7.5.5.3 scope expanded** | User principles require dashboard-first configuration. Settings panel groundwork (read-only satellite list, stubbed management API) included to avoid dashboard rework later. |
+| **Critical rules 22–25 added** | LESSON-OPS-070 (ota_0), LESSON-OPS-071 (lazy imports), LESSON-OPS-072 (heap PSRAM), LESSON-OPS-073 (LXC USB) |
+| **Multi-board infrastructure step marked complete** | PR #66 + BUG-060/061 follow-up fixes |
+| **Device testing requirements updated** | Pre-v7.5.5.2 infra step needs validate-device.sh testing; v7.5.5.3 needs settings panel and board About card testing |
 
 ### 2026-03-21 — Post-Phase-4 Review Revision
 
