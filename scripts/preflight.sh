@@ -388,6 +388,23 @@ else
   echo "config/gateway.json absent — C3 default mode (gateway checks skipped)"
 fi
 
+# ── Partition table ota_0 offset validation ─────────────────────────
+for csv in partitions/*.csv; do
+  csv_name=$(basename "$csv" .csv)
+  OTA0_LINE=$(grep -E "^ota_0," "$csv" 2>/dev/null || true)
+  if [[ -z "$OTA0_LINE" ]]; then
+    echo "partition_ota0_${csv_name}: SKIP (no ota_0 entry)"
+    continue
+  fi
+  OTA0_OFFSET=$(echo "$OTA0_LINE" | head -1 | awk -F',' '{print $4}' | tr -d ' ')
+  if [[ "$OTA0_OFFSET" != "0x10000" ]]; then
+    echo "✗ partition_ota0_${csv_name}: FAIL — ota_0 at $OTA0_OFFSET (must be 0x10000)"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  else
+    echo "partition_ota0_${csv_name}: PASS"
+  fi
+done
+
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   echo "✗ Preflight failed with $FAIL_COUNT error(s)"
   exit 1

@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "sensors": [
+    {
+      "id": "wan_ping",
+      "name": "WAN Latency",
+      "category": "network",
+      "adapter": "icmp_ping",
+      "source": { "target": "8.8.8.8" }
+    }
+  ]
+}

@@ -1177,8 +1177,15 @@ def main() -> int:
     # Allow empty sensors when gateway config is present (pure aggregator mode)
     allow_empty = gateway_config is not None
 
+    # Determine sensor manifest path — gateway config can override the default
+    manifest_path = MANIFEST_PATH
+    if gateway_config:
+        sensors_file = gateway_config.get("sensors_file")
+        if isinstance(sensors_file, str) and sensors_file:
+            manifest_path = ROOT / sensors_file
+
     try:
-        sensors = load_manifest(MANIFEST_PATH, allow_empty=allow_empty)
+        sensors = load_manifest(manifest_path, allow_empty=allow_empty)
     except ManifestError as exc:
         print(f"Manifest error: {exc}", file=sys.stderr)
         return 2
@@ -1201,6 +1208,9 @@ def main() -> int:
             "sensors": fixture_manifest(sensors),
             "mode": "active-manifest",
             "connected": True,
+            "free_heap": 81920,
+            "free_heap_internal": 81920,
+            "free_heap_total": 81920,
         },
         indent=2,
     ) + "\n"

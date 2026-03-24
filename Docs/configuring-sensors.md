@@ -265,6 +265,48 @@ Optional fields:
 |-------|-------------|
 | `friendly_name` | Human-readable name shown in the dashboard; if omitted, defaults to `"{board_id} Gateway"` |
 | `manual_ip` | Object with `static_ip`, `gateway`, `subnet` (and optional `dns1`) — assigns a static IP on the device |
+| `sensors_file` | Path (relative to repo root) to a per-device sensor config JSON; defaults to `config/sensors.json` |
+
+### Per-device sensor config (`sensors_file`)
+
+By default, the generator reads sensors from `config/sensors.json`. When a device needs a different set of sensors (e.g., an aggregator with no local BLE sensors), set `sensors_file` in `gateway.json` to point to a per-device sensor config.
+
+**When to use `sensors_file`:**
+- The aggregator board is in a different location and has different physical sensors than the satellite.
+- The aggregator is a pure network device (WAN ping only) and should not inherit the satellite's ThermoPro sensors.
+
+**Naming convention:** `config/sensors-{gateway-name}.json` (e.g. `config/sensors-agg-s3-16m-1.json`).
+
+**Example — aggregator with WAN ping only:**
+
+```json
+{
+  "schema_version": 2,
+  "sensors": [
+    {
+      "id": "wan_ping",
+      "name": "WAN Latency",
+      "category": "network",
+      "adapter": "icmp_ping",
+      "source": { "target": "8.8.8.8" }
+    }
+  ]
+}
+```
+
+Add to `gateway.json`:
+
+```json
+{
+  "board": "esp32-s3-devkitc1-n16r8",
+  "esphome_name": "agg-s3-16m-1",
+  "friendly_name": "S3 Aggregator",
+  "wifi_address": "192.168.120.191",
+  "sensors_file": "config/sensors-agg-s3-16m-1.json"
+}
+```
+
+The `config/sensors.json` (default C3 satellite config) is **not** matched by the `config/sensors-*.json` gitignore pattern and remains tracked. Per-device sensor configs (`config/sensors-*.json`) are gitignored — create them per deployment.
 
 **`wifi_address` vs `manual_ip`:**
 
