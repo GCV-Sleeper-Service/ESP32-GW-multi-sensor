@@ -8,8 +8,6 @@ import re
 from pathlib import Path
 from typing import Dict, List
 
-import yaml
-
 MAC_RE = re.compile(r"^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 ID_RE = re.compile(r"^[a-z0-9_]{1,32}$")
 
@@ -352,6 +350,7 @@ def load_aggregator_config(path: Path) -> Dict | None:
 def load_board_profile(board_id: str) -> Dict:
     """Load a board profile from firmware/boards/{board_id}.yaml.
     Returns dict or raises ManifestError."""
+    import yaml  # lazy import — only needed for board profiles (BUG-060)
     profile_path = BOARDS_DIR / f"{board_id}.yaml"
     if not profile_path.is_file():
         raise ManifestError(f"Board profile not found: {profile_path}")
