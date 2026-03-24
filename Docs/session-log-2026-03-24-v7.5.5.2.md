@@ -75,7 +75,7 @@ Added three checks inside `if [[ -f "config/aggregator.json" ]]; then`:
 | Mutex timeout 100ms for web handlers | Web handlers should serve stale data (503) rather than block the HTTP response task |
 | Raw `live_json` embedded as-is | Avoids JSON parsing on ESP32; the dashboard (v7.5.5.3) will parse the nested structure |
 | `strstr()` for status field extraction | No JSON library available on ESP32; string search on short (~512 byte) fixed buffers is safe and fast |
-| `beginResponse()` for all aggregator responses | LESSON-OPS-056 compliance; `beginResponseStream` must never be used for responses that may grow |
+| `beginResponse()` for all aggregator responses | LESSON-OPS-056 compliance for the new aggregator endpoints; for aggregator responses that may grow, `beginResponseStream` must never be used (non-aggregator endpoints are unchanged) |
 | `fetch_to_buffer()` for proxy | Only HTTP client available in ESPHome IDF builds; `esp_http_client.h` is absent (BUG-057/LESSON-OPS-068) |
 
 ---

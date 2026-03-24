@@ -33,8 +33,9 @@ task) and relays the response with zero-copy `beginResponse`. Returns
 handler takes the mutex only briefly to read `base_url`, then releases
 before the blocking network fetch.
 
-**LESSON-OPS-056 compliance:** All responses use pre-reserved `std::string`
-+ `beginResponse()`. `beginResponseStream` is never used.
+**LESSON-OPS-056 compliance:** All new aggregator endpoint responses use
+pre-reserved `std::string` + `beginResponse()`. `beginResponseStream` is
+not used by these handlers.
 
 **LESSON-OPS-068 compliance:** All socket calls in `fetch_to_buffer()` use
 `lwip_*()` prefixed names (no BSD socket aliases).

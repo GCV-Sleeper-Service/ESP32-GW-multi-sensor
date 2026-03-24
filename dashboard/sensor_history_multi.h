@@ -3052,28 +3052,40 @@ class HistoryWebHandler : public AsyncWebHandler {
       request->send(503);
       return;
     }
+    bool url_too_long = false;
     for (int i = 0; i < MAX_SATELLITES; i++) {
       if (strcmp(satellite_caches[i].id, gw_id) == 0) {
-        size_t url_len = strlen(satellite_caches[i].base_url);
-        if (url_len < sizeof(base_url)) {
-          memcpy(base_url, satellite_caches[i].base_url, url_len + 1);
+        size_t blen = strlen(satellite_caches[i].base_url);
+        if (blen < sizeof(base_url)) {
+          memcpy(base_url, satellite_caches[i].base_url, blen + 1);
           found = true;
+        } else {
+          url_too_long = true;
         }
         break;
       }
     }
     xSemaphoreGive(s_cache_mutex);
 
+    if (url_too_long) { request->send(500); return; }
     if (!found) { request->send(404); return; }
 
     // Build satellite URL and fetch on-demand into s_proxy_tmp
     char url[256];
-    snprintf(url, sizeof(url), "%s/history/%s/%s", base_url, device, metric);
+    int url_fmt_len = snprintf(url, sizeof(url), "%s/history/%s/%s", base_url, device, metric);
+    if (url_fmt_len < 0 || static_cast<size_t>(url_fmt_len) >= sizeof(url)) {
+      request->send(414);
+      return;
+    }
 
     // s_proxy_tmp is only used in web handler context (single-threaded ESPHome loop)
     // The polling task never touches s_proxy_tmp — no mutex needed here.
     s_proxy_len = 0;
-    if (!fetch_to_buffer(url, s_proxy_tmp, sizeof(s_proxy_tmp), &s_proxy_len)
+    static_assert(sizeof(s_proxy_tmp) <= 65535,
+                  "s_proxy_tmp size must fit into uint16_t for fetch_to_buffer");
+    if (!fetch_to_buffer(url, s_proxy_tmp,
+                         static_cast<uint16_t>(sizeof(s_proxy_tmp)),
+                         &s_proxy_len)
         || s_proxy_len == 0) {
       request->send(502);
       return;
@@ -3083,7 +3095,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     auto *resp = request->beginResponse(
         200, "text/plain",
         reinterpret_cast<const uint8_t*>(s_proxy_tmp), s_proxy_len);
-    resp->addHeader("Cache-Control", "no-store");
+    this->add_common_headers_(resp);
     request->send(resp);
   }
 #endif  // AGGREGATOR_ENABLED
