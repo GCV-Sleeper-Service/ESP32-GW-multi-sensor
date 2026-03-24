@@ -3,11 +3,15 @@
 # 4MB history partition — ~8x the C3's 512KB budget.
 # Retention: ~132 days per device (3 ThermoPro + 1 ping, per-device persistence v7.7+)
 # OTA slots: 3MB each — ample for S3 binary with aggregator code + PSRAM support.
+#
+# IMPORTANT: ota_0 must start at 0x10000 — this is where PlatformIO/esptool
+# writes the app binary. Placing ota_0 at a different offset causes the bootloader
+# to look for the app in the wrong location (BUG-061 / flash bricking issue).
 # Name,     Type, SubType,  Offset,   Size,      Flags
-nvs,        data, nvs,      0x9000,   0x5000,
-otadata,    data, ota,      0xE000,   0x2000,
-phy_init,   data, phy,      0x10000,  0x1000,
-ota_0,      app,  ota_0,    0x20000,  0x300000,
+nvs,        data, nvs,      0x9000,   0x4000,
+otadata,    data, ota,      0xD000,   0x2000,
+phy_init,   data, phy,      0xF000,   0x1000,
+ota_0,      app,  ota_0,    0x10000,  0x300000,
 ota_1,      app,  ota_1,    ,         0x300000,
 history,    data, nvs,      ,         0x400000,
 coredump,   data, coredump, ,         0x10000,

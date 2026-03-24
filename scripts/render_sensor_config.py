@@ -844,7 +844,13 @@ def generate_board_yaml(
     if ble_sensors:
         lines.append("  # <<< SENSOR_MANIFEST:THERMOPRO_BEGIN >>>")
         for idx, sensor in enumerate(ble_sensors):
-            lines.append(thermopro_block(sensor, idx).rstrip())
+            # thermopro_block() uses 1-space base indent (designed for C3 marker
+            # replacement where the block sits inside an existing 2-space context).
+            # Generated YAML needs 2-space indent under sensor: to match
+            # wifi_signal/debug/uptime items. Add 1 space to each non-empty line.
+            block = thermopro_block(sensor, idx).rstrip()
+            for line in block.split('\n'):
+                lines.append((' ' + line) if line.strip() else '')
             lines.append("")
         # Remove trailing blank
         while lines and lines[-1] == "":
