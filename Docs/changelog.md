@@ -3,6 +3,63 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.5.5] — 2026-03-25 — Phase 5 Closure and Documentation
+
+### Phase 5 Complete ✅
+
+Phase 5 (Aggregator MVP) is closed with documentation, closure-gate verification, and full
+validation rerun across all fixture variants.
+
+| Step | Scope | Status |
+|------|-------|--------|
+| v7.5.5.0 | Aggregator configuration schema and loader | Complete |
+| v7.5.5.1 | Aggregator polling task | Complete |
+| v7.5.5.2 | Aggregator API endpoints | Complete |
+| v7.5.5.3 | Aggregator dashboard UI (+ hotfix/hotfix-2) | Complete |
+| v7.5.5.4 | Aggregator fixtures + Playwright coverage | Complete |
+| v7.5.5.5 | Phase closure, docs, validation certification | Complete |
+
+### Documentation delivered
+
+- **New:** `Docs/aggregator-setup.md`
+  - End-to-end aggregator deployment workflow
+  - Multi-board guidance (C3/S3/WROOM profiles)
+  - Naming convention guidance (`sat-*` / `agg-*`)
+  - Config separation (`gateway.json`, `aggregator.json`, `sensors_file`)
+  - Dashboard layout clarification (GATEWAYS vs SENSORS)
+  - Zero-sensor aggregator guidance
+  - Board correctness and troubleshooting guidance
+- **Updated:** `Docs/v7.5-v7.6-architecture-plan.md`
+  - Phase 5 marked COMPLETE with step table and completion date
+  - Unified boot-path architecture note (BUG-064 / LESSON-OPS-074)
+  - Multi-board validation note and Phase D next-milestone note
+- **Updated:** `prompts/prompt-index-and-workflow.md`
+  - v7.5.5.5 marked complete
+  - Critical rule added for LESSON-OPS-068 (`lwip_*` socket usage)
+
+### Closure-gate and validation evidence
+
+- Fixture JSON validation: all fixture JSON files validated with `python3 -m json.tool`
+- Generated-file consistency: `python3 scripts/render_sensor_config.py --check` passes (deployment configs absent)
+- Playwright rerun (all six commands):
+  - `FIXTURE_SET=3sensor --project=chromium`: **99 passed, 18 skipped**
+  - `FIXTURE_SET=3sensor --project=firefox`: **99 passed, 18 skipped**
+  - `FIXTURE_SET=mixed --project=chromium`: **95 passed, 22 skipped**
+  - `FIXTURE_SET=mixed --project=firefox`: **95 passed, 22 skipped**
+  - `FIXTURE_SET=aggregator --project=chromium`: **88 passed, 29 skipped**
+  - `FIXTURE_SET=aggregator --project=firefox`: **88 passed, 29 skipped**
+- `bash scripts/preflight.sh`: PASS
+
+### Closure-gate checklist status
+
+- [x] All fixture JSON files validated with `python3 -m json.tool`
+- [x] `python3 scripts/render_sensor_config.py --check` passes with deployment configs absent
+- [x] BUG-064 through BUG-069 documented in `Docs/bugs-and-lessons-learned.md`
+- [x] LESSON-OPS-074 documented
+- [x] Session logs exist for v7.5.5.3 hotfix and hotfix-2 sessions
+- [x] Critical Rule 26 (LESSON-OPS-074) present in prompt index
+
+---
 ## [v7.5.5.4] — 2026-03-25 — Aggregator Playwright Tests + Fixtures
 
 ### Phase 5 Step 4: Aggregator Test Infrastructure

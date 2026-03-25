@@ -169,7 +169,7 @@ All steps shipped. No prompts needed.
 | v7.5.5.3 | Aggregator dashboard UI + settings panel groundwork | `prompts/phase5/v7.5.5.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-24 |
 | (no bump) | v7.5.5.3 hotfix: BUG-064–067, LESSON-OPS-074 | Manual session (not agent-driven) | ✅ Complete 2026-03-25 |
 | v7.5.5.4 | Aggregator Playwright tests | `prompts/phase5/v7.5.5.4-hotfix-addendum.md` + `v7.5.5.4-implementation-instructions-for-coding-agent-updated.md` | ✅ Complete 2026-03-25 |
-| v7.5.5.5 | Phase 5 closure | `prompts/phase5/v7.5.5.5-update-notes.md` + `v7.5.5.5-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.5.5.5 | Phase 5 closure | `prompts/phase5/v7.5.5.5-update-notes.md` + `v7.5.5.5-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-25 |
 
 **Phase 5 device testing requirements:**
 - v7.5.5.0: compile-only (both with and without `aggregator.json`)
@@ -249,6 +249,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 24 | `esp_get_free_heap_size()` includes PSRAM — report both internal and total heap separately | LESSON-OPS-072 / BUG-062 |
 | 25 | LXC USB passthrough loses permissions on device reconnect — use udev rules or flash from host | LESSON-OPS-073 |
 | 26 | Aggregator boot must be a superset of satellite boot, never a fork — unified pipeline + overlay | LESSON-OPS-074 / BUG-064 |
+| 27 | ESPHome IDF socket calls must use `lwip_*` prefixed functions, not BSD socket aliases | LESSON-OPS-068 / BUG-057 |
 
 ---
 
