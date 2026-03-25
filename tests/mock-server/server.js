@@ -232,18 +232,11 @@ const server = http.createServer(function(req, res) {
   // gateways list as satellite mode. In aggregator mode (FIXTURE_SET=aggregator),
   // loadFixture() resolves the variant fixture and returns real gateway data.
   if (pathname === '/api/aggregator/gateways') {
-    const gwFixture = loadFixture('aggregator-gateways.json');
-    if (gwFixture) {
-      return json(res, JSON.parse(gwFixture));
-    }
-    return json(res, { gateways: [] });
+    return json(res, loadFixtureJson('aggregator-gateways.json', { gateways: [] }));
   }
   if (pathname === '/api/aggregator/live') {
-    const liveFixture = loadFixture('aggregator-live.json');
-    if (liveFixture) {
-      return json(res, JSON.parse(liveFixture));
-    }
-    return json(res, { timestamp: Math.floor(Date.now() / 1000), gateways: {} });
+    return json(res, loadFixtureJson('aggregator-live.json',
+      { timestamp: Math.floor(Date.now() / 1000), gateways: {} }));
   }
   if (pathname.startsWith('/api/aggregator/proxy/')) {
     // pathname: /api/aggregator/proxy/{gwId}/history/{device}/{metric}
@@ -255,9 +248,8 @@ const server = http.createServer(function(req, res) {
       const metric = parts[7];
       const csvFile = `history-${gwId}-${device}-${metric}.csv`;
       const csv = loadFixture(csvFile);
-      if (csv) {
-        res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
-        return res.end(csv);
+      if (csv !== null) {
+        return text(res, csv, 'text/plain');
       }
     }
     return notFound(res, pathname);

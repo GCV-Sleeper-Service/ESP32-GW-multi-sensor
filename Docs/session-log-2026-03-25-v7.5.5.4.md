@@ -140,7 +140,7 @@ All 21 previously-failing tests now either skip (with specific reason) or were G
 | Satellite fallback test added | tests/browser/dashboard.spec.js | Added to Group 1 with aggregator skip guard | ✓ |
 | CI matrix updated with aggregator | .github/workflows/browser-tests.yml | aggregator in matrix, dedicated step | ✓ |
 | version is 7.5.5.4 everywhere | VERSION, dashboard.js, etc. | bump-version.sh confirmed | ✓ |
-| No modifications to firmware/dashboard source | - | No changes to dashboard.js, dashboard.html, sensor_history_multi.h | ✓ |
+| Only version-bump changes to firmware/dashboard source | dashboard.js, dashboard.html, firmware/esp32-c3-multi-sensor.yaml, dashboard/sensor_history_multi.h | Version strings bumped to 7.5.5.4 only; no functional changes | ✓ |
 | Changelog updated | Docs/changelog.md | v7.5.5.4 entry added | ✓ |
 | bugs-and-lessons-learned updated | Docs/bugs-and-lessons-learned.md | BUG-070, BUG-071, LESSON-OPS-075, LESSON-OPS-076 added | ✓ |
 | Session log created | Docs/session-log-2026-03-25-v7.5.5.4.md | This file | ✓ |

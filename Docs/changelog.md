@@ -8,7 +8,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 ### Phase 5 Step 4: Aggregator Test Infrastructure
 
 Added complete Playwright test fixtures and test group for aggregator mode
-verification. No firmware or dashboard source changes in this step.
+verification. No functional or logic changes to firmware or dashboard sources in this step.
 
 #### `tests/fixtures/variants/aggregator/`
 
