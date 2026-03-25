@@ -1,0 +1,71 @@
+Here is my thoughts regarding the project and would like your opinion how to properly move forward with the vision, architecture and most ultimately - user centric design in mind.
+
+This project, I think, is a so far good indicator of showing capabilities what can be achieved with even modest resources, like with ESP32 boards. The single device use case and what dashboard offers is from my point of view a great use case. But it is a niche use case and this is why this necessitated transformation towards manifest driven architecture and ability to greatly expand supported sensors/devices and have option to aggregate them with the aggregator gateway.
+
+However, when introducing the aggregator gateway, its configuration, role, capabilities and functions probably needs further refinement and this principle can apply to satellite gateways as well. This this what I think the overall picture looks like:
+
+We have two basic roles of the devices - a satellite gateway and an aggregator gateway. The very important part of the roles are that they are not inter-dependent - they can operate independently from each other but can supplement each other
+
+A satellite gateway is a device that has:
+
+1. Receives data from one or more sensors/devices - the purpose of a satellite gateway is to have at lease one sensors/device configured, even like wan ping sensor. The sensor's configuration ultimately should be user friendly and be done via GUI, not via yaml
+2. Type of supported sensors/devices and their data types is defined by the manifest and is configured via
+3. Presents the data to a user via built-in/embedded dashboard
+4. Has ability to import/export/delete sensors/devices data
+5. Has ability to store data on its own flash storage via custom partition
+6. Has ability to add/remove sensors/devices data without affecting data from others (this goes into multi-device persistent architecture)
+7. has ability to give a users notification options based on data from devices matching certain criteria and have ability add/remove/modify save these criteria on flash storage (v8.x implementation phase) and have these settings imported/exported as well
+8. Has ability to upload sensors/devices data to a cloud storage (v8.x implementation phase)
+9. Has an interface (REST API) to present its data and information about its attached sensors/devices to an aggregator gateway
+
+An aggregator gateway is a device that all the functions of a satellite gateway with following notes:
+
+1. An aggregator gateway may or may not have its own sensors/devices - it is not required to have one. 
+2. Aggregator gateway is usually expected to have higher processing power and flash storage than a satellite gateway
+3. Aggregator gateway can be configured to get data from one or more satellite gateways and give ability to the user to select what data from that satellite gateway to display. 
+4. The configuration of attached satellite gateway and its data is done via embedded dashboard (not via YAML) and saved in flash storage and this configuration can be imported/exported
+
+Choice of devices for satellite gateway - usually a single-core device like ESP32-C3 with 4MB flash storage, but this does not mean that other devices can't be configured as a satellite gateway.
+
+Choice of devices for aggregator gateway - a more capable device, usually a dual-core device like ESP32-S3 with 8MB flash storage, but this does not mean that other devices can't be configured as a satellite gateway.
+
+Naming convention for gateways - that is hostname that is more than 25 characters:
+Satellite gateway: "sat"-"Device series"-"amount of flash storage in mb"-"location and/or number". As an example:
+sat-c3-4m-1
+sat-c3-4m-office
+sat-s3-4m-floor1
+sat-c5-8m-2
+sat-c6-8m-sunn-str1
+sat-s3-4m-off
+
+Aggregator gateway: "agg"-"Device series"-"amount of flash storage in mb"-"location and/or number". As an example:
+agg-c3-8m-2
+agg-s3-8m-hq1
+agg-s3-16m-fl2
+agg-c5-8m-office
+agg-c6-16m-aws1
+agg-s3-16m-4
+agg-pi-00m-main
+
+Above naming convention gives user the upfront information about role, capabilities and location of the gateways. 
+
+The naming convention is a suggestion, not a mandatory option - we will use it but ultimate users should have their own ways to name gateways
+
+Because all will be ESP32 devices, then ESP32 is skipped from the name. In the last example 00m refers to PI's SD card usage that is vastly higher compared to ESP32 devices
+
+Regarding names - any device should have globally unique name for this particular set of configuration that can be used for other purposes as well, like if there are two satellite gateways sat-c3-4m-1 and sat-c5-8m-2 then their sensor/devices configuration manifest file can be named as sensors-sat-c3-4m-1.json and sensors-sat-c5-8m-2.json so these configurations are distinguishable and unique as well.
+
+Now about configuring/generating config for gateways. 
+Currently the only ESP32 device that has been used was ESP32-C3 supermini board with 4mb flash. The board's svg image, pinout and documentation are provided in the dashboard.
+
+In addition to the board above I have the following boards:
+ESP32-S3 supermini
+ESP32-S3-Devkitc-1 - N16R8 
+ESP32-Wroom-32D
+ESP32-C6 supermini
+ESP32-C6-DevKitC-1 
+ESP32-C5-DevKitC-1
+
+The images for above boards, their pinout and documentation are not yet available and is planned to be supplied later, however these boards are intended to be tested and supported for development. 
+
+So while information is not available to be displayed in the dashboard in their own cards these cards should display only the relevant information that are applicable to them and SHOULD NOT display any other information that is not applying to them. In other words, on ESP32-S3 boards there should be information only for that specific board and no information coming from other board, like ESP32-C3.

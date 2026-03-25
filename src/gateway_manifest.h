@@ -23,7 +23,7 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
     "ram_window_hours": 24,
     "sample_interval_seconds": 900
   },
-  "sensor_count": 4,
+  "sensor_count": 1,
   "metrics": [
     {
       "key": "temp",
@@ -63,63 +63,6 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
     }
   ],
   "sensors": [
-    {
-      "id": "office",
-      "name": "Office",
-      "category": "environmental",
-      "adapter": "thermopro_ble",
-      "source": {
-        "mac": "DB:06:2C:58:8A:59"
-      },
-      "measurements": [
-        {
-          "key": "temp",
-          "history_url": "/history/office/temp"
-        },
-        {
-          "key": "hum",
-          "history_url": "/history/office/hum"
-        }
-      ]
-    },
-    {
-      "id": "first_floor",
-      "name": "First Floor",
-      "category": "environmental",
-      "adapter": "thermopro_ble",
-      "source": {
-        "mac": "D5:D8:4C:25:06:49"
-      },
-      "measurements": [
-        {
-          "key": "temp",
-          "history_url": "/history/first_floor/temp"
-        },
-        {
-          "key": "hum",
-          "history_url": "/history/first_floor/hum"
-        }
-      ]
-    },
-    {
-      "id": "outside",
-      "name": "Outside",
-      "category": "environmental",
-      "adapter": "thermopro_ble",
-      "source": {
-        "mac": "DF:EB:DE:19:11:6C"
-      },
-      "measurements": [
-        {
-          "key": "temp",
-          "history_url": "/history/outside/temp"
-        },
-        {
-          "key": "hum",
-          "history_url": "/history/outside/hum"
-        }
-      ]
-    },
     {
       "id": "wan_ping",
       "name": "WAN Latency",
