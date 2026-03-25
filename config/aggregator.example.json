@@ -5,15 +5,15 @@
   "gateway_name": "Central Aggregator",
   "satellites": [
     {
-      "id": "gw-main",
-      "name": "Main Gateway",
-      "base_url": "http://192.168.10.20",
+      "id": "sat-s3-4m-189",
+      "name": "First satellite - c3 supermini 4mb flash",
+      "base_url": "http://192.168.120.189",
       "poll_interval_seconds": 30
     },
     {
-      "id": "gw-garage",
-      "name": "Garage Sensors",
-      "base_url": "http://192.168.10.21",
+      "id": "sat-esp32-4m-190",
+      "name": "Second satellite - esp32 wroom 4mb flash",
+      "base_url": "http://192.168.120.190",
       "poll_interval_seconds": 30
     }
   ]
