@@ -162,3 +162,52 @@ esphome run firmware/<target-yaml> --device <ip-or-serial>
 - Ensure selected board partition table places `ota_0` at `0x10000`.
 - S3 and WROOM partition profiles are included and should be used with matching board profile.
 - Persistence and retention behavior remains local-device scoped.
+
+## 15) CI / Development Pipeline Notes
+
+### Deployment configs are gitignored
+
+`config/gateway.json` and `config/aggregator.json` are deployment-specific files listed
+in `.gitignore`. They are NOT present in CI. Their presence changes what the generator
+produces:
+
+- **With `aggregator.json`:** Generator outputs `AGGREGATOR_ENABLED 1`, satellite list,
+  aggregator-specific YAML. The generated fixture and header reflect aggregator mode.
+- **Without `aggregator.json`:** Generator outputs `AGGREGATOR_ENABLED 0` and satellite
+  (C3 default) configuration. CI expects this output.
+
+**Workaround for local development on an aggregator device:** Before running
+`render_sensor_config.py --write` / `--check`, `preflight.sh`, or the Playwright
+test suite, temporarily move deployment configs out of the way:
+
+```bash
+# Before CI-style checks
+mv config/gateway.json config/gateway.json.bak 2>/dev/null
+mv config/aggregator.json config/aggregator.json.bak 2>/dev/null
+
+# Run checks (expects C3 satellite defaults)
+python3 scripts/render_sensor_config.py --check
+bash scripts/preflight.sh
+FIXTURE_SET=3sensor npx playwright test --project=chromium
+
+# Restore after checks
+mv config/gateway.json.bak config/gateway.json 2>/dev/null
+mv config/aggregator.json.bak config/aggregator.json 2>/dev/null
+```
+
+**Proper fix (future):** Per-target builds or a `--target` flag in the generator that
+selects the expected output profile. Tracked as a Phase D improvement.
+
+### Fixture regeneration on version bumps
+
+Every version bump must run both generators and verify (Critical Rule 28):
+
+```bash
+bash scripts/bump-version.sh <version>
+python3 scripts/render_sensor_config.py --write
+node tests/fixtures/generate-fixtures.js
+bash scripts/generate-header.sh
+python3 scripts/render_sensor_config.py --check
+grep -q "free_heap" tests/fixtures/api-status.json || echo "ERROR: free_heap missing"
+bash scripts/preflight.sh
+```

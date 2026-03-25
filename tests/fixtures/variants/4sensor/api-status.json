@@ -21,5 +21,8 @@
     }
   ],
   "mode": "4sensor",
-  "connected": true
+  "connected": true,
+  "free_heap": 81920,
+  "free_heap_internal": 81920,
+  "free_heap_total": 81920
 }

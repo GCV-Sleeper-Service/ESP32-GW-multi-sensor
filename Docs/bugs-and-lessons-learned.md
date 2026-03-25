@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-25 — v7.5.5.4 (aggregator Playwright tests, skip guards)._
+_Last updated: 2026-03-25 — v7.5.5.5-hotfix (fixture fragility guard, LESSON-OPS-077)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -1203,7 +1203,45 @@ The original validation helper silently normalized MAC addresses inside the call
 
 ## Operational Lessons
 
-### LESSON-OPS-075: Aggregator fixture `live` field must be a JSON object, not a string (2026-03-25)
+### LESSON-OPS-077: api-status.json fixture requires generator-produced free_heap fields — never manually edit (2026-03-25)
+
+**Context:** The root fixture `tests/fixtures/api-status.json` must contain `free_heap`,
+`free_heap_internal`, and `free_heap_total` fields. These fields are produced by
+`render_sensor_config.py --write` (template at line ~1228) and validated by `--check`.
+The variant fixture generator (`generate-fixtures.js`) was missing these fields until
+this fix.
+
+**Failure pattern:** Across PRs #68, #69, #70, #72, and #73, coding agents either
+manually edited `api-status.json` (stripping the fields) or ran `--write` in an
+environment where the output differed from CI expectations. Each occurrence required
+fix-up commits, making this the single most expensive recurring regression in Phase 5.
+
+**Root cause:** Two generators produce `api-status.json` files:
+- `render_sensor_config.py` produces the root fixture — included `free_heap` in template
+- `generate-fixtures.js` produces variant fixtures — did NOT include `free_heap`
+
+When agents ran `generate-fixtures.js --overwrite-baseline`, it would overwrite the root
+fixture without `free_heap`, breaking `--check`. Conversely, when agents manually edited
+the root fixture for version bumps instead of running `--write`, they often dropped fields.
+
+**Fix (v7.5.5.5-hotfix):**
+1. Added `free_heap` fields to `generate-fixtures.js` api-status template
+2. Added preflight guards: `fixture_api_status_has_free_heap`, `_internal`, `_total`
+3. Established Critical Rule 28: version bumps require both generators + verification
+
+**Rule:** NEVER manually edit `tests/fixtures/api-status.json` or any variant fixture.
+Always use the generators:
+```bash
+python3 scripts/render_sensor_config.py --write    # root fixtures
+node tests/fixtures/generate-fixtures.js           # variant fixtures
+python3 scripts/render_sensor_config.py --check    # verify
+grep -q "free_heap" tests/fixtures/api-status.json # sanity check
+```
+
+**Detection:** `render_sensor_config.py --check` fails. Preflight guards
+`fixture_api_status_has_free_heap*` fail.
+
+Related: BUG-062, LESSON-OPS-072
 
 **Context:** The v7.5.5.4 prompt example showed `"live": "{...JSON string...}"` in
 `aggregator-live.json`. This is the actual wire format from the firmware (the satellite's

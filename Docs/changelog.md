@@ -3,6 +3,45 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.5.5-hotfix] — 2026-03-25 — Fixture Fragility Guard
+
+### Problem
+
+The `tests/fixtures/api-status.json` root fixture was missing `free_heap`,
+`free_heap_internal`, and `free_heap_total` fields on main after the v7.5.5.5
+merge. This caused `render_sensor_config.py --check` to fail. The same
+regression occurred across PRs #68, #69, #70, #72, and #73 — making it the
+single most expensive recurring issue in Phase 5.
+
+### Root cause
+
+Two independent fixture generators exist:
+- `render_sensor_config.py` (root fixture) — already included `free_heap` in template
+- `generate-fixtures.js` (variant fixtures) — did NOT include `free_heap`
+
+Agents either manually edited the file (dropping fields) or ran `--write`
+without also running the variant generator, leaving fixtures out of sync.
+
+### Fixes
+
+| Change | File |
+|--------|------|
+| Restored `free_heap` fields in root `api-status.json` | `tests/fixtures/api-status.json` |
+| Added `free_heap` to variant fixture template | `tests/fixtures/generate-fixtures.js` |
+| Regenerated all variant fixtures | `tests/fixtures/variants/*/api-status.json` |
+| Added 3 preflight guards for `free_heap` fields | `scripts/preflight.sh` |
+| Added LESSON-OPS-077 (systemic fixture fragility) | `Docs/bugs-and-lessons-learned.md` |
+| Added Critical Rule 28 (both generators + verify) | `prompts/prompt-index-and-workflow.md` |
+| Added CI/Development Pipeline section | `Docs/aggregator-setup.md` |
+
+### Validation
+
+- `render_sensor_config.py --check`: PASS
+- `preflight.sh`: PASS (including new `free_heap` guards)
+- All variant fixtures at v7.5.5.5 with `free_heap` fields
+- Playwright: 3sensor 97 pass / 18 skip, mixed 7 pass, aggregator 11 pass / 1 skip
+
+---
 ## [v7.5.5.5] — 2026-03-25 — Phase 5 Closure and Documentation
 
 ### Phase 5 Complete ✅
