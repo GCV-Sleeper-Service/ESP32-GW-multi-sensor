@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-25 — v7.5.5.3 hotfix-2 (BUG-068 manifest hardware string, BUG-069 env chart hiding)._
+_Last updated: 2026-03-25 — v7.5.5.4 (aggregator Playwright tests, skip guards)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,32 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-070 — Aggregator fixture `manifest.sensors` format mismatch (2026-03-25)
+
+**Severity:** Test authoring error (caught in development)
+**Introduced in:** v7.5.5.4 initial fixture draft
+**Fixed in:** v7.5.5.4
+
+**Symptoms:** `renderGatewayDevices()` showed "No device data available" despite fixture containing gateway manifest data.
+
+**Root cause:** The `aggregator-gateways.json` fixture used `"devices": {}` (object format) for the nested gateway manifest, but `renderGatewayDevices()` checks `manifest.sensors` (array). The satellite manifest v2 format uses a `sensors` array, not a `devices` object.
+
+**Fix:** Changed `aggregator-gateways.json` fixture to use `"sensors": [...]` array format matching the actual v2 manifest schema.
+
+### BUG-071 — Aggregator `aggregator-live.json` used JSON string for `live` field (2026-03-25)
+
+**Severity:** Test authoring error (caught in development)
+**Introduced in:** v7.5.5.4 initial fixture draft (following prompt example literally)
+**Fixed in:** v7.5.5.4
+
+**Symptoms:** `_populateGatewayDeviceLive()` returned early without populating live values; environmental and network cards stayed in "waiting" state.
+
+**Root cause:** The prompt example showed `"live": "{\"timestamp\":...,\"devices\":{...}}"` (JSON string). The actual code checks `gwLive.live.devices` directly — it does NOT parse a JSON string. A JSON string has `.devices === undefined`, causing the early return guard to trigger.
+
+**Fix:** Changed `aggregator-live.json` fixture to use `"live": { "timestamp": ..., "devices": {...} }` (JSON object, not string).
+
+---
 
 ### BUG-069 — Environmental chart sections visible with no environmental sensors (2026-03-25)
 
@@ -1176,6 +1202,37 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-075: Aggregator fixture `live` field must be a JSON object, not a string (2026-03-25)
+
+**Context:** The v7.5.5.4 prompt example showed `"live": "{...JSON string...}"` in
+`aggregator-live.json`. This is the actual wire format from the firmware (the satellite's
+cached `/api/v2/live` response is stored as a raw string in `SatelliteCache`).
+
+**Rule:** When the mock server serves `aggregator-live.json`, the test sees `gwLive.live`
+as whatever JSON value the file contains. The dashboard's `_populateGatewayDeviceLive()`
+checks `gwLive.live.devices` directly — it does NOT call `JSON.parse()` on the live field.
+Therefore the fixture MUST use a JSON object `{ "devices": {...} }`, not a JSON string.
+
+If the firmware ever changes to ship a pre-parsed object in the aggregator live endpoint,
+this remains correct. If the API changes to ship a string, the fixture and/or code must
+both change together.
+
+**Detection:** Tests 7 and 8 (env + network live values) stay in "—"/waiting state if
+the live field is a string instead of an object.
+
+### LESSON-OPS-076: Aggregator fixture `manifest` block must use `sensors` array (v2 format) (2026-03-25)
+
+**Context:** The v7.5.5.4 prompt example showed `"devices": {}` (object) inside the
+cached gateway manifest in `aggregator-gateways.json`. The satellite manifest v2 format
+uses a `sensors: [...]` array. `renderGatewayDevices()` checks `manifest.sensors` and
+returns "No device data available" if it's absent or empty.
+
+**Rule:** Embedded gateway manifests in `aggregator-gateways.json` must use the standard
+v2 manifest format: `"sensors": [{ "id": ..., "name": ..., "category": ... }]`.
+
+**Detection:** "No device data available" displayed in gateway device view despite fixture
+containing manifest data.
 
 ### LESSON-OPS-074: Aggregator boot must be a superset of satellite boot, never a fork (2026-03-25)
 

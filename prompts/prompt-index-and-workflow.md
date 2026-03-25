@@ -168,7 +168,7 @@ All steps shipped. No prompts needed.
 | v7.5.5.2 | Aggregator API endpoints | `prompts/phase5/v7.5.5.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-24 |
 | v7.5.5.3 | Aggregator dashboard UI + settings panel groundwork | `prompts/phase5/v7.5.5.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-24 |
 | (no bump) | v7.5.5.3 hotfix: BUG-064–067, LESSON-OPS-074 | Manual session (not agent-driven) | ✅ Complete 2026-03-25 |
-| v7.5.5.4 | Aggregator Playwright tests | `prompts/phase5/v7.5.5.4-hotfix-addendum.md` + `v7.5.5.4-implementation-instructions-for-coding-agent-updated.md` | Pending |
+| v7.5.5.4 | Aggregator Playwright tests | `prompts/phase5/v7.5.5.4-hotfix-addendum.md` + `v7.5.5.4-implementation-instructions-for-coding-agent-updated.md` | ✅ Complete 2026-03-25 |
 | v7.5.5.5 | Phase 5 closure | `prompts/phase5/v7.5.5.5-update-notes.md` + `v7.5.5.5-implementation-instructions-for-coding-agent.md` | Pending |
 
 **Phase 5 device testing requirements:**

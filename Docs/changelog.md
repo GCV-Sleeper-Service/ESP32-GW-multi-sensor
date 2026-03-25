@@ -3,6 +3,83 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.5.4] — 2026-03-25 — Aggregator Playwright Tests + Fixtures
+
+### Phase 5 Step 4: Aggregator Test Infrastructure
+
+Added complete Playwright test fixtures and test group for aggregator mode
+verification. No firmware or dashboard source changes in this step.
+
+#### `tests/fixtures/variants/aggregator/`
+
+New fixture variant simulating an aggregator with 2 satellites:
+- `sensors.json` — empty array (pure aggregator, no local env sensors)
+- `manifest.json` — v2 manifest with role=aggregator, hardware=ESP32-S3, 0 sensors
+- `api-status.json` — includes required `free_heap`/`free_heap_internal`/`free_heap_total` fields (BUG-062 prevention)
+- `aggregator-gateways.json` — 2 gateways: gw-main (reachable), gw-garage (unreachable), each with `manifest.sensors` array and `base_url`
+- `aggregator-live.json` — live data from reachable satellite (office env + wan_ping network)
+- `history-gw-main-office-temp.csv` / `history-gw-main-office-hum.csv` — CSV for proxy history route
+- `storage-stats.json` — copied from root baseline
+
+#### Mock server routes extended (`tests/mock-server/server.js`)
+
+Extended existing `/api/aggregator/gateways`, `/api/aggregator/live`, and
+`/api/aggregator/proxy/{gwId}/history/{device}/{metric}` routes to serve fixture
+files when `FIXTURE_SET=aggregator`. Fallback to empty/default responses for all
+other fixture sets (satellite mode). Routes extended, not duplicated.
+
+#### `tests/browser/dashboard.spec.js`
+
+- Added `waitForAggregatorReady(page)` helper — polls `window._aggregatorReady === true`
+- Added Group 19 (Aggregator Mode) with 11 tests covering:
+  - Mode detection (`DASHBOARD_MODE === 'aggregator'`)
+  - Gateway selector visibility and tab count (4)
+  - Offline satellite indicator
+  - All Gateways summary (2 cards)
+  - Per-gateway device cards
+  - Environmental live values (temp=23.4 from fixture)
+  - Network card live values (ping_ms=12.3 from fixture)
+  - Settings panel satellite list (2 cards)
+  - Gateways section separation (BUG-065 regression)
+  - Unified boot — modeLabel present (LESSON-OPS-074)
+- Added satellite fallback test to Group 1 (skip guard for aggregator)
+- Added skip guards to 17 existing tests incompatible with aggregator fixture
+
+#### Existing test skip guards (BUG-051 prevention)
+
+Skip guards added (FIXTURE_SET=aggregator) to the following tests, referencing
+the specific incompatibility:
+
+| Test | Reason |
+|------|--------|
+| 1. version string in DOM | #modeLabel in #c3DescriptionBlock, hidden by updateBoardInfo() for ESP32-S3 |
+| 2. four sensor cards | DEFAULT_SENSOR_META fallback yields 3 env-only (no wan_ping) |
+| 9. manifest sensors array | manifest.sensors is [] (0 local sensors) |
+| 9. manifest gateway block | gateway.role=aggregator (not satellite) |
+| 9. manifest metrics array | metrics is [] (no env sensors) |
+| 11. env renderer dispatches | card count 4 is satellite-specific |
+| 14. scenario 1 source check | DEFAULT_SENSOR_META fallback yields source=auto-promoted |
+| 14. scenario 4 env dispatcher | expectedSensorCount(4) is satellite-specific |
+| 15. legacy /sensors.json | sensors.json is [] for aggregator; length > 0 fails |
+| 15. dashboard renders identically | 4 cards + wan_ping are satellite-specific |
+| 16. /api/manifest fetched once | aggregator calls it twice (loadManifestV2 + loadSensorManifest) |
+| 17. network card renders | no wan_ping in DEFAULT_SENSOR_META |
+| 17. net-ping-wan_ping element | element absent (no wan_ping in local sensors) |
+| 17. net-success-wan_ping element | same |
+| 17. net-target-wan_ping element | same |
+| 17. SENSORS includes wan_ping | DEFAULT_SENSOR_META has no wan_ping |
+| 17. updateNetworkCards ping values | #net-ping-wan_ping absent |
+| manifest.spec.js: api manifest metadata | sensor_count=0, role=aggregator |
+| manifest.spec.js: dashboard boots from manifest | DEFAULT_SENSOR_META fallback, not 4 sensors |
+| sensor-count.spec.js: card count matches manifest | manifest.length=0, cards=3 mismatch |
+| sensor-count.spec.js: export buttons match manifest | same |
+
+#### CI matrix (`browser-tests.yml`)
+
+Added `aggregator` to `fixture_set` matrix. New CI step runs
+`--grep "19\. Aggregator Mode"`. Aggregator excluded from sensor-count smoke step.
+
+---
 ## [v7.5.5.3-hotfix-2] — 2026-03-25 — Manifest Hardware String + Environmental Chart Hiding
 
 ### BUG-068: Board-aware manifest hardware string
