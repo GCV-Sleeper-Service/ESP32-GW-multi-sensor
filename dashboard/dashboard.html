@@ -463,6 +463,35 @@
       .gateway-mini-grid, .compact-grid, .storage-grid-wide { grid-template-columns:1fr; }
       .footer { gap:8px; flex-direction:column; align-items:flex-start; }
     }
+
+    /* ── Aggregator mode UI (v7.5.5.3) ─────────────────────────────── */
+    .gw-selector { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; overflow-x:auto; padding:4px 0; }
+    .gw-tab { font-family:'JetBrains Mono',monospace; font-size:.72rem; padding:5px 14px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all .15s; white-space:nowrap; }
+    .gw-tab:hover { border-color:#666; color:var(--text-secondary); }
+    .gw-tab.active { background:rgba(96,165,250,.14); color:#60a5fa; border-color:rgba(96,165,250,.4); }
+    .gw-tab.gw-offline { border-color:rgba(248,113,113,.4); color:#f87171; }
+    .gw-tab.gw-online { border-color:rgba(52,211,153,.3); }
+    .gw-settings-tab { margin-left:auto; }
+    .gw-summary-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:10px; }
+    .gw-summary-card.gw-stale { opacity:.65; border-color:rgba(248,113,113,.35); }
+    .gw-summary-header { font-family:'JetBrains Mono',monospace; font-size:.82rem; font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .gw-summary-id { color:var(--text-muted); font-weight:400; font-size:.72rem; }
+    .gw-summary-details { font-family:'JetBrains Mono',monospace; font-size:.72rem; color:var(--text-secondary); display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; }
+    .gw-detail-label { color:var(--text-muted); }
+    .gw-status-online { color:#34d399; }
+    .gw-status-offline { color:#f87171; }
+    .gw-stale-overlay { grid-column:1/-1; color:#f87171; font-style:italic; }
+    .settings-panel { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:18px; }
+    .settings-title { font-family:'JetBrains Mono',monospace; font-size:.9rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; }
+    .settings-subtitle { font-family:'JetBrains Mono',monospace; font-size:.72rem; color:var(--text-muted); margin-bottom:16px; }
+    .settings-satellite-card { background:rgba(255,255,255,.02); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:10px; }
+    .settings-sat-header { font-family:'JetBrains Mono',monospace; font-size:.82rem; font-weight:600; color:var(--text-secondary); margin-bottom:8px; }
+    .settings-sat-id { color:var(--text-muted); font-weight:400; }
+    .settings-sat-details { font-family:'JetBrains Mono',monospace; font-size:.72rem; color:var(--text-secondary); display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; }
+    .settings-sat-details code { color:#60a5fa; }
+    :root.light .gw-tab { background:transparent; color:var(--text-muted); }
+    :root.light .gw-tab.active { background:rgba(37,99,235,.1); color:#2563eb; border-color:rgba(37,99,235,.4); }
+    :root.light .settings-satellite-card { background:rgba(0,0,0,.02); }
   </style>
 </head>
 <body>
@@ -591,7 +620,7 @@
             </div>
             <div class="collapse-body" id="body-devinfo">
               <div class="device-info-inner">
-                <div class="device-photo-wrap">
+                <div class="device-photo-wrap" id="pinoutDiagram">
                   <!-- Vectorized ESP32-C3 SuperMini SVG -->
                   <svg viewBox="130 210 600 640" width="138" height="176" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" style="border-radius:6px;background:#c8cbd0">
                     <rect x="208" y="268" width="450" height="563" rx="4" fill="#181818"/>
@@ -916,7 +945,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.5.2';
+App.version = 'v7.5.5.3';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -1007,6 +1036,11 @@ var chartsReady = false;
 // Must exist before App.State initializes, or early script execution fails
 // and the dashboard can appear stuck on the static 'connecting...' shell.
 var SENSORS = [];
+
+// ── Aggregator mode flag ────────────────────────────────────────
+// Set by detectAggregatorMode() at boot. 'satellite' (default) = normal satellite
+// dashboard. 'aggregator' = multi-gateway aggregator UI.
+var DASHBOARD_MODE = 'satellite'; // 'satellite' | 'aggregator'
 
 // ── App.State implementation (Phase 1 write chokepoints) ───────
 (function(api) {
@@ -1286,11 +1320,14 @@ function buildNormalizedSensorRows(tempText, humText) {
 function fetchDeviceHistory(sensor, manifest) {
   var historyMeasurements = [];
 
+  // Use _deviceId (original manifest ID) when available — sensor.id may be namespaced in aggregator mode.
+  var lookupId = sensor._deviceId || sensor.id;
+
   // Manifest-driven: look up this sensor's measurements and their history URLs
   if (manifest && manifest.sensors) {
     var manifestDevice = null;
     for (var i = 0; i < manifest.sensors.length; i++) {
-      if (manifest.sensors[i].id === sensor.id) { manifestDevice = manifest.sensors[i]; break; }
+      if (manifest.sensors[i].id === lookupId) { manifestDevice = manifest.sensors[i]; break; }
     }
     if (manifestDevice && manifestDevice.measurements) {
       manifestDevice.measurements.forEach(function(m) {
@@ -1302,10 +1339,14 @@ function fetchDeviceHistory(sensor, manifest) {
         }
         // Only include measurements that have history + chart enabled
         if (metricDef && metricDef.history && metricDef.display && metricDef.display.chart) {
-          historyMeasurements.push({
-            key: m.key,
-            url: m.history_url || ('/history/' + sensor.id + '/' + (metricDef.history_suffix || m.key))
-          });
+          var url;
+          if (sensor._gwId) {
+            // Aggregator mode: route history through the proxy endpoint
+            url = '/api/aggregator/proxy/' + sensor._gwId + '/history/' + lookupId + '/' + m.key;
+          } else {
+            url = m.history_url || ('/history/' + lookupId + '/' + (metricDef.history_suffix || m.key));
+          }
+          historyMeasurements.push({ key: m.key, url: url });
         }
       });
     }
@@ -1313,10 +1354,18 @@ function fetchDeviceHistory(sensor, manifest) {
 
   // Fallback: if no manifest data available, use legacy temp/hum paths
   if (historyMeasurements.length === 0) {
-    historyMeasurements = [
-      { key: 'temp', url: '/history/' + sensor.id + '/temp' },
-      { key: 'hum',  url: '/history/' + sensor.id + '/hum'  }
-    ];
+    if (sensor._gwId) {
+      // Aggregator fallback: proxy the standard history metrics
+      historyMeasurements = [
+        { key: 'temp', url: '/api/aggregator/proxy/' + sensor._gwId + '/history/' + lookupId + '/temp' },
+        { key: 'hum',  url: '/api/aggregator/proxy/' + sensor._gwId + '/history/' + lookupId + '/hum'  }
+      ];
+    } else {
+      historyMeasurements = [
+        { key: 'temp', url: '/history/' + lookupId + '/temp' },
+        { key: 'hum',  url: '/history/' + lookupId + '/hum'  }
+      ];
+    }
   }
 
   // BUG-043-cont Fix 2: fetch metrics sequentially with a 300ms gap between requests.
@@ -1655,6 +1704,7 @@ var lastAvgEpoch = {}, eventCount = 0, pollAvgLast = {};
 
 function esc(s) { return s.replace(/[^a-zA-Z0-9]/g, '_'); }
 function escAttr(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function cToF(c) { return c * 9 / 5 + 32; }
 function pad2(v) { return String(v).padStart(2, '0'); }
 function formatUtcForExport(epoch) {
@@ -3342,10 +3392,12 @@ function buildEnvironmentalCard(s, manifest) {
 }
 
 function buildNetworkCard(s, manifest) {
-  // Find source.target from manifest for display
+  // Find source.target from manifest for display.
+  // Use _deviceId (original manifest ID) when available — s.id may be namespaced in aggregator mode.
+  var lookupId = s._deviceId || s.id;
   var target = '\u2014';
   if (manifest && manifest.sensors) {
-    var entry = manifest.sensors.find(function(ms) { return ms.id === s.id; });
+    var entry = manifest.sensors.find(function(ms) { return ms.id === lookupId; });
     if (entry && entry.source && entry.source.target) target = entry.source.target;
   }
   return (
@@ -4047,84 +4099,415 @@ App.Features.register({
 });
 */
 
+// ── Aggregator mode detection and UI (v7.5.5.3) ──────────────────
+// detectAggregatorMode() probes /api/aggregator/gateways at runtime.
+// On satellites the endpoint returns 404 (fast fail). On aggregators it
+// returns the gateway list. The same dashboard.html is served by both.
+
+async function detectAggregatorMode() {
+  try {
+    var r = await fetch(ESP_HOST + '/api/aggregator/gateways', {cache: 'no-store'});
+    if (r.ok) {
+      var data = await r.json();
+      if (data && Array.isArray(data.gateways) && data.gateways.length > 0) {
+        DASHBOARD_MODE = 'aggregator';
+        window._aggregatorGateways = data.gateways;
+        return true;
+      }
+    }
+  } catch(e) { /* not aggregator — satellite mode */ }
+  return false;
+}
+
+function renderGatewaySelector(gateways) {
+  var container = document.getElementById('sensorGrid');
+  var selectorHtml = '<div id="gwSelector" class="gw-selector">' +
+    '<button class="gw-tab active" data-gw="all">All Gateways</button>';
+  gateways.forEach(function(gw) {
+    var statusClass = gw.reachable ? 'gw-online' : 'gw-offline';
+    // escAttr for attribute value; escHtml for button text content
+    selectorHtml += '<button class="gw-tab ' + statusClass + '" data-gw="' + escAttr(gw.id) + '">' +
+      escHtml(gw.name) + '</button>';
+  });
+  // Settings tab — always last
+  selectorHtml += '<button class="gw-tab gw-settings-tab" data-gw="settings">&#9881; Settings</button>';
+  selectorHtml += '</div>';
+  container.insertAdjacentHTML('beforebegin', selectorHtml);
+  // Use programmatic event binding (App.State.get/set pattern, not inline onclick)
+  document.querySelectorAll('.gw-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      document.querySelectorAll('.gw-tab').forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      var gwId = tab.getAttribute('data-gw');
+      if (gwId === 'all') {
+        _currentGwId = null; _currentGwSensors = null;
+        renderAllGatewaysSummary(window._aggregatorGateways);
+      } else if (gwId === 'settings') {
+        _currentGwId = null; _currentGwSensors = null;
+        renderSettingsPanel(window._aggregatorGateways);
+      } else {
+        renderGatewayDevices(gwId);
+      }
+    });
+  });
+}
+
+function renderAllGatewaysSummary(gateways) {
+  var grid = document.getElementById('sensorGrid');
+  grid.innerHTML = '';
+  if (!gateways || gateways.length === 0) {
+    grid.innerHTML = '<div class="gw-summary-card">No satellites configured.</div>';
+    return;
+  }
+  var html = '';
+  gateways.forEach(function(gw) {
+    var statusClass = gw.reachable ? 'gw-status-online' : 'gw-status-offline';
+    var statusText = gw.reachable ? '&#127002; Online' : '&#128308; Unreachable';
+    var lastSeenStr = gw.last_seen ? new Date(gw.last_seen * 1000).toLocaleString() : '\u2014';
+    var fwVersion = gw.firmware_version || '\u2014';
+    var deviceCount = (gw.sensor_count !== undefined) ? gw.sensor_count :
+      (gw.device_count !== undefined ? gw.device_count : '\u2014');
+    html += '<div class="gw-summary-card' + (gw.reachable ? '' : ' gw-stale') + '">';
+    html += '<div class="gw-summary-header"><span class="' + statusClass + '">' + statusText + '</span>' +
+      ' <strong>' + escHtml(gw.name) + '</strong>' +
+      ' <span class="gw-summary-id">(' + escHtml(gw.id) + ')</span></div>';
+    html += '<div class="gw-summary-details">';
+    html += '<div><span class="gw-detail-label">Last seen:</span> ' + escHtml(lastSeenStr) + '</div>';
+    html += '<div><span class="gw-detail-label">Firmware:</span> ' + escHtml(fwVersion) + '</div>';
+    html += '<div><span class="gw-detail-label">Devices:</span> ' + escHtml(String(deviceCount)) + '</div>';
+    if (!gw.reachable) html += '<div class="gw-stale-overlay">Unreachable</div>';
+    html += '</div>';
+    html += '</div>';
+  });
+  grid.innerHTML = html;
+}
+
+function renderGatewayDevices(gwId) {
+  var gw = null;
+  if (window._aggregatorGateways) {
+    for (var i = 0; i < window._aggregatorGateways.length; i++) {
+      if (window._aggregatorGateways[i].id === gwId) { gw = window._aggregatorGateways[i]; break; }
+    }
+  }
+  var grid = document.getElementById('sensorGrid');
+  grid.innerHTML = '';
+  if (!gw) {
+    grid.innerHTML = '<div class="gw-summary-card gw-stale"><div>Gateway not found: ' + escHtml(gwId) + '</div></div>';
+    return;
+  }
+  if (!gw.reachable) {
+    var lastSeenStr = gw.last_seen ? new Date(gw.last_seen * 1000).toLocaleString() : 'unknown';
+    grid.innerHTML = '<div class="gw-summary-card gw-stale">' +
+      '<div class="gw-status-offline">&#128308; Unreachable</div>' +
+      '<div>Last seen: ' + escHtml(lastSeenStr) + '</div></div>';
+    return;
+  }
+  // Parse manifest if available from /api/aggregator/gateways response
+  var manifest = null;
+  if (gw.manifest) {
+    try { manifest = (typeof gw.manifest === 'string') ? JSON.parse(gw.manifest) : gw.manifest; } catch(e) {}
+  }
+  if (!manifest || !manifest.sensors || manifest.sensors.length === 0) {
+    grid.innerHTML = '<div class="gw-summary-card"><div>No device data available for <strong>' +
+      escHtml(gw.name) + '</strong>. Manifest not yet cached.</div></div>';
+    return;
+  }
+  // Build sensor configs with namespaced IDs and render cards using existing CARD_RENDERERS
+  var gwSensors = [];
+  manifest.sensors.forEach(function(s, idx) {
+    var cat = s.category || 'environmental';
+    var nsId = gwId + '.' + s.id; // namespaced: avoids cross-gateway ID collisions
+    // cfg.id is namespaced (for DOM element IDs); _deviceId is the original id (for API calls)
+    var meta = { id: nsId, name: s.name, category: cat };
+    var cfg;
+    if (cat === 'environmental') {
+      cfg = makeSensorConfig(meta, idx);
+    } else {
+      cfg = makeNetworkSensorConfig(meta, idx); // network, system, and unknown categories
+    }
+    // Store originals for proxy history routing and API lookups
+    cfg._gwId = gwId;
+    cfg._deviceId = s.id;
+    cfg._namespacedId = nsId; // kept for clarity
+    gwSensors.push({ cfg: cfg, entry: s });
+  });
+  var html = '';
+  gwSensors.forEach(function(item) {
+    var s = item.cfg;
+    var cat = s.category || 'environmental';
+    var renderer = CARD_RENDERERS[cat] || CARD_RENDERERS._default;
+    html += renderer(s, manifest);
+  });
+  grid.innerHTML = html;
+  // Track current per-gateway view for pollAggregatorLive refresh (fix 2b)
+  _currentGwId = gwId;
+  _currentGwSensors = gwSensors;
+  // Populate live values from /api/aggregator/live (in-flight guarded separately)
+  _populateGatewayDeviceLive(gwId, gwSensors);
+}
+
+// Current per-gateway view state (for pollAggregatorLive to refresh)
+var _currentGwId = null;
+var _currentGwSensors = null;
+
+var _aggDeviceLiveInFlight = false;
+function _populateGatewayDeviceLive(gwId, gwSensors) {
+  if (_aggDeviceLiveInFlight) return;
+  _aggDeviceLiveInFlight = true;
+  fetch(ESP_HOST + '/api/aggregator/live', {cache: 'no-store'})
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(data) {
+      if (!data || !data.gateways || !data.gateways[gwId]) return;
+      var gwLive = data.gateways[gwId];
+      if (!gwLive.reachable || !gwLive.live || !gwLive.live.devices) return;
+      var devices = gwLive.live.devices;
+      gwSensors.forEach(function(item) {
+        var s = item.cfg;
+        var deviceId = s._deviceId;
+        var devData = devices[deviceId];
+        if (!devData) return;
+        var cat = s.category || 'environmental';
+        if (cat === 'environmental') {
+          // Temperature (raw float → format with unit)
+          if (devData.temp !== undefined && devData.temp !== null) {
+            var tempEl = document.getElementById('val-' + esc(s.tempId));
+            if (tempEl) {
+              var tC = devData.temp;
+              sensorCurrentTemp[s.id] = tC;
+              tempEl.textContent = formatMetricValue('temperature', tC, getMetricDef('temp'));
+              tempEl.classList.remove('waiting');
+            }
+          }
+          // Humidity
+          if (devData.hum !== undefined && devData.hum !== null) {
+            var humEl = document.getElementById('val-' + esc(s.humId));
+            if (humEl) {
+              var hV = devData.hum;
+              sensorCurrentHum[s.id] = hV;
+              humEl.textContent = formatMetricValue('humidity', hV, getMetricDef('hum'));
+              humEl.classList.remove('waiting');
+            }
+          }
+          // Derived values (dew point and comfort) once both temp and hum are available
+          if (sensorCurrentTemp[s.id] !== undefined && sensorCurrentHum[s.id] !== undefined) {
+            updateDewPoint(s.id);
+            updateComfortLevel(s.id);
+          }
+          // Battery
+          if (devData.batt !== undefined && devData.batt !== null) {
+            updateBattery(s, String(devData.batt));
+          }
+          // Last seen
+          var seenEl = document.getElementById('time-' + s.id);
+          if (seenEl && devData.last_seen) {
+            var d = new Date(devData.last_seen * 1000);
+            seenEl.textContent = 'last: ' + d.toLocaleTimeString([], {hour12:false});
+          }
+        } else if (cat === 'network') {
+          var pingEl = document.getElementById('net-ping-' + s.id);
+          if (pingEl && devData.ping_ms !== undefined && devData.ping_ms !== null) {
+            pingEl.textContent = METRIC_FORMATTERS.ping_latency(devData.ping_ms);
+            pingEl.classList.remove('waiting');
+          }
+          var successEl = document.getElementById('net-success-' + s.id);
+          if (successEl && devData.success_pct !== undefined && devData.success_pct !== null) {
+            successEl.textContent = METRIC_FORMATTERS.success_rate(devData.success_pct);
+            successEl.classList.remove('waiting');
+          }
+          var seenEl = document.getElementById('net-lastseen-' + s.id);
+          if (seenEl && devData.last_seen) {
+            var d = new Date(devData.last_seen * 1000);
+            seenEl.textContent = 'last: ' + d.toLocaleTimeString([], {hour12:false});
+          }
+        }
+      });
+    })
+    .catch(function() { /* silent */ })
+    .finally(function() { _aggDeviceLiveInFlight = false; });
+}
+
+function renderSettingsPanel(gateways) {
+  var grid = document.getElementById('sensorGrid');
+  grid.innerHTML = '';
+  var html = '<div class="settings-panel">';
+  html += '<h3 class="settings-title">Satellite Configuration</h3>';
+  html += '<p class="settings-subtitle">Configured satellites (read-only \u2014 runtime management coming in a future update)</p>';
+  gateways.forEach(function(gw) {
+    var statusDot = gw.reachable ? '\uD83D\uDFE2' : '\uD83D\uDD34';
+    var fwVersion = '\u2014';
+    var deviceCount = '\u2014';
+    if (gw.firmware_version) fwVersion = gw.firmware_version;
+    if (gw.device_count !== undefined) deviceCount = gw.device_count;
+    else if (gw.sensor_count !== undefined) deviceCount = gw.sensor_count;
+    html += '<div class="settings-satellite-card">';
+    html += '<div class="settings-sat-header">' + statusDot + ' ' + escHtml(gw.name) +
+      ' <span class="settings-sat-id">(' + escHtml(gw.id) + ')</span></div>';
+    html += '<div class="settings-sat-details">';
+    html += '<div>URL: <code>' + escHtml(gw.base_url || '\u2014') + '</code></div>';
+    html += '<div>Firmware: ' + escHtml(fwVersion) + '</div>';
+    html += '<div>Devices: ' + escHtml(String(deviceCount)) + '</div>';
+    html += '<div>Status: ' + (gw.reachable ? 'Online' : 'Unreachable') + '</div>';
+    html += '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  grid.innerHTML = html;
+}
+
+async function initAggregatorDashboard() {
+  renderGatewaySelector(window._aggregatorGateways);
+  // Render "All Gateways" as the default active view
+  renderAllGatewaysSummary(window._aggregatorGateways);
+  // Start periodic aggregator polling — 15s interval, in-flight guarded
+  setInterval(pollAggregatorLive, 15000);
+  pollAggregatorLive();
+  // Signal for Playwright test infrastructure (v7.5.5.4 will use this)
+  window._aggregatorReady = true;
+}
+
+var _aggLiveInFlight = false;
+function pollAggregatorLive() {
+  if (_aggLiveInFlight) return;
+  _aggLiveInFlight = true;
+  fetch(ESP_HOST + '/api/aggregator/gateways', {cache: 'no-store'})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data && data.gateways) {
+        window._aggregatorGateways = data.gateways;
+        // Update gateway selector tab status indicators
+        data.gateways.forEach(function(gw) {
+          var tab = document.querySelector('.gw-tab[data-gw="' + gw.id + '"]');
+          if (tab) {
+            tab.classList.toggle('gw-online', !!gw.reachable);
+            tab.classList.toggle('gw-offline', !gw.reachable);
+          }
+        });
+        var activeTab = document.querySelector('.gw-tab.active');
+        if (activeTab) {
+          var gwId = activeTab.getAttribute('data-gw');
+          if (gwId === 'all') renderAllGatewaysSummary(data.gateways);
+          else if (gwId === 'settings') renderSettingsPanel(data.gateways);
+          else if (gwId && _currentGwId === gwId && _currentGwSensors) {
+            // Refresh live values for the currently displayed per-gateway device view
+            _populateGatewayDeviceLive(gwId, _currentGwSensors);
+          }
+        }
+      }
+    })
+    .catch(function() { /* silent */ })
+    .finally(function() { _aggLiveInFlight = false; });
+}
+
+function updateBoardInfo() {
+  var manifest = window._manifest;
+  if (!manifest || !manifest.gateway) return;
+  var hw = manifest.gateway.hardware || '';
+  // Hide C3 pinout on non-C3 boards (SVG is C3-specific)
+  var pinout = document.getElementById('pinoutDiagram');
+  if (pinout && hw.indexOf('C3') === -1) {
+    pinout.style.display = 'none';
+  }
+}
+
 // ── Boot entrypoint (exported for testing) ─────────────────────
 App.Boot.start = function() {
   var modeStr = TRANSPORT === 'sse' ? (ESP_HOST === '' ? 'HOSTED' : 'SSE') : 'POLLING';
   document.getElementById('modeLabel').textContent = '[' + modeStr + ' mode]';
-  // v7.5.3.0: sequence manifest v2 load before sensor manifest load
-  // to ensure window._manifest is available when buildDeviceCards() runs
-  loadManifestV2().then(function(manifest) {
-    window._manifest = manifest;
-    dlog('[manifest] v2 manifest stored (source: ' + (manifest.source || 'unknown') + ')', 'ok');
-  }).catch(function(e) {
-    dlog('[manifest] loadManifestV2 failed: ' + e.message, 'err');
-    window._manifest = null;
-  }).then(function() {
-    // BUG-043-cont Fix 1: if v2 manifest already has sensor data, skip the second
-    // /api/manifest fetch that loadSensorManifest() would issue. Fall back to
-    // loadSensorManifest() only when the v2 manifest returned no sensor entries.
-    if (window._manifest && window._manifest.sensors && window._manifest.sensors.length) {
-      var meta = normalizeManifestSensors(window._manifest);
-      applySensorMeta(meta);
-      dlog('[manifest] Sensors loaded from v2 manifest cache (' + meta.length + ' sensors, no second fetch)', 'ok');
-      return Promise.resolve();
-    }
-    return loadSensorManifest();
-  }).then(function() {
-    dlog('init - ' + SENSORS.length + ' sensors, transport=' + TRANSPORT + ', host=' + (ESP_HOST || '(same-origin)'));
-    buildSensorCards();
-    try { initCharts(); setHistoryRange(24); } catch(e) { dlog('initCharts: ' + e.message, 'err'); showError('Chart init failed'); }
-    // BUG-037: Startup request staggering — spread non-critical requests across 5s
-    // to avoid overwhelming the ESP32-C3 HTTP server (~4-7 concurrent connections).
-    // See Docs/dashboard-stability-remediation-plan.md for full rationale.
-
-    // v7.5.4.2: Start /api/v2/live polling for network card live data updates.
-    // Network devices do not appear in SSE state events, so a periodic poll is needed.
-    setInterval(pollV2Live, 15000);
-    pollV2Live(); // initial fetch
-
-    // BUG-043-cont (PR2) Fix A: In SSE mode, start the event stream first, then defer the
-    // status snapshot ~2s. SSE 'state' events already carry initial live state so an
-    // immediate /api/status call is unnecessary and adds pressure during the fragile
-    // connection-open window. Polling mode is unchanged — startPolling() handles its
-    // own status fetch after the deferred sequential initial poll completes.
-    if (TRANSPORT === 'sse') {
-      try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); }
-      setTimeout(function() { loadStatusSnapshot().catch(function(){}); }, 2000);
+  detectAggregatorMode().then(function(isAggregator) {
+    if (isAggregator) {
+      // Aggregator boot path: load manifest and init aggregator UI.
+      // Local device cards are NOT rendered here — they have no live update mechanism
+      // in aggregator mode (no SSE/polling started). Satellite devices are shown via
+      // the gateway selector + renderGatewayDevices(). See review finding 2c.
+      loadManifestV2().then(function(manifest) {
+        window._manifest = manifest;
+        dlog('[manifest] v2 manifest stored (source: ' + (manifest.source || 'unknown') + ')', 'ok');
+      }).catch(function(e) {
+        dlog('[manifest] loadManifestV2 failed: ' + e.message, 'err');
+        window._manifest = null;
+      }).then(function() {
+        updateBoardInfo();
+        return initAggregatorDashboard();
+      });
     } else {
-      try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); }
+      // Satellite boot path — UNCHANGED (v7.5.5.3: +updateBoardInfo() per Part D)
+      // v7.5.3.0: sequence manifest v2 load before sensor manifest load
+      // to ensure window._manifest is available when buildDeviceCards() runs
+      loadManifestV2().then(function(manifest) {
+        window._manifest = manifest;
+        dlog('[manifest] v2 manifest stored (source: ' + (manifest.source || 'unknown') + ')', 'ok');
+      }).catch(function(e) {
+        dlog('[manifest] loadManifestV2 failed: ' + e.message, 'err');
+        window._manifest = null;
+      }).then(function() {
+        // BUG-043-cont Fix 1: if v2 manifest already has sensor data, skip the second
+        // /api/manifest fetch that loadSensorManifest() would issue. Fall back to
+        // loadSensorManifest() only when the v2 manifest returned no sensor entries.
+        if (window._manifest && window._manifest.sensors && window._manifest.sensors.length) {
+          var meta = normalizeManifestSensors(window._manifest);
+          applySensorMeta(meta);
+          dlog('[manifest] Sensors loaded from v2 manifest cache (' + meta.length + ' sensors, no second fetch)', 'ok');
+          return Promise.resolve();
+        }
+        return loadSensorManifest();
+      }).then(function() {
+        updateBoardInfo();
+        dlog('init - ' + SENSORS.length + ' sensors, transport=' + TRANSPORT + ', host=' + (ESP_HOST || '(same-origin)'));
+        buildSensorCards();
+        try { initCharts(); setHistoryRange(24); } catch(e) { dlog('initCharts: ' + e.message, 'err'); showError('Chart init failed'); }
+        // BUG-037: Startup request staggering — spread non-critical requests across 5s
+        // to avoid overwhelming the ESP32-C3 HTTP server (~4-7 concurrent connections).
+        // See Docs/dashboard-stability-remediation-plan.md for full rationale.
+
+        // v7.5.4.2: Start /api/v2/live polling for network card live data updates.
+        // Network devices do not appear in SSE state events, so a periodic poll is needed.
+        setInterval(pollV2Live, 15000);
+        pollV2Live(); // initial fetch
+
+        // BUG-043-cont (PR2) Fix A: In SSE mode, start the event stream first, then defer the
+        // status snapshot ~2s. SSE 'state' events already carry initial live state so an
+        // immediate /api/status call is unnecessary and adds pressure during the fragile
+        // connection-open window. Polling mode is unchanged — startPolling() handles its
+        // own status fetch after the deferred sequential initial poll completes.
+        if (TRANSPORT === 'sse') {
+          try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); }
+          setTimeout(function() { loadStatusSnapshot().catch(function(){}); }, 2000);
+        } else {
+          try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); }
+        }
+
+        // BUG-043-cont (PR2) Fix D: Defer storage stats from 3s to 5s — reduces overlap with
+        // the sequential initial poll (which now takes ~7-8s at batch=1, 200ms gap).
+        setTimeout(function() {
+          if (isImportActive()) return;
+          loadStorageStats().catch(function(){});
+          // BUG-037 Fix 8: storage stats interval increased from 60s to 120s
+          // (storage stats change only on NVS persist cycles, roughly every 60 minutes)
+          storageStatsIntervalId = setInterval(function() {
+            if (isImportActive()) return;
+            loadStorageStats().catch(function(){});
+          }, 120000);
+        }, 5000);
+
+        // BUG-037 Fix 5: 30s status interval only in polling mode — in SSE mode,
+        // state is delivered via SSE events, so periodic /api/status polling is unnecessary
+        if (TRANSPORT !== 'sse') {
+          statusSnapshotIntervalId = setInterval(function() {
+            if (isImportActive()) return;
+            loadStatusSnapshot().catch(function(){});
+          }, 30000);
+        }
+
+        // BUG-043-cont (PR2) Fix E: History deferred from 8s to 10s — the sequential initial
+        // poll (batch=1, 200ms gap, ~30 paths) takes roughly 7-8s on a loaded device. Adding
+        // 2s headroom prevents NVS-heavy history scans from overlapping with poll tail or
+        // storage stats (t+5s), keeping the startup window clean.
+        historyBootstrapTimerId = setTimeout(function() {
+          if (isImportActive()) return;
+          loadHistory();
+        }, 10000);
+      });
     }
-
-    // BUG-043-cont (PR2) Fix D: Defer storage stats from 3s to 5s — reduces overlap with
-    // the sequential initial poll (which now takes ~7-8s at batch=1, 200ms gap).
-    setTimeout(function() {
-      if (isImportActive()) return;
-      loadStorageStats().catch(function(){});
-      // BUG-037 Fix 8: storage stats interval increased from 60s to 120s
-      // (storage stats change only on NVS persist cycles, roughly every 60 minutes)
-      storageStatsIntervalId = setInterval(function() {
-        if (isImportActive()) return;
-        loadStorageStats().catch(function(){});
-      }, 120000);
-    }, 5000);
-
-    // BUG-037 Fix 5: 30s status interval only in polling mode — in SSE mode,
-    // state is delivered via SSE events, so periodic /api/status polling is unnecessary
-    if (TRANSPORT !== 'sse') {
-      statusSnapshotIntervalId = setInterval(function() {
-        if (isImportActive()) return;
-        loadStatusSnapshot().catch(function(){});
-      }, 30000);
-    }
-
-    // BUG-043-cont (PR2) Fix E: History deferred from 8s to 10s — the sequential initial
-    // poll (batch=1, 200ms gap, ~30 paths) takes roughly 7-8s on a loaded device. Adding
-    // 2s headroom prevents NVS-heavy history scans from overlapping with poll tail or
-    // storage stats (t+5s), keeping the startup window clean.
-    historyBootstrapTimerId = setTimeout(function() {
-      if (isImportActive()) return;
-      loadHistory();
-    }, 10000);
   });
 };
 

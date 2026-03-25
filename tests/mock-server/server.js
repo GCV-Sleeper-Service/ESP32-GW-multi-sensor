@@ -227,6 +227,20 @@ const server = http.createServer(function(req, res) {
     return json(res, { ok: true, stub: true, accepted: 0, rejected: 0, segments_written: 0 });
   }
 
+  // Aggregator endpoints — return empty gateways in satellite fixture sets (no 404
+  // to avoid browser console errors in tests). detectAggregatorMode() handles empty
+  // gateways list as satellite mode. In aggregator mode (FIXTURE_SET=aggregator),
+  // these would return real gateway data.
+  if (pathname === '/api/aggregator/gateways') {
+    return json(res, { gateways: [] });
+  }
+  if (pathname === '/api/aggregator/live') {
+    return json(res, { timestamp: Math.floor(Date.now() / 1000), gateways: {} });
+  }
+  if (pathname.startsWith('/api/aggregator/proxy/')) {
+    return notFound(res, pathname);
+  }
+
   notFound(res, pathname);
 });
 

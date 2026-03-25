@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.5.2.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.5.3.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -471,7 +471,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.5.2) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.5.3) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //
@@ -1707,8 +1707,18 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (strncmp(p, "/api/import/d/", 14) == 0) return true;
       if (strncmp(p, "/api/import/w/", 14) == 0) return true;
       if (strcmp(p, "/api/import/finish") == 0) return true;
+#if AGGREGATOR_ENABLED
+      if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) return true;
+      if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) return true;
+#endif
       return false;
     }
+
+#if AGGREGATOR_ENABLED
+    if (request->method() == HTTP_DELETE) {
+      if (strncmp(p, "/api/aggregator/satellite/", 26) == 0) return true;
+    }
+#endif
 
     return false;
   }
@@ -1758,10 +1768,30 @@ class HistoryWebHandler : public AsyncWebHandler {
         handle_import_finish_(request);
         return;
       }
+#if AGGREGATOR_ENABLED
+      if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) {
+        handle_aggregator_stub_501_(request);
+        return;
+      }
+      if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) {
+        handle_aggregator_stub_501_(request);
+        return;
+      }
+#endif
       request->send(404);
       return;
     }
 
+#if AGGREGATOR_ENABLED
+    if (request->method() == HTTP_DELETE) {
+      if (strncmp(p, "/api/aggregator/satellite/", 26) == 0) {
+        handle_aggregator_stub_501_(request);
+        return;
+      }
+      request->send(404);
+      return;
+    }
+#endif
     if (strcmp(p, "/favicon.ico") == 0) {
       request->send(204);
       return;
@@ -2922,8 +2952,13 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
     // LESSON-OPS-056: pre-reserve string to avoid reallocation
+    // Manifest JSON can be up to 4096 bytes per satellite; account for it in the reserve.
     std::string out;
-    out.reserve(MAX_SATELLITES * 512 + 32);
+    size_t reserve_size = 32;
+    for (int ri = 0; ri < MAX_SATELLITES; ri++) {
+      reserve_size += 512 + satellite_caches[ri].manifest_len;
+    }
+    out.reserve(reserve_size);
     out += "{\"gateways\":[";
     for (int i = 0; i < MAX_SATELLITES; i++) {
       if (i > 0) out += ",";
@@ -2969,6 +3004,22 @@ class HistoryWebHandler : public AsyncWebHandler {
         snprintf(tmp, sizeof(tmp), ",\"free_heap\":%lu",
                  (unsigned long)strtoul(fh_ptr, nullptr, 10));
         out += tmp;
+      }
+      // Include base_url for settings panel display.
+      // JSON-escape backslash and double-quote. Control chars (0x00-0x1F) are not escaped
+      // because base_url is validated at config load time to start with "http://" and is
+      // a plain ASCII URL — control characters cannot appear in valid HTTP URLs.
+      out += ",\"base_url\":\"";
+      for (const char* bp = sat.base_url; *bp != '\0'; ++bp) {
+        if (*bp == '\\') { out += "\\\\"; }
+        else if (*bp == '"') { out += "\\\""; }
+        else { out += *bp; }
+      }
+      out += "\"";
+      // Include cached manifest JSON for per-gateway device rendering
+      if (sat.manifest_len > 0) {
+        out += ",\"manifest\":";
+        out.append(sat.manifest_json, sat.manifest_len);
       }
       out += "}";
     }
@@ -3108,6 +3159,16 @@ class HistoryWebHandler : public AsyncWebHandler {
     auto *resp = request->beginResponse(
         200, "text/plain",
         reinterpret_cast<const uint8_t*>(s_proxy_tmp), s_proxy_len);
+    add_common_headers_(resp);
+    request->send(resp);
+  }
+
+  // ── Stubbed management endpoints (v7.5.5.3) — reserved for v7.6 runtime mgmt ──
+  // Returns 501 to signal "planned but not yet implemented".
+  void handle_aggregator_stub_501_(AsyncWebServerRequest *request) const {
+    auto *resp = request->beginResponse(501, "application/json",
+        "{\"error\":\"not implemented\","
+        "\"message\":\"Runtime satellite management is planned for v7.6\"}");
     add_common_headers_(resp);
     request->send(resp);
   }

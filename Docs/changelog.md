@@ -3,6 +3,129 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.5.3] — 2026-03-24 — Aggregator Dashboard UI (Phase 5 Step 3)
+
+### Aggregator dashboard mode detection
+
+`detectAggregatorMode()` probes `GET /api/aggregator/gateways` at boot.
+On satellites the endpoint returns an empty gateway list (fast fail, no
+console error). On aggregators it returns the active gateway list.
+`DASHBOARD_MODE` is set to `'aggregator'` or `'satellite'` accordingly.
+The same `dashboard.html` is served by both firmware types.
+
+### Aggregator boot path
+
+`App.Boot.start()` now calls `detectAggregatorMode()` first and branches:
+
+- **Aggregator path**: loads local manifest (the aggregator may have local
+  devices like `wan_ping`), calls `updateBoardInfo()`, builds local device
+  cards if any exist, then calls `initAggregatorDashboard()`.
+- **Satellite path**: unchanged (existing boot flow preserved byte-for-byte,
+  plus `updateBoardInfo()` added per Part D).
+
+### Aggregator UI components
+
+**`renderGatewaySelector(gateways)`** — inserts a `.gw-selector` tab bar
+before `#sensorGrid`. Tabs: "All Gateways", one tab per satellite, "⚙ Settings"
+(always last). Tab clicks dispatch to the appropriate view renderer. Uses
+programmatic `addEventListener` (no inline `onclick`).
+
+**`renderAllGatewaysSummary(gateways)`** — renders gateway health cards into
+`#sensorGrid`. Each card shows: status dot (online/offline), name, id, last
+seen timestamp, firmware version, device count. Stale (unreachable) gateways
+get `.gw-stale` class and reduced opacity.
+
+**`renderGatewayDevices(gwId)`** — renders per-gateway device cards. Parses
+the `manifest` field from the `/api/aggregator/gateways` response. Builds
+sensor configs with namespaced IDs (`{gw_id}.{device_id}`) to avoid
+cross-gateway collisions. Dispatches to existing `CARD_RENDERERS`. Populates
+live values from `/api/aggregator/live` via `_populateGatewayDeviceLive()`.
+Falls back to a "manifest not yet cached" message if manifest is unavailable.
+
+**`renderSettingsPanel(gateways)`** — read-only satellite configuration panel.
+Shows each satellite's base URL, firmware version, device count, and status.
+Displays a note that runtime management is planned for v7.6.
+
+**`initAggregatorDashboard()`** — orchestrates the aggregator startup sequence:
+build tab selector, render default "All Gateways" view, start 15s polling.
+Sets `window._aggregatorReady = true` for Playwright test infrastructure.
+
+**`pollAggregatorLive()`** — in-flight guarded (like `pollV2Live`). Fetches
+`/api/aggregator/gateways` every 15s, updates `window._aggregatorGateways`,
+refreshes gateway tab status indicators, and re-renders the active view if
+it's "All Gateways" or "Settings".
+
+### Board-aware About card (updateBoardInfo)
+
+**`updateBoardInfo()`** — called after manifest loads in both satellite and
+aggregator boot paths. Hides `#pinoutDiagram` (the C3 SuperMini SVG) if the
+manifest's `gateway.hardware` field does not contain "C3". Enables the same
+`dashboard.html` to serve non-C3 boards without showing C3-specific content.
+
+**`id="pinoutDiagram"`** added to `<div class="device-photo-wrap">` in
+`dashboard.html` to make the C3 board SVG selectable by `updateBoardInfo()`.
+
+### Aggregator gateways API extended (sensor_history_multi.h)
+
+`handle_aggregator_gateways_` now includes two additional fields per satellite:
+- `base_url` — the satellite's HTTP URL (for settings panel display)
+- `manifest` — the full cached `/api/manifest` JSON (for per-gateway device
+  rendering in `renderGatewayDevices()`)
+
+### Stub management endpoints (sensor_history_multi.h)
+
+Three stubbed endpoints added under `#if AGGREGATOR_ENABLED`, reserved for
+v7.6 runtime satellite management:
+- `POST /api/aggregator/add-satellite` → 501 Not Implemented
+- `POST /api/aggregator/test-satellite` → 501 Not Implemented
+- `DELETE /api/aggregator/satellite/{id}` → 501 Not Implemented
+
+All return `{"error":"not implemented","message":"...planned for v7.6"}`.
+
+### Aggregator CSS added to dashboard.html
+
+New CSS classes for aggregator UI elements:
+`.gw-selector`, `.gw-tab`, `.gw-online`, `.gw-offline`, `.gw-settings-tab`,
+`.gw-summary-card`, `.gw-stale`, `.gw-summary-header`, `.gw-summary-id`,
+`.gw-summary-details`, `.gw-detail-label`, `.gw-status-online`,
+`.gw-status-offline`, `.gw-stale-overlay`, `.settings-panel`,
+`.settings-title`, `.settings-subtitle`, `.settings-satellite-card`,
+`.settings-sat-header`, `.settings-sat-id`, `.settings-sat-details`.
+Light-mode overrides added for tab and card elements.
+
+### Mock server updated
+
+`tests/mock-server/server.js`: `/api/aggregator/gateways` now returns
+`{"gateways":[]}` (200 OK, empty list) for satellite fixture sets. This
+correctly triggers satellite mode in `detectAggregatorMode()` (empty list
+→ `data.gateways.length === 0` → returns false) without producing a 404
+browser console error that would fail the console error guard tests.
+
+### Test changes
+
+- `tests/browser/dashboard.spec.js` (Group 16, BUG-043 regression):
+  First-request check updated to filter `/api/aggregator/gateways` probe
+  before verifying manifest comes before entity polling.
+
+### Files modified
+
+- `dashboard/dashboard.js` — `DASHBOARD_MODE` var, aggregator UI functions,
+  `updateBoardInfo()`, modified `App.Boot.start()`; version bumped to v7.5.5.3
+- `dashboard/dashboard.html` — aggregator CSS, `id="pinoutDiagram"`,
+  mirrored JS changes, `dashboard.h` regenerated; version bumped to v7.5.5.3
+- `dashboard/dashboard.h` — regenerated from updated `dashboard.html`
+- `dashboard/sensor_history_multi.h` — `base_url`+`manifest` in gateways
+  response, stub 501 endpoints, version bumped to v7.5.5.3
+- `tests/mock-server/server.js` — aggregator route handlers (empty gateways)
+- `tests/browser/dashboard.spec.js` — BUG-043 first-request check updated
+- `scripts/render_sensor_config.py` — version bump to 7.5.5.3
+- `tests/fixtures/generate-fixtures.js` — version bump to 7.5.5.3
+- `firmware/esp32-c3-multi-sensor.yaml` — version bump to v7.5.5.3
+- `src/gateway_manifest.h`, `tests/fixtures/manifest.json`,
+  `tests/fixtures/api-status.json`, `tests/fixtures/variants/*/` —
+  regenerated artifacts
+
+---
 ## [v7.5.5.2] — 2026-03-24 — Aggregator API Endpoints (Phase 5 Step 2)
 
 ### Aggregator API endpoints (`#if AGGREGATOR_ENABLED`)
