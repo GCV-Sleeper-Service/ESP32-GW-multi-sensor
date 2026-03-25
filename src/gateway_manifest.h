@@ -10,10 +10,10 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
   "source": "active-manifest",
   "version": "v7.5.5.3",
   "gateway": {
-    "id": "agg-s3-16m-1",
-    "name": "S3 Aggregator",
-    "role": "aggregator",
-    "hardware": "ESP32-S3",
+    "id": "gw-main",
+    "name": "Main Gateway",
+    "role": "satellite",
+    "hardware": "ESP32-C3",
     "firmware_version": "v7.5.5.3",
     "api_version": "v2"
   },
@@ -23,7 +23,7 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
     "ram_window_hours": 24,
     "sample_interval_seconds": 900
   },
-  "sensor_count": 1,
+  "sensor_count": 4,
   "metrics": [
     {
       "key": "temp",
@@ -63,6 +63,63 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
     }
   ],
   "sensors": [
+    {
+      "id": "office",
+      "name": "Office",
+      "category": "environmental",
+      "adapter": "thermopro_ble",
+      "source": {
+        "mac": "DB:06:2C:58:8A:59"
+      },
+      "measurements": [
+        {
+          "key": "temp",
+          "history_url": "/history/office/temp"
+        },
+        {
+          "key": "hum",
+          "history_url": "/history/office/hum"
+        }
+      ]
+    },
+    {
+      "id": "first_floor",
+      "name": "First Floor",
+      "category": "environmental",
+      "adapter": "thermopro_ble",
+      "source": {
+        "mac": "D5:D8:4C:25:06:49"
+      },
+      "measurements": [
+        {
+          "key": "temp",
+          "history_url": "/history/first_floor/temp"
+        },
+        {
+          "key": "hum",
+          "history_url": "/history/first_floor/hum"
+        }
+      ]
+    },
+    {
+      "id": "outside",
+      "name": "Outside",
+      "category": "environmental",
+      "adapter": "thermopro_ble",
+      "source": {
+        "mac": "DF:EB:DE:19:11:6C"
+      },
+      "measurements": [
+        {
+          "key": "temp",
+          "history_url": "/history/outside/temp"
+        },
+        {
+          "key": "hum",
+          "history_url": "/history/outside/hum"
+        }
+      ]
+    },
     {
       "id": "wan_ping",
       "name": "WAN Latency",
