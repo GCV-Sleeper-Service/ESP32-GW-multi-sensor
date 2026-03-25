@@ -3,6 +3,26 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.5.3-hotfix-2] — 2026-03-25 — Manifest Hardware String + Environmental Chart Hiding
+
+### BUG-068: Board-aware manifest hardware string
+
+`render_sensor_config.py` now builds `gateway_meta` from the board profile's
+`chip_variant` field (e.g., `esp32s3` → `ESP32-S3`), the gateway config's
+`friendly_name` and `esphome_name`, and the aggregator config's role. This
+`gateway_meta` flows into both the compiled manifest (`gateway_manifest.h`) and
+test fixtures. The S3 aggregator now correctly reports `"hardware": "ESP32-S3"`
+in `/api/manifest`, enabling the BUG-067 About card fix to work.
+
+### BUG-069: Hide environmental chart sections when no env sensors
+
+After `initCharts()`, the boot path checks whether any local sensor has
+`category === 'environmental'`. If none exist (e.g., aggregator with only WAN
+ping), the Temperature/Humidity Real-Time and 15-Minute Average chart sections
+are hidden. Added `id` attributes (`hdr-realtime`, `hdr-averages`,
+`divider-charts`) to enable JS targeting.
+
+---
 ## [v7.5.5.3-hotfix] — 2026-03-25 — Aggregator Boot Path Fix + Layout Correction
 
 ### BUG-064: Unified boot path (aggregator = satellite + overlay)

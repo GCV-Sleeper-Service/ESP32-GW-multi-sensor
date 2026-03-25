@@ -517,9 +517,9 @@ def write_if_changed(path: Path, content: str) -> bool:
     return True
 
 
-def generate_gateway_manifest_h(sensors: List[Dict[str, str]], version: str) -> str:
+def generate_gateway_manifest_h(sensors: List[Dict[str, str]], version: str, gateway_meta: Dict[str, str] | None = None) -> str:
     """Generate gateway_manifest.h with v2 manifest as C raw string literal."""
-    manifest = manifest_v2(sensors, f"v{version}")
+    manifest = manifest_v2(sensors, f"v{version}", gateway_meta=gateway_meta)
     manifest_json = json.dumps(manifest, indent=2, ensure_ascii=False)
     return f'''#pragma once
 // gateway_manifest.h — Auto-generated v2 manifest JSON
@@ -1200,8 +1200,23 @@ def main() -> int:
 
     expected_header = render_header_file(HEADER_PATH, sensors)
     expected_js = render_js_file(JS_PATH, sensors)
+
+    # Build gateway_meta from board profile and gateway config (BUG-068)
+    chip_to_hw = {"esp32c3": "ESP32-C3", "esp32s3": "ESP32-S3", "esp32": "ESP32",
+                  "esp32c5": "ESP32-C5", "esp32c6": "ESP32-C6"}
+    hw_string = chip_to_hw.get(board_profile.get("chip_variant", "esp32c3"), "ESP32-C3")
+    gw_name = gateway_config.get("friendly_name", "Main Gateway") if gateway_config else "Main Gateway"
+    gw_id = gateway_config.get("esphome_name", "gw-main") if gateway_config else "gw-main"
+    gw_role = "aggregator" if aggregator_config else "satellite"
+    gateway_meta = {
+        "id": gw_id,
+        "name": gw_name,
+        "role": gw_role,
+        "hardware": hw_string,
+    }
+
     expected_fixture_sensors = json.dumps(fixture_manifest(sensors), indent=2) + "\n"
-    expected_fixture_manifest = json.dumps(manifest_v2(sensors, f"v{VERSION}"), indent=2, ensure_ascii=False) + "\n"
+    expected_fixture_manifest = json.dumps(manifest_v2(sensors, f"v{VERSION}", gateway_meta=gateway_meta), indent=2, ensure_ascii=False) + "\n"
     expected_fixture_status = json.dumps(
         {
             "ok": True,
@@ -1216,7 +1231,7 @@ def main() -> int:
         },
         indent=2,
     ) + "\n"
-    expected_gateway_manifest_h = generate_gateway_manifest_h(sensors, VERSION)
+    expected_gateway_manifest_h = generate_gateway_manifest_h(sensors, VERSION, gateway_meta=gateway_meta)
     expected_aggregator_config_h = generate_aggregator_config_h(aggregator_config)
 
     expected = {

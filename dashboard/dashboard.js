@@ -3555,6 +3555,18 @@ App.Boot.start = function() {
       dlog('init - ' + SENSORS.length + ' sensors, transport=' + TRANSPORT + ', host=' + (ESP_HOST || '(same-origin)'));
       buildSensorCards();
       try { initCharts(); setHistoryRange(24); } catch(e) { dlog('initCharts: ' + e.message, 'err'); showError('Chart init failed'); }
+      // BUG-069: Hide environmental chart sections when no env sensors exist.
+      // The aggregator with only WAN ping has no temperature/humidity data —
+      // showing empty "waiting for sensor data..." charts is confusing UX.
+      // Note: makeSensorConfig() does not set .category (environmental is implied
+      // when absent). Only makeNetworkSensorConfig() sets it explicitly.
+      var hasEnvSensors = SENSORS.some(function(s) { return !s.category || s.category === 'environmental'; });
+      if (!hasEnvSensors) {
+        ['hdr-realtime', 'body-realtime', 'divider-charts', 'hdr-averages', 'body-averages'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        });
+      }
       // BUG-037: Startup request staggering — spread non-critical requests across 5s
       // to avoid overwhelming the ESP32-C3 HTTP server (~4-7 concurrent connections).
       // See Docs/dashboard-stability-remediation-plan.md for full rationale.

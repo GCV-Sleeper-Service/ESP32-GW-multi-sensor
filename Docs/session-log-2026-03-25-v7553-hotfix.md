@@ -87,3 +87,30 @@ Zero. The Gateways section is `display:none` by default. `detectAggregatorMode()
 - [ ] Dashboard unchanged — no Gateways section visible
 - [ ] All sensors render with live data
 - [ ] History, storage stats, telemetry all work
+
+---
+
+## Hotfix-2 Addendum (same session)
+
+### BUG-068: Manifest hardware string hardcoded
+
+**Root cause:** `sensor_manifest_lib.py` `manifest_v2()` defaults to `"hardware": "ESP32-C3"`. The generator never passed board profile info to override it. The S3 aggregator reported itself as C3 in the manifest, which prevented BUG-067's `updateBoardInfo()` from hiding C3 content.
+
+**Fix:** `render_sensor_config.py` builds `gateway_meta` dict from `board_profile['chip_variant']` (mapped via lookup: `esp32s3` → `ESP32-S3`), `gateway_config['friendly_name']`, `gateway_config['esphome_name']`, and aggregator presence for role. Passed to both `manifest_v2()` and `generate_gateway_manifest_h()`.
+
+### BUG-069: Environmental chart sections visible with no env sensors
+
+**Root cause:** Chart sections hardcoded in HTML, always visible. No conditional hiding.
+
+**Fix:** After `initCharts()`, check `SENSORS.some(s => s.category === 'environmental')`. If false, hide `#hdr-realtime`, `#body-realtime`, `#divider-charts`, `#hdr-averages`, `#body-averages`. Added `id` attributes to these HTML elements.
+
+### Files changed (hotfix-2)
+- `scripts/render_sensor_config.py` — `gateway_meta` builder, passed to manifest generation
+- `dashboard/dashboard.js` — env chart hiding after `initCharts()`
+- `dashboard/dashboard.html` — IDs on chart sections + mirrored JS
+- `Docs/bugs-and-lessons-learned.md` — BUG-068, BUG-069
+- `Docs/changelog.md` — hotfix-2 entry
+
+### Additional issue discovered: generator/preflight coupling (documented, not fixed)
+
+When `config/gateway.json` is present with `sensors_file`, the generator reads the alternate sensor config (e.g., S3 aggregator wan_ping-only). This produces fixtures and headers for the S3 profile, which fails CI preflight checks expecting the C3 4-sensor config. Workaround: `mv config/gateway.json config/gateway.json.bak` before running preflight/tests, restore after. Proper fix (per-target builds or `--target` flag) is future work.

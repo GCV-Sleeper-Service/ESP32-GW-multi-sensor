@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-25 — v7.5.5.3 hotfix (BUG-064 through BUG-067, LESSON-OPS-074)._
+_Last updated: 2026-03-25 — v7.5.5.3 hotfix-2 (BUG-068 manifest hardware string, BUG-069 env chart hiding)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,32 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-069 — Environmental chart sections visible with no environmental sensors (2026-03-25)
+
+**Severity:** UX confusion
+**Introduced in:** Dashboard design (always present)
+**Fixed in:** v7.5.5.3 hotfix-2
+
+**Symptoms:** On the S3 aggregator with only WAN ping as a local sensor, the Temperature Real Time, Humidity Real Time, Temperature 15M Avg, and Humidity 15M Avg chart sections all displayed with "waiting for sensor data..." forever. These charts only make sense when environmental sensors (ThermoPro) are configured locally.
+
+**Root cause:** The chart sections are hardcoded in `dashboard.html` and always visible. `initCharts()` creates the chart objects unconditionally. No check exists for whether any environmental sensors are present.
+
+**Fix:** After `initCharts()` in the boot path, check `SENSORS.some(s => s.category === 'environmental')`. If false, hide `#hdr-realtime`, `#body-realtime`, `#divider-charts`, `#hdr-averages`, `#body-averages`. Added `id` attributes to these HTML sections to enable targeting.
+
+### BUG-068 — Manifest `gateway.hardware` hardcoded to "ESP32-C3" regardless of board (2026-03-25)
+
+**Severity:** Functional — breaks board-aware About card (BUG-067 fix depends on this)
+**Introduced in:** `sensor_manifest_lib.py` `manifest_v2()` defaults
+**Fixed in:** v7.5.5.3 hotfix-2
+
+**Symptoms:** `curl /api/manifest` on the S3 aggregator returned `"hardware": "ESP32-C3"`. The `updateBoardInfo()` function (BUG-067 fix) checks this field to hide C3-specific content. With the wrong hardware string, C3 About card title, GPIO pinout, and description were still visible on the S3.
+
+**Root cause:** `manifest_v2()` in `sensor_manifest_lib.py` has a hardcoded default `gateway_meta` with `"hardware": "ESP32-C3"`. Neither `generate_gateway_manifest_h()` nor the fixture generation in `render_sensor_config.py` passed a board-aware `gateway_meta`. The board profile's `chip_variant` field (e.g., `"esp32s3"`) was never mapped to the manifest.
+
+**Fix:** `render_sensor_config.py` now builds `gateway_meta` from the board profile (`chip_variant` → human-readable hardware string via lookup table), gateway config (`friendly_name`, `esphome_name`), and aggregator config (`role`). This `gateway_meta` is passed to both `manifest_v2()` and `generate_gateway_manifest_h()`.
+
+**Prevention:** When adding a new generated field that varies by deployment, verify it flows from the config source (board profile, gateway.json) through the generator to the output artifact. Hardcoded defaults should only apply when no config is present.
 
 ### BUG-067 — C3-specific content displayed on non-C3 boards (2026-03-25)
 
