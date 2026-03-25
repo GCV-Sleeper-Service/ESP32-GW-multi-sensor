@@ -1,0 +1,29 @@
+{
+  "timestamp": 1710264000,
+  "gateways": {
+    "gw-main": {
+      "reachable": true,
+      "live": {
+        "timestamp": 1710264000,
+        "devices": {
+          "office": {
+            "temp": 23.4,
+            "hum": 45.2,
+            "batt": 87,
+            "rssi": -62,
+            "last_seen": 1710263985
+          },
+          "wan_ping": {
+            "ping_ms": 12.3,
+            "success_pct": 100.0,
+            "last_seen": 1710263990
+          }
+        }
+      }
+    },
+    "gw-garage": {
+      "reachable": false,
+      "live": null
+    }
+  }
+}

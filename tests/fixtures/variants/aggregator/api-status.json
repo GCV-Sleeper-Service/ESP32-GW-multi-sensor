@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "version": "v7.5.5.4",
+  "sensor_count": 0,
+  "sensors": [],
+  "mode": "active-manifest",
+  "connected": true,
+  "free_heap": 163840,
+  "free_heap_internal": 163840,
+  "free_heap_total": 163840
+}

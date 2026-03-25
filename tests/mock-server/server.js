@@ -230,14 +230,36 @@ const server = http.createServer(function(req, res) {
   // Aggregator endpoints — return empty gateways in satellite fixture sets (no 404
   // to avoid browser console errors in tests). detectAggregatorMode() handles empty
   // gateways list as satellite mode. In aggregator mode (FIXTURE_SET=aggregator),
-  // these would return real gateway data.
+  // loadFixture() resolves the variant fixture and returns real gateway data.
   if (pathname === '/api/aggregator/gateways') {
+    const gwFixture = loadFixture('aggregator-gateways.json');
+    if (gwFixture) {
+      return json(res, JSON.parse(gwFixture));
+    }
     return json(res, { gateways: [] });
   }
   if (pathname === '/api/aggregator/live') {
+    const liveFixture = loadFixture('aggregator-live.json');
+    if (liveFixture) {
+      return json(res, JSON.parse(liveFixture));
+    }
     return json(res, { timestamp: Math.floor(Date.now() / 1000), gateways: {} });
   }
   if (pathname.startsWith('/api/aggregator/proxy/')) {
+    // pathname: /api/aggregator/proxy/{gwId}/history/{device}/{metric}
+    const parts = pathname.split('/');
+    // parts: ['', 'api', 'aggregator', 'proxy', gwId, 'history', device, metric]
+    if (parts.length >= 8 && parts[5] === 'history') {
+      const gwId = parts[4];
+      const device = parts[6];
+      const metric = parts[7];
+      const csvFile = `history-${gwId}-${device}-${metric}.csv`;
+      const csv = loadFixture(csvFile);
+      if (csv) {
+        res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
+        return res.end(csv);
+      }
+    }
     return notFound(res, pathname);
   }
 

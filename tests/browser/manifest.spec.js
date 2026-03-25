@@ -51,6 +51,11 @@ test.afterEach(async ({ page }) => {
 
 test.describe('manifest boot flow', () => {
   test('api manifest endpoint returns schema v2 metadata', async ({ request }) => {
+    if (process.env.FIXTURE_SET === 'aggregator') {
+      // Aggregator manifest has 0 local sensors; sensor_count=0 and gateway.role='aggregator'.
+      // Satellite-specific assertions (sensor_count>=1, role=satellite, temp/hum metrics, first sensor) do not apply.
+      test.skip(true, 'Aggregator manifest has sensor_count=0 and role=aggregator; satellite-specific manifest metadata assertions do not apply.');
+    }
     const response = await request.get('/api/manifest');
     expect(response.ok()).toBeTruthy();
     const payload = await response.json();
@@ -78,6 +83,7 @@ test.describe('manifest boot flow', () => {
 
   test('dashboard boots from /api/manifest', async ({ page }) => {
     test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor list (office+first_floor+outside+wan_ping=4) is 3sensor-specific; mixed fixture has 3 sensors (no outside).');
+    test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator manifest has 0 sensors; DEFAULT_SENSOR_META fallback loads 3 env-only sensors (not 4). Expected sensor list is satellite-specific.');
     await stubCdn(page);
     await page.goto('/dashboard.html');
     // v7.5.4.2: SENSORS now includes network devices — 3 environmental + 1 network = 4
