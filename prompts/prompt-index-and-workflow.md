@@ -157,7 +157,7 @@ All steps shipped. No prompts needed.
 - BUG-055: `bump-version.sh` stale `.min.html` handling
 - BUG-056: WAN Latency removed from temperature/humidity charts (`chartIdx` filtering)
 
-### Phase 5 — Aggregator MVP
+### Phase 5 — Aggregator MVP ✅ COMPLETE
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|

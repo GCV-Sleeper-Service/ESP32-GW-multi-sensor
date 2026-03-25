@@ -12,7 +12,7 @@
       "manifest": {
         "version": 2,
         "generated": "2026-03-24T00:00:00Z",
-        "firmware_version": "v7.5.5.4",
+        "firmware_version": "v7.5.5.5",
         "sensors": [
           {
             "id": "office",
@@ -39,7 +39,7 @@
       "manifest": {
         "version": 2,
         "generated": "2026-03-24T00:00:00Z",
-        "firmware_version": "v7.5.5.4",
+        "firmware_version": "v7.5.5.5",
         "sensors": [
           {
             "id": "garage",
