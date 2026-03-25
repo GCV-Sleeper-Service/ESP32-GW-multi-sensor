@@ -1,0 +1,53 @@
+{
+  "gateways": [
+    {
+      "id": "gw-main",
+      "name": "Main Gateway",
+      "base_url": "http://192.168.120.189",
+      "reachable": true,
+      "last_seen": 1710264000,
+      "consecutive_failures": 0,
+      "manifest_cached": true,
+      "live_cached": true,
+      "manifest": {
+        "version": 2,
+        "generated": "2026-03-24T00:00:00Z",
+        "firmware_version": "v7.5.5.4",
+        "sensors": [
+          {
+            "id": "office",
+            "name": "Office",
+            "category": "environmental"
+          },
+          {
+            "id": "wan_ping",
+            "name": "WAN Ping",
+            "category": "network"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gw-garage",
+      "name": "Garage Sensors",
+      "base_url": "http://192.168.120.192",
+      "reachable": false,
+      "last_seen": 1710260000,
+      "consecutive_failures": 5,
+      "manifest_cached": true,
+      "live_cached": false,
+      "manifest": {
+        "version": 2,
+        "generated": "2026-03-24T00:00:00Z",
+        "firmware_version": "v7.5.5.4",
+        "sensors": [
+          {
+            "id": "garage",
+            "name": "Garage",
+            "category": "environmental"
+          }
+        ]
+      }
+    }
+  ]
+}
