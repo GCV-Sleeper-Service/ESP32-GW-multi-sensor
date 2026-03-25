@@ -167,7 +167,8 @@ All steps shipped. No prompts needed.
 | (no bump) | Pre-v7.5.5.2 infrastructure | Config separation, ota_0 preflight, validate-device.sh, PR66 Codex fixes, BUG-062 | ✅ Complete 2026-03-24 |
 | v7.5.5.2 | Aggregator API endpoints | `prompts/phase5/v7.5.5.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-24 |
 | v7.5.5.3 | Aggregator dashboard UI + settings panel groundwork | `prompts/phase5/v7.5.5.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-24 |
-| v7.5.5.4 | Aggregator Playwright tests | `prompts/phase5/v7.5.5.4-implementation-instructions-for-coding-agent.md` | Pending |
+| (no bump) | v7.5.5.3 hotfix: BUG-064–067, LESSON-OPS-074 | Manual session (not agent-driven) | ✅ Complete 2026-03-25 |
+| v7.5.5.4 | Aggregator Playwright tests | `prompts/phase5/v7.5.5.4-hotfix-addendum.md` + `v7.5.5.4-implementation-instructions-for-coding-agent-updated.md` | Pending |
 | v7.5.5.5 | Phase 5 closure | `prompts/phase5/v7.5.5.5-implementation-instructions-for-coding-agent.md` | Pending |
 
 **Phase 5 device testing requirements:**
@@ -247,6 +248,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 23 | Module-level imports for optional deps (e.g. `yaml`) must be lazy (inside the function that needs them) | LESSON-OPS-071 / BUG-060 |
 | 24 | `esp_get_free_heap_size()` includes PSRAM — report both internal and total heap separately | LESSON-OPS-072 / BUG-062 |
 | 25 | LXC USB passthrough loses permissions on device reconnect — use udev rules or flash from host | LESSON-OPS-073 |
+| 26 | Aggregator boot must be a superset of satellite boot, never a fork — unified pipeline + overlay | LESSON-OPS-074 / BUG-064 |
 
 ---
 

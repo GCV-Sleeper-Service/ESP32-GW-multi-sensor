@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-24 — v7.5.5.2 post-review fix (BUG-063 proxy truncation, proxy v2 URL)._
+_Last updated: 2026-03-25 — v7.5.5.3 hotfix (BUG-064 through BUG-067, LESSON-OPS-074)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,60 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-067 — C3-specific content displayed on non-C3 boards (2026-03-25)
+
+**Severity:** Cosmetic / design principle violation
+**Introduced in:** v7.5.5.3 (incomplete `updateBoardInfo()`)
+**Fixed in:** v7.5.5.3 hotfix
+
+**Symptoms:** On the S3 aggregator, the About card showed "ESP32-C3 SuperMini Gateway" as the title, displayed the C3 board SVG photo, the C3 GPIO pinout table, and the ThermoPro-specific description paragraph. All of this content is irrelevant to an ESP32-S3 device.
+
+**Root cause:** `updateBoardInfo()` only hid the C3 SVG pinout image (`#pinoutDiagram`). The title text, GPIO pinout card, and description paragraph had no `id` attributes and were not conditionally hidden.
+
+**Fix:** Added `id` attributes (`gpioCard`, `aboutCardTitle`, `c3DescriptionBlock`) to the hardcoded C3 content in `dashboard.html`. Extended `updateBoardInfo()` to hide the GPIO card and description, and replace the title with the board's actual name from the manifest.
+
+**Prevention:** LESSON-OPS-074. Principle 4: Board content correctness — the dashboard must never show information from a different board.
+
+### BUG-066 — Remote satellite cards show "calculating..." for history min/max (2026-03-25)
+
+**Severity:** Cosmetic / confusing UX
+**Introduced in:** v7.5.5.3
+**Fixed in:** v7.5.5.3 hotfix
+
+**Symptoms:** When viewing a per-gateway satellite tab on the aggregator dashboard, environmental sensor cards showed "temp: calculating... / hum: calculating..." in the min/max sections, forever.
+
+**Root cause:** The environmental card renderer includes min/max placeholders that are populated by `loadHistory()`, which fetches from local endpoints only. No proxy history fetch exists for remote satellite data. The placeholders were never updated.
+
+**Fix:** After rendering remote satellite cards in `renderGatewayDevices()`, replace all `.minmax-line .waiting` elements with "—" and hide the range toggle buttons. Proxy history fetch is a planned future feature.
+
+### BUG-065 — Gateway cards rendered inside SENSORS section (2026-03-25)
+
+**Severity:** Layout / architecture violation
+**Introduced in:** v7.5.5.3
+**Fixed in:** v7.5.5.3 hotfix
+
+**Symptoms:** On the aggregator, gateway selector tabs and satellite device cards appeared inside the "SENSORS" collapsible section, mixed with local sensor cards. The SENSORS heading was visible above gateway content. Per the design principles, the Gateways section should be separate from and above the local Sensors section.
+
+**Root cause:** `renderGatewaySelector()` inserted the tab bar before `#sensorGrid` using `insertAdjacentHTML('beforebegin')`. All aggregator render functions (`renderAllGatewaysSummary`, `renderGatewayDevices`, `renderSettingsPanel`) wrote to `sensorGrid.innerHTML`, overwriting local sensor content.
+
+**Fix:** Added a new Gateways collapsible section (`#hdr-gateways` / `#body-gateways`) above the SENSORS section in `dashboard.html`, hidden by default. Contains `#gwSelectorContainer` for the tab bar and `#gwGrid` for gateway content. All aggregator render functions now target the new elements. `initAggregatorDashboard()` unhides the section. SENSORS section is reserved for local sensors only.
+
+### BUG-064 — Aggregator boot path skips satellite pipeline entirely (2026-03-25)
+
+**Severity:** Critical — all local functionality broken on aggregator
+**Introduced in:** v7.5.5.3
+**Fixed in:** v7.5.5.3 hotfix
+
+**Symptoms:** Aggregator dashboard showed: (1) red "connecting" dot in upper right, (2) "loading..." on History Storage, (3) "waiting for telemetry..." on Telemetry chart, (4) no local sensor cards (WAN ping not rendered), (5) Real-Time Charts stuck on "waiting for sensor data..."
+
+**Root cause:** `App.Boot.start()` had a forked if/else structure. The aggregator path only called `loadManifestV2()` → `updateBoardInfo()` → `initAggregatorDashboard()`. It skipped ALL satellite functions: no `buildSensorCards()`, no `initCharts()`, no `connectSSE()` / `startPolling()`, no `loadStorageStats()`, no `loadStatusSnapshot()`, no `loadHistory()`, no `pollV2Live()`. The code comment explicitly said "Local device cards are NOT rendered here."
+
+This directly violated **Principle 1** from the design document: "An aggregator is a satellite with aggregation enabled. Every satellite capability is available to an aggregator. The `AGGREGATOR_ENABLED` flag adds aggregator capabilities; it never subtracts satellite capabilities."
+
+**Fix:** Unified boot path — removed the if/else fork. Both satellite and aggregator run the identical pipeline (manifest → sensor load → cards → charts → SSE/polling → status → storage stats → history). At the end, if `isAggregator` is true, `initAggregatorDashboard()` overlays the Gateways section.
+
+**Prevention:** LESSON-OPS-074.
 
 ### BUG-063 — Proxy endpoint served truncated history as HTTP 200 (2026-03-24)
 
@@ -1096,6 +1150,29 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-074: Aggregator boot must be a superset of satellite boot, never a fork (2026-03-25)
+
+**Context:** The v7.5.5.3 aggregator boot path was implemented as an if/else branch that replaced the satellite pipeline entirely. The aggregator loaded the manifest and called `initAggregatorDashboard()` but skipped local sensor cards, SSE/polling, storage stats, telemetry, and history. This broke every local feature on the aggregator device.
+
+**Rule:** Per Principle 1 ("roles are capability tiers"), the aggregator boot path must be: run the full satellite pipeline first, then overlay aggregator UI at the end. Never fork the boot path into separate branches where one skips the other's functionality. The aggregator is a satellite with aggregation ON TOP, not a different product.
+
+**Pattern:**
+```javascript
+// CORRECT: unified pipeline + overlay
+detectAggregatorMode().then(function(isAgg) {
+  // ... full satellite pipeline (manifest, cards, charts, SSE, stats, history) ...
+  if (isAgg) initAggregatorDashboard(); // overlay at the end
+});
+
+// WRONG: forked pipeline
+if (isAgg) { /* aggregator-only path — skips satellite */ }
+else { /* satellite-only path */ }
+```
+
+**Applies to:** All future dashboard boot flow changes, any new role additions.
+
+Related: BUG-064, BUG-065
 
 ### LESSON-OPS-068: Use lwip_*() prefixed functions, not BSD socket aliases, in ESPHome C++ code (2026-03-22)
 

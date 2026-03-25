@@ -3,6 +3,38 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.5.3-hotfix] — 2026-03-25 — Aggregator Boot Path Fix + Layout Correction
+
+### BUG-064: Unified boot path (aggregator = satellite + overlay)
+
+The aggregator boot path was rewritten from a forked if/else to a unified pipeline.
+Both satellite and aggregator now run the full satellite pipeline (manifest → sensor
+cards → charts → SSE/polling → status → storage stats → history). The aggregator
+overlays `initAggregatorDashboard()` at the end. This fixes: red "connecting" dot,
+"loading..." on storage stats, "waiting for telemetry", and missing local sensor cards
+(WAN ping) on the aggregator.
+
+### BUG-065: Gateways section separated from SENSORS
+
+New collapsible "Gateways" section added above "SENSORS" in `dashboard.html`,
+hidden by default. `initAggregatorDashboard()` unhides it. All aggregator render
+functions (`renderGatewaySelector`, `renderAllGatewaysSummary`, `renderGatewayDevices`,
+`renderSettingsPanel`) now target `#gwSelectorContainer` and `#gwGrid` instead of
+`#sensorGrid`. Local sensors stay in SENSORS.
+
+### BUG-066: Remote satellite history suppression
+
+Per-gateway satellite device cards now show "—" for min/max history instead of
+"calculating...". Range toggle buttons are hidden. Proxy history fetch is a
+planned future feature.
+
+### BUG-067: Board-aware About card
+
+`updateBoardInfo()` extended to hide C3-specific content on non-C3 boards:
+GPIO pinout card (`#gpioCard`), C3 description (`#c3DescriptionBlock`), C3 SVG
+(`#pinoutDiagram`). About card title (`#aboutCardTitle`) updated from manifest.
+
+---
 ## [v7.5.5.3] — 2026-03-24 — Aggregator Dashboard UI (Phase 5 Step 3)
 
 ### Aggregator dashboard mode detection
