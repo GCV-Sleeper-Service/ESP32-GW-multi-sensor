@@ -214,6 +214,9 @@ function writeFixtureSet(targetDir, sensors, tag) {
     sensors: legacyManifest,
     mode: tag || 'mock',
     connected: true,
+    free_heap: 81920,
+    free_heap_internal: 81920,
+    free_heap_total: 81920,
   }, null, 2) + '\n');
   fs.writeFileSync(path.join(targetDir, 'storage-stats.json'), JSON.stringify({
     ok: true,

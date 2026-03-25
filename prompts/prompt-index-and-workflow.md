@@ -250,6 +250,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 25 | LXC USB passthrough loses permissions on device reconnect — use udev rules or flash from host | LESSON-OPS-073 |
 | 26 | Aggregator boot must be a superset of satellite boot, never a fork — unified pipeline + overlay | LESSON-OPS-074 / BUG-064 |
 | 27 | ESPHome IDF socket calls must use `lwip_*` prefixed functions, not BSD socket aliases | LESSON-OPS-068 / BUG-057 |
+| 28 | Version bumps require BOTH `render_sensor_config.py --write` AND `node tests/fixtures/generate-fixtures.js`, then verify with `--check` and `grep free_heap tests/fixtures/api-status.json` | LESSON-OPS-077 / BUG-062 |
 
 ---
 

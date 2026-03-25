@@ -262,6 +262,13 @@ python3 scripts/render_sensor_config.py --check
 node tests/fixtures/generate-fixtures.js --manifest config/sensors.json --overwrite-baseline >/dev/null
 check_contains "fixture_baseline_manifest_regenerated" tests/fixtures/manifest.json '"schema_version": 2'
 
+# BUG-062 / LESSON-OPS-077: api-status.json must contain free_heap fields.
+# These are stripped when agents manually edit the file instead of using the generator.
+# The generator (render_sensor_config.py --write) includes them; verify they survived.
+check_contains "fixture_api_status_has_free_heap" tests/fixtures/api-status.json '"free_heap":'
+check_contains "fixture_api_status_has_free_heap_internal" tests/fixtures/api-status.json '"free_heap_internal":'
+check_contains "fixture_api_status_has_free_heap_total" tests/fixtures/api-status.json '"free_heap_total":'
+
 # Phase 4 check: v2 manifest with sensors.json must contain at least one network-category device
 SENSORS_V2="$(python3 -c "import json,sys; d=json.load(open('config/sensors.json')); sys.exit(0 if d.get('schema_version',1)==2 else 1)" 2>/dev/null && echo "yes" || echo "no")"
 if [[ "$SENSORS_V2" == "yes" ]]; then
