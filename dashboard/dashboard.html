@@ -1320,11 +1320,14 @@ function buildNormalizedSensorRows(tempText, humText) {
 function fetchDeviceHistory(sensor, manifest) {
   var historyMeasurements = [];
 
+  // Use _deviceId (original manifest ID) when available — sensor.id may be namespaced in aggregator mode.
+  var lookupId = sensor._deviceId || sensor.id;
+
   // Manifest-driven: look up this sensor's measurements and their history URLs
   if (manifest && manifest.sensors) {
     var manifestDevice = null;
     for (var i = 0; i < manifest.sensors.length; i++) {
-      if (manifest.sensors[i].id === sensor.id) { manifestDevice = manifest.sensors[i]; break; }
+      if (manifest.sensors[i].id === lookupId) { manifestDevice = manifest.sensors[i]; break; }
     }
     if (manifestDevice && manifestDevice.measurements) {
       manifestDevice.measurements.forEach(function(m) {
@@ -1336,10 +1339,14 @@ function fetchDeviceHistory(sensor, manifest) {
         }
         // Only include measurements that have history + chart enabled
         if (metricDef && metricDef.history && metricDef.display && metricDef.display.chart) {
-          historyMeasurements.push({
-            key: m.key,
-            url: m.history_url || ('/history/' + sensor.id + '/' + (metricDef.history_suffix || m.key))
-          });
+          var url;
+          if (sensor._gwId) {
+            // Aggregator mode: route history through the proxy endpoint
+            url = '/api/aggregator/proxy/' + sensor._gwId + '/history/' + lookupId + '/' + m.key;
+          } else {
+            url = m.history_url || ('/history/' + lookupId + '/' + (metricDef.history_suffix || m.key));
+          }
+          historyMeasurements.push({ key: m.key, url: url });
         }
       });
     }
@@ -1347,10 +1354,18 @@ function fetchDeviceHistory(sensor, manifest) {
 
   // Fallback: if no manifest data available, use legacy temp/hum paths
   if (historyMeasurements.length === 0) {
-    historyMeasurements = [
-      { key: 'temp', url: '/history/' + sensor.id + '/temp' },
-      { key: 'hum',  url: '/history/' + sensor.id + '/hum'  }
-    ];
+    if (sensor._gwId) {
+      // Aggregator fallback: proxy the standard history metrics
+      historyMeasurements = [
+        { key: 'temp', url: '/api/aggregator/proxy/' + sensor._gwId + '/history/' + lookupId + '/temp' },
+        { key: 'hum',  url: '/api/aggregator/proxy/' + sensor._gwId + '/history/' + lookupId + '/hum'  }
+      ];
+    } else {
+      historyMeasurements = [
+        { key: 'temp', url: '/history/' + lookupId + '/temp' },
+        { key: 'hum',  url: '/history/' + lookupId + '/hum'  }
+      ];
+    }
   }
 
   // BUG-043-cont Fix 2: fetch metrics sequentially with a 300ms gap between requests.
@@ -1689,6 +1704,7 @@ var lastAvgEpoch = {}, eventCount = 0, pollAvgLast = {};
 
 function esc(s) { return s.replace(/[^a-zA-Z0-9]/g, '_'); }
 function escAttr(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function cToF(c) { return c * 9 / 5 + 32; }
 function pad2(v) { return String(v).padStart(2, '0'); }
 function formatUtcForExport(epoch) {
@@ -3376,10 +3392,12 @@ function buildEnvironmentalCard(s, manifest) {
 }
 
 function buildNetworkCard(s, manifest) {
-  // Find source.target from manifest for display
+  // Find source.target from manifest for display.
+  // Use _deviceId (original manifest ID) when available — s.id may be namespaced in aggregator mode.
+  var lookupId = s._deviceId || s.id;
   var target = '\u2014';
   if (manifest && manifest.sensors) {
-    var entry = manifest.sensors.find(function(ms) { return ms.id === s.id; });
+    var entry = manifest.sensors.find(function(ms) { return ms.id === lookupId; });
     if (entry && entry.source && entry.source.target) target = entry.source.target;
   }
   return (
@@ -4107,8 +4125,9 @@ function renderGatewaySelector(gateways) {
     '<button class="gw-tab active" data-gw="all">All Gateways</button>';
   gateways.forEach(function(gw) {
     var statusClass = gw.reachable ? 'gw-online' : 'gw-offline';
-    selectorHtml += '<button class="gw-tab ' + statusClass + '" data-gw="' + gw.id + '">' +
-      gw.name + '</button>';
+    // escAttr for attribute value; escHtml for button text content
+    selectorHtml += '<button class="gw-tab ' + statusClass + '" data-gw="' + escAttr(gw.id) + '">' +
+      escHtml(gw.name) + '</button>';
   });
   // Settings tab — always last
   selectorHtml += '<button class="gw-tab gw-settings-tab" data-gw="settings">&#9881; Settings</button>';
@@ -4121,8 +4140,10 @@ function renderGatewaySelector(gateways) {
       tab.classList.add('active');
       var gwId = tab.getAttribute('data-gw');
       if (gwId === 'all') {
+        _currentGwId = null; _currentGwSensors = null;
         renderAllGatewaysSummary(window._aggregatorGateways);
       } else if (gwId === 'settings') {
+        _currentGwId = null; _currentGwSensors = null;
         renderSettingsPanel(window._aggregatorGateways);
       } else {
         renderGatewayDevices(gwId);
@@ -4148,12 +4169,12 @@ function renderAllGatewaysSummary(gateways) {
       (gw.device_count !== undefined ? gw.device_count : '\u2014');
     html += '<div class="gw-summary-card' + (gw.reachable ? '' : ' gw-stale') + '">';
     html += '<div class="gw-summary-header"><span class="' + statusClass + '">' + statusText + '</span>' +
-      ' <strong>' + gw.name + '</strong>' +
-      ' <span class="gw-summary-id">(' + gw.id + ')</span></div>';
+      ' <strong>' + escHtml(gw.name) + '</strong>' +
+      ' <span class="gw-summary-id">(' + escHtml(gw.id) + ')</span></div>';
     html += '<div class="gw-summary-details">';
-    html += '<div><span class="gw-detail-label">Last seen:</span> ' + lastSeenStr + '</div>';
-    html += '<div><span class="gw-detail-label">Firmware:</span> ' + fwVersion + '</div>';
-    html += '<div><span class="gw-detail-label">Devices:</span> ' + deviceCount + '</div>';
+    html += '<div><span class="gw-detail-label">Last seen:</span> ' + escHtml(lastSeenStr) + '</div>';
+    html += '<div><span class="gw-detail-label">Firmware:</span> ' + escHtml(fwVersion) + '</div>';
+    html += '<div><span class="gw-detail-label">Devices:</span> ' + escHtml(String(deviceCount)) + '</div>';
     if (!gw.reachable) html += '<div class="gw-stale-overlay">Unreachable</div>';
     html += '</div>';
     html += '</div>';
@@ -4171,14 +4192,14 @@ function renderGatewayDevices(gwId) {
   var grid = document.getElementById('sensorGrid');
   grid.innerHTML = '';
   if (!gw) {
-    grid.innerHTML = '<div class="gw-summary-card gw-stale"><div>Gateway not found: ' + gwId + '</div></div>';
+    grid.innerHTML = '<div class="gw-summary-card gw-stale"><div>Gateway not found: ' + escHtml(gwId) + '</div></div>';
     return;
   }
   if (!gw.reachable) {
     var lastSeenStr = gw.last_seen ? new Date(gw.last_seen * 1000).toLocaleString() : 'unknown';
     grid.innerHTML = '<div class="gw-summary-card gw-stale">' +
       '<div class="gw-status-offline">&#128308; Unreachable</div>' +
-      '<div>Last seen: ' + lastSeenStr + '</div></div>';
+      '<div>Last seen: ' + escHtml(lastSeenStr) + '</div></div>';
     return;
   }
   // Parse manifest if available from /api/aggregator/gateways response
@@ -4188,7 +4209,7 @@ function renderGatewayDevices(gwId) {
   }
   if (!manifest || !manifest.sensors || manifest.sensors.length === 0) {
     grid.innerHTML = '<div class="gw-summary-card"><div>No device data available for <strong>' +
-      gw.name + '</strong>. Manifest not yet cached.</div></div>';
+      escHtml(gw.name) + '</strong>. Manifest not yet cached.</div></div>';
     return;
   }
   // Build sensor configs with namespaced IDs and render cards using existing CARD_RENDERERS
@@ -4196,6 +4217,7 @@ function renderGatewayDevices(gwId) {
   manifest.sensors.forEach(function(s, idx) {
     var cat = s.category || 'environmental';
     var nsId = gwId + '.' + s.id; // namespaced: avoids cross-gateway ID collisions
+    // cfg.id is namespaced (for DOM element IDs); _deviceId is the original id (for API calls)
     var meta = { id: nsId, name: s.name, category: cat };
     var cfg;
     if (cat === 'environmental') {
@@ -4203,9 +4225,10 @@ function renderGatewayDevices(gwId) {
     } else {
       cfg = makeNetworkSensorConfig(meta, idx); // network, system, and unknown categories
     }
-    // Store originals for proxy history routing
+    // Store originals for proxy history routing and API lookups
     cfg._gwId = gwId;
     cfg._deviceId = s.id;
+    cfg._namespacedId = nsId; // kept for clarity
     gwSensors.push({ cfg: cfg, entry: s });
   });
   var html = '';
@@ -4216,9 +4239,16 @@ function renderGatewayDevices(gwId) {
     html += renderer(s, manifest);
   });
   grid.innerHTML = html;
+  // Track current per-gateway view for pollAggregatorLive refresh (fix 2b)
+  _currentGwId = gwId;
+  _currentGwSensors = gwSensors;
   // Populate live values from /api/aggregator/live (in-flight guarded separately)
   _populateGatewayDeviceLive(gwId, gwSensors);
 }
+
+// Current per-gateway view state (for pollAggregatorLive to refresh)
+var _currentGwId = null;
+var _currentGwSensors = null;
 
 var _aggDeviceLiveInFlight = false;
 function _populateGatewayDeviceLive(gwId, gwSensors) {
@@ -4237,7 +4267,43 @@ function _populateGatewayDeviceLive(gwId, gwSensors) {
         var devData = devices[deviceId];
         if (!devData) return;
         var cat = s.category || 'environmental';
-        if (cat === 'network') {
+        if (cat === 'environmental') {
+          // Temperature (raw float → format with unit)
+          if (devData.temp !== undefined && devData.temp !== null) {
+            var tempEl = document.getElementById('val-' + esc(s.tempId));
+            if (tempEl) {
+              var tC = devData.temp;
+              sensorCurrentTemp[s.id] = tC;
+              tempEl.textContent = formatMetricValue('temperature', tC, getMetricDef('temp'));
+              tempEl.classList.remove('waiting');
+            }
+          }
+          // Humidity
+          if (devData.hum !== undefined && devData.hum !== null) {
+            var humEl = document.getElementById('val-' + esc(s.humId));
+            if (humEl) {
+              var hV = devData.hum;
+              sensorCurrentHum[s.id] = hV;
+              humEl.textContent = formatMetricValue('humidity', hV, getMetricDef('hum'));
+              humEl.classList.remove('waiting');
+            }
+          }
+          // Derived values (dew point and comfort) once both temp and hum are available
+          if (sensorCurrentTemp[s.id] !== undefined && sensorCurrentHum[s.id] !== undefined) {
+            updateDewPoint(s.id);
+            updateComfortLevel(s.id);
+          }
+          // Battery
+          if (devData.batt !== undefined && devData.batt !== null) {
+            updateBattery(s, String(devData.batt));
+          }
+          // Last seen
+          var seenEl = document.getElementById('time-' + s.id);
+          if (seenEl && devData.last_seen) {
+            var d = new Date(devData.last_seen * 1000);
+            seenEl.textContent = 'last: ' + d.toLocaleTimeString([], {hour12:false});
+          }
+        } else if (cat === 'network') {
           var pingEl = document.getElementById('net-ping-' + s.id);
           if (pingEl && devData.ping_ms !== undefined && devData.ping_ms !== null) {
             pingEl.textContent = METRIC_FORMATTERS.ping_latency(devData.ping_ms);
@@ -4274,12 +4340,12 @@ function renderSettingsPanel(gateways) {
     if (gw.device_count !== undefined) deviceCount = gw.device_count;
     else if (gw.sensor_count !== undefined) deviceCount = gw.sensor_count;
     html += '<div class="settings-satellite-card">';
-    html += '<div class="settings-sat-header">' + statusDot + ' ' + gw.name +
-      ' <span class="settings-sat-id">(' + gw.id + ')</span></div>';
+    html += '<div class="settings-sat-header">' + statusDot + ' ' + escHtml(gw.name) +
+      ' <span class="settings-sat-id">(' + escHtml(gw.id) + ')</span></div>';
     html += '<div class="settings-sat-details">';
-    html += '<div>URL: <code>' + (gw.base_url || '\u2014') + '</code></div>';
-    html += '<div>Firmware: ' + fwVersion + '</div>';
-    html += '<div>Devices: ' + deviceCount + '</div>';
+    html += '<div>URL: <code>' + escHtml(gw.base_url || '\u2014') + '</code></div>';
+    html += '<div>Firmware: ' + escHtml(fwVersion) + '</div>';
+    html += '<div>Devices: ' + escHtml(String(deviceCount)) + '</div>';
     html += '<div>Status: ' + (gw.reachable ? 'Online' : 'Unreachable') + '</div>';
     html += '</div>';
     html += '</div>';
@@ -4321,7 +4387,10 @@ function pollAggregatorLive() {
           var gwId = activeTab.getAttribute('data-gw');
           if (gwId === 'all') renderAllGatewaysSummary(data.gateways);
           else if (gwId === 'settings') renderSettingsPanel(data.gateways);
-          // Per-gateway view auto-refreshes from pollAggregatorLive indirectly
+          else if (gwId && _currentGwId === gwId && _currentGwSensors) {
+            // Refresh live values for the currently displayed per-gateway device view
+            _populateGatewayDeviceLive(gwId, _currentGwSensors);
+          }
         }
       }
     })
@@ -4346,7 +4415,10 @@ App.Boot.start = function() {
   document.getElementById('modeLabel').textContent = '[' + modeStr + ' mode]';
   detectAggregatorMode().then(function(isAggregator) {
     if (isAggregator) {
-      // Aggregator boot path: load manifest, build local device cards if any, init aggregator UI
+      // Aggregator boot path: load manifest and init aggregator UI.
+      // Local device cards are NOT rendered here — they have no live update mechanism
+      // in aggregator mode (no SSE/polling started). Satellite devices are shown via
+      // the gateway selector + renderGatewayDevices(). See review finding 2c.
       loadManifestV2().then(function(manifest) {
         window._manifest = manifest;
         dlog('[manifest] v2 manifest stored (source: ' + (manifest.source || 'unknown') + ')', 'ok');
@@ -4354,14 +4426,7 @@ App.Boot.start = function() {
         dlog('[manifest] loadManifestV2 failed: ' + e.message, 'err');
         window._manifest = null;
       }).then(function() {
-        if (window._manifest && window._manifest.sensors && window._manifest.sensors.length) {
-          var meta = normalizeManifestSensors(window._manifest);
-          applySensorMeta(meta);
-        }
         updateBoardInfo();
-        if (App.State.getSensors().length > 0) {
-          buildDeviceCards();
-        }
         return initAggregatorDashboard();
       });
     } else {

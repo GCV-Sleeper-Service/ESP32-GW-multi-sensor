@@ -2952,8 +2952,13 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
     // LESSON-OPS-056: pre-reserve string to avoid reallocation
+    // Manifest JSON can be up to 4096 bytes per satellite; account for it in the reserve.
     std::string out;
-    out.reserve(MAX_SATELLITES * 512 + 32);
+    size_t reserve_size = 32;
+    for (int ri = 0; ri < MAX_SATELLITES; ri++) {
+      reserve_size += 512 + satellite_caches[ri].manifest_len;
+    }
+    out.reserve(reserve_size);
     out += "{\"gateways\":[";
     for (int i = 0; i < MAX_SATELLITES; i++) {
       if (i > 0) out += ",";
@@ -3000,9 +3005,16 @@ class HistoryWebHandler : public AsyncWebHandler {
                  (unsigned long)strtoul(fh_ptr, nullptr, 10));
         out += tmp;
       }
-      // Include base_url for settings panel display
+      // Include base_url for settings panel display.
+      // JSON-escape backslash and double-quote. Control chars (0x00-0x1F) are not escaped
+      // because base_url is validated at config load time to start with "http://" and is
+      // a plain ASCII URL — control characters cannot appear in valid HTTP URLs.
       out += ",\"base_url\":\"";
-      out += sat.base_url;
+      for (const char* bp = sat.base_url; *bp != '\0'; ++bp) {
+        if (*bp == '\\') { out += "\\\\"; }
+        else if (*bp == '"') { out += "\\\""; }
+        else { out += *bp; }
+      }
       out += "\"";
       // Include cached manifest JSON for per-gateway device rendering
       if (sat.manifest_len > 0) {
