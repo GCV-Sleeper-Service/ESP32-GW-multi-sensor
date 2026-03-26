@@ -216,16 +216,20 @@ function fixtureManifestV2(sensors, tag) {
       };
     }
     if (s.adapter === 'external_push') {
+      const measurements = SYSTEM_METRICS.map(m => {
+        const entry = { key: m.key };
+        if (m.history) {
+          entry.history_url = `/api/v2/history/${s.id}/${m.history_suffix}`;
+        }
+        return entry;
+      });
       return {
         id: s.id,
         name: s.name,
         category: s.category || 'system',
         adapter: 'external_push',
         source: s.source || {},
-        measurements: SYSTEM_METRICS.map(m => ({
-          key: m.key,
-          history_url: `/api/v2/history/${s.id}/${m.history_suffix}`,
-        })),
+        measurements,
       };
     }
     return {

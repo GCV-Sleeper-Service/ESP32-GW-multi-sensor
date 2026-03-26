@@ -269,8 +269,7 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
           "history_url": "/api/v2/history/nas01/disk_pct"
         },
         {
-          "key": "uptime_hrs",
-          "history_url": "/api/v2/history/nas01/"
+          "key": "uptime_hrs"
         }
       ]
     }

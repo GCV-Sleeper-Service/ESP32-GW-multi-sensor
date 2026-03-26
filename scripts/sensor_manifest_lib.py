@@ -320,16 +320,19 @@ def manifest_v2(
                 ],
             })
         elif adapter == "external_push":
+            measurements = []
+            for m in _SYSTEM_METRICS:
+                measurement = {"key": m["key"]}
+                if m.get("history"):
+                    measurement["history_url"] = f"/api/v2/history/{s['id']}/{m['history_suffix']}"
+                measurements.append(measurement)
             sensor_entries.append({
                 "id": s["id"],
                 "name": s["name"],
                 "category": s.get("category", "system"),
                 "adapter": adapter,
                 "source": s.get("source", {}),
-                "measurements": [
-                    {"key": m["key"], "history_url": f"/api/v2/history/{s['id']}/{m['history_suffix']}"}
-                    for m in _SYSTEM_METRICS
-                ],
+                "measurements": measurements,
             })
         else:
             sensor_entries.append({
