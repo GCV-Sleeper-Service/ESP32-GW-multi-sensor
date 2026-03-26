@@ -67,8 +67,8 @@ def unwrap_marker_body(block: str, begin: str, end: str) -> str:
 def render_header_block(sensors: List[Dict[str, str]]) -> str:
     lines = [
         "// SensorSlot removed in v7.5.3.8 — all runtime state in SensorEntity devices[].",
-        "// NUM_DEVICES = all logical devices in manifest.",
-        "// NUM_SENSORS = persisted environmental sensor count only (backward-compat alias for SegmentSnapshot / HistoryMeta).",
+        "// NUM_ENV_SENSORS / NUM_SENSORS = persisted environmental-sensor count only (backward-compat alias for SegmentSnapshot / HistoryMeta).",
+        "// NUM_DEVICES = total logical devices in manifest (environmental + network + system).",
     ]
     return "\n".join(lines)
 

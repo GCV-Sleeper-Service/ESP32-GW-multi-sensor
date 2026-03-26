@@ -307,6 +307,11 @@ function writeFixtureSet(targetDir, sensors, tag) {
       // Stub history files for ping device (RAM-only, no data at this phase)
       fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-ping_ms.csv`), '');
       fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-success_pct.csv`), '');
+    } else if (sensor.adapter === 'external_push') {
+      // Stub history files for system device history-enabled metrics
+      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-cpu_pct.csv`), '');
+      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-ram_pct.csv`), '');
+      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-disk_pct.csv`), '');
     }
   });
 }

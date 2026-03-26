@@ -138,7 +138,18 @@ def canonicalize_sensors(sensors: List[Dict], allow_empty: bool = False) -> List
         sid = (sensor.get("id") or "").strip()
         name = (sensor.get("name") or "").strip()
         adapter = (sensor.get("adapter") or "thermopro_ble").strip()
-        category = (sensor.get("category") or "environmental").strip()
+        adapter_defaults = {
+            "thermopro_ble": "environmental",
+            "icmp_ping": "network",
+            "external_push": "system",
+        }
+        if adapter not in adapter_defaults:
+            raise ManifestError(
+                f'Sensor "{name}" has invalid adapter "{adapter}". '
+                "Must be one of: external_push, icmp_ping, thermopro_ble."
+            )
+        expected_category = adapter_defaults[adapter]
+        category = (sensor.get("category") or expected_category).strip()
 
         if not sid:
             raise ManifestError(f"Sensor #{idx} is missing id.")
@@ -162,6 +173,11 @@ def canonicalize_sensors(sensors: List[Dict], allow_empty: bool = False) -> List
             raise ManifestError(
                 f'Sensor "{name}" has invalid category "{category}". '
                 f'Must be one of: {", ".join(sorted(VALID_CATEGORIES))}.'
+            )
+        if category != expected_category:
+            raise ManifestError(
+                f'Sensor "{name}" has category "{category}" but adapter "{adapter}" requires '
+                f'"{expected_category}".'
             )
 
         entry: Dict = {"id": sid, "name": name, "category": category, "adapter": adapter}
@@ -198,12 +214,6 @@ def canonicalize_sensors(sensors: List[Dict], allow_empty: bool = False) -> List
             source = sensor.get("source") or {}
             if isinstance(source.get("description"), str) and source.get("description").strip():
                 entry["source"] = {"description": source["description"].strip()}
-        else:
-            raise ManifestError(
-                f'Sensor "{name}" has invalid adapter "{adapter}". '
-                "Must be one of: external_push, icmp_ping, thermopro_ble."
-            )
-
         seen_ids.add(sid)
         seen_names.add(name)
         normalized.append(entry)
