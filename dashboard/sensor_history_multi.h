@@ -2149,6 +2149,15 @@ class HistoryWebHandler : public AsyncWebHandler {
     size_t id_len = static_cast<size_t>(slash - rest);
     const char *metric_key = slash + 1;
 
+    if (id_len == 0) {
+      send_json_error_(request, 400, "Empty device ID");
+      return;
+    }
+    if (metric_key[0] == '\0') {
+      send_json_error_(request, 400, "Empty metric key");
+      return;
+    }
+
     int dev_idx = -1;
     for (int d = 0; d < NUM_DEVICES; d++) {
       if (strlen(devices[d].id) == id_len &&
@@ -2178,7 +2187,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       send_json_error_(request, 400, "Missing val parameter");
       return;
     }
-    String val_str = request->getParam("val")->value();
+    std::string val_str = request->getParam("val")->value();
     char *endptr = nullptr;
     float value = strtof(val_str.c_str(), &endptr);
     if (endptr == val_str.c_str() || *endptr != '\0' || !std::isfinite(value)) {
