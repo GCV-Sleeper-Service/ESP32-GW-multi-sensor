@@ -57,8 +57,8 @@ Key changes in v7.5.6.0:
 
 ### What v7.5.6.1 needs to do
 
-1. Add system device definitions to `config/sensors.json` (e.g., `cpu_temp`, `disk_usage`, `mem_usage` with `category_id: 1` and `adapter: "external_ingest"")
-2. Define `MetricDef` arrays for system devices (e.g., `metrics_system_cpu[]`)
+1. Add system device definitions to `config/sensors.json` (e.g., `cpu_pct`, `ram_pct`, `disk_pct` with `category_id: 1` and `adapter: "external_push"`)
+2. Define `MetricDef` arrays for system devices (e.g., `metrics_system[]`)
 3. Add `SensorEntity` entries in the `devices[]` array with `category_id = 1`
 4. Update `NUM_DEVICES` count
 5. Run full generator pipeline (Critical Rule 28)
