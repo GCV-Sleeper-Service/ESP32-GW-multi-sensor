@@ -243,12 +243,14 @@ def render_yaml_averaging(sensors: List[Dict], all_sensors: List[Dict] = None) -
     for idx, sensor in enumerate(sensors):
         lines.extend(avg_lines(sensor, idx))
 
-    # Add compute_averages() for icmp_ping (and any future non-ThermoPro) devices
+    # Add compute_averages() for non-ThermoPro history devices
     if all_sensors:
         for i, s in enumerate(all_sensors):
-            if s.get("adapter") == "icmp_ping":
+            adapter = s.get("adapter")
+            if adapter in ("icmp_ping", "external_push"):
+                label = "network" if adapter == "icmp_ping" else "system"
                 lines.extend([
-                    f" // ── {s['name']} (network) ──────────────────────────────",
+                    f" // ── {s['name']} ({label}) ──────────────────────────────",
                     f" devices[{i}].compute_averages(epoch);",
                     "",
                 ])
@@ -809,10 +811,12 @@ def generate_board_yaml(
             lines.append(f"              id(avg_hum_{sid}).publish_state(devices[{idx}].hum_avg_str);")
             lines.append(f"              if (devices[{idx}].batt_last >= 0) id(battery_{sid}).publish_state(devices[{idx}].batt_str);")
             lines.append("")
-        # Ping averaging lines
+        # Non-ThermoPro averaging lines
         for i, s in enumerate(sensors):
-            if s.get("adapter") == "icmp_ping":
-                lines.append(f"              // ── {s['name']} (network) ──────────────────────────────")
+            adapter = s.get("adapter")
+            if adapter in ("icmp_ping", "external_push"):
+                label = "network" if adapter == "icmp_ping" else "system"
+                lines.append(f"              // ── {s['name']} ({label}) ──────────────────────────────")
                 lines.append(f"              devices[{i}].compute_averages(epoch);")
         lines.append("              // <<< SENSOR_MANIFEST:AVERAGING_END >>>")
         lines.append("")
@@ -1168,6 +1172,10 @@ def generate_board_yaml(
         sensor_desc_parts.append(f"{len(ble_sensors)}x ThermoPro TP357 ({names})")
     if ping_sensors:
         sensor_desc_parts.append("WAN ping monitor")
+    system_sensors = [s for s in sensors if s.get("adapter") == "external_push"]
+    if system_sensors:
+        names = ", ".join(s["name"] for s in system_sensors)
+        sensor_desc_parts.append(f"{len(system_sensors)}x system health monitor ({names})")
     sensor_desc = " + ".join(sensor_desc_parts) if sensor_desc_parts else "Pure aggregator (no local sensors)"
 
     lines.append("  # One-time About description (5 seconds after boot)")

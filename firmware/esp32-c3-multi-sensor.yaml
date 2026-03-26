@@ -189,6 +189,9 @@ time:
 
               // ── WAN Latency (network) ──────────────────────────────
               devices[3].compute_averages(epoch);
+
+              // ── NAS Health (system) ──────────────────────────────
+              devices[4].compute_averages(epoch);
               // <<< SENSOR_MANIFEST:AVERAGING_END >>>
 
               // ── Shared clock update ────────────────────────

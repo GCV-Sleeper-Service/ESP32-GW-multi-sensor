@@ -111,8 +111,8 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
       "history": true,
       "history_suffix": "cpu_pct",
       "display": {
-        "precision": 1,
-        "chart": false
+        "precision": 0,
+        "chart": true
       }
     },
     {
@@ -129,8 +129,8 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
       "history": true,
       "history_suffix": "ram_pct",
       "display": {
-        "precision": 1,
-        "chart": false
+        "precision": 0,
+        "chart": true
       }
     },
     {
@@ -147,8 +147,8 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
       "history": true,
       "history_suffix": "disk_pct",
       "display": {
-        "precision": 1,
-        "chart": false
+        "precision": 0,
+        "chart": true
       }
     },
     {
@@ -156,14 +156,14 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
       "name": "Uptime",
       "unit": "hours",
       "unit_symbol": "h",
-      "class": "metadata",
+      "class": "analog_numeric",
       "data_type": "float",
       "bounds": {
         "min": 0,
-        "max": 1000000
+        "max": 87600
       },
       "history": false,
-      "history_suffix": "uptime_hrs",
+      "history_suffix": "",
       "display": {
         "precision": 1,
         "chart": false
@@ -270,7 +270,7 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
         },
         {
           "key": "uptime_hrs",
-          "history_url": "/api/v2/history/nas01/uptime_hrs"
+          "history_url": "/api/v2/history/nas01/"
         }
       ]
     }
