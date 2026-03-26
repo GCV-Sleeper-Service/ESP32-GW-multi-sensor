@@ -24,7 +24,7 @@ GATEWAY_URL="${1:-http://192.168.10.20}"
 DEVICE_ID="${2:-nas01}"
 
 # Collect metrics
-CPU_PCT=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' || echo "0")
+CPU_PCT=$(LC_ALL=C top -bn1 | grep "Cpu(s)" | awk '{print $2}' || echo "0")
 RAM_PCT=$(free | awk '/Mem:/ {printf "%.1f", $3/$2 * 100.0}' || echo "0")
 DISK_PCT=$(df / | awk 'NR==2 {gsub(/%/,""); print $5}' || echo "0")
 UPTIME_HRS=$(awk '{printf "%.1f", $1/3600}' /proc/uptime || echo "0")
@@ -32,7 +32,12 @@ UPTIME_HRS=$(awk '{printf "%.1f", $1/3600}' /proc/uptime || echo "0")
 # Push to gateway (silent, ignore errors for cron usage)
 for METRIC in "cpu_pct=${CPU_PCT}" "ram_pct=${RAM_PCT}" "disk_pct=${DISK_PCT}" "uptime_hrs=${UPTIME_HRS}"; do
   KEY="${METRIC%%=*}"
-  VAL="${METRIC#*=}"
+  VAL_RAW="${METRIC#*=}"
+  # Strip any non-numeric characters (e.g., '%', 'us,' from top output variations)
+  VAL="$(printf '%s' "${VAL_RAW}" | sed 's/[^0-9.+-]//g')"
+  if [ -z "${VAL}" ]; then
+    VAL="0"
+  fi
   curl -s -X POST "${GATEWAY_URL}/api/ingest/${DEVICE_ID}/${KEY}?val=${VAL}" -o /dev/null --max-time 5 || true
 done
 
@@ -41,4 +46,4 @@ done
 # The || echo "0" fallback handles all these cases — CPU_PCT will be "0" on
 # incompatible systems. Do NOT attempt to make the script work on all distros.
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pushed: cpu=${CPU_PCT}% ram=${RAM_PCT}% disk=${DISK_PCT}% uptime=${UPTIME_HRS}h → ${GATEWAY_URL}"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Attempted push: cpu=${CPU_PCT}% ram=${RAM_PCT}% disk=${DISK_PCT}% uptime=${UPTIME_HRS}h → ${GATEWAY_URL}"

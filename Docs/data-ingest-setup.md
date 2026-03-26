@@ -44,6 +44,7 @@ python3 scripts/render_sensor_config.py --write
 node tests/fixtures/generate-fixtures.js
 bash scripts/generate-header.sh
 python3 scripts/render_sensor_config.py --check
+grep -q "free_heap" tests/fixtures/api-status.json
 ```
 
 Compile/flash as normal for your board profile.

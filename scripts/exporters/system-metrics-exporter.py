@@ -8,7 +8,9 @@ Cross-platform (Linux, macOS, Windows). Runs once by default;
 use --interval for continuous mode (e.g., --interval 60).
 """
 import argparse
+import os
 import platform
+import shutil
 import subprocess
 import time
 import urllib.request
@@ -16,17 +18,15 @@ import urllib.error
 
 
 def get_cpu_pct():
-    """Approximate CPU usage (1-second sample)."""
+    """Approximate CPU usage from 1-minute load average, normalized by core count."""
     system = platform.system()
     try:
         if system == "Linux":
             load = float(open("/proc/loadavg").read().split()[0])
-            import os
             return min(100.0, load / os.cpu_count() * 100)
         elif system == "Darwin":
             out = subprocess.check_output(["sysctl", "-n", "vm.loadavg"], text=True)
             load = float(out.split()[1])
-            import os
             return min(100.0, load / os.cpu_count() * 100)
     except Exception:
         pass
@@ -43,7 +43,6 @@ def get_ram_pct():
             avail = lines.get("MemAvailable", total)
             return (1 - avail / total) * 100
         elif system == "Darwin":
-            import os
             total = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
             return 0.0  # placeholder — macOS vm_stat parsing is complex
     except Exception:
@@ -53,7 +52,6 @@ def get_ram_pct():
 
 def get_disk_pct():
     try:
-        import shutil
         total, used, free = shutil.disk_usage("/")
         return (used / total) * 100
     except Exception:
@@ -78,7 +76,8 @@ def push_metric(gateway, device, key, value):
     url = f"{gateway}/api/ingest/{device}/{key}?val={value:.1f}"
     req = urllib.request.Request(url, method="POST")
     try:
-        urllib.request.urlopen(req, timeout=5)
+        with urllib.request.urlopen(req, timeout=5):
+            pass
         return True
     except (urllib.error.URLError, OSError):
         return False
