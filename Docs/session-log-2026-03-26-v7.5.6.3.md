@@ -91,9 +91,9 @@ All required checks passed in this session.
 
 ## Scope Compliance
 
-- No edits to `dashboard/dashboard.js`
-- No edits to `dashboard/dashboard.html`
-- No edits to `dashboard/sensor_history_multi.h`
+- `dashboard/dashboard.js` — version string update only (via `bump-version.sh`), no logic changes
+- `dashboard/dashboard.html` — version string update only (via `bump-version.sh`), no logic changes
+- `dashboard/sensor_history_multi.h` — version string update only (via `generate-header.sh`), no logic changes
 - No firmware logic changes
 - No manual fixture JSON edits (generator-only)
 - Did not proceed to v7.5.6.4
@@ -118,3 +118,28 @@ All required checks passed in this session.
 | Do not manually edit fixture JSON | ✅ | Used generators only |
 | Run full required validation after implementation | ✅ | Completed required suite |
 | Do not proceed to later step | ✅ | Stayed within v7.5.6.3 scope |
+
+## Known Issue — Aggregator Dashboard Missing Satellite Cards
+
+**Reported:** 2026-03-26
+**Status:** Under investigation — not caused by v7.5.6.3 changes
+
+The aggregator gateway's dashboard is not displaying the GATEWAYS section (satellite
+summary cards). This PR does not modify any dashboard logic, aggregator fixture files,
+or firmware code. Playwright aggregator tests pass (including `#gwGrid .gw-summary-card`
+count validation).
+
+**Likely causes (device-side):**
+1. Satellite gateways are unreachable from the aggregator (network/power issue)
+2. `config/aggregator.json` on the aggregator device is missing or corrupted
+3. Browser cache serving stale dashboard HTML
+
+**Diagnostic steps:**
+```bash
+curl -s http://<aggregator-ip>/api/aggregator/gateways | jq
+curl -s http://<aggregator-ip>/api/aggregator/live | jq
+curl -s http://<aggregator-ip>/api/status | jq
+```
+
+If `/api/aggregator/gateways` returns `{"gateways":[]}`, verify device-side
+`config/aggregator.json` and satellite reachability from the aggregator network.

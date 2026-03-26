@@ -21,9 +21,12 @@ Before using ingest, confirm:
 
 1. Gateway firmware is `v7.5.6.0` or newer.
 2. A `system` device exists in `config/sensors.json` with adapter `external_push`.
-3. Generated artifacts were refreshed:
+3. Generated artifacts were refreshed (full regeneration sequence):
    - `python3 scripts/render_sensor_config.py --write`
+   - `node tests/fixtures/generate-fixtures.js`
    - `bash scripts/generate-header.sh`
+   - `python3 scripts/render_sensor_config.py --check`
+   - `grep -q "free_heap" tests/fixtures/api-status.json`
 4. Gateway is reachable on LAN (`http://<gateway-ip>`).
 
 ## 3. Adding a System Device

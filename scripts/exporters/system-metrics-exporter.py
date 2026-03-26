@@ -45,7 +45,7 @@ def get_ram_pct():
         elif system == "Darwin":
             import os
             total = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
-            return 50.0  # placeholder — macOS vm_stat parsing is complex
+            return 0.0  # placeholder — macOS vm_stat parsing is complex
     except Exception:
         pass
     return 0.0
