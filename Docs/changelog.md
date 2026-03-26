@@ -3,6 +3,69 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.6.2] — 2026-03-26 — System Card Renderer (Phase 6 Step 2)
+
+### Dashboard system card renderer added
+
+Implemented `CARD_RENDERERS.system` for dashboard card dispatch and added a dedicated
+system card layout that renders:
+
+- CPU usage bar
+- RAM usage bar
+- Disk usage bar
+- Uptime value
+- Last-seen timestamp
+- Optional `source.description` text from manifest
+
+### Live data wiring for system devices
+
+System card values are now updated from `/api/v2/live` polling (not SSE), matching
+network device behavior:
+
+- Added `updateSystemCards(liveData)` to process `cpu_pct`, `ram_pct`, `disk_pct`, `uptime_hrs`, `last_seen`
+- Added `updateUsageBar(id, value, formatter)` helper with 0–100 clamp and class-based color bands
+- Updated `pollV2Live()` to invoke both:
+  - `updateNetworkCards(data)`
+  - `updateSystemCards(data)`
+
+### Metric formatter extensions
+
+Added explicit formatter keys used by `updateSystemCards()`:
+
+- `METRIC_FORMATTERS.cpu_usage`
+- `METRIC_FORMATTERS.ram_usage`
+- `METRIC_FORMATTERS.disk_usage`
+- `METRIC_FORMATTERS.uptime_hours`
+
+These are intentionally explicit formatter keys (not auto-mapped from manifest metric names).
+
+### Aggregator per-gateway remote system card updates
+
+Extended aggregator remote gateway live-path rendering so `renderGatewayDevices()`
+cards with `category: "system"` are populated from `/api/aggregator/live` in
+`_populateGatewayDeviceLive()`.
+
+### Styling updates
+
+Added system-card styles in dashboard HTML:
+
+- `.system-card`
+- `.system-usage-row`
+- `.system-bar-bg`
+- `.system-bar-fill`
+- `.system-bar-fill.bar-ok/.bar-warning/.bar-danger`
+
+### Mirror/regeneration and validation
+
+- Mirrored all required dashboard logic updates in both:
+  - `dashboard/dashboard.js`
+  - `dashboard/dashboard.html`
+- Regenerated compressed dashboard header (`dashboard/dashboard.h`)
+- Executed required regeneration sequence (Critical Rule 28)
+- Verified `free_heap` guard in fixtures
+- Ran required Playwright/preflight/render checks before edits and again after changes
+
+---
 ## [v7.5.6.1] — 2026-03-26 — System Device Category and Manifest Entries (Phase 6 Step 1)
 
 ### System device category support added
