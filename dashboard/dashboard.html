@@ -3491,7 +3491,7 @@ function buildSystemCard(s, manifest) {
           '<div class="reading-label">Last Seen</div>' +
           '<div class="reading-time" id="sys-lastseen-' + s.id + '">last: &mdash;</div>' +
         '</div>' +
-        (description ? '<div class="sensor-reading"><div class="reading-label" style="font-size:.52rem;color:var(--text-muted)">' + description + '</div></div>' : '') +
+        (description ? '<div class="sensor-reading"><div class="reading-label" style="font-size:.52rem;color:var(--text-muted)">' + escHtml(description) + '</div></div>' : '') +
       '</div>' +
     '</div>'
   );
@@ -4119,34 +4119,38 @@ function updateNetworkCards(liveData) {
   });
 }
 
+// ── System card DOM updater (shared by satellite + aggregator paths) ──
+function _updateSystemCardDOM(s, devData) {
+  updateUsageBar('sys-cpu-' + s.id, devData.cpu_pct, METRIC_FORMATTERS.cpu_usage);
+  updateUsageBar('sys-ram-' + s.id, devData.ram_pct, METRIC_FORMATTERS.ram_usage);
+  updateUsageBar('sys-disk-' + s.id, devData.disk_pct, METRIC_FORMATTERS.disk_usage);
+
+  var uptimeEl = document.getElementById('sys-uptime-' + s.id);
+  if (uptimeEl && devData.uptime_hrs !== undefined && devData.uptime_hrs !== null) {
+    uptimeEl.textContent = METRIC_FORMATTERS.uptime_hours(devData.uptime_hrs);
+    uptimeEl.classList.remove('waiting');
+  }
+
+  var seenEl = document.getElementById('sys-lastseen-' + s.id);
+  if (seenEl && devData.last_seen !== undefined && devData.last_seen !== null) {
+    seenEl.textContent = 'last: ' + new Date(devData.last_seen * 1000).toLocaleTimeString([], {hour12:false});
+  }
+}
+
 function updateSystemCards(liveData) {
   if (!liveData || !liveData.devices) return;
   SENSORS.forEach(function(s) {
     if (s.category !== 'system') return;
     var devData = liveData.devices[s.id];
     if (!devData) return;
-
-    updateUsageBar('sys-cpu-' + s.id, devData.cpu_pct, METRIC_FORMATTERS.cpu_usage);
-    updateUsageBar('sys-ram-' + s.id, devData.ram_pct, METRIC_FORMATTERS.ram_usage);
-    updateUsageBar('sys-disk-' + s.id, devData.disk_pct, METRIC_FORMATTERS.disk_usage);
-
-    var uptimeEl = document.getElementById('sys-uptime-' + s.id);
-    if (uptimeEl && devData.uptime_hrs !== undefined && devData.uptime_hrs !== null) {
-      uptimeEl.textContent = METRIC_FORMATTERS.uptime_hours(devData.uptime_hrs);
-      uptimeEl.classList.remove('waiting');
-    }
-
-    var seenEl = document.getElementById('sys-lastseen-' + s.id);
-    if (seenEl && devData.last_seen) {
-      seenEl.textContent = 'last: ' + new Date(devData.last_seen * 1000).toLocaleTimeString([], {hour12:false});
-    }
+    _updateSystemCardDOM(s, devData);
   });
 }
 
 function updateUsageBar(id, value, formatter) {
   var barEl = document.getElementById('bar-' + id);
   var valEl = document.getElementById('val-' + id);
-  if (value === null || value === undefined) return;
+  if (value === null || value === undefined || !isFinite(value)) return;
   var pct = Math.min(100, Math.max(0, value));
   if (barEl) {
     barEl.style.width = pct + '%';
@@ -4448,19 +4452,7 @@ function _populateGatewayDeviceLive(gwId, gwSensors) {
             seenEl.textContent = 'last: ' + d.toLocaleTimeString([], {hour12:false});
           }
         } else if (cat === 'system') {
-          updateUsageBar('sys-cpu-' + s.id, devData.cpu_pct, METRIC_FORMATTERS.cpu_usage);
-          updateUsageBar('sys-ram-' + s.id, devData.ram_pct, METRIC_FORMATTERS.ram_usage);
-          updateUsageBar('sys-disk-' + s.id, devData.disk_pct, METRIC_FORMATTERS.disk_usage);
-          var uptimeEl = document.getElementById('sys-uptime-' + s.id);
-          if (uptimeEl && devData.uptime_hrs !== undefined && devData.uptime_hrs !== null) {
-            uptimeEl.textContent = METRIC_FORMATTERS.uptime_hours(devData.uptime_hrs);
-            uptimeEl.classList.remove('waiting');
-          }
-          var seenEl = document.getElementById('sys-lastseen-' + s.id);
-          if (seenEl && devData.last_seen) {
-            var d = new Date(devData.last_seen * 1000);
-            seenEl.textContent = 'last: ' + d.toLocaleTimeString([], {hour12:false});
-          }
+          _updateSystemCardDOM(s, devData);
         }
       });
     })
