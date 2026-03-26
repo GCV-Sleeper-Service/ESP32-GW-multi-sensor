@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fixture_set: [3sensor, 1sensor, 2sensor, 4sensor, mixed, aggregator]
+        fixture_set: [3sensor, 1sensor, 2sensor, 4sensor, mixed, aggregator, system]
 
     permissions:
       contents: read
@@ -85,8 +85,15 @@ jobs:
           FIXTURE_SET: ${{ matrix.fixture_set }}
         run: npx playwright test tests/browser/dashboard.spec.js --grep "19\. Aggregator Mode"
 
+      - name: Run system suite (system — Group 20)
+        if: matrix.fixture_set == 'system'
+        env:
+          CI: true
+          FIXTURE_SET: ${{ matrix.fixture_set }}
+        run: npx playwright test tests/browser/dashboard.spec.js --grep "20\. System Devices and Data Ingest"
+
       - name: Run sensor-count smoke suite (${{ matrix.fixture_set }})
-        if: matrix.fixture_set != '3sensor' && matrix.fixture_set != 'mixed' && matrix.fixture_set != 'aggregator'
+        if: matrix.fixture_set != '3sensor' && matrix.fixture_set != 'mixed' && matrix.fixture_set != 'aggregator' && matrix.fixture_set != 'system'
         env:
           CI: true
           FIXTURE_SET: ${{ matrix.fixture_set }}

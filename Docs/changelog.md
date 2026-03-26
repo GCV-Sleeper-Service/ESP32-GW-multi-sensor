@@ -3,6 +3,77 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.6.4] — 2026-03-26 — Test Fixtures, Playwright Tests, and Phase 6 Closure
+
+### ✅ Phase 6 — Data Ingest and System Metrics — COMPLETE
+
+All Phase 6 steps (v7.5.6.0–v7.5.6.4) are merged. External systems can push metrics
+into the gateway via HTTP POST. System devices (CPU, RAM, disk) display alongside
+environmental and network sensor cards.
+
+### New `system` fixture variant
+
+Added `tests/fixtures/variants/system/` with:
+- 2 ThermoPro environmental sensors (`office`, `first_floor`)
+- 1 network device (`wan_ping`)
+- 1 system device (`nas01`, `external_push` adapter)
+- 4 total sensors; all JSON files end with real `\n` newline
+- `api-status.json` includes `free_heap`, `free_heap_internal`, `free_heap_total`
+
+### LESSON-OPS-079 compliance: Updated `mixed` fixture variant
+
+Added `nas01` system device to the `mixed` fixture variant in `generate-fixtures.js`.
+Mixed variant now has 2 env + 1 network + 1 system = 4 sensors. Group 18 tests
+updated to use `expectedSensorCount: 4`.
+
+### Mock server extension
+
+- Added `POST /api/ingest/:deviceId/:metricKey` route responding `{"ok":true}` for
+  known devices, 404 for unknown devices
+- `/api/v2/live` for system fixture now returns non-null values for `nas01`:
+  `cpu_pct: 45.2`, `ram_pct: 72.8`, `disk_pct: 55.0`, `uptime_hrs: 168.5`
+
+### Playwright Group 20: System Devices and Data Ingest (8 tests)
+
+- System fixture renders correct total card count (4)
+- System card renders with usage bar elements
+- Environmental cards have full ThermoPro layout (count: 2)
+- Network card present alongside system card (count: 1)
+- `CARD_RENDERERS.system` is registered
+- `/api/v2/live` returns system device data
+- POST `/api/ingest` returns 200 for valid device/metric
+- POST `/api/ingest` returns 404 for unknown device
+
+### Skip guards: system fixture compatibility audit
+
+7 existing tests received skip guards for `FIXTURE_SET=system` (BUG-051 prevention).
+Documented in `Docs/bugs-and-lessons-learned.md` as LESSON-OPS-080.
+
+### Bug fixes
+
+- **BUG-072** (`updateNetworkCards()`): Changed truthy `last_seen` check to `!= null`
+  so a `last_seen` value of `0` correctly updates the network card display.
+- **BUG-073** (`buildNetworkCard()`): Added `escHtml()` to `target` string to prevent
+  XSS via config-derived manifest data.
+Both fixes mirrored in `dashboard.js` and `dashboard.html`.
+
+### CI matrix update
+
+Added `system` to the `fixture_set` matrix in `.github/workflows/browser-tests.yml`.
+New step runs Group 20 with `FIXTURE_SET=system --grep "20\. System Devices"`.
+System fixture excluded from sensor-count smoke step.
+
+### Version bump and regeneration
+
+- Bumped version to `7.5.6.4` via `bash scripts/bump-version.sh 7.5.6.4`
+- Ran Critical Rule 28 regeneration sequence:
+  - `python3 scripts/render_sensor_config.py --write`
+  - `node tests/fixtures/generate-fixtures.js`
+  - `bash scripts/generate-header.sh`
+  - `python3 scripts/render_sensor_config.py --check`
+  - `grep -q "free_heap" tests/fixtures/api-status.json`
+
+---
 ## [v7.5.6.3] — 2026-03-26 — Example Exporter Scripts and Ingest Documentation (Phase 6 Step 3)
 
 ### Added exporter scripts for external system metrics push

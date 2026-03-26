@@ -12,7 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
-const VERSION = 'v7.5.6.3';
+const VERSION = 'v7.5.6.4';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },
@@ -29,6 +29,15 @@ const WAN_PING_DEVICE = {
   category: 'network',
   adapter: 'icmp_ping',
   source: { target: '8.8.8.8' },
+};
+
+// System device (external_push) — included in system + mixed variants.
+const NAS01_DEVICE = {
+  id: 'nas01',
+  name: 'NAS Health',
+  category: 'system',
+  adapter: 'external_push',
+  source: {},
 };
 
 const ANCHOR_EPOCH_SEC = 1741694400; // 2025-03-11 12:00:00 UTC
@@ -340,10 +349,11 @@ function buildPingCsvLines(metricKey, pointCount) {
 }
 
 function generateMixedFixtures() {
-  // Mixed variant: 2 ThermoPro BLE sensors + 1 wan_ping network device
+  // Mixed variant: 2 ThermoPro BLE sensors + 1 wan_ping network device + 1 nas01 system device
   const bleSensors = materializeSensors(SENSOR_LIBRARY.slice(0, 2));
   const pingSensor = materializeSensors([WAN_PING_DEVICE])[0];
-  const sensors = [...bleSensors, pingSensor];
+  const sysSensor = materializeSensors([NAS01_DEVICE])[0];
+  const sensors = [...bleSensors, pingSensor, sysSensor];
   const dir = path.join(VARIANTS_ROOT, 'mixed');
 
   writeFixtureSet(dir, sensors, 'mixed');
@@ -360,6 +370,30 @@ function generateMixedFixtures() {
   );
 
   console.log(`generated variant: mixed -> ${dir}`);
+}
+
+function generateSystemFixtures() {
+  // System variant: 2 ThermoPro BLE sensors + 1 wan_ping network device + 1 nas01 system device
+  const bleSensors = materializeSensors(SENSOR_LIBRARY.slice(0, 2));
+  const pingSensor = materializeSensors([WAN_PING_DEVICE])[0];
+  const sysSensor = materializeSensors([NAS01_DEVICE])[0];
+  const sensors = [...bleSensors, pingSensor, sysSensor];
+  const dir = path.join(VARIANTS_ROOT, 'system');
+
+  writeFixtureSet(dir, sensors, 'system');
+
+  // Overwrite stub ping CSV files with realistic data (12 points per metric)
+  const PING_POINTS = 12;
+  fs.writeFileSync(
+    path.join(dir, 'history-wan_ping-ping_ms.csv'),
+    buildPingCsvLines('ping_ms', PING_POINTS)
+  );
+  fs.writeFileSync(
+    path.join(dir, 'history-wan_ping-success_pct.csv'),
+    buildPingCsvLines('success_pct', PING_POINTS)
+  );
+
+  console.log(`generated variant: system -> ${dir}`);
 }
 
 function writeVariant(count) {
@@ -419,6 +453,7 @@ function writeVariant(count) {
 
   [1, 2, 3, 4].forEach(writeVariant);
   generateMixedFixtures();
+  generateSystemFixtures();
   if (overwriteBaseline) {
     console.error('Warning: --overwrite-baseline requires either --count N or --manifest <path>. Skipped baseline overwrite.');
   }

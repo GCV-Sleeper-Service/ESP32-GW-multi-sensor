@@ -247,37 +247,43 @@ echo "Pushed: cpu=${CPU_PCT}% ram=${RAM_PCT}% disk=${DISK_PCT}% uptime=${UPTIME_
 
 ---
 
-### v7.5.6.4 — Test fixtures, Playwright tests, and Phase 6 closure
+### v7.5.6.4 — Test fixtures, Playwright tests, and Phase 6 closure ✅ COMPLETE
+
+**Status: COMPLETE** (2026-03-26)
 
 **Scope:** Create test fixtures for system devices, add Playwright tests, close phase.
 
 **Files modified:**
-- `tests/fixtures/variants/system/` — new: fixture set with environmental + network + system devices
-- `tests/mock-server/server.js` — extend for system device and ingest endpoint mocking
-- `tests/browser/dashboard.spec.js` — add Group 18: system device and ingest tests
+- `tests/fixtures/variants/system/` — new: fixture set with 2 env + 1 network + 1 system = 4 sensors
+- `tests/fixtures/variants/mixed/` — updated: added `nas01` system device (LESSON-OPS-079)
+- `tests/fixtures/generate-fixtures.js` — added `generateSystemFixtures()`, updated `generateMixedFixtures()` to include nas01
+- `tests/mock-server/server.js` — added POST `/api/ingest/:deviceId/:metricKey`, non-null system data in `/api/v2/live` for system fixture
+- `tests/browser/dashboard.spec.js` — added Group 20: System Devices and Data Ingest (8 tests), skip guards for system fixture incompatibility, updated Group 18 for 4-sensor mixed variant
+- `tests/browser/manifest.spec.js` — skip guard for system fixture
+- `dashboard/dashboard.js` + `dashboard/dashboard.html` — BUG-072 fix (`last_seen != null`), BUG-073 fix (`escHtml(target)`)
+- `.github/workflows/browser-tests.yml` — added `system` to matrix, added Group 20 CI step
 - `Docs/changelog.md` — v7.5.6.4 entry with Phase 6 Complete callout
 - `Docs/v7.5-v7.6-architecture-plan.md` — Phase 6 Status: COMPLETE
-- `Docs/session-log-2026-XX-XX-v7.5.6.4.md` — session log
-- `Docs/bugs-and-lessons-learned.md` — new entries if bugs found
+- `Docs/session-log-2026-03-26-v7.5.6.4.md` — session log
+- `Docs/bugs-and-lessons-learned.md` — skip guard documentation
 - Version bump: ALL locations to `7.5.6.4`
 
-**New Playwright tests (Group 18 — System Devices and Data Ingest):**
-1. System card renders with CPU/RAM/disk usage bars
-2. System card usage bars have correct color coding
-3. Dashboard renders environmental + network + system cards together
-4. System device appears in `/api/v2/live`
-5. Ingest endpoint returns 200 for valid push
-6. Ingest endpoint returns 404 for unknown device
+**Playwright tests (Group 20 — System Devices and Data Ingest):**
+1. System fixture renders correct total card count (4)
+2. System card renders with usage bar elements
+3. Environmental cards have full ThermoPro layout (count: 2)
+4. Network card present alongside system card (count: 1)
+5. `CARD_RENDERERS.system` is registered
+6. `/api/v2/live` returns system device data
+7. POST `/api/ingest` returns 200 for valid device/metric
+8. POST `/api/ingest` returns 404 for unknown device
 
 **Acceptance criteria:**
-- [ ] All new tests pass
-- [ ] All existing tests pass (regression gate)
-- [ ] Architecture plan updated with Phase 6 COMPLETE
-- [ ] Phase 6 Complete callout in changelog
-- [ ] Version is `7.5.6.4` everywhere
-
-**Risk:** Low.  
-**Estimated effort:** 1–2 sessions.
+- [x] All new tests pass
+- [x] All existing tests pass (regression gate)
+- [x] Architecture plan updated with Phase 6 COMPLETE
+- [x] Phase 6 Complete callout in changelog
+- [x] Version is `7.5.6.4` everywhere
 
 ---
 

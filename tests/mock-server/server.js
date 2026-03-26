@@ -160,13 +160,10 @@ const server = http.createServer(function(req, res) {
           last_seen: 1741694400 + idx * 10
         };
       } else if (s.adapter === 'external_push') {
-        devices[s.id] = {
-          cpu_pct: null,
-          ram_pct: null,
-          disk_pct: null,
-          uptime_hrs: null,
-          last_seen: 1741694400 + idx * 10
-        };
+        const isSystem = FIXTURE_SET === 'system';
+        devices[s.id] = isSystem
+          ? { cpu_pct: 45.2, ram_pct: 72.8, disk_pct: 55.0, uptime_hrs: 168.5, last_seen: 1710264000 }
+          : { cpu_pct: null, ram_pct: null, disk_pct: null, uptime_hrs: null, last_seen: 1741694400 + idx * 10 };
       }
     });
     return json(res, { timestamp: 1741694400, devices: devices });
@@ -233,6 +230,15 @@ const server = http.createServer(function(req, res) {
 
   if (pathname.startsWith('/api/import/')) {
     return json(res, { ok: true, stub: true, accepted: 0, rejected: 0, segments_written: 0 });
+  }
+
+  const ingestMatch = pathname.match(/^\/api\/ingest\/([^/]+)\/([^/]+)$/);
+  if (ingestMatch && req.method === 'POST') {
+    const deviceId = ingestMatch[1];
+    const manifest = loadFixtureJson('manifest.json', { sensors: [] });
+    const known = (manifest.sensors || []).some(function(s) { return s.id === deviceId; });
+    if (!known) return notFound(res, `Unknown device: ${deviceId}`);
+    return json(res, { ok: true });
   }
 
   // Aggregator endpoints — return empty gateways in satellite fixture sets (no 404
