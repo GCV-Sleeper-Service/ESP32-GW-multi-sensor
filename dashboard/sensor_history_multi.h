@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.5.5.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.6.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -52,6 +52,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdint>
+#include <cstdlib>
 #include <new>
 #include <string>
 #include <cctype>
@@ -471,7 +472,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.5.5) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.6.0) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //
@@ -1679,6 +1680,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     auto url = request->url_to(url_buf);
     const char *p = url.c_str();
     size_t len = url.size();
+    if (len > 12 && strncmp(p, "/api/ingest/", 12) == 0) return true;
 
     if (request->method() == HTTP_GET) {
       if (len >= 11 && strncmp(p, "/history/", 9) == 0) return true;
@@ -1730,6 +1732,11 @@ class HistoryWebHandler : public AsyncWebHandler {
 
     if (request->method() == HTTP_OPTIONS) {
       handle_options_(request);
+      return;
+    }
+
+    if (strncmp(p, "/api/ingest/", 12) == 0) {
+      handle_api_ingest_(request);
       return;
     }
 
@@ -2120,6 +2127,70 @@ class HistoryWebHandler : public AsyncWebHandler {
         200, "text/plain",
         reinterpret_cast<const uint8_t *>(csv.data()), csv.size());
     resp->addHeader("Cache-Control", "no-store");
+    request->send(resp);
+  }
+
+  void handle_api_ingest_(AsyncWebServerRequest *request) const {
+    if (request->method() != HTTP_POST) {
+      send_json_error_(request, 405, "Method not allowed");
+      return;
+    }
+
+    char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
+    auto url = request->url_to(url_buf);
+    const char *p = url.c_str();
+    const char *rest = p + 12;  // "/api/ingest/"
+    const char *slash = strchr(rest, '/');
+    if (!slash) {
+      send_json_error_(request, 400, "Missing metric key");
+      return;
+    }
+
+    size_t id_len = static_cast<size_t>(slash - rest);
+    const char *metric_key = slash + 1;
+
+    int dev_idx = -1;
+    for (int d = 0; d < NUM_DEVICES; d++) {
+      if (strlen(devices[d].id) == id_len &&
+          strncmp(devices[d].id, rest, id_len) == 0) {
+        dev_idx = d;
+        break;
+      }
+    }
+    if (dev_idx < 0) {
+      send_json_error_(request, 404, "Unknown device");
+      return;
+    }
+
+    int metric_idx = -1;
+    for (int m = 0; m < devices[dev_idx].metric_count; m++) {
+      if (strcmp(devices[dev_idx].metric_defs[m].key, metric_key) == 0) {
+        metric_idx = m;
+        break;
+      }
+    }
+    if (metric_idx < 0) {
+      send_json_error_(request, 404, "Unknown metric");
+      return;
+    }
+
+    if (!request->hasParam("val")) {
+      send_json_error_(request, 400, "Missing val parameter");
+      return;
+    }
+    String val_str = request->getParam("val")->value();
+    char *endptr = nullptr;
+    float value = strtof(val_str.c_str(), &endptr);
+    if (endptr == val_str.c_str() || *endptr != '\0' || !std::isfinite(value)) {
+      send_json_error_(request, 400, "Invalid value");
+      return;
+    }
+
+    devices[dev_idx].add_sample(metric_idx, value);
+    devices[dev_idx].mark_seen(::time(nullptr));
+
+    auto *resp = request->beginResponse(200, "application/json", "{\"ok\":true}");
+    add_common_headers_(resp);
     request->send(resp);
   }
 

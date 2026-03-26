@@ -184,7 +184,7 @@ All steps shipped. No prompts needed.
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
-| v7.5.6.0 | POST /api/ingest endpoint | `prompts/phase6/v7.5.6.0-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.5.6.0 | POST /api/ingest endpoint | `prompts/phase6/v7.5.6.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-26 |
 | v7.5.6.1 | System device category | `prompts/phase6/v7.5.6.1-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.5.6.2 | System card renderer | `prompts/phase6/v7.5.6.2-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.5.6.3 | Exporter scripts + docs | `prompts/phase6/v7.5.6.3-implementation-instructions-for-coding-agent.md` | Pending |
