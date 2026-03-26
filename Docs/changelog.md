@@ -3,6 +3,56 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.6.3] — 2026-03-26 — Example Exporter Scripts and Ingest Documentation (Phase 6 Step 3)
+
+### Added exporter scripts for external system metrics push
+
+Added new executable exporter scripts under `scripts/exporters/`:
+
+- `system-metrics-exporter.sh` (Linux bash exporter)
+- `system-metrics-exporter.py` (cross-platform Python exporter, stdlib-only)
+
+Both scripts support configurable gateway URL and device ID and push:
+
+- `cpu_pct`
+- `ram_pct`
+- `disk_pct`
+- `uptime_hrs`
+
+to:
+
+- `POST /api/ingest/{device_id}/{metric_key}?val={float}`
+
+### Added ingest workflow setup guide
+
+Added `Docs/data-ingest-setup.md` with setup and operations guidance:
+
+- endpoint overview and prerequisites
+- adding a `system` / `external_push` device
+- bash and Python exporter usage
+- custom exporter API contract
+- monitoring and troubleshooting
+- security limitations for v7.5.6.x
+
+The guide documents the exact ingest error response format returned by firmware:
+
+- `{"ok":false,"message":"...","status":N}`
+
+and success response:
+
+- `{"ok":true}`
+
+### Version bump and regeneration
+
+- Bumped version to `7.5.6.3` via `bash scripts/bump-version.sh 7.5.6.3`
+- Ran Critical Rule 28 regeneration sequence:
+  - `python3 scripts/render_sensor_config.py --write`
+  - `node tests/fixtures/generate-fixtures.js`
+  - `bash scripts/generate-header.sh`
+  - `python3 scripts/render_sensor_config.py --check`
+  - `grep -q "free_heap" tests/fixtures/api-status.json`
+
+---
 ## [v7.5.6.2] — 2026-03-26 — System Card Renderer (Phase 6 Step 2)
 
 ### Dashboard system card renderer added
