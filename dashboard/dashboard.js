@@ -39,7 +39,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.6.3';
+App.version = 'v7.5.6.4';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -2525,7 +2525,7 @@ function buildNetworkCard(s, manifest) {
         '</div>' +
         '<div class="sensor-reading">' +
           '<div class="reading-label">Target</div>' +
-          '<div class="reading-value" id="net-target-' + s.id + '">' + target + '</div>' +
+          '<div class="reading-value" id="net-target-' + s.id + '">' + escHtml(target) + '</div>' +
         '</div>' +
         '<div class="sensor-reading">' +
           '<div class="reading-label">Last Seen</div>' +
@@ -3182,7 +3182,7 @@ function updateNetworkCards(liveData) {
     }
 
     var seenEl = document.getElementById('net-lastseen-' + s.id);
-    if (seenEl && devData.last_seen) {
+    if (seenEl && devData.last_seen != null) {
       var d = new Date(devData.last_seen * 1000);
       seenEl.textContent = 'last: ' + d.toLocaleTimeString([], {hour12:false});
     }

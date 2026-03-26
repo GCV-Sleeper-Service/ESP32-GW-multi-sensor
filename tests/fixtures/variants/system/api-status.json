@@ -1,7 +1,7 @@
 {
   "ok": true,
   "version": "v7.5.6.4",
-  "sensor_count": 5,
+  "sensor_count": 4,
   "sensors": [
     {
       "id": "office",
@@ -12,15 +12,15 @@
       "name": "First Floor"
     },
     {
-      "id": "outside",
-      "name": "Outside"
+      "id": "wan_ping",
+      "name": "WAN Latency"
     },
     {
-      "id": "garage",
-      "name": "Garage"
+      "id": "nas01",
+      "name": "NAS Health"
     }
   ],
-  "mode": "4sensor",
+  "mode": "system",
   "connected": true,
   "free_heap": 81920,
   "free_heap_internal": 81920,

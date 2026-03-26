@@ -98,6 +98,7 @@ test.describe('manifest boot flow', () => {
 
   test('dashboard falls back to /sensors.json when /api/manifest is unavailable', async ({ page }) => {
     test.skip(process.env.FIXTURE_SET === 'mixed', 'sensors.json fallback list (office,first_floor,outside) is 3sensor-specific; mixed sensors.json has 2 entries (no outside).');
+    test.skip(process.env.FIXTURE_SET === 'system', 'System sensors.json has 2 entries (office,first_floor); fallback sensor list (office,first_floor,outside) is 3sensor-specific.');
     await stubCdn(page);
     await page.route('**/api/manifest', async route => {
       await route.fulfill({

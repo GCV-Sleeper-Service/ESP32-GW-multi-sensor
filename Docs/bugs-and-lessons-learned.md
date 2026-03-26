@@ -2235,7 +2235,67 @@ add Playwright assertions for system device presence in manifest + v2/live shape
 
 ---
 
-## Regression Checklist
+## BUG-072 — `updateNetworkCards()` truthy check on `last_seen` (fixed v7.5.6.4)
+
+### Symptom
+
+When `last_seen` is `0` (epoch 0, valid timestamp), the last-seen display in the
+network card would silently remain as `last: —` instead of showing the timestamp.
+
+### Root Cause
+
+`updateNetworkCards()` used a truthy check: `if (seenEl && devData.last_seen)`.
+A `last_seen` value of `0` is falsy in JavaScript, so the display was not updated.
+
+### Fix (v7.5.6.4)
+
+Changed to strict null check: `if (seenEl && devData.last_seen != null)`.
+Mirrored in both `dashboard.js` and `dashboard.html`.
+
+---
+
+## BUG-073 — `buildNetworkCard()` XSS via unescaped `target` string (fixed v7.5.6.4)
+
+### Symptom
+
+The `source.target` field from the manifest (e.g. `"8.8.8.8"`) was inserted into
+the network card HTML without HTML escaping. A malicious manifest could inject
+HTML/script tags via this field.
+
+### Root Cause
+
+`buildNetworkCard()` used `target` directly in the innerHTML string without calling
+`escHtml()`. The `description` in `buildSystemCard()` already used `escHtml()`
+(correct), but `target` in the network card did not.
+
+### Fix (v7.5.6.4)
+
+Changed `'>' + target + '</div>'` to `'>' + escHtml(target) + '</div>'`.
+Mirrored in both `dashboard.js` and `dashboard.html`.
+
+---
+
+## LESSON-OPS-080 — System fixture skip guards (v7.5.6.4)
+
+**Version:** v7.5.6.4
+**Symptom:** After adding the `system` fixture variant (2 env + 1 net + 1 sys = 4 sensors),
+7 existing tests failed because they assumed the 3sensor-specific sensor list
+(`office`, `first_floor`, `outside`) or expected exactly 3 env sensors.
+
+**Skip guards added (v7.5.6.4):**
+- `2. Sensor cards / sensor card headers contain expected sensor names` — 'Outside' absent from system fixture
+- `14. Phase 2 Closure / scenario 1` — 'Outside' name check is 3sensor-specific
+- `14. Phase 2 Closure / scenario 2` — sensors.json fallback count (3) is 3sensor-specific; system has 2 env entries
+- `14. Phase 2 Closure / scenario 4` — `envSensors.length === 3` is 3sensor-specific; system has 2 env sensors
+- `15. Phase 3 Closure / dashboard renders identically` — 'Outside' name check is 3sensor-specific
+- `17. Phase 4 Step 2 / environmental cards have full ThermoPro layout` — `.sensor-card:not(.network-card)` includes system card which lacks `.sensor-env-grid`
+- `manifest.spec.js / dashboard falls back to /sensors.json` — fallback sensor list is 3sensor-specific
+
+**Prevention:** When adding a new fixture variant, always run `FIXTURE_SET=<new> npx playwright test --project=chromium` (full suite, no `--grep`) to discover incompatibilities before merging.
+
+---
+
+
 
 Any significant dashboard or data-path modification should re-check:
 
