@@ -3,6 +3,57 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.6.0] — 2026-03-26 — POST /api/ingest Endpoint (Phase 6 Step 0)
+
+### Ingest endpoint added
+
+Added local ingest endpoint to `HistoryWebHandler`:
+
+- `POST /api/ingest/{device_id}/{metric_key}?val={float}`
+
+Behavior:
+- Parses `device_id` and `metric_key` from URL path (prefix `/api/ingest/`, 12 chars)
+- Validates device exists in `devices[]`
+- Validates metric exists in `metric_defs[]` for that device
+- Parses `val` query parameter as finite float
+- Writes data with `devices[dev].add_sample(metric, value)`
+- Updates freshness with `devices[dev].mark_seen(::time(nullptr))`
+- Returns `200 {"ok":true}` on success
+
+Error responses (reusing existing `send_json_error_()` helper):
+- `405` — `Method not allowed` (non-POST)
+- `404` — `Unknown device`
+- `404` — `Unknown metric`
+- `400` — `Missing val parameter`
+- `400` — `Invalid value`
+
+### Route registration and endpoint audit
+
+Added `/api/ingest/` prefix handling to both:
+- `canHandle()` (`strncmp(p, "/api/ingest/", 12)`)
+- `handleRequest()` (dispatches to `handle_api_ingest_()`)
+
+This does not collide with existing `/api/import/` or `/api/v2/` prefixes.
+
+### Response/header compliance
+
+- Success response uses `beginResponse()` (not `beginResponseStream()`)
+- Success response uses `add_common_headers_()`
+- Error responses use existing `send_json_error_()` helper (no duplicate helper added)
+
+### Security note
+
+`/api/ingest` currently has no authentication. Any client on the same network can push values.
+This is acceptable for home/lab deployments in Phase 6 and must be hardened in a future security phase.
+
+### Validation and tooling updates
+
+- Added preflight guard: `history_handler_has_api_ingest_route`
+- Version bumped to `7.5.6.0`
+- Regeneration sequence executed (Critical Rule 28)
+- Required Playwright + preflight validation completed
+
+---
 ## [v7.5.5.5-docs] — 2026-03-25 — Documentation Overhaul and Phase D Planning
 
 ### Documentation cleanup
