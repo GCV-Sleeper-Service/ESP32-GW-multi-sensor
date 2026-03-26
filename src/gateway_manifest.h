@@ -8,13 +8,13 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
   "ok": true,
   "schema_version": 2,
   "source": "active-manifest",
-  "version": "v7.5.6.0",
+  "version": "v7.5.6.1",
   "gateway": {
     "id": "gw-main",
     "name": "Main Gateway",
     "role": "satellite",
     "hardware": "ESP32-C3",
-    "firmware_version": "v7.5.6.0",
+    "firmware_version": "v7.5.6.1",
     "api_version": "v2"
   },
   "history": {
@@ -23,7 +23,7 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
     "ram_window_hours": 24,
     "sample_interval_seconds": 900
   },
-  "sensor_count": 4,
+  "sensor_count": 5,
   "metrics": [
     {
       "key": "temp",
@@ -59,6 +59,114 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
       "display": {
         "precision": 1,
         "chart": true
+      }
+    },
+    {
+      "key": "ping_ms",
+      "name": "Latency",
+      "unit": "ms",
+      "unit_symbol": "ms",
+      "class": "analog_numeric",
+      "data_type": "float",
+      "bounds": {
+        "min": 0,
+        "max": 10000
+      },
+      "history": true,
+      "history_suffix": "ping_ms",
+      "display": {
+        "precision": 0,
+        "chart": true
+      }
+    },
+    {
+      "key": "success_pct",
+      "name": "Success Rate",
+      "unit": "percent",
+      "unit_symbol": "%",
+      "class": "analog_numeric",
+      "data_type": "float",
+      "bounds": {
+        "min": 0,
+        "max": 100
+      },
+      "history": true,
+      "history_suffix": "success_pct",
+      "display": {
+        "precision": 0,
+        "chart": true
+      }
+    },
+    {
+      "key": "cpu_pct",
+      "name": "CPU Usage",
+      "unit": "percent",
+      "unit_symbol": "%",
+      "class": "analog_numeric",
+      "data_type": "float",
+      "bounds": {
+        "min": 0,
+        "max": 100
+      },
+      "history": true,
+      "history_suffix": "cpu_pct",
+      "display": {
+        "precision": 0,
+        "chart": true
+      }
+    },
+    {
+      "key": "ram_pct",
+      "name": "RAM Usage",
+      "unit": "percent",
+      "unit_symbol": "%",
+      "class": "analog_numeric",
+      "data_type": "float",
+      "bounds": {
+        "min": 0,
+        "max": 100
+      },
+      "history": true,
+      "history_suffix": "ram_pct",
+      "display": {
+        "precision": 0,
+        "chart": true
+      }
+    },
+    {
+      "key": "disk_pct",
+      "name": "Disk Usage",
+      "unit": "percent",
+      "unit_symbol": "%",
+      "class": "analog_numeric",
+      "data_type": "float",
+      "bounds": {
+        "min": 0,
+        "max": 100
+      },
+      "history": true,
+      "history_suffix": "disk_pct",
+      "display": {
+        "precision": 0,
+        "chart": true
+      }
+    },
+    {
+      "key": "uptime_hrs",
+      "name": "Uptime",
+      "unit": "hours",
+      "unit_symbol": "h",
+      "class": "analog_numeric",
+      "data_type": "float",
+      "bounds": {
+        "min": 0,
+        "max": 87600
+      },
+      "history": false,
+      "history_suffix": "",
+      "display": {
+        "precision": 1,
+        "chart": false
       }
     }
   ],
@@ -136,6 +244,32 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
         {
           "key": "success_pct",
           "history_url": "/api/v2/history/wan_ping/success_pct"
+        }
+      ]
+    },
+    {
+      "id": "nas01",
+      "name": "NAS Health",
+      "category": "system",
+      "adapter": "external_push",
+      "source": {
+        "description": "Pushed via /api/ingest from NAS cron job"
+      },
+      "measurements": [
+        {
+          "key": "cpu_pct",
+          "history_url": "/api/v2/history/nas01/cpu_pct"
+        },
+        {
+          "key": "ram_pct",
+          "history_url": "/api/v2/history/nas01/ram_pct"
+        },
+        {
+          "key": "disk_pct",
+          "history_url": "/api/v2/history/nas01/disk_pct"
+        },
+        {
+          "key": "uptime_hrs"
         }
       ]
     }

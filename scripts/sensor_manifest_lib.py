@@ -18,7 +18,7 @@ AGGREGATOR_MAX_POLL = 300
 AGGREGATOR_MAX_SATELLITES = 10
 NAME_MAX_LEN = 15
 MIN_SENSORS = 1
-MAX_SENSORS = 4
+MAX_SENSORS = 5
 VALID_CATEGORIES = {"environmental", "network", "system"}
 
 # Metrics defined per adapter type
@@ -46,6 +46,57 @@ _PING_METRICS = [
         "history": True,
         "history_suffix": "success_pct",
         "display": {"precision": 0, "chart": True},
+    },
+]
+
+_SYSTEM_METRICS = [
+    {
+        "key": "cpu_pct",
+        "name": "CPU Usage",
+        "unit": "percent",
+        "unit_symbol": "%",
+        "class": "analog_numeric",
+        "data_type": "float",
+        "bounds": {"min": 0, "max": 100},
+        "history": True,
+        "history_suffix": "cpu_pct",
+        "display": {"precision": 0, "chart": True},
+    },
+    {
+        "key": "ram_pct",
+        "name": "RAM Usage",
+        "unit": "percent",
+        "unit_symbol": "%",
+        "class": "analog_numeric",
+        "data_type": "float",
+        "bounds": {"min": 0, "max": 100},
+        "history": True,
+        "history_suffix": "ram_pct",
+        "display": {"precision": 0, "chart": True},
+    },
+    {
+        "key": "disk_pct",
+        "name": "Disk Usage",
+        "unit": "percent",
+        "unit_symbol": "%",
+        "class": "analog_numeric",
+        "data_type": "float",
+        "bounds": {"min": 0, "max": 100},
+        "history": True,
+        "history_suffix": "disk_pct",
+        "display": {"precision": 0, "chart": True},
+    },
+    {
+        "key": "uptime_hrs",
+        "name": "Uptime",
+        "unit": "hours",
+        "unit_symbol": "h",
+        "class": "analog_numeric",
+        "data_type": "float",
+        "bounds": {"min": 0, "max": 87600},
+        "history": False,
+        "history_suffix": "",
+        "display": {"precision": 1, "chart": False},
     },
 ]
 
@@ -87,7 +138,18 @@ def canonicalize_sensors(sensors: List[Dict], allow_empty: bool = False) -> List
         sid = (sensor.get("id") or "").strip()
         name = (sensor.get("name") or "").strip()
         adapter = (sensor.get("adapter") or "thermopro_ble").strip()
-        category = (sensor.get("category") or "environmental").strip()
+        adapter_defaults = {
+            "thermopro_ble": "environmental",
+            "icmp_ping": "network",
+            "external_push": "system",
+        }
+        if adapter not in adapter_defaults:
+            raise ManifestError(
+                f'Sensor "{name}" has invalid adapter "{adapter}". '
+                "Must be one of: external_push, icmp_ping, thermopro_ble."
+            )
+        expected_category = adapter_defaults[adapter]
+        category = (sensor.get("category") or expected_category).strip()
 
         if not sid:
             raise ManifestError(f"Sensor #{idx} is missing id.")
@@ -111,6 +173,11 @@ def canonicalize_sensors(sensors: List[Dict], allow_empty: bool = False) -> List
             raise ManifestError(
                 f'Sensor "{name}" has invalid category "{category}". '
                 f'Must be one of: {", ".join(sorted(VALID_CATEGORIES))}.'
+            )
+        if category != expected_category:
+            raise ManifestError(
+                f'Sensor "{name}" has category "{category}" but adapter "{adapter}" requires '
+                f'"{expected_category}".'
             )
 
         entry: Dict = {"id": sid, "name": name, "category": category, "adapter": adapter}
@@ -143,7 +210,10 @@ def canonicalize_sensors(sensors: List[Dict], allow_empty: bool = False) -> List
                     f'Ping device "{name}" requires source.target (e.g. "8.8.8.8").'
                 )
             entry["source"] = {"target": source["target"]}
-
+        elif adapter == "external_push":
+            source = sensor.get("source") or {}
+            if isinstance(source.get("description"), str) and source.get("description").strip():
+                entry["source"] = {"description": source["description"].strip()}
         seen_ids.add(sid)
         seen_names.add(name)
         normalized.append(entry)
@@ -259,6 +329,21 @@ def manifest_v2(
                     for m in _PING_METRICS
                 ],
             })
+        elif adapter == "external_push":
+            measurements = []
+            for m in _SYSTEM_METRICS:
+                measurement = {"key": m["key"]}
+                if m.get("history"):
+                    measurement["history_url"] = f"/api/v2/history/{s['id']}/{m['history_suffix']}"
+                measurements.append(measurement)
+            sensor_entries.append({
+                "id": s["id"],
+                "name": s["name"],
+                "category": s.get("category", "system"),
+                "adapter": adapter,
+                "source": s.get("source", {}),
+                "measurements": measurements,
+            })
         else:
             sensor_entries.append({
                 "id": s["id"],
@@ -280,7 +365,7 @@ def manifest_v2(
         },
         "history": history_meta,
         "sensor_count": len(sensors),
-        "metrics": env_metrics,
+        "metrics": env_metrics + _PING_METRICS + _SYSTEM_METRICS,
         "sensors": sensor_entries,
     }
 

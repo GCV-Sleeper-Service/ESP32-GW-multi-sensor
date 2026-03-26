@@ -12,7 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
-const VERSION = 'v7.5.6.0';
+const VERSION = 'v7.5.6.1';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },
@@ -108,6 +108,57 @@ const PING_METRICS = [
   },
 ];
 
+const SYSTEM_METRICS = [
+  {
+    key: 'cpu_pct',
+    name: 'CPU Usage',
+    unit: 'percent',
+    unit_symbol: '%',
+    class: 'analog_numeric',
+    data_type: 'float',
+    bounds: { min: 0, max: 100 },
+    history: true,
+    history_suffix: 'cpu_pct',
+    display: { precision: 0, chart: true },
+  },
+  {
+    key: 'ram_pct',
+    name: 'RAM Usage',
+    unit: 'percent',
+    unit_symbol: '%',
+    class: 'analog_numeric',
+    data_type: 'float',
+    bounds: { min: 0, max: 100 },
+    history: true,
+    history_suffix: 'ram_pct',
+    display: { precision: 0, chart: true },
+  },
+  {
+    key: 'disk_pct',
+    name: 'Disk Usage',
+    unit: 'percent',
+    unit_symbol: '%',
+    class: 'analog_numeric',
+    data_type: 'float',
+    bounds: { min: 0, max: 100 },
+    history: true,
+    history_suffix: 'disk_pct',
+    display: { precision: 0, chart: true },
+  },
+  {
+    key: 'uptime_hrs',
+    name: 'Uptime',
+    unit: 'hours',
+    unit_symbol: 'h',
+    class: 'analog_numeric',
+    data_type: 'float',
+    bounds: { min: 0, max: 87600 },
+    history: false,
+    history_suffix: '',
+    display: { precision: 1, chart: false },
+  },
+];
+
 function fixtureManifestV2(sensors, tag) {
   const envMetrics = [
     {
@@ -164,6 +215,23 @@ function fixtureManifestV2(sensors, tag) {
         })),
       };
     }
+    if (s.adapter === 'external_push') {
+      const measurements = SYSTEM_METRICS.map(m => {
+        const entry = { key: m.key };
+        if (m.history) {
+          entry.history_url = `/api/v2/history/${s.id}/${m.history_suffix}`;
+        }
+        return entry;
+      });
+      return {
+        id: s.id,
+        name: s.name,
+        category: s.category || 'system',
+        adapter: 'external_push',
+        source: s.source || {},
+        measurements,
+      };
+    }
     return {
       id: s.id,
       name: s.name,
@@ -193,7 +261,7 @@ function fixtureManifestV2(sensors, tag) {
       sample_interval_seconds: 900,
     },
     sensor_count: sensors.length,
-    metrics: envMetrics,
+    metrics: envMetrics.concat(PING_METRICS, SYSTEM_METRICS),
     sensors: sensorEntries,
   };
 }
@@ -239,6 +307,11 @@ function writeFixtureSet(targetDir, sensors, tag) {
       // Stub history files for ping device (RAM-only, no data at this phase)
       fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-ping_ms.csv`), '');
       fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-success_pct.csv`), '');
+    } else if (sensor.adapter === 'external_push') {
+      // Stub history files for system device history-enabled metrics
+      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-cpu_pct.csv`), '');
+      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-ram_pct.csv`), '');
+      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-disk_pct.csv`), '');
     }
   });
 }

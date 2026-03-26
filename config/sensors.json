@@ -28,6 +28,13 @@
       "category": "network",
       "adapter": "icmp_ping",
       "source": { "target": "8.8.8.8" }
+    },
+    {
+      "id": "nas01",
+      "name": "NAS Health",
+      "category": "system",
+      "adapter": "external_push",
+      "source": { "description": "Pushed via /api/ingest from NAS cron job" }
     }
   ]
 }

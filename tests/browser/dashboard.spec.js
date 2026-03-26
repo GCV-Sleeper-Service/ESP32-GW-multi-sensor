@@ -449,7 +449,7 @@ test.describe('9. Manifest v2 loader', () => {
     await loadDashboard(page);
     await page.waitForFunction(() => window._manifest && Array.isArray(window._manifest.metrics), { timeout: 10000 });
     const metricKeys = await page.evaluate(() => window._manifest.metrics.map(m => m.key));
-    expect(metricKeys).toEqual(['temp', 'hum']);
+    expect(metricKeys).toEqual(expect.arrayContaining(['temp', 'hum']));
   });
 });
 
@@ -949,9 +949,8 @@ test.describe('15. Phase 3 Closure — v2 API Regression', () => {
       const resp = await fetch('/api/v2/live');
       return resp.json();
     });
-    // manifest.metrics contains the environmental (BLE) metric keys.
-    // Only check environmental sensors — network devices use per-device metrics.
-    const metricKeys = manifest.metrics.map(m => m.key);
+    // Only environmental sensors are expected to expose temp/hum in live payloads.
+    const metricKeys = ['temp', 'hum'];
     const envSensorIds = new Set(
       (manifest.sensors || [])
         .filter(s => !s.category || s.category === 'environmental')

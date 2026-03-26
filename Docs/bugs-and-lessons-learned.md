@@ -2180,6 +2180,61 @@ Preflight should catch cross-reference drift, but docs should still be reviewed 
 
 ---
 
+## BUG-044 — Fixture/test drift after manifest metric expansion
+
+### Symptom
+
+After adding system-device metrics to manifest v2, preflight failed in the
+Playwright manifest check and `render_sensor_config.py --check` reported fixture
+drift. The failures appeared as stale expectations (`['temp','hum']`) and
+out-of-sync baseline fixture manifest content.
+
+### Root Cause
+
+The system-device metric expansion changed the top-level manifest `metrics`
+payload and added `external_push` measurement entries, but test expectations and
+fixture-generation paths still assumed env-only top-level metrics.
+
+### Fix
+
+- Updated fixture generator (`tests/fixtures/generate-fixtures.js`) to emit
+  system metrics and `external_push` measurement mappings.
+- Updated Playwright assertions to validate manifest metrics via
+  `arrayContaining(...)` and to derive expected sensor lists from `/api/manifest`
+  for satellite-mode boot checks.
+- Regenerated baseline + variants via required generators.
+
+### Prevention
+
+Any manifest schema/metrics change must include:
+- fixture generator update,
+- baseline + variant regeneration,
+- Playwright expectation audit for fixed cardinality assumptions.
+
+---
+
+### LESSON-OPS-078: Keep manifest tests shape-aware, not hard-coded to old metric sets
+
+When categories/metrics are expected to grow over phases, assertions should verify
+required subsets and invariants (e.g., environmental metrics must still exist)
+instead of strict full-array equality to legacy values.
+
+---
+
+### LESSON-OPS-079 — Fixture variants must include all device categories (deferred to v7.5.6.4)
+
+**Version:** v7.5.6.1
+**Symptom:** Fixture variants (3sensor, mixed, 4sensor) include system metrics in the
+top-level `metrics` array but do not include an `external_push` device in `sensors`.
+The system device manifest/measurement/history-stub code paths are only exercised
+by the baseline fixture, not by any Playwright test variant.
+**Root cause:** v7.5.6.1 scope was limited to firmware/manifest side. Test fixture
+variant updates are deferred to v7.5.6.4 (Phase 6 closure).
+**Fix:** v7.5.6.4 must add `nas01` to at least the `mixed` variant sensor list and
+add Playwright assertions for system device presence in manifest + v2/live shape.
+
+---
+
 ## Regression Checklist
 
 Any significant dashboard or data-path modification should re-check:

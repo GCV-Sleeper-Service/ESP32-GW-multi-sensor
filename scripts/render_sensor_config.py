@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_aggregator_config, load_board_profile, load_gateway_config, load_manifest, manifest_v2
 
-VERSION = "7.5.6.0"
+VERSION = "7.5.6.1"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"
@@ -67,8 +67,8 @@ def unwrap_marker_body(block: str, begin: str, end: str) -> str:
 def render_header_block(sensors: List[Dict[str, str]]) -> str:
     lines = [
         "// SensorSlot removed in v7.5.3.8 — all runtime state in SensorEntity devices[].",
-        "// NUM_DEVICES = all logical devices in manifest.",
-        "// NUM_SENSORS = persisted environmental sensor count only (backward-compat alias for SegmentSnapshot / HistoryMeta).",
+        "// NUM_ENV_SENSORS / NUM_SENSORS = persisted environmental-sensor count only (backward-compat alias for SegmentSnapshot / HistoryMeta).",
+        "// NUM_DEVICES = total logical devices in manifest (environmental + network + system).",
     ]
     return "\n".join(lines)
 
@@ -76,6 +76,7 @@ def render_header_block(sensors: List[Dict[str, str]]) -> str:
 def render_entity_block(sensors: List[Dict]) -> str:
     thermopro = [s for s in sensors if s.get("adapter", "thermopro_ble") == "thermopro_ble"]
     ping = [s for s in sensors if s.get("adapter") == "icmp_ping"]
+    system = [s for s in sensors if s.get("adapter") == "external_push"]
 
     lines = [
         "// ── Generated SensorEntity arrays ──────────────────────────────────",
@@ -100,6 +101,17 @@ def render_entity_block(sensors: List[Dict]) -> str:
             "",
         ])
 
+    if system:
+        lines.extend([
+            "static const MetricDef metrics_system[] = {",
+            '  {"cpu_pct",    "CPU Usage",  "%", 0, true},',
+            '  {"ram_pct",    "RAM Usage",  "%", 0, true},',
+            '  {"disk_pct",   "Disk Usage", "%", 0, true},',
+            '  {"uptime_hrs", "Uptime",     "h", 3, false}',
+            "};",
+            "",
+        ])
+
     for sensor in thermopro:
         sid = sensor["id"]
         lines.append(f"static HistoryBuffer entity_hbuf_{sid}_temp;")
@@ -109,6 +121,12 @@ def render_entity_block(sensors: List[Dict]) -> str:
         sid = sensor["id"]
         lines.append(f"static HistoryBuffer entity_hbuf_{sid}_ping_ms;")
         lines.append(f"static HistoryBuffer entity_hbuf_{sid}_success_pct;")
+
+    for sensor in system:
+        sid = sensor["id"]
+        lines.append(f"static HistoryBuffer entity_hbuf_{sid}_cpu_pct;")
+        lines.append(f"static HistoryBuffer entity_hbuf_{sid}_ram_pct;")
+        lines.append(f"static HistoryBuffer entity_hbuf_{sid}_disk_pct;")
 
     lines.extend([
         "",
@@ -172,6 +190,23 @@ def render_entity_block(sensors: List[Dict]) -> str:
                 "    .last_rssi = 0, .last_seen_epoch = 0",
                 "  },",
             ])
+        elif adapter == "external_push":
+            lines.extend([
+                "  {",
+                f'    .id = "{sid}", .name = "{name}",',
+                '    .category_id = 1, .adapter = "external_push",',
+                "    .metric_defs = metrics_system,",
+                "    .metric_states = {",
+                f"      {{.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_{sid}_cpu_pct}},",
+                f"      {{.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_{sid}_ram_pct}},",
+                f"      {{.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_{sid}_disk_pct}},",
+                "      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}",
+                "    },",
+                "    .metric_count = 4,",
+                '    .mac = "",',
+                "    .last_rssi = 0, .last_seen_epoch = 0",
+                "  },",
+            ])
 
     lines.append("};")
     return "\n".join(lines)
@@ -208,12 +243,14 @@ def render_yaml_averaging(sensors: List[Dict], all_sensors: List[Dict] = None) -
     for idx, sensor in enumerate(sensors):
         lines.extend(avg_lines(sensor, idx))
 
-    # Add compute_averages() for icmp_ping (and any future non-ThermoPro) devices
+    # Add compute_averages() for non-ThermoPro history devices
     if all_sensors:
         for i, s in enumerate(all_sensors):
-            if s.get("adapter") == "icmp_ping":
+            adapter = s.get("adapter")
+            if adapter in ("icmp_ping", "external_push"):
+                label = "network" if adapter == "icmp_ping" else "system"
                 lines.extend([
-                    f" // ── {s['name']} (network) ──────────────────────────────",
+                    f" // ── {s['name']} ({label}) ──────────────────────────────",
                     f" devices[{i}].compute_averages(epoch);",
                     "",
                 ])
@@ -774,10 +811,12 @@ def generate_board_yaml(
             lines.append(f"              id(avg_hum_{sid}).publish_state(devices[{idx}].hum_avg_str);")
             lines.append(f"              if (devices[{idx}].batt_last >= 0) id(battery_{sid}).publish_state(devices[{idx}].batt_str);")
             lines.append("")
-        # Ping averaging lines
+        # Non-ThermoPro averaging lines
         for i, s in enumerate(sensors):
-            if s.get("adapter") == "icmp_ping":
-                lines.append(f"              // ── {s['name']} (network) ──────────────────────────────")
+            adapter = s.get("adapter")
+            if adapter in ("icmp_ping", "external_push"):
+                label = "network" if adapter == "icmp_ping" else "system"
+                lines.append(f"              // ── {s['name']} ({label}) ──────────────────────────────")
                 lines.append(f"              devices[{i}].compute_averages(epoch);")
         lines.append("              // <<< SENSOR_MANIFEST:AVERAGING_END >>>")
         lines.append("")
@@ -1133,6 +1172,10 @@ def generate_board_yaml(
         sensor_desc_parts.append(f"{len(ble_sensors)}x ThermoPro TP357 ({names})")
     if ping_sensors:
         sensor_desc_parts.append("WAN ping monitor")
+    system_sensors = [s for s in sensors if s.get("adapter") == "external_push"]
+    if system_sensors:
+        names = ", ".join(s["name"] for s in system_sensors)
+        sensor_desc_parts.append(f"{len(system_sensors)}x system health monitor ({names})")
     sensor_desc = " + ".join(sensor_desc_parts) if sensor_desc_parts else "Pure aggregator (no local sensors)"
 
     lines.append("  # One-time About description (5 seconds after boot)")
