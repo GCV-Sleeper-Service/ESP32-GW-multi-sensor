@@ -241,6 +241,11 @@ const server = http.createServer(function(req, res) {
     if (!device) return json(res, { ok: false, message: `Unknown device: ${deviceId}`, status: 404 }, 404);
     const validMetric = (device.measurements || []).some(m => m.key === metricKey);
     if (!validMetric) return json(res, { ok: false, message: `Unknown metric: ${metricKey} for device ${deviceId}`, status: 404 }, 404);
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const val = url.searchParams.get('val');
+    if (val === null || val === '' || !isFinite(Number(val))) {
+      return json(res, { ok: false, message: 'Missing or invalid val parameter', status: 400 }, 400);
+    }
     return json(res, { ok: true });
   }
 
