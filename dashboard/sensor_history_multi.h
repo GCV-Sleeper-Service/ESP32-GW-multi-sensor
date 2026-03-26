@@ -498,9 +498,18 @@ static SensorEntity devices[NUM_DEVICES] = {
 // ═══════════════════════════════════════════════════════════════════
 // ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.6.1) ──
 //
-// Supported compile-time counts: 1, 2, 3 (default), 4
+// NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
+// Supported environmental sensor counts: 1, 2, 3 (default), 4.
 //
-// To change count (recommended workflow):
+// NUM_DEVICES = total logical devices in manifest (environmental + network + system).
+// NUM_DEVICES can exceed NUM_ENV_SENSORS when non-environmental devices
+// (icmp_ping, external_push) are present. Currently: NUM_DEVICES = 5
+// (3 environmental + 1 network + 1 system).
+//
+// NUM_SENSORS = NUM_ENV_SENSORS (backward-compat alias for persisted-history
+// segment layout). NEVER set NUM_SENSORS to NUM_DEVICES (BUG-045).
+//
+// To change environmental sensor count (recommended workflow):
 //   1. Edit config/sensors.json OR run: python3 scripts/change_sensor_number.py
 //   2. Run: python3 scripts/render_sensor_config.py --write
 //   3. Back up retained history before flashing:

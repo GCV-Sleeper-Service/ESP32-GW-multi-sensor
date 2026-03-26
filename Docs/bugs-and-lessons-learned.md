@@ -2221,6 +2221,20 @@ instead of strict full-array equality to legacy values.
 
 ---
 
+### LESSON-OPS-079 — Fixture variants must include all device categories (deferred to v7.5.6.4)
+
+**Version:** v7.5.6.1
+**Symptom:** Fixture variants (3sensor, mixed, 4sensor) include system metrics in the
+top-level `metrics` array but do not include an `external_push` device in `sensors`.
+The system device manifest/measurement/history-stub code paths are only exercised
+by the baseline fixture, not by any Playwright test variant.
+**Root cause:** v7.5.6.1 scope was limited to firmware/manifest side. Test fixture
+variant updates are deferred to v7.5.6.4 (Phase 6 closure).
+**Fix:** v7.5.6.4 must add `nas01` to at least the `mixed` variant sensor list and
+add Playwright assertions for system device presence in manifest + v2/live shape.
+
+---
+
 ## Regression Checklist
 
 Any significant dashboard or data-path modification should re-check:
