@@ -143,6 +143,14 @@
     /* Network card (v7.5.4.2) */
     .network-card { border-left:3px solid var(--accent-network, #4FC3F7); }
     .network-card .sensor-card-header { border-bottom-color:var(--accent-network, #4FC3F7); }
+    .system-card { border-left:3px solid var(--accent-system, #66BB6A); }
+    .system-card .sensor-card-header { border-bottom-color:var(--accent-system, #66BB6A); }
+    .system-usage-row { display:flex; align-items:center; gap:8px; }
+    .system-bar-bg { flex:1; height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+    .system-bar-fill { height:100%; border-radius:4px; transition:width .5s, background .3s; }
+    .system-bar-fill.bar-ok { background:#4caf50; }
+    .system-bar-fill.bar-warning { background:#ff9800; }
+    .system-bar-fill.bar-danger { background:#f44336; }
 
     /* Charts */
     .charts-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
@@ -955,7 +963,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.5.6.1';
+App.version = 'v7.5.6.2';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -1236,6 +1244,23 @@ var METRIC_FORMATTERS = {
   success_rate: function(value) {
     if (value === null || value === undefined || isNaN(value)) return '\u2014';
     return value.toFixed(0) + '%';
+  },
+  cpu_usage: function(value) {
+    if (value === null || value === undefined || isNaN(value)) return '\u2014';
+    return value.toFixed(1) + '%';
+  },
+  ram_usage: function(value) {
+    if (value === null || value === undefined || isNaN(value)) return '\u2014';
+    return value.toFixed(1) + '%';
+  },
+  disk_usage: function(value) {
+    if (value === null || value === undefined || isNaN(value)) return '\u2014';
+    return value.toFixed(1) + '%';
+  },
+  uptime_hours: function(value) {
+    if (value === null || value === undefined || isNaN(value)) return '\u2014';
+    if (value >= 24) return (value / 24).toFixed(1) + ' days';
+    return value.toFixed(1) + ' hrs';
   },
   _default: function(value, unit) {
     return value.toFixed(1) + ' ' + (unit || '');
@@ -3309,6 +3334,9 @@ var CARD_RENDERERS = {
   network: function(device, manifest) {
     return buildNetworkCard(device, manifest);
   },
+  system: function(device, manifest) {
+    return buildSystemCard(device, manifest);
+  },
   _default: function(device, manifest) {
     // Graceful fallback for unknown categories — simple key/value card
     var html = '<div class="sensor-card">' +
@@ -3434,6 +3462,47 @@ function buildNetworkCard(s, manifest) {
           '<div class="reading-time" id="net-lastseen-' + s.id + '">last: &mdash;</div>' +
         '</div>' +
       '</div>' +
+    '</div>'
+  );
+}
+
+function buildSystemCard(s, manifest) {
+  var lookupId = s._deviceId || s.id;
+  var description = '';
+  if (manifest && manifest.sensors) {
+    var entry = manifest.sensors.find(function(ms) { return ms.id === lookupId; });
+    if (entry && entry.source && entry.source.description) description = entry.source.description;
+  }
+  return (
+    '<div class="sensor-card system-card" data-device-id="' + s.id + '">' +
+      '<div class="sensor-card-header">' +
+        '<input class="sensor-color-picker" id="picker-' + s.id + '" type="color" value="' + (s.color || '#66BB6A') + '" data-sensor-color="' + s.id + '">' +
+        s.name +
+      '</div>' +
+      '<div class="sensor-readings">' +
+        buildUsageBarRow('CPU', 'sys-cpu-' + s.id) +
+        buildUsageBarRow('RAM', 'sys-ram-' + s.id) +
+        buildUsageBarRow('Disk', 'sys-disk-' + s.id) +
+        '<div class="sensor-reading">' +
+          '<div class="reading-label">Uptime</div>' +
+          '<div class="reading-value waiting" id="sys-uptime-' + s.id + '">&mdash;</div>' +
+        '</div>' +
+        '<div class="sensor-reading">' +
+          '<div class="reading-label">Last Seen</div>' +
+          '<div class="reading-time" id="sys-lastseen-' + s.id + '">last: &mdash;</div>' +
+        '</div>' +
+        (description ? '<div class="sensor-reading"><div class="reading-label" style="font-size:.52rem;color:var(--text-muted)">' + description + '</div></div>' : '') +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function buildUsageBarRow(label, id) {
+  return (
+    '<div class="sensor-reading system-usage-row">' +
+      '<div class="reading-label">' + label + '</div>' +
+      '<div class="system-bar-bg"><div class="system-bar-fill" id="bar-' + id + '"></div></div>' +
+      '<div class="reading-value waiting" id="val-' + id + '">&mdash;</div>' +
     '</div>'
   );
 }
@@ -4050,13 +4119,53 @@ function updateNetworkCards(liveData) {
   });
 }
 
+function updateSystemCards(liveData) {
+  if (!liveData || !liveData.devices) return;
+  SENSORS.forEach(function(s) {
+    if (s.category !== 'system') return;
+    var devData = liveData.devices[s.id];
+    if (!devData) return;
+
+    updateUsageBar('sys-cpu-' + s.id, devData.cpu_pct, METRIC_FORMATTERS.cpu_usage);
+    updateUsageBar('sys-ram-' + s.id, devData.ram_pct, METRIC_FORMATTERS.ram_usage);
+    updateUsageBar('sys-disk-' + s.id, devData.disk_pct, METRIC_FORMATTERS.disk_usage);
+
+    var uptimeEl = document.getElementById('sys-uptime-' + s.id);
+    if (uptimeEl && devData.uptime_hrs !== undefined && devData.uptime_hrs !== null) {
+      uptimeEl.textContent = METRIC_FORMATTERS.uptime_hours(devData.uptime_hrs);
+      uptimeEl.classList.remove('waiting');
+    }
+
+    var seenEl = document.getElementById('sys-lastseen-' + s.id);
+    if (seenEl && devData.last_seen) {
+      seenEl.textContent = 'last: ' + new Date(devData.last_seen * 1000).toLocaleTimeString([], {hour12:false});
+    }
+  });
+}
+
+function updateUsageBar(id, value, formatter) {
+  var barEl = document.getElementById('bar-' + id);
+  var valEl = document.getElementById('val-' + id);
+  if (value === null || value === undefined) return;
+  var pct = Math.min(100, Math.max(0, value));
+  if (barEl) {
+    barEl.style.width = pct + '%';
+    barEl.className = 'system-bar-fill' +
+      (pct >= 80 ? ' bar-danger' : pct >= 60 ? ' bar-warning' : ' bar-ok');
+  }
+  if (valEl) {
+    valEl.textContent = formatter(value);
+    valEl.classList.remove('waiting');
+  }
+}
+
 var _v2LiveInFlight = false;
 function pollV2Live() {
   if (_v2LiveInFlight) return;
   _v2LiveInFlight = true;
   fetch(ESP_HOST + '/api/v2/live', {cache:'no-store'})
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function(data) { updateNetworkCards(data); })
+    .then(function(data) { updateNetworkCards(data); updateSystemCards(data); })
     .catch(function(err) { dlog('v2/live poll: ' + err.message, 'err'); })
     .then(function() { _v2LiveInFlight = false; });
 }
@@ -4334,6 +4443,20 @@ function _populateGatewayDeviceLive(gwId, gwSensors) {
             successEl.classList.remove('waiting');
           }
           var seenEl = document.getElementById('net-lastseen-' + s.id);
+          if (seenEl && devData.last_seen) {
+            var d = new Date(devData.last_seen * 1000);
+            seenEl.textContent = 'last: ' + d.toLocaleTimeString([], {hour12:false});
+          }
+        } else if (cat === 'system') {
+          updateUsageBar('sys-cpu-' + s.id, devData.cpu_pct, METRIC_FORMATTERS.cpu_usage);
+          updateUsageBar('sys-ram-' + s.id, devData.ram_pct, METRIC_FORMATTERS.ram_usage);
+          updateUsageBar('sys-disk-' + s.id, devData.disk_pct, METRIC_FORMATTERS.disk_usage);
+          var uptimeEl = document.getElementById('sys-uptime-' + s.id);
+          if (uptimeEl && devData.uptime_hrs !== undefined && devData.uptime_hrs !== null) {
+            uptimeEl.textContent = METRIC_FORMATTERS.uptime_hours(devData.uptime_hrs);
+            uptimeEl.classList.remove('waiting');
+          }
+          var seenEl = document.getElementById('sys-lastseen-' + s.id);
           if (seenEl && devData.last_seen) {
             var d = new Date(devData.last_seen * 1000);
             seenEl.textContent = 'last: ' + d.toLocaleTimeString([], {hour12:false});
