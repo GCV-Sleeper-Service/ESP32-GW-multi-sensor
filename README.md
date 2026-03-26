@@ -1,89 +1,95 @@
-# ESP32-C3 Multi-Sensor BLE Gateway
+# ESP32 Multi-Sensor BLE Gateway
 
-A standalone BLE-to-WiFi gateway built on the **ESP32-C3 SuperMini**. It passively receives temperature and humidity broadcasts from multiple **ThermoPro TP357** Bluetooth sensors, computes 15-minute rolling averages, retains 24 hours in RAM, persists up to 45 days of hourly history to flash, and serves everything through a gzip-compressed embedded HTML dashboard with real-time charts.
+A manifest-driven IoT gateway platform built on ESP32. Receives BLE sensor broadcasts, accepts pushed metrics from external systems, aggregates data from multiple satellite gateways, and serves everything through an embedded HTML dashboard with real-time charts.
 
-No cloud. No database. No Home Assistant required. Just an ESP32, the gateway firmware, and a browser.
+Supports **ESP32-C3**, **ESP32-S3**, **ESP32-WROOM-32D**, and other ESP32 variants via board profiles. Single devices operate as satellites; more capable devices can aggregate multiple satellites into a unified dashboard.
 
-> **Current version: v7.5.3.9** — Phase 3 complete. Manifest-driven `SensorEntity` architecture with v2 API, gzip-compressed dashboard, and multi-browser Playwright test suite (Chromium + Firefox + WebKit).
-> Default configuration on `main`: **3 BLE sensors**. Supports **1–4 sensors** via `config/sensors.json`.
+No cloud. No database. No Home Assistant required. Just ESP32 hardware, the gateway firmware, and a browser.
 
-**Total hardware cost: ~$35 USD.**
+> **Current version: v7.5.5.5** — Phase 5 complete (Aggregator MVP).
+> Multi-board support, unified satellite/aggregator architecture, manifest-driven dashboard with environmental + network device cards.
+> Default config on `main`: **3 BLE sensors + 1 WAN ping probe** on ESP32-C3.
+
+**Satellite hardware cost: ~$35 USD.**
 
 ![Dashboard Overview](Images/dashboard-overview.png)
 
 ## What It Does
 
+**Satellite gateway (any ESP32 board):**
 - Receives BLE advertisements from ThermoPro TP357 sensors (1–4 configurable)
-- Displays live temperature (°C/°F), humidity, dew point, battery, and RSSI per sensor
+- Monitors WAN connectivity via ICMP ping probes
+- Accepts pushed metrics from external systems via `POST /api/ingest` (Phase 6)
+- Displays live temperature (°C/°F), humidity, dew point, battery, RSSI, and network latency
 - Computes 15-minute rolling averages aligned to wall-clock boundaries
-- Keeps 24h of history in RAM and persists up to 45 days of hourly history to a dedicated NVS partition
-- Serves a gzip-compressed embedded HTML dashboard directly from the ESP32
-- Dashboard supports dark/light mode, 24h/7d/30d/45d history ranges with min/max, CSV export/import, storage statistics, and device management
-- Manifest-driven sensor configuration — single JSON file generates all firmware, dashboard, and test artifacts
-- Accessible on LAN or over the internet via Cloudflare tunnel (auto-detects SSE vs polling transport)
-- Multi-browser Playwright regression suite (Chromium, Firefox, WebKit) with fixture-driven mock server
-- CI pipeline with preflight validation, ESPHome YAML parse check, and automated test runs
+- Retains 24h in RAM + up to 45 days of hourly history in dedicated NVS flash partition
+- Serves a gzip-compressed embedded dashboard (~45KB) directly from the ESP32
+- CSV export/import, dark/light mode, storage statistics, device management
+
+**Aggregator gateway (ESP32-S3 or higher recommended):**
+- All satellite capabilities plus multi-gateway aggregation
+- Polls satellite APIs and presents a unified dashboard with per-gateway tabs
+- Gateway selector with status indicators, summary cards, per-device views
+- Settings panel showing satellite configuration and health
+- Runtime satellite management planned for Phase D (v7.6.x)
+
+**Development infrastructure:**
+- Manifest-driven code generation — single `config/sensors.json` drives firmware, dashboard, and test artifacts
+- Multi-board support via board profiles (`firmware/boards/*.yaml`)
+- Playwright browser regression suite (117 tests across 3 fixture variants)
+- CI pipeline with 53 preflight checks, fixture validation, and automated test runs
 
 ## Quick Start
 
 ```bash
-# 1. Clone the repo
+# 1. Clone
 git clone https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor.git
 cd ESP32-GW-multi-sensor
 
-# 2. Create your secrets file
+# 2. Secrets
 cp secrets/secrets-example.yaml secrets/secrets.yaml
-# Edit secrets/secrets.yaml with your WiFi credentials and management password
+# Edit with your WiFi credentials and management password
 
-# 3. Symlink secrets for ESPHome (Linux/LXC)
+# 3. Symlink secrets for ESPHome
 ln -s ../secrets/secrets.yaml firmware/secrets.yaml
 
-# 4. Make helper scripts executable
+# 4. Make scripts executable
 chmod +x scripts/*.sh scripts/*.py
 
-# 5. Review / change configured sensors (canonical source: config/sensors.json)
-python3 scripts/change_sensor_number.py
+# 5. Build pipeline
+npm ci
+bash scripts/generate-header.sh
 
-# 6. Build pipeline
-npm ci                                    # install test/build dependencies
-./scripts/minify-dashboard.sh             # minify HTML source
-./scripts/generate-header.sh              # gzip-compress + embed into dashboard.h
+# 6. Validate
+bash scripts/preflight.sh
+python3 scripts/render_sensor_config.py --check
+FIXTURE_SET=3sensor npx playwright test --project=chromium
 
-# 7. Validate
-bash ./scripts/preflight.sh               # repo consistency checks (~30 checks)
-npx playwright test                       # browser regression tests (88 tests × 3 browsers)
-
-# 8. Compile and flash
+# 7. Compile and flash
 esphome compile firmware/esp32-c3-multi-sensor.yaml
 esphome run firmware/esp32-c3-multi-sensor.yaml
 ```
 
 Open `http://<esp-ip>/dashboard.html` in your browser.
 
-## Sensor Configuration Workflow
+For aggregator setup, see [Docs/aggregator-setup.md](Docs/aggregator-setup.md).
 
-The repo uses a canonical manifest (`config/sensors.json`) to drive all generated artifacts. No manual multi-file editing required.
+## Sensor Configuration
 
-Primary files and scripts:
+The repo uses a canonical manifest (`config/sensors.json`) to drive all generated artifacts:
 
-- `config/sensors.json` — canonical sensor manifest (name, MAC, display order)
-- `scripts/change_sensor_number.py` — interactive add/remove flow
-- `scripts/render_sensor_config.py` — regenerates YAML, C++, and JS from the manifest
-- `scripts/history_backup.py` — CLI backup/restore helper for retained history
-
-When sensor count changes, retained history layout changes too. Back up retained history first, then flash the new firmware, delete old retained history, and restore the backup.
+- `config/sensors.json` — sensor definitions (name, MAC, category, adapter)
+- `scripts/render_sensor_config.py` — generates C++ headers, YAML, JS, and test fixtures
+- `scripts/bump-version.sh` — atomic version bump across all files
+- `tests/fixtures/generate-fixtures.js` — generates test fixture variants
 
 ```bash
-# Export
-python3 scripts/history_backup.py export \
-  --host http://192.168.120.189 \
-  --output backup-before-sensor-change.csv
-
-# Import (after reflash)
-python3 scripts/history_backup.py import \
-  --host http://192.168.120.189 \
-  --input backup-before-sensor-change.csv \
-  --username <user> --password <pass>
+# After editing sensors.json:
+python3 scripts/render_sensor_config.py --write
+node tests/fixtures/generate-fixtures.js
+bash scripts/generate-header.sh
+python3 scripts/render_sensor_config.py --check
+bash scripts/preflight.sh
 ```
 
 ## Repository Layout
@@ -91,118 +97,136 @@ python3 scripts/history_backup.py import \
 ```text
 ESP32-GW-multi-sensor/
   config/
-    sensors.json                   Canonical sensor manifest
-    sensors.v2.example.json        Reference v2 manifest with mixed device types
+    sensors.json                   Canonical sensor manifest (v2 schema)
+    sensors.v2.example.json        Reference manifest with mixed device types
+    gateway.json                   Per-device identity config (gitignored)
+    aggregator.json                Aggregator satellite list (gitignored)
   dashboard/
-    dashboard.html                 Editable dashboard source (HTML + JS)
+    dashboard.html                 Dashboard source (HTML + inline JS)
     dashboard.js                   Dashboard JavaScript (standalone reference)
-    dashboard.h                    Generated gzip-compressed payload (committed)
-    sensor_history_multi.h         Backend: SensorEntity model, history, persistence, API
+    dashboard.h                    Generated gzip-compressed payload
+    sensor_history_multi.h         Firmware: SensorEntity model, history, API, aggregator
   firmware/
-    esp32-c3-multi-sensor.yaml     ESPHome firmware configuration
+    esp32-c3-multi-sensor.yaml     ESPHome config (C3 default)
+    boards/                        Board profiles (C3, S3, WROOM-32D)
   partitions/
-    esp32-c3-multi-partitions.csv  Custom partition table (512 KiB history)
+    esp32-c3-multi-partitions.csv  C3 partition table
+    esp32-s3-multi-partitions.csv  S3 partition table
+    esp32-wroom-multi-partitions.csv WROOM partition table
   scripts/
-    change_sensor_number.py        Interactive manifest editor
-    render_sensor_config.py        Generator for sensor-dependent files
-    generate-header.sh             Gzip-compress dashboard into C header
-    minify-dashboard.sh            HTML/JS minification
-    bump-version.sh                Atomic version bump across all files
-    history_backup.py              CLI export/import helper
-    preflight.sh                   Repo validation (~30 checks)
+    render_sensor_config.py        Generator for all sensor-dependent files
+    generate-header.sh             Gzip dashboard into C header
+    bump-version.sh                Atomic version bump
+    preflight.sh                   Repo validation (53 checks)
+    exporters/                     System metrics exporter scripts (Phase 6)
   src/
-    gateway_manifest.h             Generated manifest v2 JSON (compiled into firmware)
+    gateway_manifest.h             Generated manifest v2 JSON
+    aggregator_config.h            Generated aggregator constants
   tests/
-    browser/                       Playwright browser regression specs (88 tests)
-    fixtures/                      Mock API data and generated variants
+    browser/                       Playwright specs (117 tests)
+    fixtures/                      Mock API data and variant fixtures
     mock-server/                   Local HTTP mock for Playwright
-  prompts/                         Per-step implementation instructions for AI-assisted development
-  Docs/                            Architecture plans, session logs, changelog, bugs & lessons
+  prompts/                         Per-step AI agent implementation instructions
+  Docs/                            Architecture, implementation plans, changelog
   VERSION                          Current version number
 ```
 
 ## API Endpoints
 
-### v2 API (current)
+### Data API (v2)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/dashboard.html` | GET | Embedded dashboard |
+| `/api/manifest` | GET | Manifest v2 — devices, metrics, gateway metadata |
+| `/api/v2/live` | GET | Current values for all devices (JSON) |
+| `/api/v2/history/{device}/{metric}` | GET | Per-device per-metric history (CSV) |
+| `/api/status` | GET | Version, uptime, sensor health, free heap |
+| `/api/storage-stats` | GET | Partition sizes and retention statistics |
+| `/api/ingest/{device}/{metric}?val={float}` | POST | Push external metrics (Phase 6) |
+
+### Aggregator API (when `AGGREGATOR_ENABLED`)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/aggregator/gateways` | GET | Satellite list with cached manifests and status |
+| `/api/aggregator/live` | GET | Merged live data from all satellites |
+| `/api/aggregator/proxy/{gw_id}/...` | GET | Proxy requests to satellite APIs |
+| `/api/aggregator/add-satellite` | POST | Add satellite (stub — Phase D) |
+| `/api/aggregator/satellite/{id}` | DELETE | Remove satellite (stub — Phase D) |
+| `/api/aggregator/test-satellite` | POST | Probe satellite URL (stub — Phase D) |
+
+### Legacy + Management
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/dashboard.html` | GET | No | Embedded dashboard (gzip-compressed, ~45KB) |
-| `/dashboard-download` | GET | No | Dashboard as file download |
-| `/api/manifest` | GET | No | Manifest v2 — devices, metrics, history config, gateway metadata |
-| `/api/v2/live` | GET | No | Current values for all devices and metrics (JSON) |
-| `/api/v2/history/{device}/{metric}` | GET | No | Per-device per-metric history (CSV) |
-| `/api/status` | GET | No | Version, uptime, sensor health, free heap |
-| `/api/storage-stats` | GET | No | Partition sizes and retention statistics |
-
-### Legacy endpoints (preserved for backward compatibility)
-
-| Endpoint | Method | Auth | Purpose |
-|----------|--------|------|---------|
-| `/sensors.json` | GET | No | v1 sensor list (id + name only) |
-| `/history/{id}/temp` | GET | No | Temperature history (NVS + RAM, CSV) |
-| `/history/{id}/hum` | GET | No | Humidity history (NVS + RAM, CSV) |
-
-### Management endpoints
-
-| Endpoint | Method | Auth | Purpose |
-|----------|--------|------|---------|
+| `/sensors.json` | GET | No | v1 sensor list (backward compat) |
+| `/history/{id}/temp` | GET | No | Legacy temperature history |
+| `/history/{id}/hum` | GET | No | Legacy humidity history |
 | `/api/reboot` | POST | Basic | Reboot the ESP |
 | `/api/delete-data` | POST | Basic | Erase persisted history |
-| `/api/import/begin` | POST | Basic | Start multi-sensor import (erases history) |
-| `/api/import/begin/single/{id}` | POST | Basic | Start single-sensor merge import |
-| `/api/import/d/{data}` | POST | Basic | Add import data points |
-| `/api/import/w/{data}` | POST | Basic | Add data points + write segment |
-| `/api/import/finish` | POST | Basic | Finalize import, restore RAM |
+| `/api/import/*` | POST | Basic | CSV history import (multi/single) |
 
 ## Testing
 
-The project uses a multi-layer testing approach:
-
-**Playwright browser tests** (88 tests × 3 browsers = 264 test runs) validate dashboard rendering, API contract, boot sequence, and request scheduling against a fixture-driven mock server. Browsers: Chromium, Firefox, WebKit.
+**Playwright browser tests** (117 tests across 3 fixture variants):
 
 ```bash
 npm ci
-npx playwright install --with-deps chromium firefox webkit
-npx playwright test                       # all browsers, parallel
-npx playwright test --project=chromium    # single browser
-npx playwright test --workers=4           # control parallelism
+npx playwright install --with-deps chromium firefox
+FIXTURE_SET=3sensor npx playwright test --project=chromium    # baseline: 97 pass, 18 skip
+FIXTURE_SET=mixed npx playwright test --grep "Mixed" --project=chromium   # 7 pass
+FIXTURE_SET=aggregator npx playwright test --grep "Aggregator" --project=chromium  # 11 pass
 ```
 
-**Preflight checks** (~30 checks) validate version sync, manifest schema, code patterns, and build pipeline integrity:
+**Preflight checks** (53 checks) validate version sync, manifest schema, fixture integrity, and build pipeline:
 
 ```bash
 bash scripts/preflight.sh
+python3 scripts/render_sensor_config.py --check
 ```
 
-**Device testing** (manual, post-merge) validates real ESP32-C3 behavior: BLE reception, NVS persistence, heap stability, dashboard rendering, and Cloudflare tunnel transport.
+**Device testing** (manual, post-merge) validates real hardware behavior.
 
 ## Architecture
 
-The project follows a manifest-driven architecture. A single `config/sensors.json` drives code generation across the entire stack:
+The project follows a manifest-driven architecture. `config/sensors.json` drives code generation:
 
-- **Python generator** (`render_sensor_config.py`) reads the manifest and produces `SensorEntity` C++ arrays, YAML configuration blocks, gateway manifest JSON header, and test fixtures
-- **Firmware** runs ESPHome on ESP-IDF (not Arduino) for BLE + WiFi coexistence on the single-core ESP32-C3
-- **SensorEntity model** — generalized `SensorEntity` + `MetricDef` + `MetricState` structs replace the original ThermoPro-specific `SensorSlot`. Designed for extensibility to non-climate sensor types (network, system) while maintaining identical ThermoPro behavior
-- **Dashboard** is a self-contained HTML/JS application embedded in firmware flash as a gzip-compressed C byte array (~45KB), served with `Content-Encoding: gzip`. Uses a `CARD_RENDERERS` registry and `METRIC_FORMATTERS` registry for manifest-driven rendering
-- **History** uses a pre-reserved string pattern for CSV response building to avoid heap exhaustion on the memory-constrained ESP32-C3 (LESSON-OPS-056)
+- **Python generator** produces C++ entity arrays, YAML configs, gateway manifest headers, and test fixtures
+- **Firmware** runs ESPHome on ESP-IDF for BLE + WiFi coexistence
+- **SensorEntity model** — generalized structs supporting environmental, network, and system device categories
+- **Dashboard** uses `CARD_RENDERERS` and `METRIC_FORMATTERS` registries for manifest-driven rendering
+- **Aggregator** uses a unified boot path (satellite pipeline + overlay) per LESSON-OPS-074
 
-See [Docs/v7.5-v7.6-architecture-plan.md](Docs/v7.5-v7.6-architecture-plan.md) for the full architecture document covering the SensorEntity model, manifest v2 schema, dashboard renderer registry, and aggregation roadmap.
+See [Docs/v7.5-v7.6-architecture-plan.md](Docs/v7.5-v7.6-architecture-plan.md) for the full architecture document.
 
 ## Development Roadmap
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| Phase 0 | Clean baseline | ✅ Complete |
-| Phase 1 | Manifest v2 + `/api/manifest` endpoint | ✅ Complete |
-| Phase 2 | Dashboard consumes v2 manifest | ✅ Complete |
-| Phase 3 | C++ SensorEntity model (ThermoPro only) | ✅ Complete |
-| **Phase 4** | **First non-climate sensor (ping probe)** | **Next** |
-| Phase 5 | Aggregator MVP (multi-gateway dashboard) | Planned |
-| Phase 6 | Data ingest endpoint + system metrics | Planned |
+| Phase | Version | Description | Status |
+|-------|---------|-------------|--------|
+| Phase 1 | v7.5.0.x | Manifest v2 + `/api/manifest` | ✅ Complete |
+| Phase 2 | v7.5.1.x | Dashboard consumes v2 manifest | ✅ Complete |
+| Phase 3 | v7.5.3.x | C++ SensorEntity model | ✅ Complete |
+| Phase 4 | v7.5.4.x | First non-climate sensor (ping probe) | ✅ Complete |
+| Phase 5 | v7.5.5.x | Aggregator MVP (multi-gateway) | ✅ Complete |
+| **Phase 6** | **v7.5.6.x** | **Data ingest + system metrics** | **Next** |
+| Phase D | v7.6.0.x | Runtime satellite management | Planned |
+| Phase 7 | v7.7.x | Per-device persistence engine | Planned |
+| Phase E | v8.x | Captive portal + WiFi config | Future |
 
-## Current Version
+## Documentation
 
-**v7.5.3.9** — Phase 3 complete. The `SensorSlot` struct has been replaced by the generalized `SensorEntity` + `MetricDef` + `MetricState` model. All API endpoints, persistence, dashboard rendering, and history work identically to pre-Phase 3 behavior. The firmware is ready for Phase 4 (first non-climate sensor category).
+| Document | Content |
+|----------|---------|
+| [Docs/changelog.md](Docs/changelog.md) | Full release history |
+| [Docs/v7.5-v7.6-architecture-plan.md](Docs/v7.5-v7.6-architecture-plan.md) | Architecture plan (Phases 1–6) |
+| [Docs/phase-d-implementation-plan.md](Docs/phase-d-implementation-plan.md) | Phase D (runtime satellite management) |
+| [Docs/phase6-implementation-plan.md](Docs/phase6-implementation-plan.md) | Phase 6 (data ingest + system metrics) |
+| [Docs/v7.7-v7.8-persistence-architecture.md](Docs/v7.7-v7.8-persistence-architecture.md) | Phase 7 persistence architecture |
+| [Docs/aggregator-setup.md](Docs/aggregator-setup.md) | Aggregator deployment guide |
+| [Docs/bugs-and-lessons-learned.md](Docs/bugs-and-lessons-learned.md) | Bug database + operational lessons |
+| [Docs/writing-prompts-for-coding-agents-guide.md](Docs/writing-prompts-for-coding-agents-guide.md) | AI agent prompt methodology |
 
-See [Docs/changelog.md](Docs/changelog.md) for full release history.
+## License
+
+This project is provided as-is for personal and educational use.

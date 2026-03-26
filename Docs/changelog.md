@@ -3,6 +3,40 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.5.5-docs] — 2026-03-25 — Documentation Overhaul and Phase D Planning
+
+### Documentation cleanup
+
+Consolidated and removed 23 obsolete files from root, Docs/, and prompts/:
+- 8 individual Phase 5 session logs → consolidated into `session-log-archive-v7.5.x.md`
+- 13 superseded Docs/ files (old architecture, version-specific docs, one-off fix prompts)
+- 2 obsolete prompt handoff files (updates already applied)
+
+### New documents
+
+- **`Docs/phase-d-implementation-plan.md`** — detailed 6-step plan for Phase D (v7.6.0.0–v7.6.0.5): NVS satellite persistence, add/remove/test endpoints, dashboard management UI
+- **`prompts/session-handoff-phase6.md`** — complete context handoff for Phase 6 start
+- **`prompts/prompt-index-and-workflow.md`** — added Phase D section, version mapping table
+
+### README rewrite
+
+Updated from v7.5.3.9 to v7.5.5.5 state:
+- Multi-board support, aggregator architecture, satellite/aggregator roles
+- Updated API table (aggregator endpoints, ingest stub)
+- Updated roadmap (Phases 1–5 complete, Phase 6 next, Phase D and 7 planned)
+- Updated repo layout, test counts, preflight counts
+
+### Version mapping established
+
+| Phase | Version Range |
+|-------|--------------|
+| Phase 6 | v7.5.6.x |
+| Phase D | v7.6.0.x |
+| Phase 7 | v7.7.x |
+| Phase E | v8.x |
+
+
+---
 ## [v7.5.5.5-hotfix] — 2026-03-25 — Fixture Fragility Guard
 
 ### Problem

@@ -197,6 +197,27 @@ All steps shipped. No prompts needed.
 - v7.5.6.3: run bash/Python exporters from an external host, verify dashboard shows data
 - v7.5.6.4: Playwright only + Phase 6 closure verification
 
+### Phase D — Runtime Satellite Management (v7.6.0.x)
+
+| Version | Scope | Prompt File | Status |
+|---------|-------|-------------|--------|
+| v7.6.0.0 | NVS satellite persistence layer | _Prompt not yet created_ | Pending |
+| v7.6.0.1 | POST /api/aggregator/add-satellite | _Prompt not yet created_ | Pending |
+| v7.6.0.2 | DELETE /api/aggregator/satellite/{id} | _Prompt not yet created_ | Pending |
+| v7.6.0.3 | POST /api/aggregator/test-satellite | _Prompt not yet created_ | Pending |
+| v7.6.0.4 | Dashboard add/remove/test UI | _Prompt not yet created_ | Pending |
+| v7.6.0.5 | Playwright tests + Phase D closure | _Prompt not yet created_ | Pending |
+
+**Implementation plan:** `Docs/phase-d-implementation-plan.md`
+
+**Phase D device testing requirements:**
+- v7.6.0.0: boot with NVS satellite list, reboot persistence, fallback to compile-time
+- v7.6.0.1: add satellite via API, verify polling starts, verify NVS persistence
+- v7.6.0.2: remove satellite, verify polling stops, verify NVS updated
+- v7.6.0.3: test-satellite probe returns manifest info without side effects
+- v7.6.0.4: full dashboard add/remove/test workflow via browser
+- v7.6.0.5: Playwright + Phase D closure verification
+
 ### Phase 7 — Per-Device Persistence Engine
 
 | Version | Scope | Prompt File | Status |
@@ -214,6 +235,22 @@ All steps shipped. No prompts needed.
 | v7.7.2.3 | Full regression + Phase 7 closure | _Prompt not yet created_ | Pending |
 
 **Note:** Phase 7 prompts for v7.7.0.2 through v7.7.2.3 should be created when Phase 7 implementation begins — they require the Phase 6 codebase state to properly trace data paths and verify function names. See `prompts/phase7/prompt-index-and-workflow.md` for Phase 7-specific workflow details.
+
+---
+
+## Version Number ↔ Phase Mapping
+
+| Phase | Version Range | Description | Implementation Plan |
+|-------|--------------|-------------|---------------------|
+| Phase 1 | v7.5.0.x | Manifest v2 endpoint | `Docs/v7.5-v7.6-architecture-plan.md` §11 |
+| Phase 2 | v7.5.1.x | Dashboard consumes manifest | Same |
+| Phase 3 | v7.5.3.x | SensorEntity C++ model | `Docs/phase3-implementation-plan.md` |
+| Phase 4 | v7.5.4.x | First non-climate sensor (ping) | `Docs/phase4-implementation-plan.md` |
+| Phase 5 | v7.5.5.x | Aggregator MVP | `Docs/phase5-implementation-plan.md` |
+| **Phase 6** | **v7.5.6.x** | **Data ingest + system metrics** | **`Docs/phase6-implementation-plan.md`** |
+| **Phase D** | **v7.6.0.x** | **Runtime satellite management** | **`Docs/phase-d-implementation-plan.md`** |
+| Phase 7 | v7.7.0.x–v7.7.2.x | Per-device persistence engine | `Docs/v7.7-v7.8-persistence-architecture.md` |
+| Phase E | v8.0.x | Captive portal + WiFi config | _Not yet planned_ |
 
 ---
 
