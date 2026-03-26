@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_aggregator_config, load_board_profile, load_gateway_config, load_manifest, manifest_v2
 
-VERSION = "7.5.6.0"
+VERSION = "7.5.6.1"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"
@@ -76,6 +76,7 @@ def render_header_block(sensors: List[Dict[str, str]]) -> str:
 def render_entity_block(sensors: List[Dict]) -> str:
     thermopro = [s for s in sensors if s.get("adapter", "thermopro_ble") == "thermopro_ble"]
     ping = [s for s in sensors if s.get("adapter") == "icmp_ping"]
+    system = [s for s in sensors if s.get("adapter") == "external_push"]
 
     lines = [
         "// ── Generated SensorEntity arrays ──────────────────────────────────",
@@ -100,6 +101,17 @@ def render_entity_block(sensors: List[Dict]) -> str:
             "",
         ])
 
+    if system:
+        lines.extend([
+            "static const MetricDef metrics_system[] = {",
+            '  {"cpu_pct",    "CPU Usage",  "%", 0, true},',
+            '  {"ram_pct",    "RAM Usage",  "%", 0, true},',
+            '  {"disk_pct",   "Disk Usage", "%", 0, true},',
+            '  {"uptime_hrs", "Uptime",     "h", 3, false}',
+            "};",
+            "",
+        ])
+
     for sensor in thermopro:
         sid = sensor["id"]
         lines.append(f"static HistoryBuffer entity_hbuf_{sid}_temp;")
@@ -109,6 +121,12 @@ def render_entity_block(sensors: List[Dict]) -> str:
         sid = sensor["id"]
         lines.append(f"static HistoryBuffer entity_hbuf_{sid}_ping_ms;")
         lines.append(f"static HistoryBuffer entity_hbuf_{sid}_success_pct;")
+
+    for sensor in system:
+        sid = sensor["id"]
+        lines.append(f"static HistoryBuffer entity_hbuf_{sid}_cpu_pct;")
+        lines.append(f"static HistoryBuffer entity_hbuf_{sid}_ram_pct;")
+        lines.append(f"static HistoryBuffer entity_hbuf_{sid}_disk_pct;")
 
     lines.extend([
         "",
@@ -168,6 +186,23 @@ def render_entity_block(sensors: List[Dict]) -> str:
                 "      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}",
                 "    },",
                 "    .metric_count = 2,",
+                '    .mac = "",',
+                "    .last_rssi = 0, .last_seen_epoch = 0",
+                "  },",
+            ])
+        elif adapter == "external_push":
+            lines.extend([
+                "  {",
+                f'    .id = "{sid}", .name = "{name}",',
+                '    .category_id = 1, .adapter = "external_push",',
+                "    .metric_defs = metrics_system,",
+                "    .metric_states = {",
+                f"      {{.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_{sid}_cpu_pct}},",
+                f"      {{.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_{sid}_ram_pct}},",
+                f"      {{.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_{sid}_disk_pct}},",
+                "      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}",
+                "    },",
+                "    .metric_count = 4,",
                 '    .mac = "",',
                 "    .last_rssi = 0, .last_seen_epoch = 0",
                 "  },",

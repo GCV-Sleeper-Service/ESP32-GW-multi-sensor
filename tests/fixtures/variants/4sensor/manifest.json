@@ -2,13 +2,13 @@
   "ok": true,
   "schema_version": 2,
   "source": "4sensor",
-  "version": "v7.5.6.0",
+  "version": "v7.5.6.1",
   "gateway": {
     "id": "gw-main",
     "name": "Main Gateway",
     "role": "satellite",
     "hardware": "ESP32-C3",
-    "firmware_version": "v7.5.6.0",
+    "firmware_version": "v7.5.6.1",
     "api_version": "v2"
   },
   "history": {

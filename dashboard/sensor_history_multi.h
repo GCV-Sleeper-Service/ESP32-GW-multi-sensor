@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.6.0.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.5.6.1.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -395,6 +395,13 @@ static const MetricDef metrics_ping[] = {
   {"success_pct", "Success", "%",  0, true}
 };
 
+static const MetricDef metrics_system[] = {
+  {"cpu_pct",    "CPU Usage",  "%", 0, true},
+  {"ram_pct",    "RAM Usage",  "%", 0, true},
+  {"disk_pct",   "Disk Usage", "%", 0, true},
+  {"uptime_hrs", "Uptime",     "h", 3, false}
+};
+
 static HistoryBuffer entity_hbuf_office_temp;
 static HistoryBuffer entity_hbuf_office_hum;
 static HistoryBuffer entity_hbuf_first_floor_temp;
@@ -403,8 +410,11 @@ static HistoryBuffer entity_hbuf_outside_temp;
 static HistoryBuffer entity_hbuf_outside_hum;
 static HistoryBuffer entity_hbuf_wan_ping_ping_ms;
 static HistoryBuffer entity_hbuf_wan_ping_success_pct;
+static HistoryBuffer entity_hbuf_nas01_cpu_pct;
+static HistoryBuffer entity_hbuf_nas01_ram_pct;
+static HistoryBuffer entity_hbuf_nas01_disk_pct;
 
-static constexpr int NUM_DEVICES = 4;
+static constexpr int NUM_DEVICES = 5;
 static constexpr int NUM_ENV_SENSORS = 3;
 static constexpr int NUM_SENSORS = NUM_ENV_SENSORS;  // backward compat alias for persisted environmental history
 
@@ -468,11 +478,25 @@ static SensorEntity devices[NUM_DEVICES] = {
     .mac = "",
     .last_rssi = 0, .last_seen_epoch = 0
   },
+  {
+    .id = "nas01", .name = "NAS Health",
+    .category_id = 1, .adapter = "external_push",
+    .metric_defs = metrics_system,
+    .metric_states = {
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_cpu_pct},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_ram_pct},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_disk_pct},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}
+    },
+    .metric_count = 4,
+    .mac = "",
+    .last_rssi = 0, .last_seen_epoch = 0
+  },
 };
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.6.0) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.6.1) ──
 //
 // Supported compile-time counts: 1, 2, 3 (default), 4
 //
