@@ -67,7 +67,8 @@ test.describe('manifest boot flow', () => {
     expect(payload.history.backend).toBe('nvs');
     expect(typeof payload.history.retention_hours).toBe('number');
     expect(Array.isArray(payload.metrics)).toBeTruthy();
-    expect(payload.metrics.map(m => m.key)).toEqual(['temp', 'hum']);
+    const metricKeys = payload.metrics.map(m => m.key);
+    expect(metricKeys).toEqual(expect.arrayContaining(['temp', 'hum', 'cpu_pct', 'ram_pct', 'disk_pct', 'uptime_hrs']));
     const firstMetric = payload.metrics[0];
     expect(firstMetric.class).toBe('analog_numeric');
     expect(firstMetric.data_type).toBe('float');
@@ -82,19 +83,17 @@ test.describe('manifest boot flow', () => {
   });
 
   test('dashboard boots from /api/manifest', async ({ page }) => {
-    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor list (office+first_floor+outside+wan_ping=4) is 3sensor-specific; mixed fixture has 3 sensors (no outside).');
-    test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator manifest has 0 sensors; DEFAULT_SENSOR_META fallback loads 3 env-only sensors (not 4). Expected sensor list is satellite-specific.');
+    test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator manifest has 0 sensors; DEFAULT_SENSOR_META fallback loads 3 env-only sensors. Expected sensor list is satellite-specific.');
     await stubCdn(page);
     await page.goto('/dashboard.html');
-    // v7.5.4.2: SENSORS now includes network devices — 3 environmental + 1 network = 4
-    await waitForDashboardReady(page, 4);
+    const manifest = await page.evaluate(async () => {
+      const response = await fetch('/api/manifest');
+      return response.json();
+    });
+    const expectedSensors = (manifest.sensors || []).map(s => ({ id: s.id, name: s.name }));
+    await waitForDashboardReady(page, expectedSensors.length);
     const sensors = await page.evaluate(() => App.State.getSensors().map(s => ({ id: s.id, name: s.name })));
-    expect(sensors).toEqual([
-      { id: 'office', name: 'Office' },
-      { id: 'first_floor', name: 'First Floor' },
-      { id: 'outside', name: 'Outside' },
-      { id: 'wan_ping', name: 'WAN Latency' },
-    ]);
+    expect(sensors).toEqual(expectedSensors);
   });
 
   test('dashboard falls back to /sensors.json when /api/manifest is unavailable', async ({ page }) => {

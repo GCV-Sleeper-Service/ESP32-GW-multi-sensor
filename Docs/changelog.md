@@ -3,6 +3,77 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.6.1] — 2026-03-26 — System Device Category and Manifest Entries (Phase 6 Step 1)
+
+### System device category support added
+
+Implemented support for a new `system` device category using the `external_push`
+adapter, with default manifest entry:
+
+- `nas01` (`NAS Health`) in `config/sensors.json`
+- `category: "system"`
+- `adapter: "external_push"`
+- `source.description` metadata for ingest provenance
+
+### Manifest validation and generation updates
+
+- Extended `canonicalize_sensors()` in `scripts/sensor_manifest_lib.py`:
+  - Accepts `external_push` adapter
+  - Does not require `mac` for `external_push`
+  - Preserves optional `source.description`
+  - Rejects unknown adapters explicitly
+- Increased manifest sensor limit from 4 to 5 to support default set:
+  - 3 environmental + 1 network + 1 system
+- Extended manifest v2 generation to include system metrics and measurements:
+  - `cpu_pct`, `ram_pct`, `disk_pct` (history-enabled)
+  - `uptime_hrs` (metadata, no history)
+
+### Generator/runtime entity updates
+
+Updated `scripts/render_sensor_config.py` to generate system entities in
+`dashboard/sensor_history_multi.h`:
+
+- Added `metrics_system[]`
+- Added history buffers for:
+  - `entity_hbuf_nas01_cpu_pct`
+  - `entity_hbuf_nas01_ram_pct`
+  - `entity_hbuf_nas01_disk_pct`
+- Added `SensorEntity` for `nas01` with:
+  - `category_id = 1` (`system`)
+  - `adapter = "external_push"`
+  - `metric_count = 4`
+
+### BUG-045 / BUG-052 / BUG-053 invariants preserved
+
+Verified generated constants and endpoint behavior:
+
+- `NUM_DEVICES = 5`
+- `NUM_ENV_SENSORS = 3`
+- `NUM_SENSORS = NUM_ENV_SENSORS` (unchanged alias; no persistence schema break)
+- `/sensors.json` remains environmental-only (no `nas01`)
+- `/api/status` includes `nas01` with `"category":"system"` and excludes
+  `temp_valid`/`hum_valid`
+- `/api/v2/live` includes `nas01` with null metric values before ingest
+- Legacy `/history/nas01/temp` remains blocked (404)
+
+### Fixture/mock/test alignment
+
+- Updated `tests/fixtures/generate-fixtures.js` for `external_push` manifest output
+  and system metric metadata.
+- Updated `tests/mock-server/server.js` `/api/v2/live` stub to emit null-valued
+  system metrics for system devices.
+- Updated Playwright expectations for 5-device satellite manifests where needed.
+- Updated preflight guard:
+  - `fixture_manifest_sensor_count` now expects `5`.
+
+### Validation
+
+- Required precondition suite passed before edits.
+- Critical Rule 28 regeneration sequence executed.
+- Required Playwright + preflight + `render_sensor_config.py --check` validation
+  completed after changes.
+
+---
 ## [v7.5.6.0] — 2026-03-26 — POST /api/ingest Endpoint (Phase 6 Step 0)
 
 ### Ingest endpoint added

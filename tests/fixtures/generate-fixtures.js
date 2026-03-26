@@ -108,6 +108,57 @@ const PING_METRICS = [
   },
 ];
 
+const SYSTEM_METRICS = [
+  {
+    key: 'cpu_pct',
+    name: 'CPU Usage',
+    unit: 'percent',
+    unit_symbol: '%',
+    class: 'analog_numeric',
+    data_type: 'float',
+    bounds: { min: 0, max: 100 },
+    history: true,
+    history_suffix: 'cpu_pct',
+    display: { precision: 1, chart: false },
+  },
+  {
+    key: 'ram_pct',
+    name: 'RAM Usage',
+    unit: 'percent',
+    unit_symbol: '%',
+    class: 'analog_numeric',
+    data_type: 'float',
+    bounds: { min: 0, max: 100 },
+    history: true,
+    history_suffix: 'ram_pct',
+    display: { precision: 1, chart: false },
+  },
+  {
+    key: 'disk_pct',
+    name: 'Disk Usage',
+    unit: 'percent',
+    unit_symbol: '%',
+    class: 'analog_numeric',
+    data_type: 'float',
+    bounds: { min: 0, max: 100 },
+    history: true,
+    history_suffix: 'disk_pct',
+    display: { precision: 1, chart: false },
+  },
+  {
+    key: 'uptime_hrs',
+    name: 'Uptime',
+    unit: 'hours',
+    unit_symbol: 'h',
+    class: 'metadata',
+    data_type: 'float',
+    bounds: { min: 0, max: 1000000 },
+    history: false,
+    history_suffix: 'uptime_hrs',
+    display: { precision: 1, chart: false },
+  },
+];
+
 function fixtureManifestV2(sensors, tag) {
   const envMetrics = [
     {
@@ -164,6 +215,19 @@ function fixtureManifestV2(sensors, tag) {
         })),
       };
     }
+    if (s.adapter === 'external_push') {
+      return {
+        id: s.id,
+        name: s.name,
+        category: s.category || 'system',
+        adapter: 'external_push',
+        source: s.source || {},
+        measurements: SYSTEM_METRICS.map(m => ({
+          key: m.key,
+          history_url: `/api/v2/history/${s.id}/${m.history_suffix}`,
+        })),
+      };
+    }
     return {
       id: s.id,
       name: s.name,
@@ -193,7 +257,7 @@ function fixtureManifestV2(sensors, tag) {
       sample_interval_seconds: 900,
     },
     sensor_count: sensors.length,
-    metrics: envMetrics,
+    metrics: envMetrics.concat(PING_METRICS, SYSTEM_METRICS),
     sensors: sensorEntries,
   };
 }

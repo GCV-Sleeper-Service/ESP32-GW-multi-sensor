@@ -159,6 +159,14 @@ const server = http.createServer(function(req, res) {
           success_pct: 100.0,
           last_seen: 1741694400 + idx * 10
         };
+      } else if (s.adapter === 'external_push') {
+        devices[s.id] = {
+          cpu_pct: null,
+          ram_pct: null,
+          disk_pct: null,
+          uptime_hrs: null,
+          last_seen: 1741694400 + idx * 10
+        };
       }
     });
     return json(res, { timestamp: 1741694400, devices: devices });
