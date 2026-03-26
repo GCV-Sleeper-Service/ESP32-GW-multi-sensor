@@ -720,7 +720,7 @@ test.describe('13. Manifest-driven history fetching', () => {
 test.describe('14. Phase 2 Closure — Full Regression', () => {
   // Scenario 1: full v2 manifest → correct rendering
   test('scenario 1: sensor cards render correctly when /api/manifest returns full v2 manifest', async ({ page }) => {
-    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (4) and Outside name are 3sensor-specific; mixed fixture has 3 sensors (no outside).');
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (4) and Outside name are 3sensor-specific; mixed fixture has 4 sensors including nas01, so these assertions do not apply.');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator manifest has 0 sensors; loadSensorManifest() falls back to DEFAULT_SENSOR_META (source=auto-promoted). Satellite-manifest rendering verified in other groups.');
     test.skip(process.env.FIXTURE_SET === 'system', 'System fixture has 2 env sensors (no Outside); sensor name assertions are 3sensor-specific.');
     // Default mock server serves full v2 manifest from /api/manifest.
@@ -794,7 +794,7 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
 
   // Scenario 4: environmental card renderer dispatches correctly
   test('scenario 4: environmental card renderer dispatches correctly for all sensors', async ({ page }) => {
-    test.skip(process.env.FIXTURE_SET === 'mixed', 'expectedSensorCount (4) and envSensors.length (3) are 3sensor-specific; mixed fixture has 2 env sensors + 1 network = 3 total.');
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'expectedSensorCount (4) and envSensors.length (3) are 3sensor-specific; mixed fixture has 2 env + 1 network + 1 system (nas01) = 4 total.');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator fixture uses DEFAULT_SENSOR_META fallback (3 env, no network); expectedSensorCount(4) and envSensors.length(3) assertions are satellite-specific.');
     test.skip(process.env.FIXTURE_SET === 'system', 'System fixture has 2 env sensors (not 3); envSensors.length(3) assertion is 3sensor-specific.');
     // v7.5.4.2: SENSORS now includes network devices, so getSensors() returns 4.
@@ -1018,7 +1018,7 @@ test.describe('15. Phase 3 Closure — v2 API Regression', () => {
 
   // Test 6: Dashboard renders identically with new endpoints
   test('dashboard renders identically with new endpoints', async ({ page }) => {
-    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (4) and Outside name are 3sensor-specific; mixed fixture has 3 sensors (no outside).');
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (4) and Outside name are 3sensor-specific; mixed fixture has 4 sensors (includes nas01; layout/names differ).');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator uses DEFAULT_SENSOR_META fallback (3 env-only); card count (4) and wan_ping network card are satellite-specific.');
     test.skip(process.env.FIXTURE_SET === 'system', 'System fixture has 2 env sensors (no Outside); Outside name assertion is 3sensor-specific.');
     await loadDashboard(page);
@@ -1342,8 +1342,10 @@ test.describe('17. Phase 4 Step 2 — Network Card Renderer', () => {
 
 // ── 18. Mixed-Category Rendering (Phase 4 Step 3) ─────────────────────
 test.describe('18. Mixed-Category Rendering', () => {
-  // This group is specific to the 'mixed' fixture variant (2 ThermoPro + 1 wan_ping + 1 nas01 = 4 sensors).
-  // It must be skipped when running under any other fixture set (e.g. 3sensor which has 4 sensors).
+  // This group is specific to the 'mixed' fixture variant: 2 ThermoPro environmental sensors,
+  // 1 network sensor (wan_ping), and 1 system device (nas01) — i.e., a mixed set of categories.
+  // It must be skipped under other fixture sets where the composition differs (e.g. '3sensor' includes
+  // an 'outside' environmental sensor and no system device, even though it also has 4 total sensors).
   // In CI, this group runs exclusively via the 'browser-tests (mixed)' matrix job.
   // LESSON-OPS-063: use expectedSensorCount (not { timeout }) for readiness gating;
   //                 use hardcoded integer literals in toHaveCount (not dynamic manifest reads).
@@ -1587,7 +1589,7 @@ test.describe('20. System Devices and Data Ingest', () => {
     expect(has).toBe(true);
   });
 
-  test('/api/v2/live returns system device data', async ({ page, request }) => {
+  test('/api/v2/live returns system device data', async ({ request }) => {
     const resp = await request.get('/api/v2/live');
     expect(resp.ok()).toBeTruthy();
     const data = await resp.json();

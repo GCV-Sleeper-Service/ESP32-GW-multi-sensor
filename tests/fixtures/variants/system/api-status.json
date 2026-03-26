@@ -10,6 +10,14 @@
     {
       "id": "first_floor",
       "name": "First Floor"
+    },
+    {
+      "id": "wan_ping",
+      "name": "WAN Latency"
+    },
+    {
+      "id": "nas01",
+      "name": "NAS Health"
     }
   ],
   "mode": "system",

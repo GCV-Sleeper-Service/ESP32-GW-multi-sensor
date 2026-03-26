@@ -235,9 +235,12 @@ const server = http.createServer(function(req, res) {
   const ingestMatch = pathname.match(/^\/api\/ingest\/([^/]+)\/([^/]+)$/);
   if (ingestMatch && req.method === 'POST') {
     const deviceId = ingestMatch[1];
+    const metricKey = ingestMatch[2];
     const manifest = loadFixtureJson('manifest.json', { sensors: [] });
-    const known = (manifest.sensors || []).some(function(s) { return s.id === deviceId; });
-    if (!known) return notFound(res, `Unknown device: ${deviceId}`);
+    const device = (manifest.sensors || []).find(s => s.id === deviceId);
+    if (!device) return json(res, { ok: false, message: `Unknown device: ${deviceId}`, status: 404 }, 404);
+    const validMetric = (device.measurements || []).some(m => m.key === metricKey);
+    if (!validMetric) return json(res, { ok: false, message: `Unknown metric: ${metricKey} for device ${deviceId}`, status: 404 }, 404);
     return json(res, { ok: true });
   }
 
