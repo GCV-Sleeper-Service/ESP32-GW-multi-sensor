@@ -1,7 +1,7 @@
 # Writing Effective Prompts for Coding Agents — A Practitioner's Guide
 
 _Based on real prompt failures and revisions from the ESP32-GW Multi-Sensor Gateway project_
-_Date: 2026-03-21 (revised post-Phase-4 review)_
+_Date: 2026-03-27 (revised post-Phase-6 — added §3.12, §3.13, Gaps 14–18, Checks 11–19, Anti-Patterns 9–13, §14)_
 _Audience: Anyone creating implementation prompts for AI coding agents (Claude, Copilot, Cursor, etc.)_
 
 ---
@@ -21,6 +21,7 @@ _Audience: Anyone creating implementation prompts for AI coding agents (Claude, 
 11. [Prompt Maintenance as the Codebase Evolves](#11-prompt-maintenance-as-the-codebase-evolves)
 12. [Quick Reference Card](#12-quick-reference-card)
 13. [Lessons Learned from Phase 4 Implementation Analysis](#13-lessons-learned-from-phase-4-implementation-analysis)
+14. [Lessons Learned from Phase 6 Implementation Analysis](#14-lessons-learned-from-phase-6-implementation-analysis)
 
 ---
 
@@ -34,7 +35,9 @@ During Phase 4 (v7.5.4.x) and Phase 5 (v7.5.5.x) of the ESP32-GW Multi-Sensor Ga
 
 The gap between the second and third iteration is where the most instructive lessons live. The expanded prompts *looked* comprehensive — they had required reading lists, code examples, do-not lists, review checklists, and device testing sections. But they missed things that could only be caught by reading the actual implementation code line by line and tracing the data flow end to end.
 
-This document captures those lessons as a reusable methodology.
+Phase 6 (v7.5.6.x) added a second layer of lessons. The Phase 6 prompts were written with the Phase 4/5 lessons already incorporated, and the structural quality was good — zero scope violations, correct data flow tracing in most steps, strong CI-exact pre-conditions. The new failure mode Phase 6 exposed was **the quality of code and specifications within the instructions**: prompt-authored code blocks that contained bugs, mock specifications that omitted validation branches, and reference code patterns that carried latent defects. Section 14 documents these lessons.
+
+This document captures both layers as a reusable methodology.
 
 ---
 
@@ -213,6 +216,72 @@ Before committing, verify:
     (full suite, no --grep) was run and all failures have skip guards with reason strings
 ```
 
+### 3.12 Mock Contract Fidelity (required in every prompt that adds mock endpoints)
+
+When a prompt asks the agent to create or extend a mock endpoint in the test server, the prompt must include a **contract-lock section**. Without this, mock endpoints default to stub-level implementations that hide the very bugs the test layer should detect.
+
+A contract-lock section has five mandatory elements:
+
+1. **Name the firmware function the mock must mirror.** The agent must read the real handler before writing the mock.
+2. **Enumerate all positive and negative validation branches.** Every `if` that returns an error in the firmware must have a corresponding branch in the mock.
+3. **Specify exact success and failure response shapes.** JSON key names, HTTP status codes, and error message format.
+4. **Require at least one test per branch.** A mock branch without a test is invisible.
+5. **Explicitly prohibit stub-level mocking.** State that "device exists → 200" is not acceptable when the firmware also validates metric keys and parameter values.
+
+**Bad:**
+```
+Add a mock ingest route that returns 200 for valid devices.
+```
+
+**Good:**
+```
+### Contract-Lock: Mock `/api/ingest` Route
+
+Read `handle_api_ingest_()` in `dashboard/sensor_history_multi.h` first.
+Mirror all validation branches:
+
+| Condition | HTTP Status | Response |
+|---|---|---|
+| Device found, metric found, val valid | 200 | `{"ok":true}` |
+| Device not found | 404 | `{"ok":false,"message":"Unknown device: {id}","status":404}` |
+| Metric not found for device | 404 | `{"ok":false,"message":"Unknown metric: {key}","status":404}` |
+| Missing or non-finite val | 400 | `{"ok":false,"message":"Missing or invalid val","status":400}` |
+
+Write one test per row. Do NOT reduce this mock to a "device exists → 200" stub.
+```
+
+**Why this matters:** Phase 6.4 showed that a stub-level mock made the test suite green while removing the contract checks the test layer was supposed to defend. Two fix commits were needed after the initial implementation because the prompt only specified happy-path and unknown-device branches.
+
+### 3.13 Prompt-Provided Code Quality Gates (required when a prompt contains code blocks)
+
+If a prompt contains copy-ready code, that code is an upstream artifact in the implementation pipeline. Agents reproduce prompt code faithfully — including bugs. The prompt author must review embedded code with the same discipline as repository code.
+
+**Minimum quality checks before prompt publication:**
+
+**JavaScript:**
+- `escHtml()` applied to every config-derived or manifest-derived string inserted into HTML
+- Null/undefined guards use explicit checks (`!== undefined && !== null`), never truthy checks on values that could legitimately be `0` or `""`
+- `isFinite()` guard on any numeric value before conversion to CSS (width, percentage, etc.)
+- No mixed guard styles within a single function body
+
+**Python:**
+- All imports at module top level (not inside functions), even in prompt-provided snippets
+- `with` context managers for network resources (`urlopen`), file handles, and subprocesses
+- Unsupported-platform stub functions return the documented safe default (`0.0`), not a non-zero placeholder
+- Docstrings match actual behavior
+
+**Shell (bash):**
+- `LC_ALL=C` before any command whose output varies by locale (`top`, `df`, `free`, `date`, `ps`)
+- Command-derived numeric values sanitized before URL interpolation (strip non-numeric characters)
+- Log messages match true behavior ("Attempted push" if failures are suppressed, not "Pushed successfully")
+- Full script in one unbroken code fence
+
+**General:**
+- When copying a pattern from existing code, audit the reference code for latent bugs first. Existing code is not automatically correct.
+- Comments and docstrings must match the actual implementation behavior, not describe an idealized version.
+
+**Why this matters:** Phase 6 showed that prompt-authored code was the primary defect source across four of five steps. The agents didn't invent bugs — they copied them from the prompt.
+
 ---
 
 ## 4. The Gap Categories
@@ -364,6 +433,40 @@ The build pipeline has a chain: `dashboard.html` → `dashboard.min.html` → `d
 **How to catch it:** For any build pipeline with intermediate artifacts, trace the full derivation chain. Ask: "If the source changes (version bump, code edit), does every intermediate artifact get re-derived before the final output is produced?" If any step is manual or conditional, the prompt must either automate it or document the manual step explicitly.
 
 This gap applies beyond version bumps — any time a prompt instructs the agent to modify a source file that has generated intermediates, the prompt must include the regeneration commands for the full chain.
+
+### Gap 14: Inconsistent Guard Style in Prompt Snippets
+
+The prompt provides code with mixed value-presence checks within a single function: one line uses explicit `!== undefined && !== null`, another uses a truthy check on a field that could legitimately be `0`. The agent copies both patterns faithfully, and the truthy check silently skips valid zero values.
+
+**How to catch it:** Before publishing a prompt with code blocks, audit all value-presence guards for consistency. The project standard for optional numeric and timestamp fields is `value !== undefined && value !== null` (never truthy). Apply this consistently within each function body.
+
+**Concrete example from Phase 6.2 (BUG-072):** The prompt provided `if (seenEl && devData.last_seen)` — a truthy check that fails when `last_seen === 0`. Two lines above, the prompt correctly used `!== undefined && !== null` for `uptime_hrs`. The inconsistency was copied from the reference `updateNetworkCards()` function, which has the same latent bug.
+
+### Gap 15: Prompt-Seeded Security Sink
+
+The prompt provides HTML-building code that concatenates config-derived or manifest-derived strings directly into HTML output without escaping. On an embedded LAN device the practical risk is low, but it is inconsistent with the project's existing `escHtml()` helper and creates an XSS vector that propagates into every future copy of the pattern.
+
+**How to catch it:** For every prompt-provided code block that builds HTML, list each text insertion point and verify it uses `escHtml()` (or the equivalent sanitizer) for any value that originates from config, manifest, or user input. The agent will not add escaping that the prompt's code omits.
+
+### Gap 16: Numeric-to-CSS Without Finite Guard
+
+The prompt provides code that converts a numeric value to a CSS property (e.g., `width: ${value}%`) without checking `isFinite(value)` first. If the value is `NaN` or `Infinity` — which happens when the source metric has no data yet — the resulting CSS is `width: NaN%`, which browsers ignore silently.
+
+**How to catch it:** Any function in a prompt that maps a numeric input to a CSS or DOM geometry property must include an `isFinite()` early-return or default. This is a mechanical check: search the prompt's code blocks for string templates that embed numeric variables into style attributes.
+
+### Gap 17: Under-Specified Contract Mocks
+
+The prompt asks the agent to mock an existing firmware endpoint but describes only the happy path and one error case. The firmware's actual handler has three or more validation branches. The resulting mock passes tests that should fail, because the mock silently accepts requests the firmware would reject.
+
+**How to catch it:** See §3.12 (Mock Contract Fidelity). Every mock endpoint prompt must include a contract-lock section. Before writing the contract-lock, read the firmware handler and enumerate every branch.
+
+**Concrete example from Phase 6.4:** The prompt specified "known device → 200, unknown device → 404" for the ingest mock. The firmware also validates metric key existence and `val` parameter presence/finiteness. Two fix commits were required.
+
+### Gap 18: Fixture Composition Ripple Omissions
+
+The prompt changes a fixture's sensor/device count or composition but does not instruct the agent to update the skip-reason strings, group comments, and helper expectations that reference the old composition. The fixture data is correct; the explanatory text is stale.
+
+**How to catch it:** After any fixture composition change in a prompt, include an explicit instruction: "Search all `test.skip()` reason strings for references to the old composition. Update any group header comments or fixture descriptions that embed the old count. Verify no stale comments survive in neighboring groups."
 
 ---
 
@@ -753,6 +856,92 @@ FIXTURE_SET=<new_variant> npx playwright test   # full suite, no --grep
 
 Any test that fails gets a skip guard with a reason string explaining the specific incompatibility. This step must be completed before the PR is opened — not as a follow-up.
 
+### Check 11: Lint prompt-provided code snippets before publication
+
+Run the embedded code through basic quality checks before the prompt is finalized. See §3.13 for the language-specific checklist. At minimum:
+
+- Python: verify imports are at module level, context managers used for I/O, safe defaults for unsupported platforms
+- Shell: verify `LC_ALL=C` for locale-sensitive commands, input sanitization before URL interpolation
+- JavaScript: verify `escHtml()` at HTML sinks, explicit null checks (not truthy), `isFinite()` for numeric-to-CSS
+
+A prompt with buggy code is an upstream bug source, not an imperfect instruction.
+
+### Check 12: Verify contract fidelity for mocked endpoints
+
+If the prompt asks the agent to create or extend a mock endpoint, verify that the contract-lock section (§3.12) enumerates all firmware validation branches. Read the actual firmware handler and compare branch-by-branch:
+
+- Does the mock validate all the same conditions as the firmware?
+- Does the mock return the same response shapes (JSON keys, status codes)?
+- Is there one test per branch?
+- Does the prompt explicitly prohibit stub-level mocking?
+
+### Check 13: Trace the full data lifecycle for new entities
+
+For every new adapter, device category, or metric type introduced by the prompt, trace all of these explicitly:
+
+- Input path (where data enters the system)
+- Accumulation/buffer state (where data sits before processing)
+- Periodic flush/transfer trigger (what moves data from accumulator to storage)
+- Final storage target (RAM ring buffer, NVS, etc.)
+- API exposure (which endpoints serve this data)
+- Fixture generation (does the generator know about this entity?)
+- Mock server behavior (does the mock serve/accept this entity?)
+- Playwright assertions (are there tests for this entity?)
+
+If any link is not explicitly named in the prompt, the prompt is incomplete. This is the generalized form of Gap 3 (Missing Periodic Trigger).
+
+### Check 14: Verify sanitization at every HTML sink
+
+For every prompt-provided code block that builds HTML from dynamic data:
+
+- List each text insertion point
+- Verify `escHtml()` (or equivalent) wraps every value from config, manifest, or external input
+- Verify no raw template literal concatenation of user-controlled strings
+
+### Check 15: Verify finite-number guards for numeric-to-UI conversions
+
+For every prompt-provided code block that converts a number to a CSS property, DOM text, or SVG attribute:
+
+- Verify `isFinite(value)` (or equivalent) is checked before the conversion
+- Verify a sensible fallback exists when the value is not finite (`0`, `"—"`, hidden element)
+
+### Check 16: After fixture composition changes, require downstream text audit
+
+If the prompt changes a fixture's sensor/device count or composition:
+
+- Search all `test.skip()` reason strings for references to the old composition
+- Update any group header comments that embed the old count
+- Update any helper expectations or hardcoded counts that reference the old composition
+- Verify no stale comments survive in neighboring groups
+
+### Check 17: Verify Playwright test signatures are minimal
+
+Before finalizing a prompt that adds Playwright tests:
+
+- Remove `page` from destructuring if the test only uses `request`
+- Remove `request` from destructuring if the test only uses `page`
+- Do not create a browser context unless the test needs DOM interaction
+
+### Check 18: Audit reference code before copying patterns
+
+If the prompt's code blocks are based on existing functions in the codebase:
+
+- Read the reference function's implementation
+- Check its value-presence guards, sanitization, and error handling
+- Verify the reference code is actually correct before using it as a template
+- If the reference has latent bugs, fix them in the prompt's code — do not propagate them
+
+### Check 19: Verify phase-boundary state synchronization
+
+At phase boundaries (when the last step of a phase closes):
+
+- Workflow index (`prompts/prompt-index-and-workflow.md`) shows all steps as ✅ Complete
+- Architecture plan status section reflects completion
+- Changelog has a closure entry
+- Session handoff page is current
+
+Do not leave one document behind as "pending" when the others show complete. Operators use these documents to decide what to run next.
+
 ---
 
 ## 10. Common Anti-Patterns
@@ -835,6 +1024,46 @@ The format: state the correct behaviour → name the incorrect behaviour the age
 
 Additionally, for count assertions specifically: when prohibiting dynamic reads, always state the **vacuous-pass failure mode**. Without it, the agent will choose dynamic reads as the apparently more robust option. With it, the agent understands that the "robust" option is actually the dangerous one.
 
+### Anti-Pattern 9: "Prompt snippet compiles, therefore prompt is good"
+
+**Example:** A prompt contains a Python exporter script that runs without errors on the prompt author's machine. It is shipped as-is.
+
+**Problem:** The script has imports inside functions, uses `50.0` as an unsupported-platform placeholder, misses `LC_ALL=C` for locale-sensitive commands, and lacks context managers for network resources. It compiles and runs — but it has five defects that will be faithfully reproduced by the agent and then caught by reviewers.
+
+**Fix:** Apply the §3.13 quality gates to every code block before prompt publication. "It runs" is not the same as "it's correct."
+
+### Anti-Pattern 10: Mock Only Happy-Path Plus One Error
+
+**Example:** "Add a mock ingest route. Return 200 for known devices, 404 for unknown devices."
+
+**Problem:** The firmware handler validates device existence, metric key existence, and parameter presence/finiteness. A mock that only checks device existence passes tests that should fail — the test suite is now testing the mock's simplifications, not the firmware's contract.
+
+**Fix:** Use §3.12 contract-lock. Read the firmware handler. Enumerate every branch. One test per branch. Explicitly prohibit simplification.
+
+### Anti-Pattern 11: Copy Reference Code Without Re-Auditing
+
+**Example:** The prompt author copies the guard pattern from `updateNetworkCards()` to use in the new `updateSystemCards()` function. The reference code uses a truthy check on `last_seen`. The truthy check is itself a latent bug — it fails on `last_seen === 0`.
+
+**Problem:** Existing code is not automatically correct. The prompt propagated a pre-existing bug into a new subsystem.
+
+**Fix:** Before including code copied from an existing function, audit the reference for: truthy vs. explicit null checks, missing sanitization, locale assumptions, and resource lifecycle. Fix any latent issues in the prompt's version. See Check 18.
+
+### Anti-Pattern 12: Truthy Checks for Numeric or Timestamp Values
+
+**Example:** `if (devData.last_seen) { ... }` instead of `if (devData.last_seen !== undefined && devData.last_seen !== null) { ... }`
+
+**Problem:** Truthy check fails on `0`, which is a valid epoch timestamp (Jan 1, 1970 00:00:00 UTC) and can appear during initialization. The code silently skips a valid update.
+
+**Fix:** The project convention for all optional numeric and timestamp fields: use `!== undefined && !== null`, never truthy. State this convention in the prompt when providing code that checks value presence.
+
+### Anti-Pattern 13: Interpolate Parsed Shell Output into URLs Without Sanitization
+
+**Example:** A shell exporter script reads CPU usage with `top` and directly interpolates the result into a `curl` URL: `curl "http://gateway/api/ingest/nas01/cpu_pct?val=$CPU_PCT"`
+
+**Problem:** On some locales or systems, `top` output may include commas, spaces, or other characters that break the URL or inject additional query parameters. The `curl` call may fail silently or send malformed data.
+
+**Fix:** Strip non-numeric characters (keeping only digits and the decimal point) before interpolation. Add `LC_ALL=C` to stabilize the `top` output format.
+
 ---
 
 ## 11. Prompt Maintenance as the Codebase Evolves
@@ -867,6 +1096,17 @@ After each step merges, run a structured audit:
 
 This is what LESSON-OPS-057 ("specified tests must be tracked to implementation completion") generalises: every specified artifact must be tracked to delivery, and every delivery must be checked for cascade effects.
 
+### Phase-boundary state synchronization
+
+When a phase or major step closes, update all operator-facing state documents together:
+
+- Workflow index (`prompts/prompt-index-and-workflow.md`) — mark all steps complete with dates
+- Phase/architecture status section in `Docs/v7.5-v7.6-architecture-plan.md`
+- Changelog closure entry in `Docs/changelog.md`
+- Any session handoff page used as a human control surface
+
+Do not leave one of these behind as "pending" once the others show complete. Phase 6 showed that a stale workflow index creates execution risk even when the codebase is correct — an operator or agent may select incorrect next steps, re-run completed work, or mis-sequence tagging and testing.
+
 ---
 
 ## 12. Quick Reference Card
@@ -895,20 +1135,25 @@ This is what LESSON-OPS-057 ("specified tests must be tracked to implementation 
 17. Use CI-exact commands in pre-condition blocks — never bare `npx playwright test`
 18. If the step adds new test groups: include a Test Group Implementation Guardrails section (§3.11)
 19. If the step adds a new fixture variant: include the full-suite cross-variant audit instruction
+20. If the step adds or extends mock endpoints: include a Contract-Lock section (§3.12)
+21. Lint all embedded code blocks before finalizing the prompt (§3.13)
+22. Audit any reference code used as a pattern source for latent bugs (Check 18)
 
 ### After Writing a Prompt
 
-20. Walk through the prompt as if you were the agent — can you implement it without guessing?
-21. Run the pre-flight checklist (Section 9) against the prompt
-22. Check for cascading effects on subsequent step prompts
+23. Walk through the prompt as if you were the agent — can you implement it without guessing?
+24. Run the pre-flight checklist (Section 9, Checks 1–19) against the prompt
+25. Check for cascading effects on subsequent step prompts
+26. If the prompt contains code blocks: verify against §3.13 quality gates
 
 ### After Each Step Completes
 
-23. Audit subsequent prompts for invalidated assumptions
-24. Update cascading decisions log
-25. Add new lessons to the critical rules section
-26. If a new fixture variant was introduced: run full-suite audit immediately, add skip guards before next step begins
-27. If any sequential count changed: update downstream prompts to derive rather than hardcode
+27. Audit subsequent prompts for invalidated assumptions
+28. Update cascading decisions log
+29. Add new lessons to the critical rules section
+30. If a new fixture variant was introduced: run full-suite audit immediately, add skip guards before next step begins
+31. If any sequential count changed: update downstream prompts to derive rather than hardcode
+32. At phase boundaries: synchronize all operator-facing state documents (Check 19)
 
 ---
 
@@ -1110,6 +1355,116 @@ Using v7.5.4.2 (Network Card Renderer) as the example:
 | New device category without endpoint audit | v7.5.4.0–v7.5.4.4 — no audit of `/sensors.json`, `/api/status` | v1 endpoint returns non-environmental devices; status has meaningless fields (BUG-052, BUG-053) |
 | Legacy endpoint serves wrong data for new category | v7.5.4.x — `/history/wan_ping/temp` returns ping HistoryBuffer | Temperature chart shows ping latency as temperature values (BUG-056 chain link 4) |
 | Build pipeline intermediate artifact not re-derived | `bump-version.sh` — `dashboard.min.html` stale | `dashboard.h` embeds old version; preflight fails (BUG-055) |
+| Inconsistent guard style in prompt code (Gap 14) | v7.5.6.2 — `last_seen` truthy check | Valid zero timestamp skipped silently (BUG-072) |
+| Prompt-seeded security sink (Gap 15) | v7.5.6.2 — `description` not escaped | XSS vector in system card HTML |
+| Numeric-to-CSS without finite guard (Gap 16) | v7.5.6.2 — usage bar width | `"NaN%"` in style attribute |
+| Under-specified contract mock (Gap 17) | v7.5.6.4 — ingest mock device-only | Mock accepts requests firmware would reject; 2 fix commits |
+| Fixture composition ripple omission (Gap 18) | v7.5.6.4 — mixed fixture expanded | Stale skip-reason strings in Groups 14, 15, 18 |
+| Prompt-authored code defect (imports) | v7.5.6.3 — Python imports inside functions | 3 review comments; fix commit required |
+| Prompt-authored code defect (safe default) | v7.5.6.3 — `return 50.0` placeholder | Misleading 50% RAM bar on unsupported platforms |
+| Prompt-authored code defect (locale) | v7.5.6.3 — missing `LC_ALL=C` in shell | Script fails silently on non-English locales |
+| Reference code latent bug propagated | v7.5.6.2 — `updateNetworkCards()` truthy check | Same bug copied into `updateSystemCards()` |
+| Missing periodic trigger (Gap 3 repeat) | v7.5.6.1 — `compute_averages()` for system metrics | System metric history empty despite ingest working |
+
+---
+
+## 14. Lessons Learned from Phase 6 Implementation Analysis
+
+Phase 6 (v7.5.6.0–v7.5.6.4) was implemented using prompts written with the Phase 4 lessons already incorporated. The guide's existing gap taxonomy and prompt structure held up well — zero scope violations, correct data-flow tracing in most steps, and strong CI-exact pre-conditions.
+
+The new failure mode that Phase 6 exposed is not about missing instructions. It's about **the quality of code and specifications within the instructions themselves.**
+
+### 14.1 The Core Phase 6 Finding: Prompts Are Upstream Engineering Artifacts
+
+In Phase 4, the primary failure mode was "the prompt didn't tell the agent about X." In Phase 6, the primary failure mode was "the prompt told the agent to do X, and X itself was wrong."
+
+Specifically:
+- Prompt-provided JavaScript had truthy checks that should have been explicit null checks
+- Prompt-provided JavaScript omitted `escHtml()` at HTML sinks
+- Prompt-provided Python had imports inside functions instead of at module level
+- Prompt-provided Python used `50.0` as a placeholder where `0.0` was the documented default
+- Prompt-provided shell script lacked `LC_ALL=C` for locale-sensitive commands
+- The mock specification omitted 60% of the firmware's validation branches
+
+The agents faithfully implemented every one of these defects. The review layer caught them all, but each one required a fix commit and a review round that could have been avoided.
+
+**The maturity step:** Stop treating prompts as "descriptions of work" and start treating them as upstream engineering artifacts. If the prompt is wrong, the PR will be wrong in exactly the same shape.
+
+### 14.2 Case Study: v7.5.6.2 — Latent Bug Propagation from Reference Code
+
+The system card renderer prompt (v7.5.6.2) needed a `last_seen` presence check. The prompt author looked at the existing `updateNetworkCards()` function and copied its guard pattern:
+
+```javascript
+if (seenEl && devData.last_seen) {
+```
+
+This is a truthy check. `devData.last_seen === 0` evaluates to `false`, silently skipping the DOM update. The `uptime_hrs` guard two lines above in the same prompt correctly used:
+
+```javascript
+if (upVal !== undefined && upVal !== null) {
+```
+
+The inconsistency within the prompt's own code block was the defect. The agent reproduced both patterns exactly as provided. Both Copilot PR review rounds flagged the truthy check. The fix changed it to `devData.last_seen !== undefined && devData.last_seen !== null`.
+
+**Lesson:** Existing code is not automatically correct. When a prompt uses existing code as a reference pattern, the prompt author must audit the reference for the same classes of defects the review process checks for. See Anti-Pattern 11 and Check 18.
+
+### 14.3 Case Study: v7.5.6.4 — Under-Specified Mock Contract
+
+The Phase 6 closure step needed a mock for `/api/ingest`. The prompt said:
+
+> Add `/api/ingest/:deviceId/:metricKey` mock route for POST requests. Return `{"ok":true}` for known devices, 404 for unknown.
+
+The real firmware handler (`handle_api_ingest_()`) validates:
+1. Device ID exists in the manifest
+2. Metric key exists for that device
+3. `val` query parameter is present
+4. `val` is a finite number
+
+The prompt only specified validation #1. The agent implemented exactly what the prompt said. The reviewer caught it. Two fix commits followed — one for metric validation, one for val validation.
+
+**Lesson:** A mock endpoint is only as good as its specification. "Known device → 200" is a stub, not a mock. The contract-lock pattern (§3.12) eliminates this class of defect by forcing the prompt author to enumerate all branches before writing the mock specification.
+
+### 14.4 Case Study: v7.5.6.1 — Gap 3 Repeated Despite Being Documented
+
+The system device category (v7.5.6.1) added the `external_push` adapter with RAM-based metrics and history. The prompt correctly described the input path (ingest endpoint) and the output path (API/history). It did not mention `compute_averages()` — the periodic flush that moves accumulated samples into the history buffer.
+
+This is exactly Gap 3 (Missing Periodic Trigger), documented in this guide since its first version. The guide had the right lesson. The Phase 6 prompt didn't apply it.
+
+**Lesson:** Documented lessons only prevent bugs when they are operationalized as checklist items in the actual prompt. See Check 13 (data lifecycle trace) — this check generalizes Gap 3 into a mandatory pre-flight step that traces every link in the chain.
+
+### 14.5 Summary: What Phase 6 Added to the Guide
+
+| Addition | Section | Why |
+|---|---|---|
+| Mock Contract Fidelity | §3.12 | Phase 6.4 mock under-specification |
+| Prompt Code Quality Gates | §3.13 | Phase 6.2/6.3 prompt-authored code defects |
+| Gaps 14–18 | §4 | New failure modes from Phase 6 |
+| Checks 11–19 | §9 | Operationalize Phase 6 lessons as pre-flight items |
+| Anti-Patterns 9–13 | §10 | Named patterns to avoid, from Phase 6 audit |
+
+The existing guide structure was validated by Phase 6 — the anatomy, gap taxonomy, case study format, checklist, and anti-pattern patterns all worked. Phase 6's contribution is a second layer of refinement focused on **the quality of prompt content**, not just the completeness of prompt instructions.
+
+### Appendix C — Compact Template Block for Future Prompts
+
+Reusable template text for prompts that add mock endpoints or include code blocks:
+
+```md
+### Contract-Lock (Mandatory for endpoint mocks)
+- Read firmware handler: <file:function>
+- Implement all branches: success + each validation failure
+- Match JSON response shape exactly
+- Add one test per branch
+- Do NOT implement a stub (e.g., device-exists-only)
+
+### Snippet Quality Gates (Mandatory when prompt includes code)
+- [ ] JS: escHtml sinks audited
+- [ ] JS: null/undefined guards consistent (no truthy for numeric/timestamp)
+- [ ] JS: isFinite guard for numeric→CSS
+- [ ] Shell: LC_ALL=C + metric sanitization
+- [ ] Python: module-level imports + context managers
+- [ ] Docs/comments aligned with actual behavior
+- [ ] Reference code audited for latent bugs before copying pattern
+```
 
 ---
 
