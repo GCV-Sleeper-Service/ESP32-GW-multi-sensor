@@ -57,16 +57,21 @@ Before starting v7.5.7.0:
 
 ## What to Read Before v7.5.7.0
 
-| Priority | Document | Why |
-|----------|----------|-----|
-| 1 | Issue #85 — [[BUG-071][ARCH] Aggregator manifest truncation](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/issues/85) | Canonical source for v7.5.7.0 scope |
-| 2 | `Docs/bugs-and-lessons-learned.md` — BUG-071 | Truncation root cause |
-| 3 | `Docs/aggregator-setup.md` | Aggregator architecture |
-| 4 | `Docs/v7.5-v7.6-architecture-plan.md` | Architecture context |
-| 5 | `prompts/phase6/v7.5.6.4-prompt-and-pr-audit.md` | Lessons from Phase 6 closure |
-| 6 | `prompts/prompt-index-and-workflow.md` — Critical Rules 1–28 | All project guardrails |
+1. `Docs/v7.5-v7.6-architecture-plan.md` — main architecture (Phases 1-6)
+3. `Docs/phase6-implementation-plan.md` — Phase 6 (Data Ingest)
+4. `Docs/bugs-and-lessons-learned.md` —  ALL entries, BUG-071 - Truncation root cause, BUG-057 through BUG-069 and LESSON-OPS-068 through LESSON-OPS-074
+5. `Docs/changelog.md` — all Phase 6 entries 
+6. All session logs from the most recent steps (check Docs/ for session-log-* files) — the v7.5.6.x session logs
+7. `Docs/aggregator-satellite-gateway-principles.txt` — forward looking plan and user design principles
+8. `Docs/phase-d-implementation-plan.md` — next phase implementation plan
+9. `prompts/prompt-index-and-workflow.md` — step index and critical rules (28 rules)
+10. Prompt audit for phase6 reports in prompts/phase6/ - `v7.5.6.0-PR80-consolidated-audit-and-lessons.md`, `v7.5.6.1-PR82-consolidated-audit-and-lessons.md`, `v7.5.6.2-PR83-consolidated-audit-and-lessons.md`, `v7.5.6.3-PR84-consolidated-audit-and-lessons.md`, `v7.5.6.4-PR87-consolidated-audit-and-lessons.md`
+11. prompts/session-handoff* - session handoff files for phase6
+12. `writing-prompts-for-coding-agents-guide.md` - master document how to write prompts for coding agents
+13. `Docs/v7.7-implementation-plan.md` 
+14. `Docs/v7.7-v7.8-persistence-architecture.md`
 
----
+
 
 ## Phase Progress
 
