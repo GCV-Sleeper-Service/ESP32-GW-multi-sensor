@@ -226,3 +226,19 @@ This hybrid gives the best chance of successful, reproducible downstream executi
 - **v7.6.0.5:** Base (with CL test guardrail detail merged)
 
 Overall best delivery path: **Base-first hybridization with selective CL hardening notes**.
+
+
+---
+
+## 9) Delivery Update (This Session)
+
+Delivered six hybrid prompts that combine base structure compliance with selective CL hardening details:
+
+- `prompts/phaseD/v7.6.0.0-implementation-instructions-for-coding-agent-updated.md`
+- `prompts/phaseD/v7.6.0.1-implementation-instructions-for-coding-agent-updated.md`
+- `prompts/phaseD/v7.6.0.2-implementation-instructions-for-coding-agent-updated.md`
+- `prompts/phaseD/v7.6.0.3-implementation-instructions-for-coding-agent-updated.md`
+- `prompts/phaseD/v7.6.0.4-implementation-instructions-for-coding-agent-updated.md`
+- `prompts/phaseD/v7.6.0.5-implementation-instructions-for-coding-agent-updated.md`
+
+These updated prompts are now the recommended execution set for downstream coding-agent runs.
