@@ -2295,6 +2295,46 @@ Mirrored in both `dashboard.js` and `dashboard.html`.
 
 ---
 
+## LESSON-OPS-081 — Mock endpoint prompts must enumerate all firmware validation branches (v7.5.6.4)
+
+**Version:** v7.5.6.4
+**Source:** PR #87 — mock `/api/ingest` required 2 fix commits because the prompt only specified device validation, not metric/val validation.
+
+When a prompt asks the agent to create a mock endpoint for an existing firmware API, the prompt MUST:
+1. Name the firmware function to read (e.g., `handle_api_ingest_()`)
+2. Enumerate all positive and negative validation branches
+3. Specify exact response shapes for success (`{"ok":true}`) and failure (`{"ok":false,"message":"...","status":N}`)
+4. Require one test per branch
+5. Explicitly prohibit stub-level mocking: "Do NOT reduce this mock to a 'device exists → 200' stub"
+
+A mock that only validates device existence is a stub, not a contract-faithful implementation. It hides client-side bugs and causes merge-blocking review comments.
+
+---
+
+## LESSON-OPS-082 — Fixture composition changes require downstream text audit (v7.5.6.4)
+
+**Version:** v7.5.6.4
+**Source:** PR #87 — mixed fixture gained `nas01` (3 → 4 sensors) but skip-reason strings referencing "3 sensors" remained in multiple locations.
+
+When a prompt changes a fixture's sensor count or composition:
+1. The prompt MUST include an explicit instruction: "After updating the fixture, search all `test.skip()` reason strings in `dashboard.spec.js` for references to the old sensor count and update them."
+2. The prompt MUST also flag any group header comments that describe the fixture by composition.
+
+A fixture change is not complete until all downstream text references to that fixture's old composition are updated.
+
+---
+
+## LESSON-OPS-083 — Playwright test signatures must not include unused fixture arguments (v7.5.6.4)
+
+**Version:** v7.5.6.4
+**Source:** PR #87 review comment (Gemini r2997248086) — test `/api/v2/live returns system device data` destructured `{ page, request }` but only used `request`.
+
+When writing a Playwright test that only uses the `request` fixture (e.g., a pure API test), do not include `page` in the destructured argument list. Including `page` forces Playwright to create a browser context even when it is not needed, wasting ~1–2 s per test run.
+
+**Rule:** Every test function signature must destructure only the fixtures it actually uses. Before merging, scan all new tests for unused Playwright fixture arguments.
+
+---
+
 
 
 Any significant dashboard or data-path modification should re-check:
