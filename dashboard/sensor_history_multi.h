@@ -1367,6 +1367,14 @@ class PingAdapter {
 #include <lwip/sockets.h>
 
 static const char* TAG_AGG = "aggregator";
+#ifndef AGG_MANIFEST_BUF_SIZE
+// Maximum buffer size for cached satellite manifest JSON.
+// Must accommodate the largest manifest a satellite can produce.
+// A satellite with 5+ sensors and system devices generates ~5–6KB manifests.
+// Truncation detection: if manifest_len >= AGG_MANIFEST_BUF_SIZE - 1,
+// the manifest was likely truncated by fetch_to_buffer().
+static constexpr uint16_t AGG_MANIFEST_BUF_SIZE = 8192;
+#endif
 
 struct SatelliteCache {
   const char* id;
@@ -1375,7 +1383,7 @@ struct SatelliteCache {
   int poll_interval_seconds;
 
   // Cached responses (statically allocated — no malloc)
-  char manifest_json[4096];     // cached /api/manifest response
+  char manifest_json[AGG_MANIFEST_BUF_SIZE];  // cached /api/manifest response
   char live_json[2048];         // cached /api/v2/live response
   char status_json[512];        // cached /api/status response
   uint16_t manifest_len;
@@ -1421,7 +1429,7 @@ static void init_aggregator_mutex() {
 
 // Single static temp buffer, reused across all fetches.
 // Safe because aggregator_poll_task is the only writer and fetches are sequential.
-static char s_fetch_tmp[4096];
+static char s_fetch_tmp[AGG_MANIFEST_BUF_SIZE];
 
 // Separate from s_fetch_tmp — the proxy runs in web handler context
 // while the polling task runs in RTOS context. They must not share buffers.
@@ -3065,7 +3073,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
     // LESSON-OPS-056: pre-reserve string to avoid reallocation
-    // Manifest JSON can be up to 4096 bytes per satellite; account for it in the reserve.
+    // Manifest JSON can be up to AGG_MANIFEST_BUF_SIZE bytes per satellite.
     std::string out;
     size_t reserve_size = 32;
     for (int ri = 0; ri < MAX_SATELLITES; ri++) {
@@ -3129,10 +3137,18 @@ class HistoryWebHandler : public AsyncWebHandler {
         else { out += *bp; }
       }
       out += "\"";
-      // Include cached manifest JSON for per-gateway device rendering
+      // Include cached manifest JSON for per-gateway device rendering.
+      // BUG-074: detect truncated manifests — if manifest_len >= AGG_MANIFEST_BUF_SIZE - 1,
+      // the JSON was likely cut off by fetch_to_buffer() and is not valid JSON.
       if (sat.manifest_len > 0) {
-        out += ",\"manifest\":";
-        out.append(sat.manifest_json, sat.manifest_len);
+        if (sat.manifest_len >= AGG_MANIFEST_BUF_SIZE - 1) {
+          ESP_LOGW(TAG_AGG, "Satellite %s manifest truncated (%u bytes >= %u limit), omitting",
+                   sat.id, (unsigned)sat.manifest_len, (unsigned)AGG_MANIFEST_BUF_SIZE);
+          out += ",\"manifest\":null";
+        } else {
+          out += ",\"manifest\":";
+          out.append(sat.manifest_json, sat.manifest_len);
+        }
       }
       out += "}";
     }
