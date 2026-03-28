@@ -43,6 +43,14 @@ In the Phase E captive provisioning portal, the role selection screen should ins
 
 Research needed: the ESP-IDF provides `esp_psram_get_size()` (or equivalent) for runtime PSRAM detection. The ESPHome framework may expose this through a different API. The exact detection mechanism should be validated before Phase E prompt authoring.
 
+### Build-Time Enforcement (v7.5.7.0)
+
+Since v7.5.7.0, `render_sensor_config.py` enforces this decision at build time: if `aggregator.json` exists but the board profile has `capabilities.psram: false`, the generator emits `AGGREGATOR_ENABLED 0` with a build-time warning. This allows the same `config/` directory to be shared across multiple boards — the C3 satellite and S3 aggregator can share a repo checkout, and each build gets the correct configuration.
+
+### Boot-Time Heap Warning (Phase D)
+
+Phase D should emit a boot-time log warning if free internal heap drops below a configurable threshold (recommended: 40KB) after aggregator initialization. This catches edge cases where a PSRAM board is under memory pressure from a combination of large satellite count, sensor history, and WiFi/BLE stacks. The warning should include the current heap values and a suggestion to reduce `MAX_SATELLITES`.
+
 ---
 
 ## 2. Manifest Serving Separation (Future Refactor)

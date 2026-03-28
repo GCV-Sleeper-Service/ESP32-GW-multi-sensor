@@ -70,7 +70,7 @@ Read-only display showing configured satellites with status dots, URLs, firmware
 1. **NVS key length limit:** 15 characters max. Satellite IDs can be longer — use a hash or index scheme.
 2. **Static buffer sizes:** `SatelliteCache` uses fixed arrays. `MAX_SATELLITES` is compile-time. Phase D can raise the cap (e.g., 8) but cannot make it dynamic without redesigning the struct.
 3. **Thread safety:** The polling task runs on a separate RTOS thread. All cache mutations must hold `s_cache_mutex`.
-4. **No PSRAM assumption:** ESP32-C3 has no PSRAM. ESP32-S3 may have it but the code must work without it. Keep satellite config in NVS, not in heap-allocated structures.
+4. **PSRAM required for aggregator role:** Devices without PSRAM are satellite-only (enforced at build time by `render_sensor_config.py` since v7.5.7.0). The aggregator code (`SatelliteCache` array, polling task, management endpoints) is compiled only when `AGGREGATOR_ENABLED 1`, which requires PSRAM. Phase D code runs exclusively on PSRAM-equipped boards. NVS satellite config uses the default NVS partition, not heap-allocated structures.
 5. **Backward compatibility:** Aggregators flashed with Phase 5 firmware must boot correctly after Phase D flash. If the NVS satellite namespace is empty, fall back to the compile-time list.
 
 ---

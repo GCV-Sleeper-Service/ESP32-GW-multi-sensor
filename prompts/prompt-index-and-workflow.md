@@ -209,7 +209,7 @@ All steps shipped. No prompts needed.
 **v7.5.7.0 device testing requirements:**
 - Compile and flash aggregator board (S3)
 - Verify manifest buffer handles 5+ sensor satellites without truncation
-- Verify MAX_SATELLITES=8 on S3, MAX_SATELLITES=2 on C3
+- Verify AGGREGATOR_ENABLED=1 and MAX_SATELLITES=8 on S3, AGGREGATOR_ENABLED=0 on C3 (satellite only)
 - Verify `/api/aggregator/gateways` emits valid JSON for all satellites
 - Heap check after aggregator boot
 

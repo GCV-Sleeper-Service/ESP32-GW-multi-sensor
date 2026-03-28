@@ -64,7 +64,7 @@ Before starting v7.5.7.0:
 6. All session logs from the most recent steps (check Docs/ for session-log-* files) — the v7.5.6.x session logs
 7. `Docs/aggregator-satellite-gateway-principles.txt` — forward looking plan and user design principles
 8. `Docs/phase-d-implementation-plan.md` — next phase implementation plan
-9. `prompts/prompt-index-and-workflow.md` — step index and critical rules (28 rules)
+9. `prompts/prompt-index-and-workflow.md` — step index and critical rules (35 rules)
 10. Prompt audit for phase6 reports in prompts/phase6/ - `v7.5.6.0-PR80-consolidated-audit-and-lessons.md`, `v7.5.6.1-PR82-consolidated-audit-and-lessons.md`, `v7.5.6.2-PR83-consolidated-audit-and-lessons.md`, `v7.5.6.3-PR84-consolidated-audit-and-lessons.md`, `v7.5.6.4-PR87-consolidated-audit-and-lessons.md`
 11. prompts/session-handoff* - session handoff files for phase6
 12. `writing-prompts-for-coding-agents-guide.md` - master document how to write prompts for coding agents
@@ -90,7 +90,7 @@ The scope covers:
 1. **Buffer increase:** Aggregator manifest buffer from 4096 → 8192 bytes in `SatelliteCache` struct
 2. **Truncation detection guard:** Add runtime check that rejects/logs truncated JSON manifests (detect `manifest_len == AGG_MANIFEST_BUF_SIZE - 1`, log warning, omit broken manifest from `/api/aggregator/gateways` response)
 3. **PSRAM-aware `MAX_SATELLITES` scaling** in `render_sensor_config.py`:
-   - No PSRAM → 2 satellites (ESP32-C3 SuperMini, ESP32-WROOM-32D)
+   - No PSRAM → satellite only (AGGREGATOR_ENABLED 0) (ESP32-C3 SuperMini, ESP32-WROOM-32D)
    - PSRAM ≥ 4MB → up to 8 satellites (ESP32-S3 N16R8)
 4. **Documentation updates:** `Docs/aggregator-setup.md` and `Docs/v7.5-v7.6-architecture-plan.md` updated for new limits
 

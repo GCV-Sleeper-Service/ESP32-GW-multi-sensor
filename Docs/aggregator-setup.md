@@ -7,9 +7,9 @@ Satellite and aggregator are capability tiers in one firmware architecture: an a
 
 ## 2) Hardware Requirements
 
-- **ESP32-C3 SuperMini (4MB)**: suitable satellite device; can run small aggregator setups (typically 1–2 satellites) but RAM-constrained.
-- **ESP32-S3 (recommended aggregator for up to ~5 satellites)**: more RAM, better for aggregation workloads.
-- **ESP32-WROOM-32D**: supported as an additional board profile and validated compile target.
+- **ESP32-C3 SuperMini (4MB)**: satellite role only. No PSRAM — insufficient memory for aggregator infrastructure. Excellent as a compact, low-power sensor gateway.
+- **ESP32-S3 (recommended aggregator for up to 8 satellites)**: PSRAM enables the aggregator role. Required for all aggregator deployments.
+- **ESP32-WROOM-32D**: satellite role only. No PSRAM — supported as a compile target but not recommended for aggregator use.
 - **Raspberry Pi Zero 2W (or similar)**: preferred for larger deployments (>5 satellites), via separate implementation outside this firmware path.
 
 ## 3) Naming Convention (recommended, not mandatory)
