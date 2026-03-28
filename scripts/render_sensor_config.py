@@ -594,7 +594,6 @@ def generate_aggregator_config_h(aggregator_config: Dict | None, board_profile: 
 
     # Aggregator config exists — check if the board can run aggregator role
     if not has_psram:
-        import sys
         print("WARNING: aggregator.json is present but this board has no PSRAM. "
               "Aggregator role requires PSRAM — generating AGGREGATOR_ENABLED 0 "
               "(satellite-only mode). See Docs/architecture-forward-looking-notes.md §1.",
@@ -616,7 +615,6 @@ def generate_aggregator_config_h(aggregator_config: Dict | None, board_profile: 
     # For now, any PSRAM = cap at 8.
     board_cap = 8
     if n > board_cap:
-        import sys
         print(f"WARNING: aggregator.json lists {n} satellites but board cap is {board_cap}. "
               f"Capping at {board_cap}.",
               file=sys.stderr)
