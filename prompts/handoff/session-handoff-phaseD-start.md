@@ -1,6 +1,6 @@
 # Session Handoff — Phase D Start: Runtime Satellite Management (v7.6.0.x)
 
-_Date: 2026-03-27_
+_Date: 2026-03-28_
 _Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
 _Assumption: v7.5.7.0 has been implemented, tested, and merged to `main`_
 
@@ -19,6 +19,12 @@ _Assumption: v7.5.7.0 has been implemented, tested, and merged to `main`_
 - `#define AGG_MANIFEST_BUF_SIZE 8192` emitted in generated `aggregator_config.h`
 - BUG-074 and LESSON-OPS-085 documented
 - `Docs/aggregator-setup.md` updated with buffer sizes and PSRAM scaling rules
+- **Fixup commit (`4336f33`) — PR #93 audit corrections:**
+  - Heading hierarchy fixed in `Docs/aggregator-setup.md` (`## 2.1)` → `### 2.1)`)
+  - Magic numbers extracted to `SATELLITE_CAP_PSRAM = 8` and `AGG_MANIFEST_BUF_SIZE_BYTES = 8192` module-level constants in `render_sensor_config.py`
+  - Instruction Compliance Output table (16 rows) added to session log
+
+**PR #93 merged 2026-03-28. 5 commits, 28 files changed.**
 
 ### Cumulative state entering Phase D
 
@@ -46,7 +52,7 @@ _Assumption: v7.5.7.0 has been implemented, tested, and merged to `main`_
 
 Before starting v7.6.0.0:
 
-- [ ] v7.5.7.0 merged to main and tagged
+- [x] v7.5.7.0 merged to main and tagged — merged 2026-03-28T21:19:35Z
 - [ ] Device testing completed:
   - [ ] S3 aggregator compiles and boots with `MAX_SATELLITES` ≤ 8
   - [ ] `/api/aggregator/gateways` returns valid JSON
@@ -139,6 +145,16 @@ These lessons from Phase 6 apply directly to Phase D prompt execution:
 | Rule 29 (prompt code = production code) | Phase D prompts contain C++ code blocks. The `-updated` variants have been reviewed, but verify during execution. |
 | Rule 30 (no stub-level mocking) | Mock endpoints for add/remove/test must mirror all firmware validation branches. |
 | LESSON-OPS-074 (aggregator boot = satellite + overlay) | The NVS satellite loading in v7.6.0.0 is an extension of the boot overlay pattern. It must not break the satellite boot path. |
+
+---
+
+## v7.5.7.0 Lessons
+
+| Lesson | Description |
+|--------|-------------|
+| LESSON-OPS-086 | Prompt Do-NOT lists must exclude expected regeneration side-effects. "Do NOT change dashboard JS" conflicts with `bump-version.sh` which changes `App.version`. |
+| LESSON-OPS-087 | Prompt-provided code blocks must apply the same constant policy as the target codebase. Python literal `8192` was inconsistent with C++ named `AGG_MANIFEST_BUF_SIZE`. |
+| LESSON-OPS-088 | Mandatory deliverable tables should be templated with placeholder rows in the session log section to prevent omission. |
 
 ---
 
