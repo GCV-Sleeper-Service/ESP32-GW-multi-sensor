@@ -1,7 +1,7 @@
 # Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-03-24 — architecture review, infrastructure step added, critical rules 22–25_
+_Last updated: 2026-03-27 — Phase 6 completion, v7.5.7.0 added, critical rules 29–35_
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -29,6 +29,7 @@ Your job as the human operator is to:
 | Phase 7 Implementation Plan | `Docs/v7.7-implementation-plan.md` | Step-level scope for Phase 7 |
 | Bugs & Lessons Learned | `Docs/bugs-and-lessons-learned.md` | Project guardrails and failure history |
 | **Prompt Writing Guide** | `Docs/writing-prompts-for-coding-agents-guide.md` | How to create and audit prompts |
+| Architecture Forward-Looking Notes | `Docs/architecture-forward-looking-notes.md` | Post-Phase-6 architectural decisions and risks |
 
 ---
 
@@ -180,15 +181,15 @@ All steps shipped. No prompts needed.
 - v7.5.5.4: Playwright only — no device testing
 - v7.5.5.5: final verification, screenshot for record
 
-### Phase 6 — Data Ingest and System Metrics
+### Phase 6 — Data Ingest and System Metrics ✅ COMPLETE
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
 | v7.5.6.0 | POST /api/ingest endpoint | `prompts/phase6/v7.5.6.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-26 |
 | v7.5.6.1 | System device category | `prompts/phase6/v7.5.6.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-26 |
-| v7.5.6.2 | System card renderer | `prompts/phase6/v7.5.6.2-implementation-instructions-for-coding-agent.md` | Pending |
-| v7.5.6.3 | Exporter scripts + docs | `prompts/phase6/v7.5.6.3-implementation-instructions-for-coding-agent.md` | Pending |
-| v7.5.6.4 | Tests + Phase 6 closure | `prompts/phase6/v7.5.6.4-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.5.6.2 | System card renderer | `prompts/phase6/v7.5.6.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-26 |
+| v7.5.6.3 | Exporter scripts + docs | `prompts/phase6/v7.5.6.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-26 |
+| v7.5.6.4 | Tests + Phase 6 closure | `prompts/phase6/v7.5.6.4-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-26 |
 
 **Phase 6 device testing requirements:**
 - v7.5.6.0: verify ingest endpoint with curl (200/404/400 cases), heap stable
@@ -196,6 +197,21 @@ All steps shipped. No prompts needed.
 - v7.5.6.2: push test data via ingest, verify system card renders with usage bars
 - v7.5.6.3: run bash/Python exporters from an external host, verify dashboard shows data
 - v7.5.6.4: Playwright only + Phase 6 closure verification
+
+### v7.5.7.0 — Aggregator Manifest Truncation Fix + PSRAM Scaling
+
+| Version | Scope | Prompt File | Status |
+|---------|-------|-------------|--------|
+| v7.5.7.0 | Manifest buffer increase, truncation guard, PSRAM-aware MAX_SATELLITES | `prompts/phase6/v7.5.7.0-implementation-instructions-for-coding-agent.md` | Pending |
+
+**Reference:** [Issue #85](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/issues/85)
+
+**v7.5.7.0 device testing requirements:**
+- Compile and flash aggregator board (S3)
+- Verify manifest buffer handles 5+ sensor satellites without truncation
+- Verify MAX_SATELLITES=8 on S3, MAX_SATELLITES=2 on C3
+- Verify `/api/aggregator/gateways` emits valid JSON for all satellites
+- Heap check after aggregator boot
 
 ### Phase D — Runtime Satellite Management (v7.6.0.x)
 
@@ -288,6 +304,13 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 26 | Aggregator boot must be a superset of satellite boot, never a fork — unified pipeline + overlay | LESSON-OPS-074 / BUG-064 |
 | 27 | ESPHome IDF socket calls must use `lwip_*` prefixed functions, not BSD socket aliases | LESSON-OPS-068 / BUG-057 |
 | 28 | Version bumps require BOTH `render_sensor_config.py --write` AND `node tests/fixtures/generate-fixtures.js`, then verify with `--check` and `grep free_heap tests/fixtures/api-status.json` | LESSON-OPS-077 / BUG-062 |
+| 29 | Prompt-provided code blocks must be reviewed as production code before prompt publication | LESSON-OPS-084 / Phase 6 audit |
+| 30 | Mock endpoints must mirror all firmware validation branches — stub-level mocking prohibited | LESSON-OPS-081 |
+| 31 | Fixture composition changes require downstream text audit (skip reasons, comments, helpers) | LESSON-OPS-082 |
+| 32 | Playwright test signatures must only destructure used fixtures | LESSON-OPS-083 |
+| 33 | Unsupported-platform stub functions must return the documented safe default (usually `0.0`) | Phase 6.3 audit finding |
+| 34 | Shell scripts with locale-sensitive commands must use `LC_ALL=C` | Phase 6.3 audit finding |
+| 35 | Python network/file resources must use context managers (`with`) in long-running modes | Phase 6.3 audit finding |
 
 ---
 
@@ -343,6 +366,20 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-03-27 — Post-Phase-6 Completion Update
+
+**Context:** Phase 6 complete (v7.5.6.4). Post-phase documentation batch merged. Phase D preparation underway.
+
+**What was updated and why:**
+
+| Change | Why |
+|--------|-----|
+| **Phase 6 steps v7.5.6.2–6.4 marked complete** | Workflow index was stale — steps had been merged but not reflected |
+| **v7.5.7.0 added to index** | Manifest truncation fix (Issue #85) must ship before Phase D |
+| **Critical rules 29–35 added** | Phase 6 audit identified 7 new rules for prompt quality, mock fidelity, fixture ripple, script quality |
+| **Architecture Forward-Looking Notes added to Related Documents** | New document created during Phase 6 assessment |
+| **Phase 7 prompts reviewed and updated** | Checked against updated writing guide (§3.12, §3.13) |
 
 ### 2026-03-24 — Architecture Review Revision
 
