@@ -118,6 +118,29 @@ python3 scripts/render_sensor_config.py --check                             -> P
 
 ---
 
+---
+
+## Instruction Compliance Output
+
+| # | Prompt Instruction | Outcome | Notes |
+|---|---|---|---|
+| 1 | Buffer increase: `SatelliteCache.manifest_json` 4096 → 8192 via `AGG_MANIFEST_BUF_SIZE` | ✅ Compliant | `#ifndef` fallback + sized to `AGG_MANIFEST_BUF_SIZE` |
+| 2 | Buffer increase: `s_fetch_tmp` 4096 → `AGG_MANIFEST_BUF_SIZE` | ✅ Compliant | Updated in same commit |
+| 3 | Truncation guard: detect `manifest_len >= AGG_MANIFEST_BUF_SIZE - 1`, log warning, emit `"manifest":null` | ✅ Compliant | BUG-074 guard in `handle_aggregator_gateways_()` |
+| 4 | PSRAM-aware gating: no PSRAM → `AGGREGATOR_ENABLED 0` | ✅ Compliant | `board_profile["capabilities"]["psram"]` check added |
+| 5 | PSRAM board satellite cap: `MAX_SATELLITES` ≤ 8 | ✅ Compliant | `board_cap = 8`, warning on overflow, array slicing |
+| 6 | `AGG_MANIFEST_BUF_SIZE` emitted in generated header | ✅ Compliant | `#define AGG_MANIFEST_BUF_SIZE 8192` in aggregator-enabled path |
+| 7 | Version bump to 7.5.7.0 | ✅ Compliant | `bump-version.sh` + full regeneration |
+| 8 | Full regeneration pipeline (Critical Rule 28) | ✅ Compliant | All generators + preflight + fixture check |
+| 9 | Docs: `bugs-and-lessons-learned.md` updated | ✅ Compliant | BUG-074 + LESSON-OPS-085 |
+| 10 | Docs: `changelog.md` updated | ✅ Compliant | v7.5.7.0 entry added |
+| 11 | Docs: `aggregator-setup.md` updated | ✅ Compliant | Buffer + PSRAM section added |
+| 12 | Docs: `v7.5-v7.6-architecture-plan.md` updated | ✅ Compliant | v7.5.7.0 section added |
+| 13 | Session log created | ✅ Compliant | This file |
+| 14 | No Phase D runtime logic added | ✅ Compliant | Scope control verified |
+| 15 | Pre-condition tests passed before edits | ✅ Compliant | All 5 fixture sets + preflight |
+| 16 | Post-condition tests passed after edits | ✅ Compliant | All 5 fixture sets + preflight |
+
 ## Bugs Found During Session
 
 - BUG-074 implemented/fixed as intended by this step.

@@ -12,15 +12,15 @@ Satellite and aggregator are capability tiers in one firmware architecture: an a
 - **ESP32-WROOM-32D**: satellite role only. No PSRAM — supported as a compile target but not recommended for aggregator use.
 - **Raspberry Pi Zero 2W (or similar)**: preferred for larger deployments (>5 satellites), via separate implementation outside this firmware path.
 
-## 2.1) Buffer Sizes and PSRAM Scaling Rules
+### 2.1) Buffer Sizes and PSRAM Scaling Rules
 
-### Buffer Sizes
+#### Buffer Sizes
 
 - Aggregator manifest cache buffer is **8192 bytes** (`AGG_MANIFEST_BUF_SIZE`).
 - If a satellite manifest reaches the truncation threshold (`manifest_len >= AGG_MANIFEST_BUF_SIZE - 1`), the aggregator omits it from `/api/aggregator/gateways` as `"manifest":null` and logs a warning.
 - Reference sizing: a satellite with 5 sensors plus system devices typically produces a manifest around 5–6KB.
 
-### PSRAM Scaling Rules (enforced by generator)
+#### PSRAM Scaling Rules (enforced by generator)
 
 `scripts/render_sensor_config.py` enforces aggregator role eligibility and caps at build time:
 
@@ -32,7 +32,7 @@ Satellite and aggregator are capability tiers in one firmware architecture: an a
 
 If `config/aggregator.json` lists more satellites than the board cap, generation emits a warning and truncates to the cap.
 
-### Board Recommendations
+#### Board Recommendations
 
 - **Use ESP32-S3 with PSRAM for aggregator deployments.**
 - **ESP32-C3 and ESP32-WROOM-32D should be used as satellites only.**
