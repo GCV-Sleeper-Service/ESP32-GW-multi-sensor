@@ -9,6 +9,18 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 ## Bug Fixes
 
+### BUG-074 — Aggregator manifest buffer truncation produces broken JSON (v7.5.7.0)
+
+**Symptom:** `/api/aggregator/gateways` returns invalid JSON when a satellite has a manifest exceeding 4095 bytes. The dashboard fails to render the gateway's device list.
+
+**Root cause:** `SatelliteCache.manifest_json` was a 4096-byte buffer. `fetch_to_buffer()` silently truncates responses exceeding `buf_size - 1`. The truncated (invalid) JSON was embedded verbatim in the `/api/aggregator/gateways` response, breaking the entire JSON document.
+
+**Detection:** The truncation was invisible — no log message, no error return. The only symptom was dashboard malfunction when a satellite with 5+ sensors was polled.
+
+**Fix:** (1) Increased `manifest_json` and `s_fetch_tmp` to 8192 bytes via `AGG_MANIFEST_BUF_SIZE` constant. (2) Added truncation detection guard in `handle_aggregator_gateways_()`: if `manifest_len >= AGG_MANIFEST_BUF_SIZE - 1`, emit `"manifest":null` and log a warning instead of embedding the truncated JSON.
+
+**Prevention:** LESSON-OPS-085: When embedding fetched content into a composed JSON response, always validate that the content was not truncated before embedding. Buffer-size assumptions are especially dangerous for variable-length content like manifests that grow as sensors are added.
+
 ### BUG-070 — Aggregator fixture `manifest.sensors` format mismatch (2026-03-25)
 
 **Severity:** Test authoring error (caught in development)
@@ -1202,6 +1214,12 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-085: Validate fetched content wasn't truncated before embedding in composed JSON responses (2026-03-28)
+
+When composing a JSON response from cached or proxied upstream payloads, never assume a fixed-size fetch buffer captured a complete document. If `fetch_to_buffer()` (or equivalent) reaches `buf_size - 1`, treat the payload as likely truncated and do not embed it verbatim.
+
+For aggregator manifests specifically, guard with `manifest_len >= AGG_MANIFEST_BUF_SIZE - 1` and emit `"manifest":null` plus a warning log. This preserves valid top-level JSON and prevents one oversized satellite payload from breaking the entire `/api/aggregator/gateways` response.
 
 ### LESSON-OPS-077: api-status.json fixture requires generator-produced free_heap fields — never manually edit (2026-03-25)
 
