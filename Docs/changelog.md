@@ -3,6 +3,24 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.5.7.0] — 2026-03-28 — Aggregator Manifest Truncation Fix + PSRAM Scaling
+
+### Bug Fixes
+
+- **BUG-074:** Aggregator manifest buffer increased from 4096 to 8192 bytes (`AGG_MANIFEST_BUF_SIZE`). `s_fetch_tmp` increased to match. Truncation detection guard added to `handle_aggregator_gateways_()` — truncated manifests emit `"manifest":null` with a log warning instead of broken JSON.
+
+### Architecture
+
+- **PSRAM-aware aggregator gating:** Generator now enforces "no PSRAM = satellite only" — boards without PSRAM get `AGGREGATOR_ENABLED 0` even if `aggregator.json` is present (with build-time warning). PSRAM boards support up to 8 satellites.
+- **`AGG_MANIFEST_BUF_SIZE` constant:** Buffer size no longer a magic number. Defined in generated `aggregator_config.h` and as a fallback `constexpr` in `sensor_history_multi.h`.
+
+### Documentation
+
+- `Docs/aggregator-setup.md` updated with buffer sizes and PSRAM scaling rules
+- `Docs/v7.5-v7.6-architecture-plan.md` updated with v7.5.7.0 entry
+- BUG-074 and LESSON-OPS-085 added to `Docs/bugs-and-lessons-learned.md`
+
+---
 ## [v7.5.6.4] — 2026-03-26 — Test Fixtures, Playwright Tests, and Phase 6 Closure
 
 ### ✅ Phase 6 — Data Ingest and System Metrics — COMPLETE
