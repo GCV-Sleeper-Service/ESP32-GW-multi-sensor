@@ -54,11 +54,12 @@ _Assumption: v7.5.7.0 has been implemented, tested, and merged to `main`_
 Before starting v7.6.0.0:
 
 - [x] v7.5.7.0 merged to main and tagged — merged 2026-03-28T21:19:35Z
-- [ ] Device testing completed:
-  - [ ] S3 aggregator compiles and boots with `MAX_SATELLITES` ≤ 8
-  - [ ] `/api/aggregator/gateways` returns valid JSON
-  - [ ] Heap values recorded (internal + total)
-- [ ] All Playwright fixture sets passing:
+- [x] Device testing completed:
+  - [x] S3 aggregator compiles and boots with `MAX_SATELLITES` ≤ 8
+  - [x] `/api/aggregator/gateways` returns valid JSON
+  - [x] Heap values recorded (internal + total)
+  - [x] WROOM-32D satellite at .190 updated to v7.5.7.0
+- [x] All Playwright fixture sets passing:
   ```bash
   FIXTURE_SET=3sensor npx playwright test --project=chromium
   FIXTURE_SET=mixed npx playwright test --grep "Mixed-Category" --project=chromium
@@ -67,6 +68,11 @@ Before starting v7.6.0.0:
   bash scripts/preflight.sh
   python3 scripts/render_sensor_config.py --check
   ```
+
+### Pre-Phase-D Housekeeping PRs
+PR #96: fixed hardcoded sensor_count in preflight.sh (dynamic computation)
+PR #97: documented LESSON-OPS-089
+PR #96 must be merged before v7.6.0.0 starts (otherwise preflight fails on S3 profile) - merged
 
 ---
 
@@ -150,7 +156,8 @@ These are settled — do not revisit during implementation:
 Phase D requires two devices throughout:
 
 - **S3 aggregator** (ESP32-S3-DevKitC-1 at 192.168.120.191, PSRAM-equipped, runs aggregator firmware with `config/aggregator.json`)
-- **C3 satellite** (ESP32-C3 SuperMini at 192.168.120.189, at least one reachable from aggregator over network)
+- **C3 satellite** (ESP32-C3 SuperMini at 192.168.120.189, reachable from aggregator over network)
+- **WROOM-32D satellite** (ESP32-WROOM-32D at 192.168.120.190, running v7.5.7.0, reachable from aggregator over network)
 
 Device testing highlights per step:
 - **v7.6.0.0:** Boot with NVS satellites, reboot and verify persistence, clear NVS and verify compile-time fallback
