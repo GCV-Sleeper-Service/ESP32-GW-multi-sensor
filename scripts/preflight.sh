@@ -67,7 +67,32 @@ check_contains "dashboard_prefers_api_manifest" dashboard/dashboard.js "fetch(ES
 check_contains "dashboard_legacy_manifest_fallback" dashboard/dashboard.js "fetch(ESP_HOST + '/sensors.json'"
 check_contains "mock_server_serves_api_manifest" tests/mock-server/server.js "pathname === '/api/manifest'"
 check_contains "fixture_manifest_schema_v2" tests/fixtures/manifest.json '"schema_version": 2'
-check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"sensor_count": 5'
+# Dynamic sensor count — respects gateway.json sensors_file redirect (same logic as render_sensor_config.py).
+# Do NOT re-hardcode this value; different board profiles (e.g. S3 aggregator) produce different sensor counts.
+EXPECTED_SENSOR_COUNT=$(python3 -c "
+import json, sys
+from pathlib import Path
+
+# Check for gateway.json sensors_file redirect
+manifest_path = Path('config/sensors.json')
+gw_path = Path('config/gateway.json')
+if gw_path.exists():
+    try:
+        gw = json.loads(gw_path.read_text())
+        sf = gw.get('sensors_file', '')
+        if sf:
+            manifest_path = Path(sf)
+    except (json.JSONDecodeError, KeyError):
+        pass
+
+try:
+    data = json.loads(manifest_path.read_text())
+    sensors = data.get('sensors', data) if isinstance(data, dict) else data
+    print(len(sensors))
+except Exception:
+    print(5)  # fallback to legacy default
+")
+check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json "\"sensor_count\": ${EXPECTED_SENSOR_COUNT}"
 check_contains "browser_spec_present" tests/browser/manifest.spec.js "dashboard falls back to /sensors.json"
 check_not_contains "no_old_dashboard_version" dashboard/dashboard.js "App.version = 'v7.4.5.1'"
 check_not_contains "no_old_firmware_version" firmware/esp32-c3-multi-sensor.yaml "v7.4.5.1"
