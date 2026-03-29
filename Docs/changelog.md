@@ -3,6 +3,25 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.6.0.0] — 2026-03-29 — NVS Satellite Persistence Layer (Phase D Step 0)
+
+### New Features
+
+- **NVS satellite persistence:** Satellites now survive reboots without reflashing. On boot, the aggregator loads the satellite list from the `agg_sats` NVS namespace. If NVS is empty or corrupt, it falls back to the compile-time defaults from `aggregator_config.h`.
+- **`runtime_satellite_count`:** New static variable replaces all `MAX_SATELLITES` loop bounds in `aggregator_poll_task()`, `handle_aggregator_gateways_()`, `handle_aggregator_live_()`, and the proxy handler. `MAX_SATELLITES` is retained only as the compile-time array sizing cap.
+- **`SatelliteCache` owned string storage:** Added `id_buf[32]`, `name_buf[64]`, `url_buf[128]` fixed-length buffers to `SatelliteCache`. Added `set_identity()` helper that copies strings into buffers and points `id`/`name`/`base_url` at them. No heap allocation.
+- **`load_satellites_from_nvs_()`:** Reads satellite list from NVS `agg_sats` namespace on boot.
+- **`save_satellites_to_nvs_()`:** Writes all satellites to NVS (full rewrite — erases stale keys first).
+- **`save_single_satellite_to_nvs_()`:** Writes a single satellite entry + updated count (optimisation for add operations in future steps).
+- **`POST /api/system/reset-satellites`:** Factory reset endpoint — erases the NVS satellite namespace and reloads compile-time defaults. Returns `{"ok":true,"message":"Reset to compile-time defaults","satellite_count":N}`.
+
+### Architecture
+
+- Boot path remains unified (satellite boot + aggregator overlay, LESSON-OPS-074). `init_satellite_caches_()` is called inside `aggregator_poll_task()` as the first action after task start.
+- Compile-time satellite arrays remain as the first-boot fallback source. The aggregator is still fully operational with a fresh flash (no prior NVS state required).
+- All NVS write errors are logged but do not crash or corrupt runtime state.
+
+---
 ## [v7.5.7.0] — 2026-03-28 — Aggregator Manifest Truncation Fix + PSRAM Scaling
 
 ### Bug Fixes
