@@ -5,7 +5,7 @@
   "gateway_name": "Central Aggregator",
   "satellites": [
     {
-      "id": "sat-s3-4m-189",
+      "id": "sat-c3-4m-189",
       "name": "First satellite - c3 supermini 4mb flash",
       "base_url": "http://192.168.120.189",
       "poll_interval_seconds": 30
