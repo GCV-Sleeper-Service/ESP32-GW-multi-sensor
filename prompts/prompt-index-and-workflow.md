@@ -1,7 +1,7 @@
 # Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-03-28 — v7.5.7.0 complete, Phase D prompts linked, LESSON-OPS-086/087/088_
+_Last updated: 2026-03-29 — v7.6.0.0 complete (Phase D Step 0), v7.6.0.1 prompt updated with back-ported findings_
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -217,7 +217,7 @@ All steps shipped. No prompts needed.
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
-| v7.6.0.0 | NVS satellite persistence layer | `prompts/phaseD/v7.6.0.0-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.0.0 | NVS satellite persistence layer | `prompts/phaseD/v7.6.0.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-29 |
 | v7.6.0.1 | POST /api/aggregator/add-satellite | `prompts/phaseD/v7.6.0.1-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.0.2 | DELETE /api/aggregator/satellite/{id} | `prompts/phaseD/v7.6.0.2-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.0.3 | POST /api/aggregator/test-satellite | `prompts/phaseD/v7.6.0.3-implementation-instructions-for-coding-agent.md` | Pending |
@@ -366,6 +366,17 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-03-29 — v7.6.0.0 Complete (Phase D Step 0)
+
+**Context:** v7.6.0.0 merged (PR #98 + review fixes PR #99). NVS satellite persistence layer operational.
+
+**What was updated and why:**
+
+| Change | Why |
+|--------|-----|
+| **v7.6.0.0 marked complete** | PR #98 merged with review fixes from PR #99 |
+| **v7.6.0.1 prompt updated** | Back-ported 5 findings from v7.6.0.0 review (mutex, NVS seeding, key buffers, auth pattern, erase semantics) |
 
 ### 2026-03-28 — Post-v7.5.7.0 Completion and Phase D Readiness
 
