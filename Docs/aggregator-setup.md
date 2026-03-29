@@ -72,7 +72,7 @@ Deployment config files:
 
 Important separation:
 
-- `gateway.json` and `aggregator.json` are deployment configs.
+- `gateway.json` and `aggregator.json` are **human-authored** deployment configs — they are NOT generated. You create them manually.
 - For CI-style generation validation (`render_sensor_config.py --check`), keep both absent unless specifically validating deployment variants.
 
 ## 6) Configuration Steps
@@ -105,33 +105,83 @@ Copy `config/aggregator.example.json` to `config/aggregator.json`, then configur
 
 ## 7) Build and Flash
 
-Generate artifacts:
+### 7.1) Full Regeneration Pipeline
+
+**⚠️ ALWAYS run the complete pipeline before compiling firmware.** The pipeline generates all derived artifacts from the config files. Missing any step can produce stale or mismatched firmware.
 
 ```bash
+# Step 1: Generate C++ headers, YAML, and test fixtures from config
 python3 scripts/render_sensor_config.py --write
+
+# Step 2: Regenerate test fixture files
+node tests/fixtures/generate-fixtures.js
+
+# Step 3: Minify dashboard HTML (produces dashboard.min.html)
+bash scripts/minify-dashboard.sh
+
+# Step 4: Generate gzip-compressed dashboard header (uses .min.html if present)
 bash scripts/generate-header.sh
+
+# Step 5: Verify all generated files are in sync
+python3 scripts/render_sensor_config.py --check
+
+# Step 6: Run preflight checks
+bash scripts/preflight.sh
 ```
 
-Verify generated aggregator header:
+**Why `minify-dashboard.sh` matters:** `generate-header.sh` auto-detects `dashboard.min.html` and uses it if present. Without the minification step, the firmware embeds the unminified HTML — larger flash footprint and slower page load. If `dashboard.min.html` already exists from a previous run but `dashboard.html` has been modified since (e.g. version bump), the stale minified copy gets embedded. Always re-run the minification step.
+
+### 7.2) Which YAML Do I Compile?
+
+**⚠️ CRITICAL: The YAML you compile must match the board you are flashing.** The C3 satellite template (`firmware/esp32-c3-multi-sensor.yaml`) is the only YAML committed to the repo. All other board YAMLs are **generated** by `render_sensor_config.py --write` and are **gitignored** — they only exist in your local working copy after generation.
+
+| Target board | YAML to compile | How it gets there | Role determined by |
+|---|---|---|---|
+| ESP32-C3 SuperMini (default satellite) | `firmware/esp32-c3-multi-sensor.yaml` | Committed to repo (template, modified in-place when no gateway.json) | Always satellite (no PSRAM) |
+| ESP32-C3 SuperMini (with gateway.json) | `firmware/{esphome_name}-gw.yaml` | **Generated** by `render_sensor_config.py --write` | Always satellite (no PSRAM) |
+| ESP32-S3-DevKitC-1 N16R8 | `firmware/esp32-s3-devkitc1-n16r8-gw.yaml` | **Generated** by `render_sensor_config.py --write` | Aggregator if `aggregator.json` exists; satellite otherwise |
+| ESP32-WROOM-32D | `firmware/esp32-wroom-32d-gw.yaml` | **Generated** by `render_sensor_config.py --write` | Always satellite (no PSRAM) |
+
+**If the generated YAML doesn't exist, you forgot to run `render_sensor_config.py --write` with the correct `gateway.json` in place.** The generator prints the files it updated — look for the YAML path in the output.
+
+**DO NOT compile `firmware/esp32-c3-multi-sensor.yaml` for non-C3 boards.** This is a C3-specific template. Compiling it for an S3 will produce satellite firmware for the wrong chip architecture, without any aggregator capability.
+
+### 7.3) Verify Generated Artifacts
+
+After running the regeneration pipeline, verify the key outputs:
 
 ```bash
+# Check that the correct YAML was generated for your board
+ls -la firmware/esp32-s3-devkitc1-n16r8-gw.yaml  # for S3 aggregator
+# or
+ls -la firmware/esp32-wroom-32d-gw.yaml            # for WROOM satellite
+
+# Check aggregator is enabled (for aggregator builds)
 grep -n "AGGREGATOR_ENABLED" src/aggregator_config.h
+# Expected for aggregator: #define AGGREGATOR_ENABLED 1
+
+# Check board identity in generated YAML
+head -5 firmware/esp32-s3-devkitc1-n16r8-gw.yaml
+# Should show: "# S3 Aggregator - vX.Y.Z.W" and board profile reference
 ```
 
-Compile (board-dependent):
+### 7.4) Compile and Flash
 
 ```bash
-# C3 default path
-esphome compile firmware/esp32-c3-multi-sensor.yaml
+# === S3 AGGREGATOR ===
+esphome clean firmware/esp32-s3-devkitc1-n16r8-gw.yaml
+esphome run firmware/esp32-s3-devkitc1-n16r8-gw.yaml
+# Select OTA at 192.168.120.191 or USB with correct passthrough (LESSON-OPS-073)
 
-# Non-C3 board profiles generate board-specific YAML
-esphome compile firmware/<board-id>-gw.yaml
-```
+# === C3 SATELLITE (default, no gateway.json) ===
+esphome clean firmware/esp32-c3-multi-sensor.yaml
+esphome run firmware/esp32-c3-multi-sensor.yaml
+# Select OTA at 192.168.120.189 or USB
 
-Flash:
-
-```bash
-esphome run firmware/<target-yaml> --device <ip-or-serial>
+# === WROOM-32D SATELLITE ===
+esphome clean firmware/esp32-wroom-32d-gw.yaml
+esphome run firmware/esp32-wroom-32d-gw.yaml
+# Select OTA at 192.168.120.190 or USB
 ```
 
 ## 8) Accessing the Dashboard
@@ -140,7 +190,7 @@ esphome run firmware/<target-yaml> --device <ip-or-serial>
 - Layout has two sections:
   - **GATEWAYS**: selector tabs, all-gateway summary, per-gateway views, settings.
   - **SENSORS**: local sensors on the aggregator device.
-- “All Gateways” gives reachability and metadata summary.
+- "All Gateways" gives reachability and metadata summary.
 
 ## 9) Network Requirements
 
@@ -162,15 +212,19 @@ esphome run firmware/<target-yaml> --device <ip-or-serial>
 |---|---|---|
 | Satellite marked unreachable | Wrong IP, network/routing/firewall issue, satellite offline | Validate direct reachability and satellite `/api/status` |
 | Empty aggregator gateway view | Missing/invalid `config/aggregator.json` or stale generated artifacts | Re-run render step and confirm `AGGREGATOR_ENABLED 1` |
+| Dashboard shows local sensors but no Gateways card | Compiled wrong YAML — used C3 template instead of generated S3 YAML | Verify YAML path per Section 7.2 table, re-run pipeline, recompile correct YAML |
 | History charts empty for remote gateway | Proxy path/upstream issue | Validate satellite `/api/v2/history/{device}/{metric}` directly |
 | High latency/slow UI | Too many satellites for board RAM | Reduce satellites or move to S3/Pi |
 | Wrong board info in About section | Board metadata mismatch | Validate manifest `gateway.hardware` and board profile selection |
+| Generated YAML not found after `--write` | Missing or incorrect `config/gateway.json` | Verify `gateway.json` exists and `board` field matches a board profile |
+| `AGGREGATOR_ENABLED 0` on S3 board | Missing `config/aggregator.json` or board profile has `psram: false` | Verify both config files are present and board profile is correct |
 
 ## 12) Reverting to Satellite Mode
 
 ```bash
 rm -f config/aggregator.json
 python3 scripts/render_sensor_config.py --write
+bash scripts/minify-dashboard.sh
 bash scripts/generate-header.sh
 esphome compile firmware/<target-yaml>
 esphome run firmware/<target-yaml> --device <ip-or-serial>
@@ -224,14 +278,24 @@ mv config/aggregator.json.bak config/aggregator.json 2>/dev/null
 **Proper fix (future):** Per-target builds or a `--target` flag in the generator that
 selects the expected output profile. Tracked as a Phase D improvement.
 
+### Generated YAML files are gitignored
+
+All `firmware/*-gw.yaml` files are generated and gitignored. They are produced by
+`render_sensor_config.py --write` based on the board profile and gateway config. Only
+`firmware/esp32-c3-multi-sensor.yaml` (the C3 template) is committed to the repo.
+
+**Do NOT compile a committed YAML for a non-C3 board.** If you need to flash an S3 or
+WROOM board, you MUST run the regeneration pipeline first to produce the generated YAML.
+
 ### Fixture regeneration on version bumps
 
-Every version bump must run both generators and verify (Critical Rule 28):
+Every version bump must run the full regeneration pipeline and verify (Critical Rule 28):
 
 ```bash
 bash scripts/bump-version.sh <version>
 python3 scripts/render_sensor_config.py --write
 node tests/fixtures/generate-fixtures.js
+bash scripts/minify-dashboard.sh
 bash scripts/generate-header.sh
 python3 scripts/render_sensor_config.py --check
 grep -q "free_heap" tests/fixtures/api-status.json || echo "ERROR: free_heap missing"

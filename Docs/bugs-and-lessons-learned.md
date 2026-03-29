@@ -2398,6 +2398,44 @@ When a prompt requires a specific table as a deliverable (e.g., Instruction Comp
 
 ---
 
+## LESSON-OPS-090 — Device testing sections must reference the correct generated YAML for the target board (v7.6.0.0)
+
+**Context:** All six Phase D prompt device testing sections (v7.6.0.0 through v7.6.0.5) contained `esphome clean firmware/esp32-c3-multi-sensor.yaml` and `esphome run firmware/esp32-c3-multi-sensor.yaml` in the aggregator build instructions. This is the committed C3 satellite template — it does not produce aggregator firmware and targets the wrong chip architecture for S3 boards.
+
+**Root cause:** The prompt author wrote the device testing section by copying the C3 compile command (the only committed YAML) without accounting for the fact that non-C3 boards use **generated** YAML files that only exist after `render_sensor_config.py --write`. The generated S3 YAML is `firmware/esp32-s3-devkitc1-n16r8-gw.yaml` — it is gitignored and not visible in the repo file listing.
+
+**Impact:** The operator compiled C3 satellite firmware and flashed it to the S3 aggregator. The device booted as a satellite with all local sensors displayed instead of as an aggregator with the Gateways card. Device testing could not proceed.
+
+**Fix:** Corrected all Phase D prompts to reference `firmware/esp32-s3-devkitc1-n16r8-gw.yaml` for aggregator builds. Added Section 7.2 "Which YAML Do I Compile?" decision table to `Docs/aggregator-setup.md`.
+
+**Rule:** Prompt device testing sections must use the exact YAML path that the generator produces for the target board. For non-C3 boards, this is always a **generated** gitignored file — never the committed C3 template. The correct path can be determined from the `get_yaml_output_path()` function in `render_sensor_config.py` or from the output of `render_sensor_config.py --write`.
+
+**Critical Rule 36 added.**
+
+---
+
+## LESSON-OPS-091 — Regeneration pipeline must include dashboard minification before header generation (v7.6.0.0)
+
+**Context:** The regeneration pipeline documented in prompts and `Docs/aggregator-setup.md` listed four steps: `render_sensor_config.py --write`, `generate-fixtures.js`, `generate-header.sh`, and `render_sensor_config.py --check`. The `minify-dashboard.sh` step was absent from all references.
+
+**Root cause:** `generate-header.sh` auto-detects `dashboard.min.html` and uses it if present, falling back to unminified `dashboard.html` otherwise. This "silent fallback" masked the missing step — the build succeeds either way, but produces a larger firmware payload without minification. More dangerously, if a stale `dashboard.min.html` exists from a previous run, the header embeds the outdated minified copy instead of the current source.
+
+**Fix:** Added `bash scripts/minify-dashboard.sh` as Step 3 in the regeneration pipeline (after fixture generation, before header generation) in `Docs/aggregator-setup.md` Sections 7.1 and 15, and in all Phase D prompt device testing sections.
+
+**Rule:** The canonical regeneration pipeline is five steps in this exact order:
+
+1. `python3 scripts/render_sensor_config.py --write`
+2. `node tests/fixtures/generate-fixtures.js`
+3. `bash scripts/minify-dashboard.sh`
+4. `bash scripts/generate-header.sh`
+5. `python3 scripts/render_sensor_config.py --check`
+
+Any prompt or documentation that references "the regeneration pipeline" must include all five steps. Omitting the minification step risks stale embedded dashboard content.
+
+**Critical Rule 37 added.**
+
+---
+
 
 
 Any significant dashboard or data-path modification should re-check:

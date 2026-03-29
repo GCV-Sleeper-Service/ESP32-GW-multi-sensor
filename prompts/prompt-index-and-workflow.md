@@ -311,6 +311,8 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 33 | Unsupported-platform stub functions must return the documented safe default (usually `0.0`) | Phase 6.3 audit finding |
 | 34 | Shell scripts with locale-sensitive commands must use `LC_ALL=C` | Phase 6.3 audit finding |
 | 35 | Python network/file resources must use context managers (`with`) in long-running modes | Phase 6.3 audit finding |
+| 36 | Device testing firmware commands must reference the GENERATED YAML for the target board — never use the committed C3 template (`esp32-c3-multi-sensor.yaml`) for non-C3 boards. Generated YAMLs are gitignored and only exist after `render_sensor_config.py --write`. | LESSON-OPS-090 |
+| 37 | Regeneration pipeline must include `minify-dashboard.sh` before `generate-header.sh`. Full pipeline: `render_sensor_config.py --write` → `generate-fixtures.js` → `minify-dashboard.sh` → `generate-header.sh` → `render_sensor_config.py --check` | LESSON-OPS-091 |
 
 ---
 

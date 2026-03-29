@@ -1372,6 +1372,26 @@ def main() -> int:
             print(f" - {item}")
     else:
         print("No generated-file changes were needed.")
+
+    # Print build instructions for the target board (LESSON-OPS-090)
+    yaml_rel = str(yaml_output_path.relative_to(ROOT))
+    board_id = board_profile.get("board_id", "unknown")
+    print("")
+    print("=" * 60)
+    print(f"  Build target: {yaml_rel}")
+    print(f"  Board:        {board_id} ({hw_string})")
+    print(f"  Role:         {gw_role}")
+    if gateway_config:
+        wifi_addr = gateway_config.get("wifi_address", "unknown")
+        print(f"  WiFi address: {wifi_addr}")
+    print("-" * 60)
+    print(f"  esphome clean {yaml_rel}")
+    print(f"  esphome run   {yaml_rel}")
+    if gateway_config and gateway_config.get("wifi_address"):
+        wifi_addr = gateway_config["wifi_address"]
+        print(f"  # OTA target: {wifi_addr}")
+    print("=" * 60)
+
     return 0
 
 
