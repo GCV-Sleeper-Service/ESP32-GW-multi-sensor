@@ -67,30 +67,30 @@ check_contains "dashboard_prefers_api_manifest" dashboard/dashboard.js "fetch(ES
 check_contains "dashboard_legacy_manifest_fallback" dashboard/dashboard.js "fetch(ESP_HOST + '/sensors.json'"
 check_contains "mock_server_serves_api_manifest" tests/mock-server/server.js "pathname === '/api/manifest'"
 check_contains "fixture_manifest_schema_v2" tests/fixtures/manifest.json '"schema_version": 2'
-# Dynamic sensor count — respects gateway.json sensors_file redirect (same logic as render_sensor_config.py).
+# Dynamic sensor count — uses sensor_manifest_lib.py to mirror render_sensor_config.py logic exactly.
 # Do NOT re-hardcode this value; different board profiles (e.g. S3 aggregator) produce different sensor counts.
 EXPECTED_SENSOR_COUNT=$(python3 -c "
-import json, sys
+import sys
+sys.path.insert(0, 'scripts')
+from sensor_manifest_lib import load_gateway_config, load_manifest, ManifestError
 from pathlib import Path
 
-# Check for gateway.json sensors_file redirect
-manifest_path = Path('config/sensors.json')
-gw_path = Path('config/gateway.json')
-if gw_path.exists():
-    try:
-        gw = json.loads(gw_path.read_text())
-        sf = gw.get('sensors_file', '')
+try:
+    gateway_config = load_gateway_config()
+    manifest_path = Path('config/sensors.json')
+    allow_empty = gateway_config is not None
+    if gateway_config:
+        sf = gateway_config.get('sensors_file', '')
         if sf:
             manifest_path = Path(sf)
-    except (json.JSONDecodeError, KeyError):
-        pass
-
-try:
-    data = json.loads(manifest_path.read_text())
-    sensors = data.get('sensors', data) if isinstance(data, dict) else data
+    sensors = load_manifest(manifest_path, allow_empty=allow_empty)
     print(len(sensors))
-except Exception:
-    print(5)  # fallback to legacy default
+except ManifestError as e:
+    print(f'sensor count check failed: {e}', file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f'sensor count check failed: {e}', file=sys.stderr)
+    sys.exit(1)
 ")
 check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json "\"sensor_count\": ${EXPECTED_SENSOR_COUNT}"
 check_contains "browser_spec_present" tests/browser/manifest.spec.js "dashboard falls back to /sensors.json"
