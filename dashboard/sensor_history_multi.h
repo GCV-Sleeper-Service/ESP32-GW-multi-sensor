@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.5.7.0.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.6.0.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -496,7 +496,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.5.7.0) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.0.0) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -1382,6 +1382,13 @@ struct SatelliteCache {
   const char* base_url;
   int poll_interval_seconds;
 
+  // ── Owned string storage for NVS-loaded satellites (v7.6.0.0) ──
+  // When loaded from NVS, id/name/base_url point to these buffers.
+  // When loaded from compile-time arrays, they point to static literals.
+  char id_buf[32];       // max satellite ID length (NVS s{i}_id max 31 chars)
+  char name_buf[64];     // max friendly name (NVS s{i}_name max 63 chars)
+  char url_buf[128];     // max base URL (NVS s{i}_url max 127 chars)
+
   // Cached responses (statically allocated — no malloc)
   char manifest_json[AGG_MANIFEST_BUF_SIZE];  // cached /api/manifest response
   char live_json[2048];         // cached /api/v2/live response
@@ -1409,9 +1416,23 @@ struct SatelliteCache {
     last_status_fetch = 0;
     last_seen_epoch = 0;
   }
+
+  void set_identity(const char* new_id, const char* new_name, const char* new_url, int poll_s) {
+    strncpy(id_buf, new_id, sizeof(id_buf) - 1);
+    id_buf[sizeof(id_buf) - 1] = '\0';
+    strncpy(name_buf, new_name, sizeof(name_buf) - 1);
+    name_buf[sizeof(name_buf) - 1] = '\0';
+    strncpy(url_buf, new_url, sizeof(url_buf) - 1);
+    url_buf[sizeof(url_buf) - 1] = '\0';
+    id = id_buf;
+    name = name_buf;
+    base_url = url_buf;
+    poll_interval_seconds = poll_s;
+  }
 };
 
 static SatelliteCache satellite_caches[MAX_SATELLITES];
+static int runtime_satellite_count = 0;   // actual count at runtime (≤ MAX_SATELLITES)
 
 static SemaphoreHandle_t s_cache_mutex = nullptr;
 
@@ -1548,15 +1569,175 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   return false;
 }
 
-static void aggregator_poll_task(void* arg) {
-  // Initialize caches — id/name/base_url point to static string literals (safe lifetime)
-  for (int i = 0; i < MAX_SATELLITES; i++) {
-    satellite_caches[i].id = SATELLITE_IDS[i];
-    satellite_caches[i].name = SATELLITE_NAMES[i];
-    satellite_caches[i].base_url = SATELLITE_URLS[i];
-    satellite_caches[i].poll_interval_seconds = SATELLITE_POLL_INTERVALS[i];
+// ── NVS satellite persistence (v7.6.0.0) ───────────────────────────────────
+// Namespace: "agg_sats" (9 chars — under the 15-char NVS key limit)
+// Key scheme: count (u8), s{i}_id (str), s{i}_name (str), s{i}_url (str), s{i}_poll (u16)
+
+// Returns the number of satellites loaded, or 0 if NVS is empty/corrupt.
+static int load_satellites_from_nvs_() {
+  nvs_handle_t nvs;
+  esp_err_t err = nvs_open("agg_sats", NVS_READONLY, &nvs);
+  if (err != ESP_OK) {
+    ESP_LOGW(TAG_AGG, "NVS agg_sats: open failed (%s) — will use compile-time defaults",
+             esp_err_to_name(err));
+    return 0;
+  }
+
+  uint8_t count = 0;
+  err = nvs_get_u8(nvs, "count", &count);
+  if (err != ESP_OK || count == 0 || count > MAX_SATELLITES) {
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+      ESP_LOGI(TAG_AGG, "NVS agg_sats: no 'count' key — first boot, using compile-time defaults");
+    } else if (count > MAX_SATELLITES) {
+      ESP_LOGW(TAG_AGG, "NVS agg_sats: count=%u exceeds MAX_SATELLITES=%d — using compile-time defaults",
+               (unsigned)count, MAX_SATELLITES);
+    }
+    nvs_close(nvs);
+    return 0;
+  }
+
+  int loaded = 0;
+  for (int i = 0; i < (int)count; i++) {
+    char key_id[16], key_name[16], key_url[16], key_poll[16];
+    snprintf(key_id,   sizeof(key_id),   "s%d_id",   i);
+    snprintf(key_name, sizeof(key_name), "s%d_name", i);
+    snprintf(key_url,  sizeof(key_url),  "s%d_url",  i);
+    snprintf(key_poll, sizeof(key_poll), "s%d_poll", i);
+
+    char id_tmp[32] = {0};
+    char name_tmp[64] = {0};
+    char url_tmp[128] = {0};
+    size_t id_len = sizeof(id_tmp);
+    size_t name_len = sizeof(name_tmp);
+    size_t url_len = sizeof(url_tmp);
+
+    if (nvs_get_str(nvs, key_id, id_tmp, &id_len) != ESP_OK ||
+        nvs_get_str(nvs, key_name, name_tmp, &name_len) != ESP_OK ||
+        nvs_get_str(nvs, key_url, url_tmp, &url_len) != ESP_OK) {
+      ESP_LOGE(TAG_AGG, "NVS agg_sats: corrupt entry at index %d — falling back to compile-time defaults", i);
+      nvs_close(nvs);
+      return 0;
+    }
+
+    uint16_t poll_s = 30;
+    nvs_get_u16(nvs, key_poll, &poll_s);  // optional — default 30 if missing
+
+    satellite_caches[i].set_identity(id_tmp, name_tmp, url_tmp, (int)poll_s);
+    loaded++;
+    ESP_LOGI(TAG_AGG, "NVS satellite[%d]: id=%s url=%s poll=%us",
+             i, satellite_caches[i].id, satellite_caches[i].base_url, (unsigned)poll_s);
+  }
+
+  nvs_close(nvs);
+  return loaded;
+}
+
+// Rewrites ALL satellite keys from scratch. Called after add, delete, or factory reset reload.
+static bool save_satellites_to_nvs_() {
+  nvs_handle_t nvs;
+  esp_err_t err = nvs_open("agg_sats", NVS_READWRITE, &nvs);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG_AGG, "NVS agg_sats: open for write failed (%s)", esp_err_to_name(err));
+    return false;
+  }
+
+  // Erase all keys first to avoid stale entries after delete+compact
+  nvs_erase_all(nvs);
+
+  err = nvs_set_u8(nvs, "count", (uint8_t)runtime_satellite_count);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG_AGG, "NVS agg_sats: failed to write count (%s)", esp_err_to_name(err));
+    nvs_close(nvs);
+    return false;
+  }
+
+  bool all_ok = true;
+  for (int i = 0; i < runtime_satellite_count; i++) {
+    char key_id[16], key_name[16], key_url[16], key_poll[16];
+    snprintf(key_id,   sizeof(key_id),   "s%d_id",   i);
+    snprintf(key_name, sizeof(key_name), "s%d_name", i);
+    snprintf(key_url,  sizeof(key_url),  "s%d_url",  i);
+    snprintf(key_poll, sizeof(key_poll), "s%d_poll", i);
+
+    const SatelliteCache& sat = satellite_caches[i];
+    if (nvs_set_str(nvs, key_id, sat.id) != ESP_OK ||
+        nvs_set_str(nvs, key_name, sat.name) != ESP_OK ||
+        nvs_set_str(nvs, key_url, sat.base_url) != ESP_OK ||
+        nvs_set_u16(nvs, key_poll, (uint16_t)sat.poll_interval_seconds) != ESP_OK) {
+      ESP_LOGE(TAG_AGG, "NVS agg_sats: write failed for satellite %d", i);
+      all_ok = false;
+      // Continue writing remaining satellites — partial save is better than none
+    }
+  }
+
+  err = nvs_commit(nvs);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG_AGG, "NVS agg_sats: commit failed (%s)", esp_err_to_name(err));
+    all_ok = false;
+  }
+  nvs_close(nvs);
+
+  if (all_ok) {
+    ESP_LOGI(TAG_AGG, "NVS agg_sats: saved %d satellites", runtime_satellite_count);
+  }
+  return all_ok;
+}
+
+// Optimization for add — writes one satellite entry + count without erasing all
+static bool save_single_satellite_to_nvs_(int index) {
+  if (index < 0 || index >= runtime_satellite_count) return false;
+
+  nvs_handle_t nvs;
+  if (nvs_open("agg_sats", NVS_READWRITE, &nvs) != ESP_OK) return false;
+
+  char key_id[16], key_name[16], key_url[16], key_poll[16];
+  snprintf(key_id,   sizeof(key_id),   "s%d_id",   index);
+  snprintf(key_name, sizeof(key_name), "s%d_name", index);
+  snprintf(key_url,  sizeof(key_url),  "s%d_url",  index);
+  snprintf(key_poll, sizeof(key_poll), "s%d_poll", index);
+
+  const SatelliteCache& sat = satellite_caches[index];
+  bool ok = (nvs_set_u8(nvs, "count", (uint8_t)runtime_satellite_count) == ESP_OK &&
+             nvs_set_str(nvs, key_id, sat.id) == ESP_OK &&
+             nvs_set_str(nvs, key_name, sat.name) == ESP_OK &&
+             nvs_set_str(nvs, key_url, sat.base_url) == ESP_OK &&
+             nvs_set_u16(nvs, key_poll, (uint16_t)sat.poll_interval_seconds) == ESP_OK &&
+             nvs_commit(nvs) == ESP_OK);
+
+  nvs_close(nvs);
+  if (!ok) ESP_LOGE(TAG_AGG, "NVS agg_sats: single save failed for satellite %d", index);
+  return ok;
+}
+
+// Initialise satellite_caches[] — try NVS first, fall back to compile-time arrays.
+// Called at the start of aggregator_poll_task().
+static void init_satellite_caches_() {
+  int nvs_count = load_satellites_from_nvs_();
+  if (nvs_count > 0) {
+    runtime_satellite_count = nvs_count;
+    ESP_LOGI(TAG_AGG, "Loaded %d satellites from NVS", nvs_count);
+  } else {
+    // Compile-time fallback
+    for (int i = 0; i < MAX_SATELLITES; i++) {
+      satellite_caches[i].set_identity(
+          SATELLITE_IDS[i], SATELLITE_NAMES[i],
+          SATELLITE_URLS[i], SATELLITE_POLL_INTERVALS[i]);
+    }
+    runtime_satellite_count = MAX_SATELLITES;
+    ESP_LOGI(TAG_AGG, "Using %d compile-time satellites (NVS empty)", MAX_SATELLITES);
+    if (!save_satellites_to_nvs_()) {
+      ESP_LOGW(TAG_AGG, "NVS agg_sats: failed to persist compile-time defaults (non-fatal)");
+    }
+  }
+
+  // Clear cached response buffers for all active satellites
+  for (int i = 0; i < runtime_satellite_count; i++) {
     satellite_caches[i].clear_cache();
   }
+}
+
+static void aggregator_poll_task(void* arg) {
+  init_satellite_caches_();   // replaces the old inline init loop
 
   // Initial delay — wait for WiFi and local boot to settle
   vTaskDelay(pdMS_TO_TICKS(10000));
@@ -1571,7 +1752,7 @@ static void aggregator_poll_task(void* arg) {
     // May be 0 before SNTP sync; that's fine for display purposes.
     uint32_t epoch_now = (uint32_t)::time(nullptr);
 
-    for (int i = 0; i < MAX_SATELLITES; i++) {
+    for (int i = 0; i < runtime_satellite_count; i++) {
       SatelliteCache& sat = satellite_caches[i];
       // Back off unreachable satellites to 5-minute polling (saves CPU on C3)
       uint32_t effective_interval = sat.reachable
@@ -1681,7 +1862,7 @@ static void aggregator_poll_task(void* arg) {
       }
 
       // Stagger between satellites to avoid simultaneous connections
-      if (i + 1 < MAX_SATELLITES) {
+      if (i + 1 < runtime_satellite_count) {
         vTaskDelay(pdMS_TO_TICKS(2000));
       }
     }
@@ -1699,7 +1880,7 @@ static void start_aggregator_task() {
   }
   xTaskCreate(aggregator_poll_task, "agg_poll", 10240, nullptr,
               tskIDLE_PRIORITY + 2, nullptr);
-  ESP_LOGI(TAG_AGG, "Aggregator polling task started (%d satellites)", MAX_SATELLITES);
+  ESP_LOGI(TAG_AGG, "Aggregator polling task started (init pending)");
 }
 
 #endif  // AGGREGATOR_ENABLED
@@ -1751,6 +1932,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (strncmp(p, "/api/import/w/", 14) == 0) return true;
       if (strcmp(p, "/api/import/finish") == 0) return true;
 #if AGGREGATOR_ENABLED
+      if (strcmp(p, "/api/system/reset-satellites") == 0) return true;
       if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) return true;
       if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) return true;
 #endif
@@ -1817,6 +1999,10 @@ class HistoryWebHandler : public AsyncWebHandler {
         return;
       }
 #if AGGREGATOR_ENABLED
+      if (strcmp(p, "/api/system/reset-satellites") == 0) {
+        handle_reset_satellites_(request);
+        return;
+      }
       if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) {
         handle_aggregator_stub_501_(request);
         return;
@@ -3076,12 +3262,12 @@ class HistoryWebHandler : public AsyncWebHandler {
     // Manifest JSON can be up to AGG_MANIFEST_BUF_SIZE bytes per satellite.
     std::string out;
     size_t reserve_size = 32;
-    for (int ri = 0; ri < MAX_SATELLITES; ri++) {
+    for (int ri = 0; ri < runtime_satellite_count; ri++) {
       reserve_size += 512 + satellite_caches[ri].manifest_len;
     }
     out.reserve(reserve_size);
     out += "{\"gateways\":[";
-    for (int i = 0; i < MAX_SATELLITES; i++) {
+    for (int i = 0; i < runtime_satellite_count; i++) {
       if (i > 0) out += ",";
       const SatelliteCache& sat = satellite_caches[i];
       char tmp[128];
@@ -3164,14 +3350,14 @@ class HistoryWebHandler : public AsyncWebHandler {
       request->send(503);
       return;
     }
-    // LESSON-OPS-056: pre-reserve string (MAX_SATELLITES * live_json max ~2048)
+    // LESSON-OPS-056: pre-reserve string (runtime_satellite_count * live_json max ~2048)
     std::string out;
-    out.reserve(MAX_SATELLITES * 2304 + 64);
+    out.reserve(runtime_satellite_count * 2304 + 64);
     char tmp[64];
     snprintf(tmp, sizeof(tmp), "{\"timestamp\":%u,\"gateways\":{",
              (unsigned)::time(nullptr));
     out += tmp;
-    for (int i = 0; i < MAX_SATELLITES; i++) {
+    for (int i = 0; i < runtime_satellite_count; i++) {
       if (i > 0) out += ",";
       const SatelliteCache& sat = satellite_caches[i];
       out += "\""; out += sat.id; out += "\":{";
@@ -3233,7 +3419,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
     bool url_too_long = false;
-    for (int i = 0; i < MAX_SATELLITES; i++) {
+    for (int i = 0; i < runtime_satellite_count; i++) {
       if (strcmp(satellite_caches[i].id, gw_id) == 0) {
         size_t blen = strlen(satellite_caches[i].base_url);
         if (blen < sizeof(base_url)) {
@@ -3298,6 +3484,71 @@ class HistoryWebHandler : public AsyncWebHandler {
     auto *resp = request->beginResponse(501, "application/json",
         "{\"error\":\"not implemented\","
         "\"message\":\"Runtime satellite management is planned for v7.6\"}");
+    add_common_headers_(resp);
+    request->send(resp);
+  }
+
+  // POST /api/system/reset-satellites — erase NVS satellite namespace and reload compile-time defaults
+  void handle_reset_satellites_(AsyncWebServerRequest *request) const {
+    if (request->method() != HTTP_POST) {
+      send_json_error_(request, 405, "Method not allowed");
+      return;
+    }
+
+    // 1. Authenticate
+    if (!authenticate_management_(request)) return;
+
+    // 2. Erase the NVS namespace — fail honestly if it doesn't work
+    nvs_handle_t nvs;
+    esp_err_t err = nvs_open("agg_sats", NVS_READWRITE, &nvs);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG_AGG, "NVS agg_sats: open for erase failed (%s)", esp_err_to_name(err));
+      send_json_error_(request, 500, "NVS open failed");
+      return;
+    }
+    err = nvs_erase_all(nvs);
+    if (err != ESP_OK) {
+      nvs_close(nvs);
+      ESP_LOGE(TAG_AGG, "NVS agg_sats: erase failed (%s)", esp_err_to_name(err));
+      send_json_error_(request, 500, "NVS erase failed");
+      return;
+    }
+    err = nvs_commit(nvs);
+    nvs_close(nvs);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG_AGG, "NVS agg_sats: commit after erase failed (%s)", esp_err_to_name(err));
+      send_json_error_(request, 500, "NVS commit failed");
+      return;
+    }
+    ESP_LOGI(TAG_AGG, "NVS agg_sats: erased (factory reset)");
+
+    // 3. Reload compile-time defaults under mutex
+    if (AGG_LOCK() != pdTRUE) {
+      ESP_LOGE(TAG_AGG, "Factory reset: failed to acquire AGG_LOCK");
+      send_json_error_(request, 503, "Lock acquisition failed");
+      return;
+    }
+    for (int i = 0; i < MAX_SATELLITES; i++) {
+      satellite_caches[i].set_identity(
+          SATELLITE_IDS[i], SATELLITE_NAMES[i],
+          SATELLITE_URLS[i], SATELLITE_POLL_INTERVALS[i]);
+      satellite_caches[i].clear_cache();
+    }
+    runtime_satellite_count = MAX_SATELLITES;
+
+    // 4. Persist defaults to NVS so NVS is deterministic after reset
+    if (!save_satellites_to_nvs_()) {
+      ESP_LOGW(TAG_AGG, "NVS agg_sats: failed to persist defaults after reset (non-fatal)");
+    }
+    AGG_UNLOCK();
+
+    ESP_LOGI(TAG_AGG, "Factory reset: %d compile-time satellites restored", MAX_SATELLITES);
+
+    char body[128];
+    snprintf(body, sizeof(body),
+             "{\"ok\":true,\"message\":\"Reset to compile-time defaults\",\"satellite_count\":%d}",
+             MAX_SATELLITES);
+    auto *resp = request->beginResponse(200, "application/json", body);
     add_common_headers_(resp);
     request->send(resp);
   }
