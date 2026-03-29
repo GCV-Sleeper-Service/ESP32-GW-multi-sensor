@@ -2386,6 +2386,18 @@ When a prompt requires a specific table as a deliverable (e.g., Instruction Comp
 
 ---
 
+## LESSON-OPS-089 — Preflight checks must be environment-aware
+
+**Context:** `scripts/preflight.sh` line 70 hardcoded `check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"sensor_count": 5'`. This was correct for the C3 satellite profile (3 ThermoPro + wan_ping + nas01 = 5 sensors) but broke when `config/gateway.json` pointed to the S3 aggregator sensor file (`config/sensors-agg-s3-16m-1.json`) which has only 1 sensor (wan_ping).
+
+**Root cause:** The preflight check assumed all deployments had the same sensor count. When multi-board support was added (v7.5.5.0), the check was not updated to handle board-specific sensor manifests.
+
+**Fix (PR #96):** Replaced the hardcoded value with a Python snippet that uses `sensor_manifest_lib.load_gateway_config()` and `load_manifest()` to dynamically compute the expected count — the exact same resolution logic as `render_sensor_config.py`. Errors fail loudly (no silent fallback). The `# Do NOT re-hardcode` comment guards against regression.
+
+**Rule:** Preflight validation checks that depend on configuration-derived values (sensor count, device names, gateway metadata) must compute expected values dynamically using the same library functions as the generators. Never hardcode values that vary by board profile, sensor manifest, or deployment configuration.
+
+---
+
 
 
 Any significant dashboard or data-path modification should re-check:
