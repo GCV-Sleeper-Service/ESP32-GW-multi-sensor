@@ -13,7 +13,7 @@ Implement Phase D Step 0: NVS Satellite Persistence Layer.
 - Replace all `MAX_SATELLITES` loop bounds with `runtime_satellite_count`
 - Add `POST /api/system/reset-satellites` factory reset endpoint
 - Extend `SatelliteCache` struct with owned string buffers (`id_buf`, `name_buf`, `url_buf`)
-- No dashboard changes, no management endpoint changes, no test changes
+- No functional dashboard changes beyond version bump; added POST /api/system/reset-satellites management endpoint; no test logic changes — regeneration/version churn only
 
 ---
 
@@ -121,4 +121,4 @@ Output: all checks passed. Updated: `VERSION`, `render_sensor_config.py`, `gener
 
 - `nvs.h` and `nvs_flash.h` were already included at the file level (lines 81–82) — no new includes needed.
 - The NVS loop in `load_satellites_from_nvs_()` reads at most `MAX_SATELLITES` × 4 keys (≤ 32 NVS reads). Per LESSON-OPS-053, yielding is only required for >50 operations — no yield needed here.
-- No dashboard changes, no test changes, no fixture changes (other than version bump regeneration).
+- No functional dashboard changes; no functional test logic changes; regeneration/version churn only.

@@ -1598,7 +1598,7 @@ static int load_satellites_from_nvs_() {
 
   int loaded = 0;
   for (int i = 0; i < (int)count; i++) {
-    char key_id[8], key_name[8], key_url[8], key_poll[8];
+    char key_id[16], key_name[16], key_url[16], key_poll[16];
     snprintf(key_id,   sizeof(key_id),   "s%d_id",   i);
     snprintf(key_name, sizeof(key_name), "s%d_name", i);
     snprintf(key_url,  sizeof(key_url),  "s%d_url",  i);
@@ -1614,8 +1614,9 @@ static int load_satellites_from_nvs_() {
     if (nvs_get_str(nvs, key_id, id_tmp, &id_len) != ESP_OK ||
         nvs_get_str(nvs, key_name, name_tmp, &name_len) != ESP_OK ||
         nvs_get_str(nvs, key_url, url_tmp, &url_len) != ESP_OK) {
-      ESP_LOGW(TAG_AGG, "NVS agg_sats: failed to read satellite %d — stopping load", i);
-      break;
+      ESP_LOGE(TAG_AGG, "NVS agg_sats: corrupt entry at index %d — falling back to compile-time defaults", i);
+      nvs_close(nvs);
+      return 0;
     }
 
     uint16_t poll_s = 30;
@@ -1652,7 +1653,7 @@ static bool save_satellites_to_nvs_() {
 
   bool all_ok = true;
   for (int i = 0; i < runtime_satellite_count; i++) {
-    char key_id[8], key_name[8], key_url[8], key_poll[8];
+    char key_id[16], key_name[16], key_url[16], key_poll[16];
     snprintf(key_id,   sizeof(key_id),   "s%d_id",   i);
     snprintf(key_name, sizeof(key_name), "s%d_name", i);
     snprintf(key_url,  sizeof(key_url),  "s%d_url",  i);
@@ -1689,7 +1690,7 @@ static bool save_single_satellite_to_nvs_(int index) {
   nvs_handle_t nvs;
   if (nvs_open("agg_sats", NVS_READWRITE, &nvs) != ESP_OK) return false;
 
-  char key_id[8], key_name[8], key_url[8], key_poll[8];
+  char key_id[16], key_name[16], key_url[16], key_poll[16];
   snprintf(key_id,   sizeof(key_id),   "s%d_id",   index);
   snprintf(key_name, sizeof(key_name), "s%d_name", index);
   snprintf(key_url,  sizeof(key_url),  "s%d_url",  index);
@@ -1724,6 +1725,9 @@ static void init_satellite_caches_() {
     }
     runtime_satellite_count = MAX_SATELLITES;
     ESP_LOGI(TAG_AGG, "Using %d compile-time satellites (NVS empty)", MAX_SATELLITES);
+    if (!save_satellites_to_nvs_()) {
+      ESP_LOGW(TAG_AGG, "NVS agg_sats: failed to persist compile-time defaults (non-fatal)");
+    }
   }
 
   // Clear cached response buffers for all active satellites
@@ -3491,30 +3495,52 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    // 1. Erase the NVS namespace
+    // 1. Authenticate
+    if (!authenticate_management_(request)) return;
+
+    // 2. Erase the NVS namespace — fail honestly if it doesn't work
     nvs_handle_t nvs;
     esp_err_t err = nvs_open("agg_sats", NVS_READWRITE, &nvs);
-    if (err == ESP_OK) {
-      nvs_erase_all(nvs);
-      nvs_commit(nvs);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG_AGG, "NVS agg_sats: open for erase failed (%s)", esp_err_to_name(err));
+      send_json_error_(request, 500, "NVS open failed");
+      return;
+    }
+    err = nvs_erase_all(nvs);
+    if (err != ESP_OK) {
       nvs_close(nvs);
-      ESP_LOGI(TAG_AGG, "NVS agg_sats: erased (factory reset)");
-    } else {
-      ESP_LOGW(TAG_AGG, "NVS agg_sats: erase failed (%s) — reloading defaults anyway",
-               esp_err_to_name(err));
+      ESP_LOGE(TAG_AGG, "NVS agg_sats: erase failed (%s)", esp_err_to_name(err));
+      send_json_error_(request, 500, "NVS erase failed");
+      return;
     }
+    err = nvs_commit(nvs);
+    nvs_close(nvs);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG_AGG, "NVS agg_sats: commit after erase failed (%s)", esp_err_to_name(err));
+      send_json_error_(request, 500, "NVS commit failed");
+      return;
+    }
+    ESP_LOGI(TAG_AGG, "NVS agg_sats: erased (factory reset)");
 
-    // 2. Reload compile-time defaults under mutex
-    if (AGG_LOCK() == pdTRUE) {
-      for (int i = 0; i < MAX_SATELLITES; i++) {
-        satellite_caches[i].set_identity(
-            SATELLITE_IDS[i], SATELLITE_NAMES[i],
-            SATELLITE_URLS[i], SATELLITE_POLL_INTERVALS[i]);
-        satellite_caches[i].clear_cache();
-      }
-      runtime_satellite_count = MAX_SATELLITES;
-      AGG_UNLOCK();
+    // 3. Reload compile-time defaults under mutex
+    if (AGG_LOCK() != pdTRUE) {
+      ESP_LOGE(TAG_AGG, "Factory reset: failed to acquire AGG_LOCK");
+      send_json_error_(request, 503, "Lock acquisition failed");
+      return;
     }
+    for (int i = 0; i < MAX_SATELLITES; i++) {
+      satellite_caches[i].set_identity(
+          SATELLITE_IDS[i], SATELLITE_NAMES[i],
+          SATELLITE_URLS[i], SATELLITE_POLL_INTERVALS[i]);
+      satellite_caches[i].clear_cache();
+    }
+    runtime_satellite_count = MAX_SATELLITES;
+
+    // 4. Persist defaults to NVS so NVS is deterministic after reset
+    if (!save_satellites_to_nvs_()) {
+      ESP_LOGW(TAG_AGG, "NVS agg_sats: failed to persist defaults after reset (non-fatal)");
+    }
+    AGG_UNLOCK();
 
     ESP_LOGI(TAG_AGG, "Factory reset: %d compile-time satellites restored", MAX_SATELLITES);
 
