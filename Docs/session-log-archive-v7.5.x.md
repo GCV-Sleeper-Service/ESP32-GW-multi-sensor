@@ -1,8 +1,8 @@
-# Session Log Archive — v7.5.3.x through v7.5.5.5
+# Session Log Archive — v7.5.3.x through v7.5.7.0
 
-_This file consolidates session logs from 2026-03-17 through 2026-03-25._
+_This file consolidates session logs from 2026-03-17 through 2026-03-28._
 _Sessions are presented in chronological order, oldest first._
-_Archived on: 2026-03-25 (extended during P3 documentation overhaul)._
+_Archived on: 2026-03-25 (extended 2026-03-28 — added Phase 6 + v7.5.7.0 sessions)._
 
 ---
 
@@ -19,6 +19,13 @@ _Archived on: 2026-03-25 (extended during P3 documentation overhaul)._
 | 2026-03-22 | v7.5.5.1 aggregator polling | session-log-2026-03-22-v7.5.5.1.md |
 | 2026-03-23 | BUG-058/059 fixes | session-log-2026-03-23-BUG-058-059.md |
 | 2026-03-23 | Multi-board infrastructure | session-log-2026-03-23-multi-board-infra.md |
+| 2026-03-25 | P3 docs overhaul | session-log-2026-03-25-p3-docs-overhaul.md |
+| 2026-03-26 | v7.5.6.0 POST /api/ingest endpoint | session-log-2026-03-26-v7.5.6.0.md |
+| 2026-03-26 | v7.5.6.1 System device category | session-log-2026-03-26-v7.5.6.1.md |
+| 2026-03-26 | v7.5.6.2 System card renderer | session-log-2026-03-26-v7.5.6.2.md |
+| 2026-03-26 | v7.5.6.3 Exporter scripts + docs | session-log-2026-03-26-v7.5.6.3.md |
+| 2026-03-26 | v7.5.6.4 Tests + Phase 6 closure | session-log-2026-03-26-v7.5.6.4.md |
+| 2026-03-28 | v7.5.7.0 Manifest truncation fix + PSRAM scaling | session-log-2026-03-28-v7.5.7.0.md |
 
 ---
 
@@ -2074,3 +2081,862 @@ specify common updates that were never applied. Additionally:
 ---
 
 _End of session log._
+
+---
+
+---
+
+# Session Log — 2026-03-25 — P3 Documentation Overhaul
+
+_Session type: Documentation cleanup, Phase D planning, session handoff_
+_Version: v7.5.5.5 (no version bump — documentation only)_
+
+---
+
+## Scope
+
+This session performed Priority 3 from the Phase 5 assessment action plan:
+comprehensive documentation overhaul to clean the repo for Phase 6 implementation.
+
+---
+
+## Changes Made
+
+### New files created
+
+| File | Content |
+|------|---------|
+| `Docs/phase-d-implementation-plan.md` | Detailed 6-step implementation plan for Phase D (v7.6.0.0–v7.6.0.5): NVS satellite persistence, add/remove/test API endpoints, dashboard management UI, Playwright tests |
+| `prompts/session-handoff-phase6.md` | Complete context handoff for Phase 6 implementation start |
+| `README.md` | Full rewrite reflecting v7.5.5.5 state — multi-board, aggregator, updated roadmap |
+| `prompts/prompt-index-and-workflow.md` | Added Phase D section (v7.6.0.x), version mapping table |
+
+### Files consolidated or removed
+
+**Session logs** — 8 individual Phase 5 session logs consolidated into `Docs/session-log-archive-v7.5.x.md`:
+- `session-log-2026-03-24-architecture-review.md`
+- `session-log-2026-03-24-pre-v7552-infrastructure.md`
+- `session-log-2026-03-24-v7.5.5.2.md`
+- `session-log-2026-03-24-v7.5.5.3.md`
+- `session-log-2026-03-25-v7553-hotfix.md`
+- `session-log-2026-03-25-v7.5.5.4.md`
+- `session-log-2026-03-25-v7.5.5.5.md`
+- `session-log-2026-03-25-v7555-hotfix.md`
+
+**Root files removed** (obsolete):
+- `README-apply-notes.md` — Phase 1 delivery notes
+- `pr70-fix-prompt.md` — one-off fix, lessons captured
+- `phase5-assessment-and-phase6-action-plan.md` — assessment delivered, actions completed
+
+**Docs/ files removed** (superseded):
+- `architecture.md` → `v7.5-v7.6-architecture-plan.md`
+- `build-history.md` → `changelog.md`
+- `future-plans.md` → architecture plan + implementation plans
+- `development-pipeline.md` → `aggregator-setup.md` §15
+- `esp32-gateway-fresh-start-handoff.md` → `session-handoff-phase6.md`
+- `fix-prompt-pr64-socket-collision.md` → lessons in bugs doc
+- `pr70-fix-prompt.md` → lessons in bugs doc
+- `multi-board-infrastructure-plan.md` → executed, in aggregator-setup.md
+- `v7.3.5.0-documentation.md` → historical, superseded
+- `v7.4.0-documentation.md` → historical, superseded
+- `v7.5.x-documentation.md` → superseded by architecture plan
+- `configuring-sensors.md` → aggregator-setup.md + README
+- `persistence-v2-design-first-draft.md` → `v7.7-v7.8-persistence-architecture.md`
+- `session-log-archive.md` → pre-v7.4 archive, no longer actionable
+
+**Prompt files removed** (superseded):
+- `prompts/prompt-update-notes-post-hotfix.md` → updates applied to Phase 6 prompts
+- `prompts/session-handoff-post-phase5.md` → replaced by `session-handoff-phase6.md`
+
+### Files retained (current and active)
+
+| File | Status | Purpose |
+|------|--------|---------|
+| `Docs/v7.5-v7.6-architecture-plan.md` | Active | Master architecture (Phases 1–6) |
+| `Docs/phase-d-implementation-plan.md` | New | Phase D plan (v7.6.0.x) |
+| `Docs/phase6-implementation-plan.md` | Active | Phase 6 plan |
+| `Docs/v7.7-v7.8-persistence-architecture.md` | Active | Phase 7 architecture |
+| `Docs/v7.7-implementation-plan.md` | Active | Phase 7 steps |
+| `Docs/phase3-implementation-plan.md` | Reference | Phase 3 (completed) |
+| `Docs/phase4-implementation-plan.md` | Reference | Phase 4 (completed) |
+| `Docs/phase5-implementation-plan.md` | Reference | Phase 5 (completed) |
+| `Docs/aggregator-setup.md` | Active | Deployment guide |
+| `Docs/aggregator-satellite-gateway-principles.txt` | Active | User design principles |
+| `Docs/architecture-revision-and-action-plan.md` | Reference | Phase 5 design decisions |
+| `Docs/bugs-and-lessons-learned.md` | Active | Bug database |
+| `Docs/changelog.md` | Active | Release history |
+| `Docs/writing-prompts-for-coding-agents-guide.md` | Active | Prompt methodology |
+| `Docs/device-test-report-template.md` | Active | Test template |
+| `Docs/session-log-archive-v7.5.x.md` | Archive | Consolidated v7.5.x logs |
+
+---
+
+_End of session log._
+
+---
+
+# Session Log — v7.5.6.0 (POST /api/ingest)
+
+**Date:** 2026-03-26  
+**Step:** Phase 6 Step 0 (`v7.5.6.0`)  
+**Scope:** Implement `POST /api/ingest/{device_id}/{metric_key}?val={float}` only.
+
+---
+
+## 1) Pre-condition Results (before any edits)
+
+Required commands from prompt:
+
+1. `FIXTURE_SET=3sensor npx playwright test --project=chromium`  
+   **Result:** PASS — 99 passed / 18 skipped
+2. `FIXTURE_SET=3sensor npx playwright test --project=firefox`  
+   **Result:** PASS — 99 passed / 18 skipped
+3. `FIXTURE_SET=mixed npx playwright test --grep "Mixed-Category" --project=chromium`  
+   **Result:** PASS — 7 passed
+4. `FIXTURE_SET=aggregator npx playwright test --grep "Aggregator" --project=chromium`  
+   **Result:** PASS — 11 passed / 1 skipped
+5. `bash scripts/preflight.sh`  
+   **Result:** PASS
+6. `python3 scripts/render_sensor_config.py --check`  
+   **Result:** PASS
+
+Environment note: Playwright browsers were missing initially (`Executable doesn't exist ... headless_shell`), so `npx playwright install --with-deps chromium firefox` was executed before pre-condition rerun.
+
+---
+
+## 2) Implementation Summary
+
+### Code changes
+
+- Added new endpoint handler in `dashboard/sensor_history_multi.h`:
+  - `handle_api_ingest_(AsyncWebServerRequest *request) const`
+- Added route recognition and dispatch:
+  - `canHandle()` recognizes `/api/ingest/` with exact 12-char prefix check
+  - `handleRequest()` dispatches `/api/ingest/` to `handle_api_ingest_()`
+
+### Endpoint behavior implemented
+
+- Method gate: only `HTTP_POST` accepted
+- Path parse: `/api/ingest/{device_id}/{metric_key}`
+- Device validation against `devices[]`
+- Metric validation against `devices[dev_idx].metric_defs[]`
+- Query parse: `val` required and parsed with `strtof`
+- Validation: rejects non-finite and non-numeric values
+- Success write path:
+  - `devices[dev_idx].add_sample(metric_idx, value)`
+  - `devices[dev_idx].mark_seen(::time(nullptr))`
+- Success response:
+  - `200 {"ok":true}` using `beginResponse()` + `add_common_headers_()`
+- Error responses via existing helper `send_json_error_()`:
+  - `405 Method not allowed`
+  - `404 Unknown device`
+  - `404 Unknown metric`
+  - `400 Missing val parameter`
+  - `400 Invalid value`
+
+### Supporting updates
+
+- Added preflight check in `scripts/preflight.sh`:
+  - `history_handler_has_api_ingest_route`
+- Version bumped with required command:
+  - `bash scripts/bump-version.sh 7.5.6.0`
+- Ran Critical Rule 28 regeneration sequence:
+  - `python3 scripts/render_sensor_config.py --write`
+  - `node tests/fixtures/generate-fixtures.js`
+  - `bash scripts/generate-header.sh`
+  - `python3 scripts/render_sensor_config.py --check`
+  - `grep -q "free_heap" tests/fixtures/api-status.json`
+
+---
+
+## 3) Bugs Found During This Step
+
+- No new firmware/runtime bug discovered in ingest implementation.
+- One environment/setup blocker found and resolved:
+  - Missing Playwright browser binaries in sandbox.
+
+---
+
+## 4) Validation Results (after implementation)
+
+Required validation set rerun:
+
+1. `FIXTURE_SET=3sensor npx playwright test --project=chromium`  
+   **Result:** PASS — 99 passed / 18 skipped
+2. `FIXTURE_SET=3sensor npx playwright test --project=firefox`  
+   **Result:** PASS — 99 passed / 18 skipped
+3. `FIXTURE_SET=mixed npx playwright test --grep "Mixed-Category" --project=chromium`  
+   **Result:** PASS — 7 passed
+4. `FIXTURE_SET=aggregator npx playwright test --grep "Aggregator" --project=chromium`  
+   **Result:** PASS — 11 passed / 1 skipped
+5. `bash scripts/preflight.sh`  
+   **Result:** PASS
+6. `python3 scripts/render_sensor_config.py --check`  
+   **Result:** PASS
+
+Additional verification:
+- `history_handler_has_api_ingest_route`: PASS in preflight
+- `grep -q "free_heap" tests/fixtures/api-status.json`: PASS
+
+---
+
+## 5) Instruction Compliance Output
+
+| Requirement | File(s) Changed | How Satisfied | Verified? |
+|---|---|---|---|
+| Add `POST /api/ingest/{device_id}/{metric_key}?val={float}` | `dashboard/sensor_history_multi.h` | Implemented `handle_api_ingest_()` with exact path/query parsing and value ingestion | Yes |
+| Unknown device → 404 | `dashboard/sensor_history_multi.h` | Uses `send_json_error_(404, "Unknown device")` | Yes |
+| Unknown metric → 404 | `dashboard/sensor_history_multi.h` | Uses `send_json_error_(404, "Unknown metric")` | Yes |
+| Missing/invalid val → 400 | `dashboard/sensor_history_multi.h` | Missing param and parse validation return 400 via helper | Yes |
+| Non-POST → 405 | `dashboard/sensor_history_multi.h` | Method check at handler start | Yes |
+| Register route in `canHandle()` and `handleRequest()` | `dashboard/sensor_history_multi.h` | Added `/api/ingest/` checks and dispatch | Yes |
+| Use existing `send_json_error_()` and `add_common_headers_()` | `dashboard/sensor_history_multi.h` | Reused helper for errors; success uses `add_common_headers_()` | Yes |
+| Use `beginResponse()` for success response | `dashboard/sensor_history_multi.h` | Success response is `beginResponse(200, ...)` | Yes |
+| Use `::time(nullptr)` | `dashboard/sensor_history_multi.h` | `mark_seen(::time(nullptr))` | Yes |
+| Version bump via script to `7.5.6.0` | `VERSION` + generated/versioned files | Executed `bash scripts/bump-version.sh 7.5.6.0` | Yes |
+| Run Critical Rule 28 regeneration sequence | Multiple generated files | Executed full sequence including free_heap check | Yes |
+| Update changelog for v7.5.6.0 | `Docs/changelog.md` | Added new v7.5.6.0 section with endpoint + security note | Yes |
+| Update prompt index status | `prompts/prompt-index-and-workflow.md` | Marked v7.5.6.0 as complete | Yes |
+| Create session log | `Docs/session-log-2026-03-26-v7.5.6.0.md` | Created this file | Yes |
+
+
+---
+
+# Session Log — 2026-03-26 — v7.5.6.1
+
+## Summary
+Implemented Phase 6 Step 1 (v7.5.6.1): added system device category support and `external_push` adapter support, generated system `SensorEntity` entries/metrics/history buffers, regenerated artifacts, and updated regression expectations for the new 5-device satellite manifest.
+
+## Changes Made
+
+### 1) Manifest/config updates
+- Added `nas01` to `config/sensors.json` after `wan_ping`:
+  - `category: "system"`
+  - `adapter: "external_push"`
+  - `source.description` for ingest origin
+
+### 2) Validation/modeling updates (`scripts/sensor_manifest_lib.py`)
+- Kept `VALID_CATEGORIES` with `system` support.
+- Added `external_push` adapter branch in `canonicalize_sensors()`:
+  - No `mac` required
+  - Optional `source.description` accepted and normalized
+  - Added explicit invalid-adapter error for unknown adapters
+- Increased `MAX_SENSORS` from 4 → 5 for the new default 5-device manifest.
+- Added `_SYSTEM_METRICS` definitions:
+  - `cpu_pct`, `ram_pct`, `disk_pct` (history enabled)
+  - `uptime_hrs` (metadata, no history)
+- Extended `manifest_v2()`:
+  - System device entries now emit `source` + `measurements` with `/api/v2/history/...` URLs
+  - Top-level `metrics` now includes environmental + network + system metric definitions
+
+### 3) Generator updates (`scripts/render_sensor_config.py`)
+- Extended `render_entity_block()` to support `external_push` devices:
+  - Added `metrics_system[]`
+  - Added HistoryBuffers for `cpu_pct`, `ram_pct`, `disk_pct`
+  - Added `SensorEntity` emission with `category_id = 1`, `adapter = "external_push"`, `metric_count = 4`
+- Verified generated constants in header now show:
+  - `NUM_DEVICES = 5`
+  - `NUM_ENV_SENSORS = 3`
+  - `NUM_SENSORS = NUM_ENV_SENSORS`
+
+### 4) Fixture/mock/test alignment
+- Updated `tests/fixtures/generate-fixtures.js`:
+  - Added system metric library
+  - Added `external_push` manifest sensor mapping
+  - Included system metrics in top-level manifest `metrics`
+- Updated `tests/mock-server/server.js` `/api/v2/live` stub to return null-valued system metrics for `external_push` devices.
+- Updated Playwright expectations:
+  - `tests/browser/manifest.spec.js` now accepts expanded metrics and validates dashboard sensor list dynamically from `/api/manifest`.
+  - `tests/browser/dashboard.spec.js` updated 3sensor expectations from 4→5 cards where appropriate and category assertions include `system`.
+
+### 5) Tooling/docs updates
+- Ran `bash scripts/bump-version.sh 7.5.6.1`.
+- Updated preflight guard in `scripts/preflight.sh`:
+  - `fixture_manifest_sensor_count` expects 5.
+- Updated documentation files listed below.
+
+## Regeneration Sequence (Critical Rule 28)
+Executed in order:
+1. `python3 scripts/render_sensor_config.py --write`
+2. `node tests/fixtures/generate-fixtures.js`
+3. `bash scripts/generate-header.sh`
+4. `python3 scripts/render_sensor_config.py --check`
+5. `grep -q "free_heap" tests/fixtures/api-status.json`
+
+## Validation
+- Pre-condition suite run before edits:
+  - `FIXTURE_SET=3sensor npx playwright test --project=chromium`
+  - `FIXTURE_SET=3sensor npx playwright test --project=firefox`
+  - `FIXTURE_SET=mixed npx playwright test --grep "Mixed-Category" --project=chromium`
+  - `FIXTURE_SET=aggregator npx playwright test --grep "Aggregator" --project=chromium`
+  - `bash scripts/preflight.sh`
+  - `python3 scripts/render_sensor_config.py --check`
+- Post-change full suite rerun (same command set + required checks) completed and passing in this session.
+
+## Endpoint audit notes for v7.5.6.1
+- `/sensors.json`: environmental-only projection; excludes `nas01`.
+- `/api/status`: includes `nas01` with `category: "system"` and omits `temp_valid`/`hum_valid` (environmental-only fields).
+- `/api/manifest`: includes `nas01` and system measurements.
+- `/api/v2/live`: includes `nas01` (null values before ingest).
+- `/history/nas01/temp`: returns 404 (legacy environmental route guard).
+- `/api/v2/history/nas01/cpu_pct`: route resolves and returns CSV payload semantics.
+- `/api/ingest/nas01/cpu_pct?val=50`: handled by existing v7.5.6.0 ingest endpoint.
+
+## Instruction Compliance Output
+- Read implementation prompt file fully before any changes.
+- Read all files listed under Required Reading fully before edits.
+- Ran required pre-condition checks before modifying files.
+- Did not add system card renderer (reserved for v7.5.6.2).
+- Did not modify ingest endpoint semantics beyond required integration validation.
+- Preserved `NUM_SENSORS = NUM_ENV_SENSORS` invariant.
+- Used generators/regeneration flow; no manual fixture JSON edits.
+
+---
+
+# Session Log — 2026-03-26 — v7.5.6.2
+
+## Summary
+Implemented Phase 6 Step 2 (v7.5.6.2): added a dedicated dashboard `system` card renderer with CPU/RAM/disk usage bars and uptime, wired system values to `/api/v2/live` polling, mirrored all changes to `dashboard.html`, regenerated dashboard/header artifacts, and completed required validation.
+
+## Changes Made
+
+### 1) Dashboard renderer registry and system card
+- Added `CARD_RENDERERS.system` in:
+  - `dashboard/dashboard.js`
+  - `dashboard/dashboard.html`
+- Added `buildSystemCard(s, manifest)` with:
+  - color picker
+  - CPU/RAM/disk usage rows
+  - uptime row
+  - last-seen row
+  - optional manifest `source.description`
+- Added `buildUsageBarRow(label, id)` helper for consistent usage row markup.
+
+### 2) System metric formatting and update path
+- Extended `METRIC_FORMATTERS` with:
+  - `cpu_usage`
+  - `ram_usage`
+  - `disk_usage`
+  - `uptime_hours`
+- Added `updateSystemCards(liveData)` for system-category polling updates.
+- Added `updateUsageBar(id, value, formatter)` to:
+  - clamp values to 0–100
+  - update fill width
+  - apply threshold classes:
+    - `bar-ok` (<60)
+    - `bar-warning` (60–79.9)
+    - `bar-danger` (>=80)
+- Updated `pollV2Live()` to call both:
+  - `updateNetworkCards(data)`
+  - `updateSystemCards(data)`
+
+### 3) Aggregator remote system live updates
+- Extended aggregator per-gateway live population branch (`_populateGatewayDeviceLive`) to handle `cat === 'system'` and update remote system card fields in gateway views.
+
+### 4) CSS additions
+- Added system card styling in `dashboard/dashboard.html`:
+  - `.system-card`
+  - `.system-card .sensor-card-header`
+  - `.system-usage-row`
+  - `.system-bar-bg`
+  - `.system-bar-fill`
+  - `.system-bar-fill.bar-ok/.bar-warning/.bar-danger`
+
+### 5) Version and regeneration workflow
+- Ran required version bump script:
+  - `bash scripts/bump-version.sh 7.5.6.2`
+- Ran required regeneration sequence (Critical Rule 28):
+  1. `python3 scripts/render_sensor_config.py --write`
+  2. `node tests/fixtures/generate-fixtures.js`
+  3. `bash scripts/generate-header.sh`
+  4. `python3 scripts/render_sensor_config.py --check`
+  5. `grep -q "free_heap" tests/fixtures/api-status.json`
+- Also executed the minify/header conditional step from prompt guidance.
+
+## Validation
+- Required pre-condition suite run before edits:
+  - `FIXTURE_SET=3sensor npx playwright test --project=chromium`
+  - `FIXTURE_SET=3sensor npx playwright test --project=firefox`
+  - `FIXTURE_SET=mixed npx playwright test --grep "Mixed-Category" --project=chromium`
+  - `FIXTURE_SET=aggregator npx playwright test --grep "Aggregator" --project=chromium`
+  - `bash scripts/preflight.sh`
+  - `python3 scripts/render_sensor_config.py --check`
+- Post-change validation rerun with same required command set completed in this session.
+
+## Instruction Compliance Output
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Read implementation instruction file fully before changes | ✅ | `prompts/phase6/v7.5.6.2-implementation-instructions-for-coding-agent.md` read first |
+| Read all Required Reading files completely | ✅ | `Docs/phase6-implementation-plan.md`, `Docs/bugs-and-lessons-learned.md`, `dashboard/dashboard.js`, `dashboard/dashboard.html`, `config/sensors.json`, `Docs/aggregator-setup.md` |
+| Run pre-condition checks before edits | ✅ | All required commands run; initial environment issues resolved (dependencies/browsers installed), then clean pass |
+| Use `bash scripts/bump-version.sh 7.5.6.2` | ✅ | Executed |
+| Add `CARD_RENDERERS.system` | ✅ | Added in both dashboard JS mirrors |
+| Implement `buildSystemCard()` and usage-bar helper | ✅ | Added in both dashboard JS mirrors |
+| Add specified metric formatters | ✅ | Added explicit formatter keys in both mirrors |
+| Wire system updates via `/api/v2/live` polling | ✅ | Added `updateSystemCards()` and poll wiring in both mirrors |
+| Add system card CSS | ✅ | Added in `dashboard/dashboard.html` |
+| Mirror all JS changes to `dashboard.html` | ✅ | Logic and helper additions mirrored |
+| Regenerate `dashboard.h` | ✅ | Regenerated via `scripts/generate-header.sh` |
+| Run full regeneration sequence (Critical Rule 28) | ✅ | Completed and verified |
+| Preserve chart guards (BUG-056) | ✅ | No chart dataset behavior changed for non-environmental categories |
+| Do not manually edit fixture JSON | ✅ | Fixtures regenerated via scripts |
+| Do not modify firmware ingest/sensor_history scope beyond task | ✅ | No direct `sensor_history_multi.h` logic edits were made for this step |
+| Update changelog and create required session log | ✅ | `Docs/changelog.md` updated and this session log created |
+
+---
+
+# Session Log — 2026-03-26 — v7.5.6.3
+
+## Summary
+Implemented Phase 6 Step 3 (v7.5.6.3): added example exporter scripts for Linux and Python, added ingest setup documentation, bumped version to 7.5.6.3, ran required regeneration flow, and completed required validation.
+
+## Changes Made
+
+### 1) Exporter scripts (new)
+Created `scripts/exporters/` and added:
+
+- `scripts/exporters/system-metrics-exporter.sh`
+- `scripts/exporters/system-metrics-exporter.py`
+
+Both scripts are executable and support configurable gateway URL/device ID.
+
+Bash exporter behavior:
+
+- Collects `cpu_pct`, `ram_pct`, `disk_pct`, `uptime_hrs`
+- Uses fallback guards (`|| echo "0"`) for cron-safe operation
+- Pushes each metric to `/api/ingest/{device}/{metric}?val=...`
+- Uses curl timeout and ignores per-metric push failures
+
+Python exporter behavior:
+
+- Stdlib-only implementation (no pip dependencies)
+- Linux/macOS metric paths with safe fallback to `0.0`
+- Supports one-shot and continuous mode (`--interval`)
+- Pushes metrics via POST to ingest endpoint
+
+### 2) Ingest workflow documentation (new)
+Created:
+
+- `Docs/data-ingest-setup.md`
+
+Guide includes required sections:
+
+1. Overview
+2. Prerequisites
+3. Adding a system device
+4. Bash exporter usage
+5. Python exporter usage
+6. Custom exporter API contract
+7. Monitoring
+8. Troubleshooting
+9. Security
+
+Exact ingest response format documented from firmware code (`handle_api_ingest_()` + `send_json_error_()`):
+
+- Success: `{"ok":true}`
+- Error: `{"ok":false,"message":"...","status":N}`
+
+### 3) Version + regeneration
+- Ran `bash scripts/bump-version.sh 7.5.6.3`
+- Ran Critical Rule 28 sequence:
+  1. `python3 scripts/render_sensor_config.py --write`
+  2. `node tests/fixtures/generate-fixtures.js`
+  3. `bash scripts/generate-header.sh`
+  4. `python3 scripts/render_sensor_config.py --check`
+  5. `grep -q "free_heap" tests/fixtures/api-status.json`
+
+### 4) Changelog update
+Updated `Docs/changelog.md` with v7.5.6.3 entry documenting:
+
+- exporter script additions
+- ingest setup guide
+- version bump/regeneration sequence
+
+## Validation
+
+### Precondition checks before edits
+Executed required commands before file changes:
+
+- `FIXTURE_SET=3sensor npx playwright test --project=chromium`
+- `FIXTURE_SET=3sensor npx playwright test --project=firefox`
+- `FIXTURE_SET=mixed npx playwright test --grep "Mixed-Category" --project=chromium`
+- `FIXTURE_SET=aggregator npx playwright test --grep "Aggregator" --project=chromium`
+- `bash scripts/preflight.sh`
+- `python3 scripts/render_sensor_config.py --check`
+
+### Post-change validation
+Executed the same required suite after implementation:
+
+- `FIXTURE_SET=3sensor npx playwright test --project=chromium`
+- `FIXTURE_SET=3sensor npx playwright test --project=firefox`
+- `FIXTURE_SET=mixed npx playwright test --grep "Mixed-Category" --project=chromium`
+- `FIXTURE_SET=aggregator npx playwright test --grep "Aggregator" --project=chromium`
+- `bash scripts/preflight.sh`
+- `python3 scripts/render_sensor_config.py --check`
+
+All required checks passed in this session.
+
+## Scope Compliance
+
+- `dashboard/dashboard.js` — version string update only (via `bump-version.sh`), no logic changes
+- `dashboard/dashboard.html` — version string update only (via `bump-version.sh`), no logic changes
+- `dashboard/sensor_history_multi.h` — version string update only (via `generate-header.sh`), no logic changes
+- No firmware logic changes
+- No manual fixture JSON edits (generator-only)
+- Did not proceed to v7.5.6.4
+
+## Instruction Compliance Output
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Read implementation instructions before any change | ✅ | `prompts/phase6/v7.5.6.3-implementation-instructions-for-coding-agent.md` read first |
+| Read all Required Reading files | ✅ | `Docs/phase6-implementation-plan.md`, `Docs/bugs-and-lessons-learned.md`, `Docs/v7.5-v7.6-architecture-plan.md` §9.2, `Docs/aggregator-setup.md` §15 |
+| Run required precondition checks before edits | ✅ | Completed before edits |
+| Create bash exporter script | ✅ | `scripts/exporters/system-metrics-exporter.sh` |
+| Create Python exporter script | ✅ | `scripts/exporters/system-metrics-exporter.py` |
+| Make both scripts executable | ✅ | `chmod +x` applied |
+| Create ingest setup documentation | ✅ | `Docs/data-ingest-setup.md` |
+| Verify ingest response format from firmware | ✅ | Documented exact success/error JSON format from `sensor_history_multi.h` |
+| Use `bump-version.sh 7.5.6.3` | ✅ | Executed |
+| Run Critical Rule 28 regeneration sequence | ✅ | Completed in full |
+| Update changelog | ✅ | v7.5.6.3 entry added |
+| Create mandatory session log | ✅ | This file |
+| Do not modify firmware/dashboard code | ✅ | No such code changes made for this step |
+| Do not manually edit fixture JSON | ✅ | Used generators only |
+| Run full required validation after implementation | ✅ | Completed required suite |
+| Do not proceed to later step | ✅ | Stayed within v7.5.6.3 scope |
+
+## Known Issue — Aggregator Dashboard Missing Satellite Cards
+
+**Reported:** 2026-03-26
+**Status:** Under investigation — not caused by v7.5.6.3 changes
+
+The aggregator gateway's dashboard is not displaying the GATEWAYS section (satellite
+summary cards). This PR does not modify any dashboard logic, aggregator fixture files,
+or firmware code. Playwright aggregator tests pass (including `#gwGrid .gw-summary-card`
+count validation).
+
+**Likely causes (device-side):**
+1. Satellite gateways are unreachable from the aggregator (network/power issue)
+2. `config/aggregator.json` on the aggregator device is missing or corrupted
+3. Browser cache serving stale dashboard HTML
+
+**Diagnostic steps:**
+```bash
+curl -s http://<aggregator-ip>/api/aggregator/gateways | jq
+curl -s http://<aggregator-ip>/api/aggregator/live | jq
+curl -s http://<aggregator-ip>/api/status | jq
+```
+
+If `/api/aggregator/gateways` returns `{"gateways":[]}`, verify device-side
+`config/aggregator.json` and satellite reachability from the aggregator network.
+
+---
+
+# Session Log — v7.5.6.4: Test Fixtures, Playwright Tests, and Phase 6 Closure
+
+_Date: 2026-03-26_
+_Version: v7.5.6.4_
+_Session type: Coding agent_
+
+---
+
+## Summary
+
+v7.5.6.4 is the final Phase 6 step. No new firmware or dashboard application logic.
+Deliverables: `system` fixture variant, Group 20 Playwright tests, mock server extension,
+LESSON-OPS-079 mixed variant update, BUG-072/073 fixes, CI matrix update, Phase 6 closure docs.
+
+---
+
+## Changes Made
+
+### 1. `tests/fixtures/generate-fixtures.js`
+
+- Added `NAS01_DEVICE` constant (`id: 'nas01'`, `category: 'system'`, `adapter: 'external_push'`)
+- Added `generateSystemFixtures()` function: 2 ThermoPro + 1 wan_ping + 1 nas01 = 4 sensors
+- Updated `generateMixedFixtures()` to include `nas01` (LESSON-OPS-079 compliance)
+- Called `generateSystemFixtures()` from `main()`
+- Version constant updated to `v7.5.6.4` via `scripts/bump-version.sh`
+
+### 2. `tests/fixtures/variants/system/` (generated)
+
+New fixture variant with:
+- `sensors.json` — v1 legacy: 2 env sensors only
+- `manifest.json` — v2: 4 sensors (2 env + 1 network + 1 system), `sensor_count: 4`
+- `api-status.json` — includes `free_heap`, `free_heap_internal`, `free_heap_total`
+- `storage-stats.json` — computed for env-only sensor count
+- `history-office-temp.csv`, `history-office-hum.csv` — 96 points
+- `history-first_floor-temp.csv`, `history-first_floor-hum.csv` — 96 points
+- `history-wan_ping-ping_ms.csv`, `history-wan_ping-success_pct.csv` — 12 realistic points
+- `history-nas01-cpu_pct.csv`, `history-nas01-ram_pct.csv`, `history-nas01-disk_pct.csv` — empty stubs
+
+### 3. `tests/fixtures/variants/mixed/` (regenerated)
+
+- Now includes `nas01` system device (LESSON-OPS-079)
+- `sensor_count: 4` (was 3)
+- Added `history-nas01-{cpu_pct,ram_pct,disk_pct}.csv` stubs
+
+### 4. `tests/mock-server/server.js`
+
+- `/api/v2/live`: Returns non-null values for `nas01` when `FIXTURE_SET=system`
+  (`cpu_pct: 45.2`, `ram_pct: 72.8`, `disk_pct: 55.0`, `uptime_hrs: 168.5`)
+- Added `POST /api/ingest/:deviceId/:metricKey` route:
+  - Returns `{"ok":true}` for known devices (from manifest)
+  - Returns 404 for unknown devices
+  - Uses `loadFixtureJson()` for manifest lookup (per LESSON-OPS-077)
+
+### 5. `tests/browser/dashboard.spec.js`
+
+- Added Group 20: System Devices and Data Ingest (8 tests) with `beforeEach` skip guard
+- All `loadDashboard()` calls use `{ expectedSensorCount: 4 }`
+- All count assertions use hardcoded integers
+- Group 18 (Mixed) updated: `expectedSensorCount: 3` → `4`, `toHaveCount(3)` → `4`,
+  env card selector updated to exclude system cards
+- Skip guards added for `FIXTURE_SET=system` on 6 tests (LESSON-OPS-080)
+
+### 6. `tests/browser/manifest.spec.js`
+
+- Skip guard added for `FIXTURE_SET=system` on "dashboard falls back to /sensors.json" test
+
+### 7. `dashboard/dashboard.js` + `dashboard/dashboard.html`
+
+- **BUG-072 fix**: `updateNetworkCards()` — `if (seenEl && devData.last_seen)` →
+  `if (seenEl && devData.last_seen != null)`
+- **BUG-073 fix**: `buildNetworkCard()` — `target` now escaped with `escHtml(target)`
+- Both fixes mirrored to `dashboard.html` (LESSON-OPS-043)
+
+### 8. `.github/workflows/browser-tests.yml`
+
+- Added `system` to `fixture_set` matrix
+- Added "Run system suite (system — Group 20)" step
+- Excluded `system` from sensor-count smoke step
+
+### 9. Documentation
+
+- `Docs/changelog.md` — v7.5.6.4 entry with Phase 6 Complete callout
+- `Docs/v7.5-v7.6-architecture-plan.md` — Phase 6 COMPLETE status block
+- `Docs/phase6-implementation-plan.md` — v7.5.6.4 section marked COMPLETE
+- `Docs/bugs-and-lessons-learned.md` — BUG-072, BUG-073, LESSON-OPS-080 entries
+- `Docs/session-log-2026-03-26-v7.5.6.4.md` — this file
+
+---
+
+## Validation Evidence
+
+```
+FIXTURE_SET=3sensor npx playwright test --project=chromium -> 99 passed, 26 skipped
+FIXTURE_SET=mixed npx playwright test --grep "18. Mixed-Category Rendering" --project=chromium -> 7 passed
+FIXTURE_SET=system npx playwright test --grep "20. System Devices and Data Ingest" --project=chromium -> 8 passed
+FIXTURE_SET=system npx playwright test --project=chromium (FULL, no grep) -> 100 passed, 25 skipped
+FIXTURE_SET=aggregator npx playwright test --grep "19. Aggregator Mode" --project=chromium -> 11 passed
+bash scripts/preflight.sh -> PASS
+python3 scripts/render_sensor_config.py --check -> PASS
+grep -q "free_heap" tests/fixtures/api-status.json -> PASS
+```
+
+---
+
+## Instruction Compliance
+
+| Requirement | File(s) Changed | How Satisfied | Verified? |
+|---|---|---|---|
+| `system` fixture variant | `generate-fixtures.js`, `variants/system/` | Added `generateSystemFixtures()`, runs on `node generate-fixtures.js` | ✅ |
+| LESSON-OPS-079: `mixed` includes `nas01` | `generate-fixtures.js`, `variants/mixed/` | Updated `generateMixedFixtures()` | ✅ |
+| Mock server POST `/api/ingest` | `server.js` | Added route with `loadFixtureJson()` manifest lookup | ✅ |
+| Mock server non-null system data | `server.js` | `FIXTURE_SET=system` branch in `/api/v2/live` | ✅ |
+| Group 20 tests (8 tests) | `dashboard.spec.js` | Added with `beforeEach` skip guard, `expectedSensorCount: 4` | ✅ |
+| Existing test audit (BUG-051) | `dashboard.spec.js`, `manifest.spec.js` | 7 skip guards added, full suite passes with `FIXTURE_SET=system` | ✅ |
+| CI matrix update | `.github/workflows/browser-tests.yml` | `system` added to matrix, Group 20 step added | ✅ |
+| BUG-072 fix | `dashboard.js`, `dashboard.html` | `!= null` check in `updateNetworkCards()` | ✅ |
+| BUG-073 fix | `dashboard.js`, `dashboard.html` | `escHtml(target)` in `buildNetworkCard()` | ✅ |
+| Phase 6 COMPLETE | `Docs/v7.5-v7.6-architecture-plan.md` | Status block added | ✅ |
+| Version bump to 7.5.6.4 | All version locations | `bash scripts/bump-version.sh 7.5.6.4` | ✅ |
+| Regeneration pipeline | All generated files | Full Critical Rule 28 sequence executed | ✅ |
+
+---
+
+## Phase 6 Closure Gate
+
+- [x] All Phase 6 PRs merged
+- [x] No corrective PR pending
+- [x] All CI-exact Playwright runs pass (3sensor, mixed, system, aggregator)
+- [x] `python3 scripts/render_sensor_config.py --check` passes
+- [x] `bash scripts/preflight.sh` passes (including `free_heap` guards)
+- [x] All fixture JSON files validated with `python3 -m json.tool` (no errors)
+- [x] All fixture variants have documented run strategy
+- [x] No undiscovered test mismatches
+- [x] Environmental/network cards pixel-identical to pre-Phase-6
+- [x] `grep -q "free_heap" tests/fixtures/api-status.json` passes
+
+---
+
+_End of session log._
+
+---
+
+# Session Log — v7.5.7.0: Aggregator Manifest Truncation Fix + PSRAM Scaling
+
+_Date: 2026-03-28_  
+_Version: v7.5.7.0_  
+_Session type: Coding agent_
+
+---
+
+## Summary
+
+Implemented v7.5.7.0 exactly per prompt scope:
+
+- Added `AGG_MANIFEST_BUF_SIZE` and manifest truncation guard in aggregator gateways response path.
+- Added PSRAM-aware aggregator gating and satellite cap logic in generator.
+- Bumped version to `7.5.7.0` and ran full regeneration pipeline.
+- Updated required documentation (bugs/lessons, changelog, aggregator setup, architecture plan).
+
+No Phase D runtime satellite management logic was added.
+
+---
+
+## Pre-condition Results (before edits)
+
+Executed required pre-condition checks from the prompt:
+
+```bash
+FIXTURE_SET=3sensor npx playwright test --project=chromium                  -> 99 passed, 26 skipped
+FIXTURE_SET=3sensor npx playwright test --project=firefox                   -> 99 passed, 26 skipped
+FIXTURE_SET=mixed npx playwright test --grep "Mixed-Category" --project=chromium -> 7 passed
+FIXTURE_SET=system npx playwright test --grep "System Devices" --project=chromium -> 8 passed
+FIXTURE_SET=aggregator npx playwright test --grep "Aggregator" --project=chromium -> 11 passed, 1 skipped
+bash scripts/preflight.sh                                                    -> PASS
+python3 scripts/render_sensor_config.py --check                             -> PASS
+```
+
+Notes:
+- Initial Playwright run required local dependency setup (`npm ci`, Playwright browser install).
+- One intermediate parallel run hit transient webserver port contention (`EADDRINUSE`); reruns passed.
+
+---
+
+## Implementation Details
+
+### 1) `dashboard/sensor_history_multi.h`
+
+- Added fallback constant under preprocessor guard:
+  - `#ifndef AGG_MANIFEST_BUF_SIZE`
+  - `static constexpr uint16_t AGG_MANIFEST_BUF_SIZE = 8192;`
+- Updated `SatelliteCache.manifest_json` from `4096` to `AGG_MANIFEST_BUF_SIZE`.
+- Updated `s_fetch_tmp` from `4096` to `AGG_MANIFEST_BUF_SIZE`.
+- Updated reserve comment in `handle_aggregator_gateways_()` to reference `AGG_MANIFEST_BUF_SIZE`.
+- Replaced direct manifest embedding block with BUG-074 guard:
+  - If `sat.manifest_len >= AGG_MANIFEST_BUF_SIZE - 1`: log warning + emit `"manifest":null`
+  - Else: unchanged append path (`out.append(...)`)
+
+### 2) `scripts/render_sensor_config.py`
+
+- Changed signature:
+  - `generate_aggregator_config_h(aggregator_config, board_profile=None)`
+- Added PSRAM detection from `board_profile["capabilities"]["psram"]`.
+- Enforced no-PSRAM behavior when `aggregator.json` exists:
+  - emit warning to stderr
+  - generate `AGGREGATOR_ENABLED 0`
+- Added PSRAM board satellite cap:
+  - `board_cap = 8`
+  - warn and cap `n` if configured satellites exceed cap
+- Added `satellites[:n]` slicing for all generated arrays.
+- Added generated define in enabled mode:
+  - `#define AGG_MANIFEST_BUF_SIZE 8192`
+- Updated call site to pass board profile:
+  - `generate_aggregator_config_h(aggregator_config, board_profile)`
+
+### 3) Version bump and regeneration
+
+Ran:
+
+```bash
+bash scripts/bump-version.sh 7.5.7.0
+python3 scripts/render_sensor_config.py --write
+python3 scripts/render_sensor_config.py --check
+node tests/fixtures/generate-fixtures.js
+node tests/fixtures/generate-fixtures.js --check
+grep -q "free_heap" tests/fixtures/api-status.json
+bash scripts/generate-header.sh
+bash scripts/preflight.sh
+```
+
+Result: all commands succeeded.
+
+---
+
+## Documentation Updates
+
+- `Docs/bugs-and-lessons-learned.md`
+  - Added **BUG-074** entry
+  - Added **LESSON-OPS-085** entry
+- `Docs/changelog.md`
+  - Added top entry for **v7.5.7.0**
+- `Docs/aggregator-setup.md`
+  - Added section for manifest buffer sizing and PSRAM scaling rules
+  - Added board-to-cap table and board recommendations
+- `Docs/v7.5-v7.6-architecture-plan.md`
+  - Added dedicated v7.5.7.0 section (buffer rationale, PSRAM decision, Phase D linkage)
+
+---
+
+## Validation Evidence (post-change)
+
+```bash
+FIXTURE_SET=3sensor npx playwright test --project=chromium                  -> 99 passed, 26 skipped
+FIXTURE_SET=3sensor npx playwright test --project=firefox                   -> 99 passed, 26 skipped
+FIXTURE_SET=mixed npx playwright test --grep "Mixed-Category" --project=chromium -> 7 passed
+FIXTURE_SET=system npx playwright test --grep "System Devices" --project=chromium -> 8 passed
+FIXTURE_SET=aggregator npx playwright test --grep "Aggregator" --project=chromium -> 11 passed, 1 skipped
+bash scripts/preflight.sh                                                    -> PASS
+python3 scripts/render_sensor_config.py --check                             -> PASS
+```
+
+---
+
+---
+
+## Instruction Compliance Output
+
+| # | Prompt Instruction | Outcome | Notes |
+|---|---|---|---|
+| 1 | Buffer increase: `SatelliteCache.manifest_json` 4096 → 8192 via `AGG_MANIFEST_BUF_SIZE` | ✅ Compliant | `#ifndef` fallback + sized to `AGG_MANIFEST_BUF_SIZE` |
+| 2 | Buffer increase: `s_fetch_tmp` 4096 → `AGG_MANIFEST_BUF_SIZE` | ✅ Compliant | Updated in same commit |
+| 3 | Truncation guard: detect `manifest_len >= AGG_MANIFEST_BUF_SIZE - 1`, log warning, emit `"manifest":null` | ✅ Compliant | BUG-074 guard in `handle_aggregator_gateways_()` |
+| 4 | PSRAM-aware gating: no PSRAM → `AGGREGATOR_ENABLED 0` | ✅ Compliant | `board_profile["capabilities"]["psram"]` check added |
+| 5 | PSRAM board satellite cap: `MAX_SATELLITES` ≤ 8 | ✅ Compliant | `board_cap = 8`, warning on overflow, array slicing |
+| 6 | `AGG_MANIFEST_BUF_SIZE` emitted in generated header | ✅ Compliant | `#define AGG_MANIFEST_BUF_SIZE 8192` in aggregator-enabled path |
+| 7 | Version bump to 7.5.7.0 | ✅ Compliant | `bump-version.sh` + full regeneration |
+| 8 | Full regeneration pipeline (Critical Rule 28) | ✅ Compliant | All generators + preflight + fixture check |
+| 9 | Docs: `bugs-and-lessons-learned.md` updated | ✅ Compliant | BUG-074 + LESSON-OPS-085 |
+| 10 | Docs: `changelog.md` updated | ✅ Compliant | v7.5.7.0 entry added |
+| 11 | Docs: `aggregator-setup.md` updated | ✅ Compliant | Buffer + PSRAM section added |
+| 12 | Docs: `v7.5-v7.6-architecture-plan.md` updated | ✅ Compliant | v7.5.7.0 section added |
+| 13 | Session log created | ✅ Compliant | This file |
+| 14 | No Phase D runtime logic added | ✅ Compliant | Scope control verified |
+| 15 | Pre-condition tests passed before edits | ✅ Compliant | All 5 fixture sets + preflight |
+| 16 | Post-condition tests passed after edits | ✅ Compliant | All 5 fixture sets + preflight |
+
+## Bugs Found During Session
+
+- BUG-074 implemented/fixed as intended by this step.
+- No additional new defects found in changed scope.
+
+---
+
+## Scope Compliance Notes
+
+- Did **not** change `s_proxy_tmp` size (remains 32768).
+- Did **not** change `SatelliteCache.live_json` or `status_json`.
+- Did **not** modify loop patterns using `for (int i = 0; i < MAX_SATELLITES; i++)`.
+- Did **not** edit board profile YAML files.
+- Did **not** add runtime satellite management (Phase D) logic.
+
+---
+
+_End of session log._
+
+---
+

@@ -1,7 +1,7 @@
 # Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-03-27 — Phase 6 completion, v7.5.7.0 added, critical rules 29–35_
+_Last updated: 2026-03-28 — v7.5.7.0 complete, Phase D prompts linked, LESSON-OPS-086/087/088_
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -198,13 +198,13 @@ All steps shipped. No prompts needed.
 - v7.5.6.3: run bash/Python exporters from an external host, verify dashboard shows data
 - v7.5.6.4: Playwright only + Phase 6 closure verification
 
-### v7.5.7.0 — Aggregator Manifest Truncation Fix + PSRAM Scaling
+### v7.5.7.0 — Aggregator Manifest Truncation Fix + PSRAM Scaling ✅ COMPLETE
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
-| v7.5.7.0 | Manifest buffer increase, truncation guard, PSRAM-aware MAX_SATELLITES | `prompts/phase6/v7.5.7.0-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.5.7.0 | Manifest buffer increase, truncation guard, PSRAM-aware MAX_SATELLITES | `prompts/phase6/v7.5.7.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-28 |
 
-**Reference:** [Issue #85](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/issues/85)
+**Reference:** [Issue #85](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/issues/85) — resolved by PR #93
 
 **v7.5.7.0 device testing requirements:**
 - Compile and flash aggregator board (S3)
@@ -217,12 +217,12 @@ All steps shipped. No prompts needed.
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
-| v7.6.0.0 | NVS satellite persistence layer | _Prompt not yet created_ | Pending |
-| v7.6.0.1 | POST /api/aggregator/add-satellite | _Prompt not yet created_ | Pending |
-| v7.6.0.2 | DELETE /api/aggregator/satellite/{id} | _Prompt not yet created_ | Pending |
-| v7.6.0.3 | POST /api/aggregator/test-satellite | _Prompt not yet created_ | Pending |
-| v7.6.0.4 | Dashboard add/remove/test UI | _Prompt not yet created_ | Pending |
-| v7.6.0.5 | Playwright tests + Phase D closure | _Prompt not yet created_ | Pending |
+| v7.6.0.0 | NVS satellite persistence layer | `prompts/phaseD/v7.6.0.0-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.0.1 | POST /api/aggregator/add-satellite | `prompts/phaseD/v7.6.0.1-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.0.2 | DELETE /api/aggregator/satellite/{id} | `prompts/phaseD/v7.6.0.2-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.0.3 | POST /api/aggregator/test-satellite | `prompts/phaseD/v7.6.0.3-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.0.4 | Dashboard add/remove/test UI | `prompts/phaseD/v7.6.0.4-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.0.5 | Playwright tests + Phase D closure | `prompts/phaseD/v7.6.0.5-implementation-instructions-for-coding-agent.md` | Pending |
 
 **Implementation plan:** `Docs/phase-d-implementation-plan.md`
 
@@ -366,6 +366,20 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-03-28 — Post-v7.5.7.0 Completion and Phase D Readiness
+
+**Context:** v7.5.7.0 merged (PR #93). Phase D prompts finalized and corrections applied.
+
+**What was updated and why:**
+
+| Change | Why |
+|--------|-----|
+| **v7.5.7.0 marked complete** | PR #93 merged 2026-03-28T21:19:35Z |
+| **Phase D prompt files linked** | Canonical prompts exist in `prompts/phaseD/`, replacing "_Prompt not yet created_" placeholders |
+| **v7.5.7.0 audit corrections applied to Phase D prompts** | LESSON-OPS-086 (Do-NOT regeneration churn), LESSON-OPS-087 (cross-language constants), LESSON-OPS-088 (compliance table templating) |
+| **Device testing sections expanded** | Specific build/flash commands, `esphome clean` requirement, preflight steps, concrete device IPs |
+| **`curl -X POST` commands fixed** | Added `-H "Content-Length: 0"` — curl does not send POST without it |
 
 ### 2026-03-27 — Post-Phase-6 Completion Update
 

@@ -1,7 +1,7 @@
 # Writing Effective Prompts for Coding Agents — A Practitioner's Guide
 
 _Based on real prompt failures and revisions from the ESP32-GW Multi-Sensor Gateway project_
-_Date: 2026-03-27 (revised post-Phase-6 — added §3.12, §3.13, Gaps 14–18, Checks 11–19, Anti-Patterns 9–13, §14)_
+_Date: 2026-03-28 (revised post-Phase-6 — added §3.12, §3.13, Gaps 14–18, Checks 11–19, Anti-Patterns 9–13, §14; added §15 v7.5.7.0 lessons)_
 _Audience: Anyone creating implementation prompts for AI coding agents (Claude, Copilot, Cursor, etc.)_
 
 ---
@@ -1464,6 +1464,43 @@ Reusable template text for prompts that add mock endpoints or include code block
 - [ ] Python: module-level imports + context managers
 - [ ] Docs/comments aligned with actual behavior
 - [ ] Reference code audited for latent bugs before copying pattern
+```
+
+---
+
+## 15. Lessons Learned from v7.5.7.0 Implementation (PR #93)
+
+_Added: 2026-03-28_
+
+v7.5.7.0 was the cleanest PR in the project's history — only 3 defects, all documentation/process issues, zero implementation bugs. But the three defects it did produce exposed three new gap types worth codifying.
+
+### 15.1 Do-NOT Lists Must Account for Regeneration Churn (LESSON-OPS-086)
+
+The prompt said "Do NOT change dashboard JS/HTML" but also required `bump-version.sh`, which necessarily updates `App.version` in both files. The agent correctly ran the bump, but the Do-NOT list was technically violated.
+
+**Rule for prompt authors:** When a Do-NOT list prohibits changes to a file, check whether the version bump or regeneration pipeline touches that file. If it does, qualify the prohibition: "No *functional* changes to X; version bump and regeneration churn is expected and does not violate this rule."
+
+**Checklist addition for §9 (Prompt Author Pre-Flight):**
+- After writing the Do-NOT list, mentally run `bump-version.sh` and the full regeneration pipeline. If any Do-NOT file is touched, add the regeneration exclusion.
+
+### 15.2 Cross-Language Constant Consistency (LESSON-OPS-087)
+
+The prompt introduced a C++ named constant `AGG_MANIFEST_BUF_SIZE` but provided Python code with the bare literal `8192`. The agent copied the prompt faithfully — including the inconsistency. The Gemini reviewer caught it.
+
+**Rule for prompt authors:** Before publishing a prompt with code blocks in multiple languages, verify that every named constant in language A has a corresponding named constant (not a literal) in language B.
+
+**Checklist addition for §9:**
+- Cross-reference named constants across all code blocks in the prompt. If C++ defines `AGG_MANIFEST_BUF_SIZE = 8192`, the Python block must use `AGG_MANIFEST_BUF_SIZE_BYTES = 8192`, not the bare `8192`.
+
+### 15.3 Compliance Tables Need Placeholder Rows (LESSON-OPS-088)
+
+The prompt required an Instruction Compliance Output table but provided only the table header — no placeholder rows. The agent omitted the table entirely from the session log. The Codex reviewer caught it, requiring a fixup commit.
+
+**Rule for prompt authors:** When a prompt requires a deliverable table, include a template with placeholder rows. An empty template with `_describe_` / `☐` placeholders is harder to overlook than a prose instruction to "provide a table."
+
+**Snippet Quality Gates addition:**
+```markdown
+- [ ] Mandatory deliverable tables include placeholder rows (not just headers)
 ```
 
 ---

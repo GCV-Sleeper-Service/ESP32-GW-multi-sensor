@@ -2353,6 +2353,39 @@ When writing a Playwright test that only uses the `request` fixture (e.g., a pur
 
 ---
 
+## LESSON-OPS-086 — Prompt Do-NOT lists must exclude expected regeneration side-effects (v7.5.7.0)
+
+**Version:** v7.5.7.0
+**Source:** PR #93 — Do-NOT list said "no dashboard JS/HTML changes" but `bump-version.sh` necessarily updates `App.version` in those files.
+
+When a prompt says "Do NOT change file X" but also requires a version bump or regeneration pipeline that necessarily touches file X, the prompt contains an internal contradiction. The agent correctly ran the bump (version churn is expected), but the Do-NOT list was technically violated.
+
+**Rule:** Future prompts should qualify: "No *functional* changes to file X; version bump and regeneration churn is expected and does not violate this rule."
+
+---
+
+## LESSON-OPS-087 — Prompt-provided code blocks must apply the same constant policy as the target codebase (v7.5.7.0)
+
+**Version:** v7.5.7.0
+**Source:** PR #93 — prompt introduced C++ named constant `AGG_MANIFEST_BUF_SIZE` but provided Python code with bare literal `8192`.
+
+When a prompt introduces a named constant in one language (C++ `AGG_MANIFEST_BUF_SIZE`), the corresponding value in prompt-provided code for another language (Python) should also use a named constant, not a bare literal. The agent copies prompt code faithfully — including inconsistencies. The Gemini reviewer caught the mismatch and it was fixed in the fixup commit by extracting `SATELLITE_CAP_PSRAM = 8` and `AGG_MANIFEST_BUF_SIZE_BYTES = 8192` as module-level constants.
+
+**Rule:** Before publishing a prompt that contains code blocks in multiple languages, verify that each named constant defined in language A has a corresponding named constant (not a literal) in language B.
+
+---
+
+## LESSON-OPS-088 — Mandatory deliverable tables should be templated with placeholder rows (v7.5.7.0)
+
+**Version:** v7.5.7.0
+**Source:** PR #93 — prompt required Instruction Compliance Output table (§8b) but the agent omitted it from the session log entirely.
+
+When a prompt requires a specific table as a deliverable (e.g., Instruction Compliance Output), include a template with placeholder rows in the session log section. An empty template is harder to overlook than a prose instruction to "provide a table."
+
+**Rule:** The session log section of any prompt that requires a compliance table must include a template with at least one placeholder row, not just the table header.
+
+---
+
 
 
 Any significant dashboard or data-path modification should re-check:
