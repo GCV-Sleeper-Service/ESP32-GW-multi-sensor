@@ -3,6 +3,22 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.6.0.0] — 2026-03-30 — Post-Merge HTTPD/POST Stabilization (BUG-075, BUG-076)
+
+### Bug Fixes
+
+- **BUG-076: Zero-length POST crash path (`Content-Length: 0`) on management/import routes:** Hardened dashboard POST requests to always send JSON payloads (`body: '{}'`) and `Content-Type: application/json` for management and import endpoints. Mirrored in both `dashboard/dashboard.js` and `dashboard/dashboard.html`.
+- **BUG-076: Defensive server-side route gating for unsafe zero-length POSTs:** Split `HTTP_OPTIONS` handling from `HTTP_POST` handling in `HistoryWebHandler::canHandle()` and reject zero-length POSTs (`request->contentLength() == 0`) before route acceptance.
+- **BUG-075 follow-up: board-profile sdkconfig alignment:** Applied profile-level socket/stack settings so generated board YAMLs inherit stable HTTPD runtime defaults:
+  - S3: `CONFIG_LWIP_MAX_SOCKETS=24`, `CONFIG_HTTPD_STACK_SIZE=16384`
+  - C3/WROOM: `CONFIG_LWIP_MAX_SOCKETS=18`, `CONFIG_HTTPD_STACK_SIZE=8192`
+
+### Notes
+
+- This is a **v7.6.0.0 fixup** entry (no version bump).
+- Prior v7.6.0.1 draft references to BUG-049 for this incident are superseded by BUG-075/BUG-076 tracking.
+
+---
 ## [v7.6.0.1] — 2026-03-30 — httpd Stack Overflow Fix (BUG-049)
 
 ### Bug Fixes

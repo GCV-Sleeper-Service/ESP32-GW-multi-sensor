@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-25 — v7.5.5.5-hotfix (fixture fragility guard, LESSON-OPS-077)._
+_Last updated: 2026-03-30 — v7.6.0.0 post-merge fixups (BUG-075/076, LESSON-OPS-097/098)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,28 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-076 — Zero-length POST (`Content-Length: 0`) triggers HTTPD instability/crash on aggregator (v7.6.0.0 fixup)
+
+**Symptom:** `POST` requests with `Content-Length: 0` to management/import endpoints (e.g., `/api/system/reset-satellites`) can crash the S3 aggregator with panics (`StoreProhibited`) and/or HTTPD instability. With dashboard open during reboot flows, repeated failures can appear as reboot loops.
+
+**Root cause:** Request-shape mismatch against ESPHome IDF HTTP behavior. Requests without Content-Length are rejected safely with 411, but accepted zero-length POSTs can enter an unstable path before custom handler execution. This was amplified by dashboard POST calls that omitted explicit body/content-type.
+
+**Fix:** (1) Dashboard POST requests now send `body: '{}'` and `Content-Type: application/json` for management/import endpoints. (2) `HistoryWebHandler::canHandle()` now separates `HTTP_OPTIONS` from `HTTP_POST` and rejects zero-length POST route acceptance (`request->contentLength() == 0`).
+
+**Prevention:** Enforce request-shape contracts in frontend code and add firmware-side defensive routing guards. Include zero-length POST negative tests in release validation.
+
+### BUG-075 — HTTPD stack overflow under aggregator runtime load (v7.6.0.0 fixup)
+
+**Symptom:** S3 aggregator emitted `***ERROR*** A stack overflow in task httpd` under post-merge runtime activity, including dashboard-open reboot scenarios.
+
+**Root cause:** Board-profile sdkconfig defaults were insufficient for aggregator HTTPD/runtime pressure and were not consistently aligned across board profiles.
+
+**Fix:** Applied explicit board-profile sdkconfig options:
+- `esp32-s3-devkitc1-n16r8`: `CONFIG_LWIP_MAX_SOCKETS=24`, `CONFIG_HTTPD_STACK_SIZE=16384`
+- `esp32-c3-supermini` and `esp32-wroom-32d`: `CONFIG_LWIP_MAX_SOCKETS=18`, `CONFIG_HTTPD_STACK_SIZE=8192`
+
+**Prevention:** Treat board profiles as source-of-truth for `sdkconfig_options`; verify generated YAML inherits expected values before device testing.
 
 ### BUG-074 — Aggregator manifest buffer truncation produces broken JSON (v7.5.7.0)
 
@@ -1214,6 +1236,14 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-098: `sdkconfig_options` must be updated in board profiles, not only templates (2026-03-30)
+
+For multi-board builds, generated YAMLs inherit `sdkconfig_options` from `firmware/boards/*.yaml`. Updating only a template YAML can appear to fix one local build while leaving other board builds unchanged. Apply socket/stack changes to all relevant board profiles and verify generated outputs before release testing.
+
+### LESSON-OPS-097: Never commit generated artifacts while operator configs are present (2026-03-30)
+
+When local operator config files (`config/gateway.json`, `config/aggregator.json`) are present, running `render_sensor_config.py --write` can produce environment-specific generated files that diverge from CI defaults. Move operator configs aside before generating commit-bound artifacts to prevent accidental local-state leakage.
 
 ### LESSON-OPS-085: Validate fetched content wasn't truncated before embedding in composed JSON responses (2026-03-28)
 

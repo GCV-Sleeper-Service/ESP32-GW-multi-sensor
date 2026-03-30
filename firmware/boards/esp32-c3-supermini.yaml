@@ -9,7 +9,8 @@ partitions: "../partitions/esp32-c3-multi-partitions.csv"
 framework:
   type: "esp-idf"
 sdkconfig_options:
-  CONFIG_LWIP_MAX_SOCKETS: "16"
+  CONFIG_LWIP_MAX_SOCKETS: "18"
+  CONFIG_HTTPD_STACK_SIZE: "8192"
 capabilities:
   ble: true
   psram: false

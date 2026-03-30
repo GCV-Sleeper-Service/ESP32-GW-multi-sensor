@@ -1923,7 +1923,26 @@ class HistoryWebHandler : public AsyncWebHandler {
       return false;
     }
 
-    if (request->method() == HTTP_POST || request->method() == HTTP_OPTIONS) {
+    if (request->method() == HTTP_OPTIONS) {
+      if (strcmp(p, "/api/reboot") == 0) return true;
+      if (strcmp(p, "/api/delete-data") == 0) return true;
+      if (strcmp(p, "/api/import/begin") == 0) return true;
+      if (strncmp(p, "/api/import/begin/single/", 25) == 0) return true;
+      if (strncmp(p, "/api/import/d/", 14) == 0) return true;
+      if (strncmp(p, "/api/import/w/", 14) == 0) return true;
+      if (strcmp(p, "/api/import/finish") == 0) return true;
+#if AGGREGATOR_ENABLED
+      if (strcmp(p, "/api/system/reset-satellites") == 0) return true;
+      if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) return true;
+      if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) return true;
+#endif
+      return false;
+    }
+
+    if (request->method() == HTTP_POST) {
+      // ESPHome web_server_idf can become unstable on zero-length POST payloads.
+      // Reject these here so they never enter custom POST handlers.
+      if (request->contentLength() == 0) return false;
       if (strcmp(p, "/api/reboot") == 0) return true;
       if (strcmp(p, "/api/delete-data") == 0) return true;
       if (strcmp(p, "/api/import/begin") == 0) return true;
