@@ -1,7 +1,7 @@
 # v7.6.0.0 Post-Merge Incident Report: HTTPD POST Crash and Reboot Loop
 
 _Date: 2026-03-30_  
-_Target: ESP32-S3 aggregator (`192.168.120.191`)
+_Target: ESP32-S3 aggregator (`192.168.120.191`)_
 
 ---
 
