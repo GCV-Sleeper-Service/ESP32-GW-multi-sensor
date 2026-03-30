@@ -395,17 +395,75 @@ static const MetricDef metrics_ping[] = {
   {"success_pct", "Success", "%",  0, true}
 };
 
+static const MetricDef metrics_system[] = {
+  {"cpu_pct",    "CPU Usage",  "%", 0, true},
+  {"ram_pct",    "RAM Usage",  "%", 0, true},
+  {"disk_pct",   "Disk Usage", "%", 0, true},
+  {"uptime_hrs", "Uptime",     "h", 3, false}
+};
+
+static HistoryBuffer entity_hbuf_office_temp;
+static HistoryBuffer entity_hbuf_office_hum;
+static HistoryBuffer entity_hbuf_first_floor_temp;
+static HistoryBuffer entity_hbuf_first_floor_hum;
+static HistoryBuffer entity_hbuf_outside_temp;
+static HistoryBuffer entity_hbuf_outside_hum;
 static HistoryBuffer entity_hbuf_wan_ping_ping_ms;
 static HistoryBuffer entity_hbuf_wan_ping_success_pct;
+static HistoryBuffer entity_hbuf_nas01_cpu_pct;
+static HistoryBuffer entity_hbuf_nas01_ram_pct;
+static HistoryBuffer entity_hbuf_nas01_disk_pct;
 
-static constexpr int NUM_DEVICES = 1;
-static constexpr int NUM_ENV_SENSORS = 0;
+static constexpr int NUM_DEVICES = 5;
+static constexpr int NUM_ENV_SENSORS = 3;
 static constexpr int NUM_SENSORS = NUM_ENV_SENSORS;  // backward compat alias for persisted environmental history
 
-#define PING_DEVICE_INDEX 0
+#define PING_DEVICE_INDEX 3
 #define PING_TARGET "8.8.8.8"
 
 static SensorEntity devices[NUM_DEVICES] = {
+  {
+    .id = "office", .name = "Office",
+    .category_id = 0, .adapter = "thermopro_ble",
+    .metric_defs = metrics_thermopro,
+    .metric_states = {
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_office_temp},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_office_hum},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}
+    },
+    .metric_count = 4,
+    .mac = "DB:06:2C:58:8A:59",
+    .last_rssi = 0, .last_seen_epoch = 0
+  },
+  {
+    .id = "first_floor", .name = "First Floor",
+    .category_id = 0, .adapter = "thermopro_ble",
+    .metric_defs = metrics_thermopro,
+    .metric_states = {
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_first_floor_temp},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_first_floor_hum},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}
+    },
+    .metric_count = 4,
+    .mac = "D5:D8:4C:25:06:49",
+    .last_rssi = 0, .last_seen_epoch = 0
+  },
+  {
+    .id = "outside", .name = "Outside",
+    .category_id = 0, .adapter = "thermopro_ble",
+    .metric_defs = metrics_thermopro,
+    .metric_states = {
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_outside_temp},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_outside_hum},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}
+    },
+    .metric_count = 4,
+    .mac = "DF:EB:DE:19:11:6C",
+    .last_rssi = 0, .last_seen_epoch = 0
+  },
   {
     .id = "wan_ping", .name = "WAN Latency",
     .category_id = 2, .adapter = "icmp_ping",
@@ -417,6 +475,20 @@ static SensorEntity devices[NUM_DEVICES] = {
       {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}
     },
     .metric_count = 2,
+    .mac = "",
+    .last_rssi = 0, .last_seen_epoch = 0
+  },
+  {
+    .id = "nas01", .name = "NAS Health",
+    .category_id = 1, .adapter = "external_push",
+    .metric_defs = metrics_system,
+    .metric_states = {
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_cpu_pct},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_ram_pct},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_disk_pct},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}
+    },
+    .metric_count = 4,
     .mac = "",
     .last_rssi = 0, .last_seen_epoch = 0
   },
