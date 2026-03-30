@@ -1,7 +1,7 @@
 # v7.6.0.0 Post-Merge Incident Report: HTTPD POST Crash and Reboot Loop
 
 _Date: 2026-03-30_  
-_Target: ESP32-S3 aggregator (`192.168.120.191`)
+_Target: ESP32-S3 aggregator (`192.168.120.191`)_
 
 ---
 
@@ -9,7 +9,7 @@ _Target: ESP32-S3 aggregator (`192.168.120.191`)
 
 ### A) POST requests with `Content-Length: 0` can crash the board
 - Reproducible with:
-  - `curl -v -X POST -d '' -u ESPadmin:ESppass100 http://192.168.120.191/api/system/reset-satellites`
+  - `curl -v -X POST -d '' -u <user>:<password> http://192.168.120.191/api/system/reset-satellites`
 - Result:
   - Client sees `Recv failure: Connection reset by peer`.
   - Device panics (`StoreProhibited`) and reboots.
@@ -17,7 +17,7 @@ _Target: ESP32-S3 aggregator (`192.168.120.191`)
 
 ### B) POST requests without `Content-Length` do not crash (clean 411)
 - Reproducible with:
-  - `curl -v -X POST -u ESPadmin:ESppass100 http://192.168.120.191/api/system/reset-satellites`
+  - `curl -v -X POST -u -u <user>:<password> http://192.168.120.191/api/system/reset-satellites`
 - Result:
   - `HTTP/1.1 411 Length Required`
   - ESPHome log warning: `Content length is required for post: /api/system/reset-satellites`
@@ -35,13 +35,13 @@ _Target: ESP32-S3 aggregator (`192.168.120.191`)
 
 ## 2) What tests have been done
 
-1. **Board-profile sdkconfig changes and rebuild**
-   - S3 profile updated to:
+1. **Board-profile sdkconfig changes and rebuild (local incident-build only, not merged at time of this report)**
+   - For a local S3 test build, the board profile was updated to:
      - `CONFIG_LWIP_MAX_SOCKETS: "24"`
      - `CONFIG_HTTPD_STACK_SIZE: "16384"`
-   - C3 and WROOM profiles updated to include `CONFIG_HTTPD_STACK_SIZE: "8192"`.
-   - Regenerated YAML using `python3 scripts/render_sensor_config.py --write`.
-   - Verified generated S3 YAML contains expected sdkconfig options.
+   - For local C3 and WROOM test builds, the profiles were updated to include `CONFIG_HTTPD_STACK_SIZE: "8192"`.
+   - Locally regenerated YAML using `python3 scripts/render_sensor_config.py --write`.
+   - Verified the locally generated S3 YAML contains the expected sdkconfig options.
 
 2. **Controlled POST request-shape tests**
    - `POST + -d ''` (Content-Length: 0) to `/api/system/reset-satellites` causes crash.
@@ -126,13 +126,13 @@ Apply to:
 
 Run the following matrix after implementing Fix A + Fix B:
 
-1. `curl -v -X POST -d '' -u ESPadmin:ESppass100 http://192.168.120.191/api/system/reset-satellites`
+1. `curl -v -X POST -d '' -u <user>:<password> http://192.168.120.191/api/system/reset-satellites`
    - Expected: no crash; controlled HTTP response.
 
-2. `curl -v -X POST -u ESPadmin:ESppass100 http://192.168.120.191/api/system/reset-satellites`
+2. `curl -v -X POST -u <user>:<password> http://192.168.120.191/api/system/reset-satellites`
    - Expected: 411 or controlled error; no crash.
 
-3. `curl -v -X POST -d '{}' -H 'Content-Type: application/json' -u ESPadmin:ESppass100 http://192.168.120.191/api/reboot`
+3. `curl -v -X POST -d '{}' -H 'Content-Type: application/json' -u <user>:<password> http://192.168.120.191/api/reboot`
    - Expected: intentional reboot only; no panic pre-reboot.
 
 4. Dashboard open + reboot button
