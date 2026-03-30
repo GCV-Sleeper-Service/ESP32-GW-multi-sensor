@@ -17,7 +17,7 @@ _Target: ESP32-S3 aggregator (`192.168.120.191`)_
 
 ### B) POST requests without `Content-Length` do not crash (clean 411)
 - Reproducible with:
-  - `curl -v -X POST -u ESPadmin:ESppass100 http://192.168.120.191/api/system/reset-satellites`
+  - `curl -v -X POST -u -u <user>:<password> http://192.168.120.191/api/system/reset-satellites`
 - Result:
   - `HTTP/1.1 411 Length Required`
   - ESPHome log warning: `Content length is required for post: /api/system/reset-satellites`
@@ -126,13 +126,13 @@ Apply to:
 
 Run the following matrix after implementing Fix A + Fix B:
 
-1. `curl -v -X POST -d '' -u ESPadmin:ESppass100 http://192.168.120.191/api/system/reset-satellites`
+1. `curl -v -X POST -d '' -u <user>:<password> http://192.168.120.191/api/system/reset-satellites`
    - Expected: no crash; controlled HTTP response.
 
-2. `curl -v -X POST -u ESPadmin:ESppass100 http://192.168.120.191/api/system/reset-satellites`
+2. `curl -v -X POST -u <user>:<password> http://192.168.120.191/api/system/reset-satellites`
    - Expected: 411 or controlled error; no crash.
 
-3. `curl -v -X POST -d '{}' -H 'Content-Type: application/json' -u ESPadmin:ESppass100 http://192.168.120.191/api/reboot`
+3. `curl -v -X POST -d '{}' -H 'Content-Type: application/json' -u <user>:<password> http://192.168.120.191/api/reboot`
    - Expected: intentional reboot only; no panic pre-reboot.
 
 4. Dashboard open + reboot button
