@@ -9,7 +9,7 @@ _Target: ESP32-S3 aggregator (`192.168.120.191`)_
 
 ### A) POST requests with `Content-Length: 0` can crash the board
 - Reproducible with:
-  - `curl -v -X POST -d '' -u ESPadmin:ESppass100 http://192.168.120.191/api/system/reset-satellites`
+  - `curl -v -X POST -d '' -u <user>:<password> http://192.168.120.191/api/system/reset-satellites`
 - Result:
   - Client sees `Recv failure: Connection reset by peer`.
   - Device panics (`StoreProhibited`) and reboots.
