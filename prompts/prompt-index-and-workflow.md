@@ -1,7 +1,7 @@
 # Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-03-28 — v7.5.7.0 complete, Phase D prompts linked, LESSON-OPS-086/087/088_
+_Last updated: 2026-03-29 — v7.6.0.0 complete (Phase D Step 0), v7.6.0.1 prompt updated, Rules 36–37 added, LESSON-OPS-090–096_
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -217,7 +217,7 @@ All steps shipped. No prompts needed.
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
-| v7.6.0.0 | NVS satellite persistence layer | `prompts/phaseD/v7.6.0.0-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.0.0 | NVS satellite persistence layer | `prompts/phaseD/v7.6.0.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-29 |
 | v7.6.0.1 | POST /api/aggregator/add-satellite | `prompts/phaseD/v7.6.0.1-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.0.2 | DELETE /api/aggregator/satellite/{id} | `prompts/phaseD/v7.6.0.2-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.0.3 | POST /api/aggregator/test-satellite | `prompts/phaseD/v7.6.0.3-implementation-instructions-for-coding-agent.md` | Pending |
@@ -368,6 +368,23 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-03-29 — v7.6.0.0 Complete (Phase D Step 0)
+
+**Context:** v7.6.0.0 merged (PR #98 + review fixes PR #99). NVS satellite persistence layer operational. Device testing fix applied to all Phase D prompts.
+
+**What was updated and why:**
+
+| Change | Why |
+|--------|-----|
+| **v7.6.0.0 marked complete** | PR #98 merged with review fixes from PR #99 |
+| **v7.6.0.1 prompt updated** | Back-ported 5 findings from v7.6.0.0 review (mutex, NVS seeding, key buffers, auth pattern, erase semantics) — Section 3a added |
+| **All Phase D device testing sections fixed** | All 6 prompts referenced wrong YAML (`esp32-c3-multi-sensor.yaml` instead of `esp32-s3-devkitc1-n16r8-gw.yaml`) — LESSON-OPS-090 |
+| **Regeneration pipeline completed** | `minify-dashboard.sh` added to all pipeline references — LESSON-OPS-091 |
+| **Critical Rules 36–37 added** | Rule 36 (correct YAML path), Rule 37 (full pipeline with minification) |
+| **`render_sensor_config.py` enhancement** | Prints build target/commands after `--write` to prevent YAML path confusion |
+| **LESSON-OPS-090–096** | 7 new lessons from v7.6.0.0 execution and review |
+| **`Docs/aggregator-setup.md` rewritten Section 7** | Added "Which YAML Do I Compile?" decision table, complete 5-step pipeline |
 
 ### 2026-03-28 — Post-v7.5.7.0 Completion and Phase D Readiness
 

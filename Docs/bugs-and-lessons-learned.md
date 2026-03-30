@@ -2436,6 +2436,54 @@ Any prompt or documentation that references "the regeneration pipeline" must inc
 
 ---
 
+## LESSON-OPS-092 — NVS key buffer sizing must be explicit in prompts (v7.6.0.0)
+
+**Context:** v7.6.0.0 prompt specified the NVS key scheme (`s{i}_id`, `s{i}_name`, etc.) but not buffer sizes for key construction variables. The coding agent chose `char key_*[8]`, which overflows for satellite indices ≥ 10 (e.g. `s10_name` = 8 chars + NUL = 9 bytes).
+
+**Fix (PR #99):** All NVS key buffers changed to `char key_*[16]`. NVS max key length is 15 chars + NUL = 16 bytes.
+
+**Rule:** When a prompt specifies an indexed NVS key scheme, it must explicitly state the buffer size for key construction. Use `char key_*[16]` for all NVS key buffers and state this in prompt code blocks.
+
+---
+
+## LESSON-OPS-093 — Management endpoints must have explicit auth requirement in prompt (v7.6.0.0)
+
+**Context:** v7.6.0.0 prompt added `POST /api/system/reset-satellites` without specifying that it must call `authenticate_management_()`. The agent implemented the endpoint without authentication. The Copilot reviewer caught it during PR review; fixed in PR #99.
+
+**Root cause:** Security conventions from neighbouring code are not inherited by the coding agent. Every other management endpoint in the codebase calls `authenticate_management_()`, but the agent did not infer this pattern.
+
+**Rule:** Every prompt that adds a destructive or persistent-state-mutating endpoint must explicitly state: "This endpoint MUST call `authenticate_management_()` as the first action." For non-destructive endpoints (e.g. add-satellite), the prompt must explicitly state whether auth is required or not, with a rationale.
+
+---
+
+## LESSON-OPS-094 — NVS seeding on first boot must be explicit in prompt (v7.6.0.0)
+
+**Context:** v7.6.0.0 prompt said "if NVS count key is absent, populate from compile-time arrays" but did not say "and write them to NVS." The agent loaded compile-time defaults into the cache but did not persist them to NVS. The first runtime mutation (add/remove) would write only the delta; on reboot, all compile-time defaults were lost.
+
+**Fix (PR #99):** `init_satellite_caches_()` now calls `save_satellites_to_nvs_()` after loading compile-time defaults as fallback.
+
+**Rule:** When NVS is the single source of truth for runtime data that starts from compile-time defaults, prompts must explicitly state: "After loading compile-time defaults into the cache, call `save_satellites_to_nvs_()` to seed NVS. This prevents the first runtime mutation from orphaning the defaults."
+
+---
+
+## LESSON-OPS-095 — All-or-nothing NVS array load must be explicit in prompt (v7.6.0.0)
+
+**Context:** v7.6.0.0 prompt said `load_satellites_from_nvs_()` "returns 0 if NVS is empty or corrupt" but did not define what "corrupt" means for partial reads within a counted array. The agent used `break` on per-entry NVS read failure, silently truncating the satellite list at the first bad entry.
+
+**Fix (PR #99):** On any per-entry read failure, the function now closes the NVS handle and returns 0, triggering full fallback to compile-time defaults.
+
+**Rule:** Prompts for NVS array loading must specify: "On any per-entry read failure (`nvs_get_str`, `nvs_get_u16` returning non-`ESP_OK`), close the NVS handle and return 0. Partial loads are worse than no load — they create invisible topology shrink."
+
+---
+
+## LESSON-OPS-096 — Boot-time init vs runtime mutation mutex ordering (v7.6.0.0)
+
+**Context:** `init_satellite_caches_()` in v7.6.0.0 runs without acquiring `s_cache_mutex`. The ESPHome startup sequence guarantees `aggregator_poll_task()` init completes before the web server accepts connections, so the current implementation is safe. However, the absence of a mutex creates technical debt if startup ordering ever changes.
+
+**Status:** Accepted as technical debt for v7.6.0.0. For v7.6.0.1+, any code added during init must be verified to run before web handlers can fire. Future consideration: wrap init in the same mutex for defense-in-depth once runtime mutators are active.
+
+---
+
 
 
 Any significant dashboard or data-path modification should re-check:
