@@ -35,13 +35,13 @@ _Target: ESP32-S3 aggregator (`192.168.120.191`)_
 
 ## 2) What tests have been done
 
-1. **Board-profile sdkconfig changes and rebuild**
-   - S3 profile updated to:
+1. **Board-profile sdkconfig changes and rebuild (local incident-build only, not merged at time of this report)**
+   - For a local S3 test build, the board profile was updated to:
      - `CONFIG_LWIP_MAX_SOCKETS: "24"`
      - `CONFIG_HTTPD_STACK_SIZE: "16384"`
-   - C3 and WROOM profiles updated to include `CONFIG_HTTPD_STACK_SIZE: "8192"`.
-   - Regenerated YAML using `python3 scripts/render_sensor_config.py --write`.
-   - Verified generated S3 YAML contains expected sdkconfig options.
+   - For local C3 and WROOM test builds, the profiles were updated to include `CONFIG_HTTPD_STACK_SIZE: "8192"`.
+   - Locally regenerated YAML using `python3 scripts/render_sensor_config.py --write`.
+   - Verified the locally generated S3 YAML contains the expected sdkconfig options.
 
 2. **Controlled POST request-shape tests**
    - `POST + -d ''` (Content-Length: 0) to `/api/system/reset-satellites` causes crash.
