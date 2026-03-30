@@ -12,7 +12,8 @@ framework:
   advanced:
     minimum_chip_revision: "3.1"
 sdkconfig_options:
-  CONFIG_LWIP_MAX_SOCKETS: "16"
+  CONFIG_LWIP_MAX_SOCKETS: "18"
+  CONFIG_HTTPD_STACK_SIZE: "8192"
 capabilities:
   ble: true
   psram: false

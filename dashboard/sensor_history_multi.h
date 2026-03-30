@@ -1897,6 +1897,27 @@ class HistoryWebHandler : public AsyncWebHandler {
         mgmt_password_(std::move(password)),
         firmware_version_(std::move(version)) {}
 
+  bool is_management_post_route_(const char *p) const {
+    if (strcmp(p, "/api/reboot") == 0) return true;
+    if (strcmp(p, "/api/delete-data") == 0) return true;
+#if AGGREGATOR_ENABLED
+    if (strcmp(p, "/api/system/reset-satellites") == 0) return true;
+    if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) return true;
+    if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) return true;
+#endif
+    return false;
+  }
+
+  bool is_post_or_options_route_(const char *p) const {
+    if (is_management_post_route_(p)) return true;
+    if (strcmp(p, "/api/import/begin") == 0) return true;
+    if (strncmp(p, "/api/import/begin/single/", 25) == 0) return true;
+    if (strncmp(p, "/api/import/d/", 14) == 0) return true;
+    if (strncmp(p, "/api/import/w/", 14) == 0) return true;
+    if (strcmp(p, "/api/import/finish") == 0) return true;
+    return false;
+  }
+
   bool canHandle(AsyncWebServerRequest *request) const override {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     auto url = request->url_to(url_buf);
@@ -1923,20 +1944,12 @@ class HistoryWebHandler : public AsyncWebHandler {
       return false;
     }
 
-    if (request->method() == HTTP_POST || request->method() == HTTP_OPTIONS) {
-      if (strcmp(p, "/api/reboot") == 0) return true;
-      if (strcmp(p, "/api/delete-data") == 0) return true;
-      if (strcmp(p, "/api/import/begin") == 0) return true;
-      if (strncmp(p, "/api/import/begin/single/", 25) == 0) return true;
-      if (strncmp(p, "/api/import/d/", 14) == 0) return true;
-      if (strncmp(p, "/api/import/w/", 14) == 0) return true;
-      if (strcmp(p, "/api/import/finish") == 0) return true;
-#if AGGREGATOR_ENABLED
-      if (strcmp(p, "/api/system/reset-satellites") == 0) return true;
-      if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) return true;
-      if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) return true;
-#endif
-      return false;
+    if (request->method() == HTTP_OPTIONS) {
+      return is_post_or_options_route_(p);
+    }
+
+    if (request->method() == HTTP_POST) {
+      return is_post_or_options_route_(p);
     }
 
 #if AGGREGATOR_ENABLED
@@ -1964,6 +1977,10 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
 
     if (request->method() == HTTP_POST) {
+      if (is_management_post_route_(p) && request->contentLength() == 0) {
+        send_json_error_(request, 411, "Content-Length is required for management POST");
+        return;
+      }
       if (strcmp(p, "/api/reboot") == 0) {
         handle_reboot_(request);
         return;
@@ -3487,6 +3504,7 @@ class HistoryWebHandler : public AsyncWebHandler {
   // ── Stubbed management endpoints (v7.5.5.3) — reserved for v7.6 runtime mgmt ──
   // Returns 501 to signal "planned but not yet implemented".
   void handle_aggregator_stub_501_(AsyncWebServerRequest *request) const {
+    if (!authenticate_management_(request)) return;
     auto *resp = request->beginResponse(501, "application/json",
         "{\"error\":\"not implemented\","
         "\"message\":\"Runtime satellite management is planned for v7.6\"}");
@@ -3542,11 +3560,13 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
     runtime_satellite_count = MAX_SATELLITES;
 
-    // 4. Persist defaults to NVS so NVS is deterministic after reset
+    AGG_UNLOCK();
+
+    // 4. Persist defaults to NVS after releasing AGG_LOCK so flash I/O does not
+    // block concurrent readers/writers on the shared cache mutex.
     if (!save_satellites_to_nvs_()) {
       ESP_LOGW(TAG_AGG, "NVS agg_sats: failed to persist defaults after reset (non-fatal)");
     }
-    AGG_UNLOCK();
 
     ESP_LOGI(TAG_AGG, "Factory reset: %d compile-time satellites restored", MAX_SATELLITES);
 
