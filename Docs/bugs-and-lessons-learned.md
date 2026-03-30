@@ -15,7 +15,7 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 **Root cause:** Request-shape mismatch against ESPHome IDF HTTP behavior. Requests without Content-Length are rejected safely with 411, but accepted zero-length POSTs can enter an unstable path before custom handler execution. This was amplified by dashboard POST calls that omitted explicit body/content-type.
 
-**Mitigation:** (1) Dashboard POST requests now send `body: '{}'` and `Content-Type: application/json` for management/import endpoints. (2) `HistoryWebHandler::canHandle()` now separates `HTTP_OPTIONS` from `HTTP_POST` and rejects zero-length POST route acceptance only for management routes, preserving URL-bodyless import compatibility.
+**Mitigation:** (1) Dashboard POST requests now send `body: '{}'` and `Content-Type: application/json` for management/import endpoints. (2) `HistoryWebHandler::canHandle()` now separates `HTTP_OPTIONS` from `HTTP_POST` for management routes, and `HistoryWebHandler::handleRequest()` enforces a zero-length POST guard (`request->contentLength() == 0`) for those routes, preserving URL-bodyless import compatibility.
 
 **Prevention:** Enforce request-shape contracts in frontend code and add firmware-side defensive routing guards. Include zero-length POST negative tests in release validation.
 
