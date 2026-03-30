@@ -3,6 +3,21 @@
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ---
+## [v7.6.0.1] — 2026-03-30 — httpd Stack Overflow Fix (BUG-049)
+
+### Bug Fixes
+
+- **BUG-049: httpd task stack overflow (aggregator boot loop):** The ESP32-S3 aggregator (`agg-s3-16m-1`) entered an infinite reboot loop after upgrading to v7.6.0.0. The root cause was the default 4096-byte httpd task stack being exhausted by the aggregator overlay's deep call chains: `handleRequest()` → `handle_aggregator_gateways_()` / `handle_aggregator_live_()` building large `std::string` responses, plus `authenticate_management_()` → `extract_basic_auth_()` → `base64_decode_()` with `std::string` temporaries. Added `CONFIG_HTTPD_STACK_SIZE: "8192"` to `sdkconfig_options` in `firmware/esp32-c3-multi-sensor.yaml`, doubling the httpd stack from 4KB to 8KB. Cost: ~4KB additional RAM.
+
+- **BUG-049: Missing Authorization header crash (early-return optimization):** `authenticate_management_()` previously checked lockout timestamps and allocated `std::string` temporaries before checking for the `Authorization` header. Requests from browsers (preflight), health probes, or any unauthenticated client would reach `extract_basic_auth_()` and trigger the full base64 decode path (with `std::string` temporaries) before returning 401 — adding unnecessary stack pressure at the worst possible moment. Added a fast-path check at the top of `authenticate_management_()` that returns 401 immediately when no `Authorization` header is present, before any lockout checks or string allocations. This significantly reduces stack usage for the common "no auth" case.
+
+### Architecture Notes
+
+- Minor behaviour change: during an active auth lockout window, requests missing an `Authorization` header now return **401** (missing credentials) instead of **429**. This is more accurate for unauthenticated clients; authenticated failed-attempt lockout responses remain 429.
+- The board was in a boot loop and could not be recovered via OTA. After this PR is compiled, the fix **must be flashed via USB serial** (`esphome run --device /dev/ttyUSB0`).
+- Serial crash signature before fix: `***ERROR*** A stack overflow in task httpd` and `Guru Meditation Error: Core 1 panic'ed (LoadProhibited)` on POST to `/api/system/reset-satellites` without credentials.
+
+---
 ## [v7.6.0.0] — 2026-03-29 — NVS Satellite Persistence Layer (Phase D Step 0)
 
 ### New Features

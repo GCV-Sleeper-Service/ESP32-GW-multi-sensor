@@ -89,6 +89,14 @@ esphome:
 #   tab doesn't trigger ENFILE (httpd_accept_conn error 23) and crash.
 #   Cost: ~600 bytes of lwIP RAM per extra socket.
 #
+# httpd task stack (CONFIG_HTTPD_STACK_SIZE):
+#   Default 4096 bytes is insufficient for the aggregator overlay.  The
+#   handleRequest() → handle_aggregator_gateways_/live_() call chains build
+#   large std::string responses plus authenticate_management_() →
+#   extract_basic_auth_() → base64_decode_() with std::string temporaries.
+#   8192 bytes provides headroom for the deepest call paths.
+#   Cost: ~4KB additional RAM (one-time, for the httpd task stack).
+#
 # NOTE: the history handler (sensor_history_multi.h) reads up to 1080
 # NVS blobs synchronously per /history/* request (PERSIST_SLOTS = 45d×24).
 # This blocks the async_tcp task for ~0.5–2 s and causes 300 ms+ component
@@ -102,7 +110,8 @@ esp32:
   framework:
     type: esp-idf
     sdkconfig_options:
-      CONFIG_LWIP_MAX_SOCKETS: "16"
+      CONFIG_LWIP_MAX_SOCKETS: "24"
+      CONFIG_HTTPD_STACK_SIZE: "8192"
 
 logger:
   level: INFO
