@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.6.0.0.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.6.0.1.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -2125,6 +2125,14 @@ class HistoryWebHandler : public AsyncWebHandler {
   }
 
   bool authenticate_management_(AsyncWebServerRequest *request) const {
+    // Fast-path: reject requests with no Authorization header before
+    // any string allocation or lockout checks to minimize httpd stack usage.
+    auto auth_header = request->get_header("Authorization");
+    if (!auth_header.has_value()) {
+      send_json_error_(request, 401, "Management authentication required");
+      return false;
+    }
+
     int64_t now = now_ms_();
     if (lockout_until_ms_ > now) {
       uint32_t retry_after = static_cast<uint32_t>((lockout_until_ms_ - now + 999) / 1000);
