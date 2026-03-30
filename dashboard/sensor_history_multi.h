@@ -1978,7 +1978,7 @@ class HistoryWebHandler : public AsyncWebHandler {
 
     if (request->method() == HTTP_POST) {
       if (is_management_post_route_(p) && request->contentLength() == 0) {
-        send_json_error_(request, 411, "Content-Length is required for management POST");
+        send_json_error_(request, 400, "Non-empty body required for management POST");
         return;
       }
       if (strcmp(p, "/api/reboot") == 0) {
@@ -3560,13 +3560,11 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
     runtime_satellite_count = MAX_SATELLITES;
 
-    AGG_UNLOCK();
-
-    // 4. Persist defaults to NVS after releasing AGG_LOCK so flash I/O does not
-    // block concurrent readers/writers on the shared cache mutex.
+    // 4. Persist defaults to NVS so NVS is deterministic after reset
     if (!save_satellites_to_nvs_()) {
       ESP_LOGW(TAG_AGG, "NVS agg_sats: failed to persist defaults after reset (non-fatal)");
     }
+    AGG_UNLOCK();
 
     ESP_LOGI(TAG_AGG, "Factory reset: %d compile-time satellites restored", MAX_SATELLITES);
 
