@@ -13,7 +13,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ### Architecture Notes
 
-- Both fixes are non-behavioural: authenticated endpoints still return 401/429 as before; unauthenticated endpoints are unaffected.
+- Minor behaviour change: during an active auth lockout window, requests missing an `Authorization` header now return **401** (missing credentials) instead of **429**. This is more accurate for unauthenticated clients; authenticated failed-attempt lockout responses remain 429.
 - The board was in a boot loop and could not be recovered via OTA. After this PR is compiled, the fix **must be flashed via USB serial** (`esphome run --device /dev/ttyUSB0`).
 - Serial crash signature before fix: `***ERROR*** A stack overflow in task httpd` and `Guru Meditation Error: Core 1 panic'ed (LoadProhibited)` on POST to `/api/system/reset-satellites` without credentials.
 

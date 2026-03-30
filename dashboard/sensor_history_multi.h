@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.6.0.1.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.6.0.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -2106,12 +2106,10 @@ class HistoryWebHandler : public AsyncWebHandler {
     request->send(resp);
   }
 
-  bool extract_basic_auth_(AsyncWebServerRequest *request,
+  bool extract_basic_auth_(const std::string &auth_header,
                            std::string *username,
                            std::string *password) const {
-    auto header = request->get_header("Authorization");
-    if (!header.has_value()) return false;
-    std::string auth = trim_copy_(header.value());
+    std::string auth = trim_copy_(auth_header);
     if (auth.size() < 6) return false;
     if (!(auth.rfind("Basic ", 0) == 0 || auth.rfind("basic ", 0) == 0)) return false;
     std::string encoded = trim_copy_(auth.substr(6));
@@ -2142,7 +2140,7 @@ class HistoryWebHandler : public AsyncWebHandler {
 
     std::string username;
     std::string password;
-    if (!extract_basic_auth_(request, &username, &password)) {
+    if (!extract_basic_auth_(auth_header.value(), &username, &password)) {
       send_json_error_(request, 401, "Management authentication required");
       return false;
     }
