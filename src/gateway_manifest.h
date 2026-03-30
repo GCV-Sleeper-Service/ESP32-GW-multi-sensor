@@ -10,10 +10,10 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
   "source": "active-manifest",
   "version": "v7.6.0.0",
   "gateway": {
-    "id": "agg-s3-16m-1",
-    "name": "S3 Aggregator",
-    "role": "aggregator",
-    "hardware": "ESP32-S3",
+    "id": "gw-main",
+    "name": "Main Gateway",
+    "role": "satellite",
+    "hardware": "ESP32-C3",
     "firmware_version": "v7.6.0.0",
     "api_version": "v2"
   },
