@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-31 — v7.6.0.0 post-merge fixups (BUG-075/076, LESSON-OPS-097–101)._
+_Last updated: 2026-03-31 — v7.6.0.0 post-merge fixups (BUG-075/076, LESSON-OPS-097–102)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -54,13 +54,23 @@ same overflow.
 - `CONFIG_HTTPD_STACK_SIZE: "65536"` → same crash
 - Stopping satellite polling → same crash (race condition ruled out)
 
-**Fix:** Deferred task pattern. `handle_reset_satellites_()` and
-`handle_delete_data_()` now authenticate + send HTTP response immediately +
-spawn a dedicated `xTaskCreate` task (8192-byte stack) that performs all NVS
-work. Pattern mirrors the existing `schedule_reboot_()` implementation.
-`handle_reboot_()` was already correct.
+**Fix (primary):** Local ESPHome component override. The `web_server_idf`
+component is copied into `firmware/local_components/web_server_idf/` and patched
+to set `config.stack_size = 16384` after `HTTPD_DEFAULT_CONFIG()`. Board profiles
+reference this via `external_components`. Managed by
+`scripts/patch-esphome-httpd-stack.sh`; re-run after every ESPHome upgrade.
 
-**Prevention:** See LESSON-OPS-100 and LESSON-OPS-101.
+**Fix (secondary):** Deferred task pattern. `handle_reset_satellites_()` and
+`handle_delete_data_()` authenticate + send HTTP response immediately + spawn a
+dedicated `xTaskCreate` task (8192-byte stack) for NVS work. Even with the
+16 KB httpd stack, NVS operations should not run on the httpd task. Pattern
+mirrors the existing `schedule_reboot_()` implementation.
+
+**Note:** Testing proved that the deferred task pattern alone is NOT sufficient.
+Even the lightest handler (unauthenticated request → `send_json_error_(401)`)
+overflows the 4 KB stack. The component override is mandatory.
+
+**Prevention:** See LESSON-OPS-100, LESSON-OPS-101, and LESSON-OPS-102.
 
 ### BUG-074 — Aggregator manifest buffer truncation produces broken JSON (v7.5.7.0)
 
@@ -74,17 +84,41 @@ work. Pattern mirrors the existing `schedule_reboot_()` implementation.
 
 **Prevention:** LESSON-OPS-085: When embedding fetched content into a composed JSON response, always validate that the content was not truncated before embedding. Buffer-size assumptions are especially dangerous for variable-length content like manifests that grow as sensors are added.
 
-### BUG-070 — Aggregator fixture `manifest.sensors` format mismatch (2026-03-25)
+## BUG-073 — `buildNetworkCard()` XSS via unescaped `target` string (fixed v7.5.6.4)
 
-**Severity:** Test authoring error (caught in development)
-**Introduced in:** v7.5.5.4 initial fixture draft
-**Fixed in:** v7.5.5.4
+### Symptom
 
-**Symptoms:** `renderGatewayDevices()` showed "No device data available" despite fixture containing gateway manifest data.
+The `source.target` field from the manifest (e.g. `"8.8.8.8"`) was inserted into
+the network card HTML without HTML escaping. A malicious manifest could inject
+HTML/script tags via this field.
 
-**Root cause:** The `aggregator-gateways.json` fixture used `"devices": {}` (object format) for the nested gateway manifest, but `renderGatewayDevices()` checks `manifest.sensors` (array). The satellite manifest v2 format uses a `sensors` array, not a `devices` object.
+### Root Cause
 
-**Fix:** Changed `aggregator-gateways.json` fixture to use `"sensors": [...]` array format matching the actual v2 manifest schema.
+`buildNetworkCard()` used `target` directly in the innerHTML string without calling
+`escHtml()`. The `description` in `buildSystemCard()` already used `escHtml()`
+(correct), but `target` in the network card did not.
+
+### Fix (v7.5.6.4)
+
+Changed `'>' + target + '</div>'` to `'>' + escHtml(target) + '</div>'`.
+Mirrored in both `dashboard.js` and `dashboard.html`.
+
+## BUG-072 — `updateNetworkCards()` truthy check on `last_seen` (fixed v7.5.6.4)
+
+### Symptom
+
+When `last_seen` is `0` (epoch 0, valid timestamp), the last-seen display in the
+network card would silently remain as `last: —` instead of showing the timestamp.
+
+### Root Cause
+
+`updateNetworkCards()` used a truthy check: `if (seenEl && devData.last_seen)`.
+A `last_seen` value of `0` is falsy in JavaScript, so the display was not updated.
+
+### Fix (v7.5.6.4)
+
+Changed to strict null check: `if (seenEl && devData.last_seen != null)`.
+Mirrored in both `dashboard.js` and `dashboard.html`.
 
 ### BUG-071 — Aggregator `aggregator-live.json` used JSON string for `live` field (2026-03-25)
 
@@ -98,7 +132,17 @@ work. Pattern mirrors the existing `schedule_reboot_()` implementation.
 
 **Fix:** Changed `aggregator-live.json` fixture to use `"live": { "timestamp": ..., "devices": {...} }` (JSON object, not string).
 
----
+### BUG-070 — Aggregator fixture `manifest.sensors` format mismatch (2026-03-25)
+
+**Severity:** Test authoring error (caught in development)
+**Introduced in:** v7.5.5.4 initial fixture draft
+**Fixed in:** v7.5.5.4
+
+**Symptoms:** `renderGatewayDevices()` showed "No device data available" despite fixture containing gateway manifest data.
+
+**Root cause:** The `aggregator-gateways.json` fixture used `"devices": {}` (object format) for the nested gateway manifest, but `renderGatewayDevices()` checks `manifest.sensors` (array). The satellite manifest v2 format uses a `sensors` array, not a `devices` object.
+
+**Fix:** Changed `aggregator-gateways.json` fixture to use `"sensors": [...]` array format matching the actual v2 manifest schema.
 
 ### BUG-069 — Environmental chart sections visible with no environmental sensors (2026-03-25)
 
@@ -799,6 +843,38 @@ Related: LESSON-OPS-055, LESSON-OPS-056
 
 ---
 
+## BUG-044 — Fixture/test drift after manifest metric expansion
+
+### Symptom
+
+After adding system-device metrics to manifest v2, preflight failed in the
+Playwright manifest check and `render_sensor_config.py --check` reported fixture
+drift. The failures appeared as stale expectations (`['temp','hum']`) and
+out-of-sync baseline fixture manifest content.
+
+### Root Cause
+
+The system-device metric expansion changed the top-level manifest `metrics`
+payload and added `external_push` measurement entries, but test expectations and
+fixture-generation paths still assumed env-only top-level metrics.
+
+### Fix
+
+- Updated fixture generator (`tests/fixtures/generate-fixtures.js`) to emit
+  system metrics and `external_push` measurement mappings.
+- Updated Playwright assertions to validate manifest metrics via
+  `arrayContaining(...)` and to derive expected sensor lists from `/api/manifest`
+  for satellite-mode boot checks.
+- Regenerated baseline + variants via required generators.
+
+### Prevention
+
+Any manifest schema/metrics change must include:
+- fixture generator update,
+- baseline + variant regeneration,
+- Playwright expectation audit for fixed cardinality assumptions.
+
+
 ## BUG-043 — Dashboard request fanout / polling destabilizes ESP32-C3 (CONFIRMED)
 
 **Date:** 2026-03-16 / continued 2026-03-17 / firmware fix 2026-03-17 / dashboard hardening 2026-03-17
@@ -1268,27 +1344,23 @@ The original validation helper silently normalized MAC addresses inside the call
 
 ## Operational Lessons
 
-### LESSON-OPS-098: `sdkconfig_options` must be updated in board profiles, not only templates (2026-03-30)
+### LESSON-OPS-102
 
-For multi-board builds, generated YAMLs inherit `sdkconfig_options` from `firmware/boards/*.yaml`. Updating only a template YAML can appear to fix one local build while leaving other board builds unchanged. Apply socket/stack changes to all relevant board profiles and verify generated outputs before release testing.
+INSERT after the LESSON-OPS-101 block (before LESSON-OPS-097):
+```markdown
+### LESSON-OPS-102: ESPHome httpd stack must be patched via local component override (2026-03-31)
 
-### LESSON-OPS-099: ESPHome IDF httpd only consumes x-www-form-urlencoded POST bodies (2026-03-30)
+Because `CONFIG_HTTPD_STACK_SIZE` is inert (LESSON-OPS-100), the only way to
+increase the httpd task stack is to override ESPHome's `web_server_idf` component
+locally. The script `scripts/patch-esphome-httpd-stack.sh` copies the upstream
+component into `firmware/local_components/web_server_idf/` and patches
+`config.stack_size = 16384` into `AsyncWebServer::begin()`. Board profiles must
+include an `external_components` block pointing to `local_components`. The script
+must be re-run after every ESPHome version upgrade. Use `--check` to verify.
+Codified as Critical Rule 42.
+```
 
-ESPHome's `web_server_idf` component only reads POST body bytes for
-`Content-Type: application/x-www-form-urlencoded` and `multipart/form-data`.
-For `application/json`, it logs "Unsupported content type for POST" and routes
-to the GET handler path without consuming body bytes. Unconsumed bytes corrupt
-socket state when the response is sent. All dashboard POST calls and curl POST
-commands must use `Content-Type: application/x-www-form-urlencoded` with
-`body: 'a=1'`. Codified as Critical Rules 38 and 39.
-
-### LESSON-OPS-100: ESPHome httpd task stack is hardcoded at 4 KB — CONFIG_HTTPD_STACK_SIZE has no effect (2026-03-30)
-
-`HTTPD_DEFAULT_CONFIG()` in ESP-IDF hardcodes `.stack_size = 4096` as a literal.
-ESPHome's `web_server_idf.cpp` never overrides this. `CONFIG_HTTPD_STACK_SIZE` in
-`sdkconfig_options` is completely inert — do not add it to any board profile.
-The only way to get more stack to an HTTP handler is to offload heavy work to a
-separately spawned `xTaskCreate` task. Codified as Critical Rules 40 and 41.
+---
 
 ### LESSON-OPS-101: Deferred task pattern for NVS-heavy HTTP handlers (2026-03-30)
 
@@ -1301,15 +1373,277 @@ This is the pattern already used by `schedule_reboot_()` / `reboot_task_`.
 Minimum task stack for NVS operations: 8192 bytes. Add
 `uxTaskGetStackHighWaterMark()` logging before release to confirm sizing.
 
+---
+
+### LESSON-OPS-100: ESPHome httpd task stack is hardcoded at 4 KB — CONFIG_HTTPD_STACK_SIZE has no effect (2026-03-30)
+
+`HTTPD_DEFAULT_CONFIG()` in ESP-IDF hardcodes `.stack_size = 4096` as a literal.
+ESPHome's `web_server_idf.cpp` never overrides this. `CONFIG_HTTPD_STACK_SIZE` in
+`sdkconfig_options` is completely inert — do not add it to any board profile.
+The only way to get more stack to an HTTP handler is to offload heavy work to a
+separately spawned `xTaskCreate` task. Codified as Critical Rules 40 and 41.
+
+---
+
+### LESSON-OPS-099: ESPHome IDF httpd only consumes x-www-form-urlencoded POST bodies (2026-03-30)
+
+ESPHome's `web_server_idf` component only reads POST body bytes for
+`Content-Type: application/x-www-form-urlencoded` and `multipart/form-data`.
+For `application/json`, it logs "Unsupported content type for POST" and routes
+to the GET handler path without consuming body bytes. Unconsumed bytes corrupt
+socket state when the response is sent. All dashboard POST calls and curl POST
+commands must use `Content-Type: application/x-www-form-urlencoded` with
+`body: 'a=1'`. Codified as Critical Rules 38 and 39.
+
+---
+
+### LESSON-OPS-098: `sdkconfig_options` must be updated in board profiles, not only templates (2026-03-30)
+
+For multi-board builds, generated YAMLs inherit `sdkconfig_options` from `firmware/boards/*.yaml`. Updating only a template YAML can appear to fix one local build while leaving other board builds unchanged. Apply socket/stack changes to all relevant board profiles and verify generated outputs before release testing.
+
+---
+
 ### LESSON-OPS-097: Never commit generated artifacts while operator configs are present (2026-03-30)
 
 When local operator config files (`config/gateway.json`, `config/aggregator.json`) are present, running `render_sensor_config.py --write` can produce environment-specific generated files that diverge from CI defaults. Move operator configs aside before generating commit-bound artifacts to prevent accidental local-state leakage.
+
+---
+
+## LESSON-OPS-096 — Boot-time init vs runtime mutation mutex ordering (v7.6.0.0)
+
+**Context:** `init_satellite_caches_()` in v7.6.0.0 runs without acquiring `s_cache_mutex`. The ESPHome startup sequence guarantees `aggregator_poll_task()` init completes before the web server accepts connections, so the current implementation is safe. However, the absence of a mutex creates technical debt if startup ordering ever changes.
+
+**Status:** Accepted as technical debt for v7.6.0.0. For v7.6.0.1+, any code added during init must be verified to run before web handlers can fire. Future consideration: wrap init in the same mutex for defense-in-depth once runtime mutators are active.
+
+Any significant dashboard or data-path modification should re-check:
+
+- Startup ordering
+- Event binding
+- Theme redraw
+- Chart marker/background/border consistency
+- History/min-max calculations
+- Export All concurrency behavior
+- SSE and polling behavior
+- Import over LAN
+- Import over Cloudflare
+- Browser compatibility across the major test targets
+- Dashboard manifest boot sequence (primary `/api/manifest`, fallback `/sensors.json`, fallback built-in defaults)
+- Both custom dashboard and built-in ESPHome web page diagnostics (Free Heap, Uptime, Loop Time)
+
+---
+
+## LESSON-OPS-095 — All-or-nothing NVS array load must be explicit in prompt (v7.6.0.0)
+
+**Context:** v7.6.0.0 prompt said `load_satellites_from_nvs_()` "returns 0 if NVS is empty or corrupt" but did not define what "corrupt" means for partial reads within a counted array. The agent used `break` on per-entry NVS read failure, silently truncating the satellite list at the first bad entry.
+
+**Fix (PR #99):** On any per-entry read failure, the function now closes the NVS handle and returns 0, triggering full fallback to compile-time defaults.
+
+**Rule:** Prompts for NVS array loading must specify: "On any per-entry read failure (`nvs_get_str`, `nvs_get_u16` returning non-`ESP_OK`), close the NVS handle and return 0. Partial loads are worse than no load — they create invisible topology shrink."
+
+---
+
+## LESSON-OPS-094 — NVS seeding on first boot must be explicit in prompt (v7.6.0.0)
+
+**Context:** v7.6.0.0 prompt said "if NVS count key is absent, populate from compile-time arrays" but did not say "and write them to NVS." The agent loaded compile-time defaults into the cache but did not persist them to NVS. The first runtime mutation (add/remove) would write only the delta; on reboot, all compile-time defaults were lost.
+
+**Fix (PR #99):** `init_satellite_caches_()` now calls `save_satellites_to_nvs_()` after loading compile-time defaults as fallback.
+
+**Rule:** When NVS is the single source of truth for runtime data that starts from compile-time defaults, prompts must explicitly state: "After loading compile-time defaults into the cache, call `save_satellites_to_nvs_()` to seed NVS. This prevents the first runtime mutation from orphaning the defaults."
+
+---
+
+## LESSON-OPS-093 — Management endpoints must have explicit auth requirement in prompt (v7.6.0.0)
+
+**Context:** v7.6.0.0 prompt added `POST /api/system/reset-satellites` without specifying that it must call `authenticate_management_()`. The agent implemented the endpoint without authentication. The Copilot reviewer caught it during PR review; fixed in PR #99.
+
+**Root cause:** Security conventions from neighbouring code are not inherited by the coding agent. Every other management endpoint in the codebase calls `authenticate_management_()`, but the agent did not infer this pattern.
+
+**Rule:** Every prompt that adds a destructive or persistent-state-mutating endpoint must explicitly state: "This endpoint MUST call `authenticate_management_()` as the first action." For non-destructive endpoints (e.g. add-satellite), the prompt must explicitly state whether auth is required or not, with a rationale.
+
+---
+
+## LESSON-OPS-092 — NVS key buffer sizing must be explicit in prompts (v7.6.0.0)
+
+**Context:** v7.6.0.0 prompt specified the NVS key scheme (`s{i}_id`, `s{i}_name`, etc.) but not buffer sizes for key construction variables. The coding agent chose `char key_*[8]`, which overflows for satellite indices ≥ 10 (e.g. `s10_name` = 8 chars + NUL = 9 bytes).
+
+**Fix (PR #99):** All NVS key buffers changed to `char key_*[16]`. NVS max key length is 15 chars + NUL = 16 bytes.
+
+**Rule:** When a prompt specifies an indexed NVS key scheme, it must explicitly state the buffer size for key construction. Use `char key_*[16]` for all NVS key buffers and state this in prompt code blocks.
+
+---
+
+## LESSON-OPS-091 — Regeneration pipeline must include dashboard minification before header generation (v7.6.0.0)
+
+**Context:** The regeneration pipeline documented in prompts and `Docs/aggregator-setup.md` listed four steps: `render_sensor_config.py --write`, `generate-fixtures.js`, `generate-header.sh`, and `render_sensor_config.py --check`. The `minify-dashboard.sh` step was absent from all references.
+
+**Root cause:** `generate-header.sh` auto-detects `dashboard.min.html` and uses it if present, falling back to unminified `dashboard.html` otherwise. This "silent fallback" masked the missing step — the build succeeds either way, but produces a larger firmware payload without minification. More dangerously, if a stale `dashboard.min.html` exists from a previous run, the header embeds the outdated minified copy instead of the current source.
+
+**Fix:** Added `bash scripts/minify-dashboard.sh` as Step 3 in the regeneration pipeline (after fixture generation, before header generation) in `Docs/aggregator-setup.md` Sections 7.1 and 15, and in all Phase D prompt device testing sections.
+
+**Rule:** The canonical regeneration pipeline is five steps in this exact order:
+
+1. `python3 scripts/render_sensor_config.py --write`
+2. `node tests/fixtures/generate-fixtures.js`
+3. `bash scripts/minify-dashboard.sh`
+4. `bash scripts/generate-header.sh`
+5. `python3 scripts/render_sensor_config.py --check`
+
+Any prompt or documentation that references "the regeneration pipeline" must include all five steps. Omitting the minification step risks stale embedded dashboard content.
+
+**Critical Rule 37 added.**
+
+---
+
+## LESSON-OPS-090 — Device testing sections must reference the correct generated YAML for the target board (v7.6.0.0)
+
+**Context:** All six Phase D prompt device testing sections (v7.6.0.0 through v7.6.0.5) contained `esphome clean firmware/esp32-c3-multi-sensor.yaml` and `esphome run firmware/esp32-c3-multi-sensor.yaml` in the aggregator build instructions. This is the committed C3 satellite template — it does not produce aggregator firmware and targets the wrong chip architecture for S3 boards.
+
+**Root cause:** The prompt author wrote the device testing section by copying the C3 compile command (the only committed YAML) without accounting for the fact that non-C3 boards use **generated** YAML files that only exist after `render_sensor_config.py --write`. The generated S3 YAML is `firmware/esp32-s3-devkitc1-n16r8-gw.yaml` — it is gitignored and not visible in the repo file listing.
+
+**Impact:** The operator compiled C3 satellite firmware and flashed it to the S3 aggregator. The device booted as a satellite with all local sensors displayed instead of as an aggregator with the Gateways card. Device testing could not proceed.
+
+**Fix:** Corrected all Phase D prompts to reference `firmware/esp32-s3-devkitc1-n16r8-gw.yaml` for aggregator builds. Added Section 7.2 "Which YAML Do I Compile?" decision table to `Docs/aggregator-setup.md`.
+
+**Rule:** Prompt device testing sections must use the exact YAML path that the generator produces for the target board. For non-C3 boards, this is always a **generated** gitignored file — never the committed C3 template. The correct path can be determined from the `get_yaml_output_path()` function in `render_sensor_config.py` or from the output of `render_sensor_config.py --write`.
+
+**Critical Rule 36 added.**
+
+---
+
+## LESSON-OPS-089 — Preflight checks must be environment-aware
+
+**Context:** Historically (before PR #96), `scripts/preflight.sh` hardcoded `check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"sensor_count": 5'`. This was correct for the C3 satellite profile (3 ThermoPro + wan_ping + nas01 = 5 sensors) but broke when `config/gateway.json` pointed to the S3 aggregator sensor file (`config/sensors-agg-s3-16m-1.json`) which has only 1 sensor (wan_ping).
+
+**Root cause:** The preflight check assumed all deployments had the same sensor count. When multi-board support was added (v7.5.5.0), the check was not updated to handle board-specific sensor manifests.
+
+**Fix (PR #96):** Replaced the hardcoded value with a Python snippet that uses `sensor_manifest_lib.load_gateway_config()` and `load_manifest()` to dynamically compute the expected count — the exact same resolution logic as `render_sensor_config.py`. Errors fail loudly (no silent fallback). The `# Do NOT re-hardcode` comment guards against regression.
+
+**Rule:** Preflight validation checks that depend on configuration-derived values (sensor count, device names, gateway metadata) must compute expected values dynamically using the same library functions as the generators. Never hardcode values that vary by board profile, sensor manifest, or deployment configuration.
+
+---
+
+## LESSON-OPS-088 — Mandatory deliverable tables should be templated with placeholder rows (v7.5.7.0)
+
+**Version:** v7.5.7.0
+**Source:** PR #93 — prompt required Instruction Compliance Output table (§8b) but the agent omitted it from the session log entirely.
+
+When a prompt requires a specific table as a deliverable (e.g., Instruction Compliance Output), include a template with placeholder rows in the session log section. An empty template is harder to overlook than a prose instruction to "provide a table."
+
+**Rule:** The session log section of any prompt that requires a compliance table must include a template with at least one placeholder row, not just the table header.
+
+---
+
+## LESSON-OPS-087 — Prompt-provided code blocks must apply the same constant policy as the target codebase (v7.5.7.0)
+
+**Version:** v7.5.7.0
+**Source:** PR #93 — prompt introduced C++ named constant `AGG_MANIFEST_BUF_SIZE` but provided Python code with bare literal `8192`.
+
+When a prompt introduces a named constant in one language (C++ `AGG_MANIFEST_BUF_SIZE`), the corresponding value in prompt-provided code for another language (Python) should also use a named constant, not a bare literal. The agent copies prompt code faithfully — including inconsistencies. The Gemini reviewer caught the mismatch and it was fixed in the fixup commit by extracting `SATELLITE_CAP_PSRAM = 8` and `AGG_MANIFEST_BUF_SIZE_BYTES = 8192` as module-level constants.
+
+**Rule:** Before publishing a prompt that contains code blocks in multiple languages, verify that each named constant defined in language A has a corresponding named constant (not a literal) in language B.
+
+---
+
+## LESSON-OPS-086 — Prompt Do-NOT lists must exclude expected regeneration side-effects (v7.5.7.0)
+
+**Version:** v7.5.7.0
+**Source:** PR #93 — Do-NOT list said "no dashboard JS/HTML changes" but `bump-version.sh` necessarily updates `App.version` in those files.
+
+When a prompt says "Do NOT change file X" but also requires a version bump or regeneration pipeline that necessarily touches file X, the prompt contains an internal contradiction. The agent correctly ran the bump (version churn is expected), but the Do-NOT list was technically violated.
+
+**Rule:** Future prompts should qualify: "No *functional* changes to file X; version bump and regeneration churn is expected and does not violate this rule."
+
+---
 
 ### LESSON-OPS-085: Validate fetched content wasn't truncated before embedding in composed JSON responses (2026-03-28)
 
 When composing a JSON response from cached or proxied upstream payloads, never assume a fixed-size fetch buffer captured a complete document. If `fetch_to_buffer()` (or equivalent) reaches `buf_size - 1`, treat the payload as likely truncated and do not embed it verbatim.
 
 For aggregator manifests specifically, guard with `manifest_len >= AGG_MANIFEST_BUF_SIZE - 1` and emit `"manifest":null` plus a warning log. This preserves valid top-level JSON and prevents one oversized satellite payload from breaking the entire `/api/aggregator/gateways` response.
+
+---
+
+## LESSON-OPS-083 — Playwright test signatures must not include unused fixture arguments (v7.5.6.4)
+
+**Version:** v7.5.6.4
+**Source:** PR #87 review comment (Gemini r2997248086) — test `/api/v2/live returns system device data` destructured `{ page, request }` but only used `request`.
+
+When writing a Playwright test that only uses the `request` fixture (e.g., a pure API test), do not include `page` in the destructured argument list. Including `page` forces Playwright to create a browser context even when it is not needed, wasting ~1–2 s per test run.
+
+**Rule:** Every test function signature must destructure only the fixtures it actually uses. Before merging, scan all new tests for unused Playwright fixture arguments.
+
+---
+
+## LESSON-OPS-082 — Fixture composition changes require downstream text audit (v7.5.6.4)
+
+**Version:** v7.5.6.4
+**Source:** PR #87 — mixed fixture gained `nas01` (3 → 4 sensors) but skip-reason strings referencing "3 sensors" remained in multiple locations.
+
+When a prompt changes a fixture's sensor count or composition:
+1. The prompt MUST include an explicit instruction: "After updating the fixture, search all `test.skip()` reason strings in `dashboard.spec.js` for references to the old sensor count and update them."
+2. The prompt MUST also flag any group header comments that describe the fixture by composition.
+
+A fixture change is not complete until all downstream text references to that fixture's old composition are updated.
+
+---
+
+## LESSON-OPS-081 — Mock endpoint prompts must enumerate all firmware validation branches (v7.5.6.4)
+
+**Version:** v7.5.6.4
+**Source:** PR #87 — mock `/api/ingest` required 2 fix commits because the prompt only specified device validation, not metric/val validation.
+
+When a prompt asks the agent to create a mock endpoint for an existing firmware API, the prompt MUST:
+1. Name the firmware function to read (e.g., `handle_api_ingest_()`)
+2. Enumerate all positive and negative validation branches
+3. Specify exact response shapes for success (`{"ok":true}`) and failure (`{"ok":false,"message":"...","status":N}`)
+4. Require one test per branch
+5. Explicitly prohibit stub-level mocking: "Do NOT reduce this mock to a 'device exists → 200' stub"
+
+A mock that only validates device existence is a stub, not a contract-faithful implementation. It hides client-side bugs and causes merge-blocking review comments.
+
+---
+
+## LESSON-OPS-080 — System fixture skip guards (v7.5.6.4)
+
+**Version:** v7.5.6.4
+**Symptom:** After adding the `system` fixture variant (2 env + 1 net + 1 sys = 4 sensors),
+7 existing tests failed because they assumed the 3sensor-specific sensor list
+(`office`, `first_floor`, `outside`) or expected exactly 3 env sensors.
+
+**Skip guards added (v7.5.6.4):**
+- `2. Sensor cards / sensor card headers contain expected sensor names` — 'Outside' absent from system fixture
+- `14. Phase 2 Closure / scenario 1` — 'Outside' name check is 3sensor-specific
+- `14. Phase 2 Closure / scenario 2` — sensors.json fallback count (3) is 3sensor-specific; system has 2 env entries
+- `14. Phase 2 Closure / scenario 4` — `envSensors.length === 3` is 3sensor-specific; system has 2 env sensors
+- `15. Phase 3 Closure / dashboard renders identically` — 'Outside' name check is 3sensor-specific
+- `17. Phase 4 Step 2 / environmental cards have full ThermoPro layout` — `.sensor-card:not(.network-card)` includes system card which lacks `.sensor-env-grid`
+- `manifest.spec.js / dashboard falls back to /sensors.json` — fallback sensor list is 3sensor-specific
+
+**Prevention:** When adding a new fixture variant, always run `FIXTURE_SET=<new> npx playwright test --project=chromium` (full suite, no `--grep`) to discover incompatibilities before merging.
+
+---
+
+### LESSON-OPS-079 — Fixture variants must include all device categories (deferred to v7.5.6.4)
+
+**Version:** v7.5.6.1
+**Symptom:** Fixture variants (3sensor, mixed, 4sensor) include system metrics in the
+top-level `metrics` array but do not include an `external_push` device in `sensors`.
+The system device manifest/measurement/history-stub code paths are only exercised
+by the baseline fixture, not by any Playwright test variant.
+**Root cause:** v7.5.6.1 scope was limited to firmware/manifest side. Test fixture
+variant updates are deferred to v7.5.6.4 (Phase 6 closure).
+**Fix:** v7.5.6.4 must add `nas01` to at least the `mixed` variant sensor list and
+add Playwright assertions for system device presence in manifest + v2/live shape.
+
+---
+
+### LESSON-OPS-078: Keep manifest tests shape-aware, not hard-coded to old metric sets
+
+When categories/metrics are expected to grow over phases, assertions should verify
+required subsets and invariants (e.g., environmental metrics must still exist)
+instead of strict full-array equality to legacy values.
+
+---
 
 ### LESSON-OPS-077: api-status.json fixture requires generator-produced free_heap fields — never manually edit (2026-03-25)
 
@@ -1367,6 +1701,8 @@ both change together.
 **Detection:** Tests 7 and 8 (env + network live values) stay in "—"/waiting state if
 the live field is a string instead of an object.
 
+---
+
 ### LESSON-OPS-076: Aggregator fixture `manifest` block must use `sensors` array (v2 format) (2026-03-25)
 
 **Context:** The v7.5.5.4 prompt example showed `"devices": {}` (object) inside the
@@ -1379,6 +1715,8 @@ v2 manifest format: `"sensors": [{ "id": ..., "name": ..., "category": ... }]`.
 
 **Detection:** "No device data available" displayed in gateway device view despite fixture
 containing manifest data.
+
+---
 
 ### LESSON-OPS-074: Aggregator boot must be a superset of satellite boot, never a fork (2026-03-25)
 
@@ -1403,36 +1741,6 @@ else { /* satellite-only path */ }
 
 Related: BUG-064, BUG-065
 
-### LESSON-OPS-068: Use lwip_*() prefixed functions, not BSD socket aliases, in ESPHome C++ code (2026-03-22)
-
-**Context:** ESPHome defines `namespace esphome::socket` which collides with lwIP's BSD-compatible inline wrappers (`socket()`, `connect()`, `close()` etc.). This is not visible when reading lwIP documentation because the aliases work fine in standalone ESP-IDF projects — the collision only appears inside the ESPHome build environment.
-
-**Rule:** In any C++ code that runs inside ESPHome (headers included via YAML `includes:`), always use the `lwip_*` prefixed function names for socket operations:
-- `lwip_socket()` not `socket()`
-- `lwip_connect()` not `connect()`
-- `lwip_send()` not `send()`
-- `lwip_recv()` not `recv()`
-- `lwip_close()` not `close()`
-- `lwip_setsockopt()` not `setsockopt()`
-- `lwip_getaddrinfo()` not `getaddrinfo()` (already used by PingAdapter)
-- `lwip_freeaddrinfo()` not `freeaddrinfo()` (already used by PingAdapter)
-
-**Applies to:** All current and future code that uses lwIP sockets — aggregator polling, history proxy, any future HTTP client code.
-
-Related: BUG-057, PR #64
-
-### LESSON-OPS-069: Interval-based "due" checks must handle the never-succeeded case (2026-03-23)
-
-**Context:** A common pattern for periodic tasks is `bool due = (last_run == 0) || (now - last_run >= interval)`. The `== 0` clause handles the "first run" case. But if the first run FAILS and `last_run` is never set, the task retries on every loop iteration regardless of the interval — the backoff is dead code.
-
-**Rule:** When a periodic operation fails and the timestamp was never set (still 0), set it to `now` so the interval starts counting — but only after the failure threshold is crossed. Seeding too early (on first failure) prevents legitimate retries during transient conditions like boot-order races. The seeding should be coupled with the state transition (e.g., "declared unreachable"), not with every individual failure. Additionally, interval tracking should use monotonic time (e.g., `esp_timer_get_time()`), not wall-clock time (`::time(nullptr)`), because wall-clock may be 0 before SNTP sync — making any `== 0` sentinel check unreliable. This applies to any pattern where:
-1. A timestamp field starts at 0 (meaning "never done")
-2. The timestamp is only updated on success
-3. A backoff/interval check uses the timestamp
-
-**Applies to:** Aggregator polling task, any future periodic fetch/sync operations.
-
-Related: BUG-058
 
 ### LESSON-OPS-073: LXC USB passthrough requires chmod after every device reconnect (2026-03-23)
 
@@ -1444,6 +1752,8 @@ Related: BUG-058
 
 Related: BUG-061
 
+---
+
 ### LESSON-OPS-072: `esp_get_free_heap_size()` includes PSRAM on boards that have it (2026-03-23)
 
 **Context:** The S3 aggregator reported 8.4 MB free heap via `/api/status`, which is correct (it includes PSRAM) but misleading when compared to C3 values (~70 KB, internal SRAM only). Monitoring dashboards and health checks that threshold on free heap will behave differently across board types.
@@ -1452,6 +1762,8 @@ Related: BUG-061
 
 Related: BUG-062
 
+---
+
 ### LESSON-OPS-071: Module-level imports for optional dependencies must be lazy (2026-03-23)
 
 **Context:** `import yaml` at the top of `sensor_manifest_lib.py` crashed the satellite workflow on systems without PyYAML, even though PyYAML was only needed for the `load_board_profile()` function which satellites never call.
@@ -1459,6 +1771,8 @@ Related: BUG-062
 **Rule:** If a Python module is only needed by one function (e.g., `yaml` for `load_board_profile()`), import it inside that function, not at the top of the file. Top-level imports break all callers of the module, even those that never use the optional dependency. This is especially important in ESPHome containers where pip packages beyond the standard library are not guaranteed.
 
 Related: BUG-060
+
+---
 
 ### LESSON-OPS-070: All ESP32 partition tables must have ota_0 at 0x10000 (2026-03-23)
 
@@ -1492,19 +1806,40 @@ in ESPHome-managed headers against the YAML `includes:` list.
 
 Related: v7.5.5.0 PR #62
 
-### LESSON-OPS-065: CSS for native browser widgets (`<input type=date>`, `<select>`) needs `color-scheme` (2026-03-21)
+---
 
-**Date:** 2026-03-21
+### LESSON-OPS-069: Interval-based "due" checks must handle the never-succeeded case (2026-03-23)
 
-Native HTML form elements like date pickers and select dropdowns are rendered by the browser,
-not by your CSS. Setting `background` and `color` on them changes the input field appearance
-but does NOT change the popup calendar or dropdown list appearance. The `color-scheme: dark`
-CSS property tells the browser to render these native widgets in dark mode.
+**Context:** A common pattern for periodic tasks is `bool due = (last_run == 0) || (now - last_run >= interval)`. The `== 0` clause handles the "first run" case. But if the first run FAILS and `last_run` is never set, the task retries on every loop iteration regardless of the interval — the backoff is dead code.
 
-**Rule:** When building dark-mode UIs, always add `color-scheme: dark` to `<input type=date>`,
-`<select>`, and other native form elements. Add `:root.light` overrides with `color-scheme: light`.
+**Rule:** When a periodic operation fails and the timestamp was never set (still 0), set it to `now` so the interval starts counting — but only after the failure threshold is crossed. Seeding too early (on first failure) prevents legitimate retries during transient conditions like boot-order races. The seeding should be coupled with the state transition (e.g., "declared unreachable"), not with every individual failure. Additionally, interval tracking should use monotonic time (e.g., `esp_timer_get_time()`), not wall-clock time (`::time(nullptr)`), because wall-clock may be 0 before SNTP sync — making any `== 0` sentinel check unreliable. This applies to any pattern where:
+1. A timestamp field starts at 0 (meaning "never done")
+2. The timestamp is only updated on success
+3. A backoff/interval check uses the timestamp
 
-Related: BUG-054
+**Applies to:** Aggregator polling task, any future periodic fetch/sync operations.
+
+Related: BUG-058
+
+---
+
+### LESSON-OPS-068: Use lwip_*() prefixed functions, not BSD socket aliases, in ESPHome C++ code (2026-03-22)
+
+**Context:** ESPHome defines `namespace esphome::socket` which collides with lwIP's BSD-compatible inline wrappers (`socket()`, `connect()`, `close()` etc.). This is not visible when reading lwIP documentation because the aliases work fine in standalone ESP-IDF projects — the collision only appears inside the ESPHome build environment.
+
+**Rule:** In any C++ code that runs inside ESPHome (headers included via YAML `includes:`), always use the `lwip_*` prefixed function names for socket operations:
+- `lwip_socket()` not `socket()`
+- `lwip_connect()` not `connect()`
+- `lwip_send()` not `send()`
+- `lwip_recv()` not `recv()`
+- `lwip_close()` not `close()`
+- `lwip_setsockopt()` not `setsockopt()`
+- `lwip_getaddrinfo()` not `getaddrinfo()` (already used by PingAdapter)
+- `lwip_freeaddrinfo()` not `freeaddrinfo()` (already used by PingAdapter)
+
+**Applies to:** All current and future code that uses lwIP sockets — aggregator polling, history proxy, any future HTTP client code.
+
+Related: BUG-057, PR #64
 
 ---
 
@@ -1522,6 +1857,22 @@ in the chain before generating final outputs. If a tool in the chain is optional
 delete the stale intermediate so downstream scripts fall back to the updated source.
 
 Related: BUG-055
+
+---
+
+### LESSON-OPS-065: CSS for native browser widgets (`<input type=date>`, `<select>`) needs `color-scheme` (2026-03-21)
+
+**Date:** 2026-03-21
+
+Native HTML form elements like date pickers and select dropdowns are rendered by the browser,
+not by your CSS. Setting `background` and `color` on them changes the input field appearance
+but does NOT change the popup calendar or dropdown list appearance. The `color-scheme: dark`
+CSS property tells the browser to render these native widgets in dark mode.
+
+**Rule:** When building dark-mode UIs, always add `color-scheme: dark` to `<input type=date>`,
+`<select>`, and other native form elements. Add `:root.light` overrides with `color-scheme: light`.
+
+Related: BUG-054
 
 ---
 
@@ -2286,312 +2637,6 @@ Only actual configuration matters.
 
 Preflight should catch cross-reference drift, but docs should still be reviewed after any rename.
 
----
-
-## BUG-044 — Fixture/test drift after manifest metric expansion
-
-### Symptom
-
-After adding system-device metrics to manifest v2, preflight failed in the
-Playwright manifest check and `render_sensor_config.py --check` reported fixture
-drift. The failures appeared as stale expectations (`['temp','hum']`) and
-out-of-sync baseline fixture manifest content.
-
-### Root Cause
-
-The system-device metric expansion changed the top-level manifest `metrics`
-payload and added `external_push` measurement entries, but test expectations and
-fixture-generation paths still assumed env-only top-level metrics.
-
-### Fix
-
-- Updated fixture generator (`tests/fixtures/generate-fixtures.js`) to emit
-  system metrics and `external_push` measurement mappings.
-- Updated Playwright assertions to validate manifest metrics via
-  `arrayContaining(...)` and to derive expected sensor lists from `/api/manifest`
-  for satellite-mode boot checks.
-- Regenerated baseline + variants via required generators.
-
-### Prevention
-
-Any manifest schema/metrics change must include:
-- fixture generator update,
-- baseline + variant regeneration,
-- Playwright expectation audit for fixed cardinality assumptions.
-
----
-
-### LESSON-OPS-078: Keep manifest tests shape-aware, not hard-coded to old metric sets
-
-When categories/metrics are expected to grow over phases, assertions should verify
-required subsets and invariants (e.g., environmental metrics must still exist)
-instead of strict full-array equality to legacy values.
-
----
-
-### LESSON-OPS-079 — Fixture variants must include all device categories (deferred to v7.5.6.4)
-
-**Version:** v7.5.6.1
-**Symptom:** Fixture variants (3sensor, mixed, 4sensor) include system metrics in the
-top-level `metrics` array but do not include an `external_push` device in `sensors`.
-The system device manifest/measurement/history-stub code paths are only exercised
-by the baseline fixture, not by any Playwright test variant.
-**Root cause:** v7.5.6.1 scope was limited to firmware/manifest side. Test fixture
-variant updates are deferred to v7.5.6.4 (Phase 6 closure).
-**Fix:** v7.5.6.4 must add `nas01` to at least the `mixed` variant sensor list and
-add Playwright assertions for system device presence in manifest + v2/live shape.
-
----
-
-## BUG-072 — `updateNetworkCards()` truthy check on `last_seen` (fixed v7.5.6.4)
-
-### Symptom
-
-When `last_seen` is `0` (epoch 0, valid timestamp), the last-seen display in the
-network card would silently remain as `last: —` instead of showing the timestamp.
-
-### Root Cause
-
-`updateNetworkCards()` used a truthy check: `if (seenEl && devData.last_seen)`.
-A `last_seen` value of `0` is falsy in JavaScript, so the display was not updated.
-
-### Fix (v7.5.6.4)
-
-Changed to strict null check: `if (seenEl && devData.last_seen != null)`.
-Mirrored in both `dashboard.js` and `dashboard.html`.
-
----
-
-## BUG-073 — `buildNetworkCard()` XSS via unescaped `target` string (fixed v7.5.6.4)
-
-### Symptom
-
-The `source.target` field from the manifest (e.g. `"8.8.8.8"`) was inserted into
-the network card HTML without HTML escaping. A malicious manifest could inject
-HTML/script tags via this field.
-
-### Root Cause
-
-`buildNetworkCard()` used `target` directly in the innerHTML string without calling
-`escHtml()`. The `description` in `buildSystemCard()` already used `escHtml()`
-(correct), but `target` in the network card did not.
-
-### Fix (v7.5.6.4)
-
-Changed `'>' + target + '</div>'` to `'>' + escHtml(target) + '</div>'`.
-Mirrored in both `dashboard.js` and `dashboard.html`.
-
----
-
-## LESSON-OPS-080 — System fixture skip guards (v7.5.6.4)
-
-**Version:** v7.5.6.4
-**Symptom:** After adding the `system` fixture variant (2 env + 1 net + 1 sys = 4 sensors),
-7 existing tests failed because they assumed the 3sensor-specific sensor list
-(`office`, `first_floor`, `outside`) or expected exactly 3 env sensors.
-
-**Skip guards added (v7.5.6.4):**
-- `2. Sensor cards / sensor card headers contain expected sensor names` — 'Outside' absent from system fixture
-- `14. Phase 2 Closure / scenario 1` — 'Outside' name check is 3sensor-specific
-- `14. Phase 2 Closure / scenario 2` — sensors.json fallback count (3) is 3sensor-specific; system has 2 env entries
-- `14. Phase 2 Closure / scenario 4` — `envSensors.length === 3` is 3sensor-specific; system has 2 env sensors
-- `15. Phase 3 Closure / dashboard renders identically` — 'Outside' name check is 3sensor-specific
-- `17. Phase 4 Step 2 / environmental cards have full ThermoPro layout` — `.sensor-card:not(.network-card)` includes system card which lacks `.sensor-env-grid`
-- `manifest.spec.js / dashboard falls back to /sensors.json` — fallback sensor list is 3sensor-specific
-
-**Prevention:** When adding a new fixture variant, always run `FIXTURE_SET=<new> npx playwright test --project=chromium` (full suite, no `--grep`) to discover incompatibilities before merging.
-
----
-
-## LESSON-OPS-081 — Mock endpoint prompts must enumerate all firmware validation branches (v7.5.6.4)
-
-**Version:** v7.5.6.4
-**Source:** PR #87 — mock `/api/ingest` required 2 fix commits because the prompt only specified device validation, not metric/val validation.
-
-When a prompt asks the agent to create a mock endpoint for an existing firmware API, the prompt MUST:
-1. Name the firmware function to read (e.g., `handle_api_ingest_()`)
-2. Enumerate all positive and negative validation branches
-3. Specify exact response shapes for success (`{"ok":true}`) and failure (`{"ok":false,"message":"...","status":N}`)
-4. Require one test per branch
-5. Explicitly prohibit stub-level mocking: "Do NOT reduce this mock to a 'device exists → 200' stub"
-
-A mock that only validates device existence is a stub, not a contract-faithful implementation. It hides client-side bugs and causes merge-blocking review comments.
-
----
-
-## LESSON-OPS-082 — Fixture composition changes require downstream text audit (v7.5.6.4)
-
-**Version:** v7.5.6.4
-**Source:** PR #87 — mixed fixture gained `nas01` (3 → 4 sensors) but skip-reason strings referencing "3 sensors" remained in multiple locations.
-
-When a prompt changes a fixture's sensor count or composition:
-1. The prompt MUST include an explicit instruction: "After updating the fixture, search all `test.skip()` reason strings in `dashboard.spec.js` for references to the old sensor count and update them."
-2. The prompt MUST also flag any group header comments that describe the fixture by composition.
-
-A fixture change is not complete until all downstream text references to that fixture's old composition are updated.
-
----
-
-## LESSON-OPS-083 — Playwright test signatures must not include unused fixture arguments (v7.5.6.4)
-
-**Version:** v7.5.6.4
-**Source:** PR #87 review comment (Gemini r2997248086) — test `/api/v2/live returns system device data` destructured `{ page, request }` but only used `request`.
-
-When writing a Playwright test that only uses the `request` fixture (e.g., a pure API test), do not include `page` in the destructured argument list. Including `page` forces Playwright to create a browser context even when it is not needed, wasting ~1–2 s per test run.
-
-**Rule:** Every test function signature must destructure only the fixtures it actually uses. Before merging, scan all new tests for unused Playwright fixture arguments.
-
----
-
-## LESSON-OPS-086 — Prompt Do-NOT lists must exclude expected regeneration side-effects (v7.5.7.0)
-
-**Version:** v7.5.7.0
-**Source:** PR #93 — Do-NOT list said "no dashboard JS/HTML changes" but `bump-version.sh` necessarily updates `App.version` in those files.
-
-When a prompt says "Do NOT change file X" but also requires a version bump or regeneration pipeline that necessarily touches file X, the prompt contains an internal contradiction. The agent correctly ran the bump (version churn is expected), but the Do-NOT list was technically violated.
-
-**Rule:** Future prompts should qualify: "No *functional* changes to file X; version bump and regeneration churn is expected and does not violate this rule."
-
----
-
-## LESSON-OPS-087 — Prompt-provided code blocks must apply the same constant policy as the target codebase (v7.5.7.0)
-
-**Version:** v7.5.7.0
-**Source:** PR #93 — prompt introduced C++ named constant `AGG_MANIFEST_BUF_SIZE` but provided Python code with bare literal `8192`.
-
-When a prompt introduces a named constant in one language (C++ `AGG_MANIFEST_BUF_SIZE`), the corresponding value in prompt-provided code for another language (Python) should also use a named constant, not a bare literal. The agent copies prompt code faithfully — including inconsistencies. The Gemini reviewer caught the mismatch and it was fixed in the fixup commit by extracting `SATELLITE_CAP_PSRAM = 8` and `AGG_MANIFEST_BUF_SIZE_BYTES = 8192` as module-level constants.
-
-**Rule:** Before publishing a prompt that contains code blocks in multiple languages, verify that each named constant defined in language A has a corresponding named constant (not a literal) in language B.
-
----
-
-## LESSON-OPS-088 — Mandatory deliverable tables should be templated with placeholder rows (v7.5.7.0)
-
-**Version:** v7.5.7.0
-**Source:** PR #93 — prompt required Instruction Compliance Output table (§8b) but the agent omitted it from the session log entirely.
-
-When a prompt requires a specific table as a deliverable (e.g., Instruction Compliance Output), include a template with placeholder rows in the session log section. An empty template is harder to overlook than a prose instruction to "provide a table."
-
-**Rule:** The session log section of any prompt that requires a compliance table must include a template with at least one placeholder row, not just the table header.
-
----
-
-## LESSON-OPS-089 — Preflight checks must be environment-aware
-
-**Context:** Historically (before PR #96), `scripts/preflight.sh` hardcoded `check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"sensor_count": 5'`. This was correct for the C3 satellite profile (3 ThermoPro + wan_ping + nas01 = 5 sensors) but broke when `config/gateway.json` pointed to the S3 aggregator sensor file (`config/sensors-agg-s3-16m-1.json`) which has only 1 sensor (wan_ping).
-
-**Root cause:** The preflight check assumed all deployments had the same sensor count. When multi-board support was added (v7.5.5.0), the check was not updated to handle board-specific sensor manifests.
-
-**Fix (PR #96):** Replaced the hardcoded value with a Python snippet that uses `sensor_manifest_lib.load_gateway_config()` and `load_manifest()` to dynamically compute the expected count — the exact same resolution logic as `render_sensor_config.py`. Errors fail loudly (no silent fallback). The `# Do NOT re-hardcode` comment guards against regression.
-
-**Rule:** Preflight validation checks that depend on configuration-derived values (sensor count, device names, gateway metadata) must compute expected values dynamically using the same library functions as the generators. Never hardcode values that vary by board profile, sensor manifest, or deployment configuration.
-
----
-
-## LESSON-OPS-090 — Device testing sections must reference the correct generated YAML for the target board (v7.6.0.0)
-
-**Context:** All six Phase D prompt device testing sections (v7.6.0.0 through v7.6.0.5) contained `esphome clean firmware/esp32-c3-multi-sensor.yaml` and `esphome run firmware/esp32-c3-multi-sensor.yaml` in the aggregator build instructions. This is the committed C3 satellite template — it does not produce aggregator firmware and targets the wrong chip architecture for S3 boards.
-
-**Root cause:** The prompt author wrote the device testing section by copying the C3 compile command (the only committed YAML) without accounting for the fact that non-C3 boards use **generated** YAML files that only exist after `render_sensor_config.py --write`. The generated S3 YAML is `firmware/esp32-s3-devkitc1-n16r8-gw.yaml` — it is gitignored and not visible in the repo file listing.
-
-**Impact:** The operator compiled C3 satellite firmware and flashed it to the S3 aggregator. The device booted as a satellite with all local sensors displayed instead of as an aggregator with the Gateways card. Device testing could not proceed.
-
-**Fix:** Corrected all Phase D prompts to reference `firmware/esp32-s3-devkitc1-n16r8-gw.yaml` for aggregator builds. Added Section 7.2 "Which YAML Do I Compile?" decision table to `Docs/aggregator-setup.md`.
-
-**Rule:** Prompt device testing sections must use the exact YAML path that the generator produces for the target board. For non-C3 boards, this is always a **generated** gitignored file — never the committed C3 template. The correct path can be determined from the `get_yaml_output_path()` function in `render_sensor_config.py` or from the output of `render_sensor_config.py --write`.
-
-**Critical Rule 36 added.**
-
----
-
-## LESSON-OPS-091 — Regeneration pipeline must include dashboard minification before header generation (v7.6.0.0)
-
-**Context:** The regeneration pipeline documented in prompts and `Docs/aggregator-setup.md` listed four steps: `render_sensor_config.py --write`, `generate-fixtures.js`, `generate-header.sh`, and `render_sensor_config.py --check`. The `minify-dashboard.sh` step was absent from all references.
-
-**Root cause:** `generate-header.sh` auto-detects `dashboard.min.html` and uses it if present, falling back to unminified `dashboard.html` otherwise. This "silent fallback" masked the missing step — the build succeeds either way, but produces a larger firmware payload without minification. More dangerously, if a stale `dashboard.min.html` exists from a previous run, the header embeds the outdated minified copy instead of the current source.
-
-**Fix:** Added `bash scripts/minify-dashboard.sh` as Step 3 in the regeneration pipeline (after fixture generation, before header generation) in `Docs/aggregator-setup.md` Sections 7.1 and 15, and in all Phase D prompt device testing sections.
-
-**Rule:** The canonical regeneration pipeline is five steps in this exact order:
-
-1. `python3 scripts/render_sensor_config.py --write`
-2. `node tests/fixtures/generate-fixtures.js`
-3. `bash scripts/minify-dashboard.sh`
-4. `bash scripts/generate-header.sh`
-5. `python3 scripts/render_sensor_config.py --check`
-
-Any prompt or documentation that references "the regeneration pipeline" must include all five steps. Omitting the minification step risks stale embedded dashboard content.
-
-**Critical Rule 37 added.**
-
----
-
-## LESSON-OPS-092 — NVS key buffer sizing must be explicit in prompts (v7.6.0.0)
-
-**Context:** v7.6.0.0 prompt specified the NVS key scheme (`s{i}_id`, `s{i}_name`, etc.) but not buffer sizes for key construction variables. The coding agent chose `char key_*[8]`, which overflows for satellite indices ≥ 10 (e.g. `s10_name` = 8 chars + NUL = 9 bytes).
-
-**Fix (PR #99):** All NVS key buffers changed to `char key_*[16]`. NVS max key length is 15 chars + NUL = 16 bytes.
-
-**Rule:** When a prompt specifies an indexed NVS key scheme, it must explicitly state the buffer size for key construction. Use `char key_*[16]` for all NVS key buffers and state this in prompt code blocks.
-
----
-
-## LESSON-OPS-093 — Management endpoints must have explicit auth requirement in prompt (v7.6.0.0)
-
-**Context:** v7.6.0.0 prompt added `POST /api/system/reset-satellites` without specifying that it must call `authenticate_management_()`. The agent implemented the endpoint without authentication. The Copilot reviewer caught it during PR review; fixed in PR #99.
-
-**Root cause:** Security conventions from neighbouring code are not inherited by the coding agent. Every other management endpoint in the codebase calls `authenticate_management_()`, but the agent did not infer this pattern.
-
-**Rule:** Every prompt that adds a destructive or persistent-state-mutating endpoint must explicitly state: "This endpoint MUST call `authenticate_management_()` as the first action." For non-destructive endpoints (e.g. add-satellite), the prompt must explicitly state whether auth is required or not, with a rationale.
-
----
-
-## LESSON-OPS-094 — NVS seeding on first boot must be explicit in prompt (v7.6.0.0)
-
-**Context:** v7.6.0.0 prompt said "if NVS count key is absent, populate from compile-time arrays" but did not say "and write them to NVS." The agent loaded compile-time defaults into the cache but did not persist them to NVS. The first runtime mutation (add/remove) would write only the delta; on reboot, all compile-time defaults were lost.
-
-**Fix (PR #99):** `init_satellite_caches_()` now calls `save_satellites_to_nvs_()` after loading compile-time defaults as fallback.
-
-**Rule:** When NVS is the single source of truth for runtime data that starts from compile-time defaults, prompts must explicitly state: "After loading compile-time defaults into the cache, call `save_satellites_to_nvs_()` to seed NVS. This prevents the first runtime mutation from orphaning the defaults."
-
----
-
-## LESSON-OPS-095 — All-or-nothing NVS array load must be explicit in prompt (v7.6.0.0)
-
-**Context:** v7.6.0.0 prompt said `load_satellites_from_nvs_()` "returns 0 if NVS is empty or corrupt" but did not define what "corrupt" means for partial reads within a counted array. The agent used `break` on per-entry NVS read failure, silently truncating the satellite list at the first bad entry.
-
-**Fix (PR #99):** On any per-entry read failure, the function now closes the NVS handle and returns 0, triggering full fallback to compile-time defaults.
-
-**Rule:** Prompts for NVS array loading must specify: "On any per-entry read failure (`nvs_get_str`, `nvs_get_u16` returning non-`ESP_OK`), close the NVS handle and return 0. Partial loads are worse than no load — they create invisible topology shrink."
-
----
-
-## LESSON-OPS-096 — Boot-time init vs runtime mutation mutex ordering (v7.6.0.0)
-
-**Context:** `init_satellite_caches_()` in v7.6.0.0 runs without acquiring `s_cache_mutex`. The ESPHome startup sequence guarantees `aggregator_poll_task()` init completes before the web server accepts connections, so the current implementation is safe. However, the absence of a mutex creates technical debt if startup ordering ever changes.
-
-**Status:** Accepted as technical debt for v7.6.0.0. For v7.6.0.1+, any code added during init must be verified to run before web handlers can fire. Future consideration: wrap init in the same mutex for defense-in-depth once runtime mutators are active.
-
----
-
-
-
-Any significant dashboard or data-path modification should re-check:
-
-- Startup ordering
-- Event binding
-- Theme redraw
-- Chart marker/background/border consistency
-- History/min-max calculations
-- Export All concurrency behavior
-- SSE and polling behavior
-- Import over LAN
-- Import over Cloudflare
-- Browser compatibility across the major test targets
-- Dashboard manifest boot sequence (primary `/api/manifest`, fallback `/sensors.json`, fallback built-in defaults)
-- Both custom dashboard and built-in ESPHome web page diagnostics (Free Heap, Uptime, Loop Time)
-
----
 
 ## Known Open Issues
 
