@@ -1178,6 +1178,23 @@ static void schedule_reboot_() {
   xTaskCreate(reboot_task_, "hist_reboot", 2048, nullptr, 1, nullptr);
 }
 
+// ── Deferred management task: delete-data ─────────────────────────────────
+// Runs NVS erase on its own stack so the httpd task (hardcoded 4 KB by
+// ESPHome/ESP-IDF) is never exposed to NVS frames.
+// Pattern mirrors the existing schedule_reboot_() / reboot_task_ pair.
+
+static void delete_data_task_(void *) {
+  bool ok = clear_persisted_history_();
+  if (!ok) {
+    ESP_LOGE(TAG, "delete_data task: clear_persisted_history_() failed");
+  }
+  vTaskDelete(nullptr);
+}
+
+static void schedule_delete_data_() {
+  xTaskCreate(delete_data_task_, "hist_delete", 8192, nullptr, 1, nullptr);
+}
+
 
 // ═══════════════════════════════════════════════════════════════════
 // PingAdapter — periodic ICMP ping probe as a low-priority RTOS task
@@ -1872,6 +1889,53 @@ static void aggregator_poll_task(void* arg) {
   }
 }
 
+// ── Deferred management task: reset-satellites ────────────────────────────
+// Runs NVS-heavy satellite reset on its own 8 KB stack so the httpd task
+// (hardcoded 4 KB by ESPHome/ESP-IDF) is never exposed to NVS frames.
+
+static void reset_satellites_task_(void *) {
+  // Erase the NVS satellite namespace
+  nvs_handle_t nvs;
+  esp_err_t err = nvs_open("agg_sats", NVS_READWRITE, &nvs);
+  if (err == ESP_OK) {
+    err = nvs_erase_all(nvs);
+    if (err == ESP_OK) nvs_commit(nvs);
+    nvs_close(nvs);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG_AGG, "reset_sats task: NVS erase/commit failed (%s)",
+               esp_err_to_name(err));
+    }
+  } else {
+    ESP_LOGE(TAG_AGG, "reset_sats task: NVS open failed (%s)",
+             esp_err_to_name(err));
+  }
+
+  // Reload compile-time defaults under mutex
+  if (AGG_LOCK() == pdTRUE) {
+    for (int i = 0; i < MAX_SATELLITES; i++) {
+      satellite_caches[i].set_identity(
+          SATELLITE_IDS[i], SATELLITE_NAMES[i],
+          SATELLITE_URLS[i], SATELLITE_POLL_INTERVALS[i]);
+      satellite_caches[i].clear_cache();
+    }
+    runtime_satellite_count = MAX_SATELLITES;
+    if (!save_satellites_to_nvs_()) {
+      ESP_LOGW(TAG_AGG, "reset_sats task: failed to persist defaults (non-fatal)");
+    }
+    AGG_UNLOCK();
+  } else {
+    ESP_LOGE(TAG_AGG, "reset_sats task: failed to acquire AGG_LOCK");
+  }
+
+  ESP_LOGI(TAG_AGG, "Factory reset complete: %d compile-time satellites restored",
+           MAX_SATELLITES);
+  vTaskDelete(nullptr);
+}
+
+static void schedule_reset_satellites_() {
+  xTaskCreate(reset_satellites_task_, "agg_reset_sats", 8192, nullptr, 1, nullptr);
+}
+
 static void start_aggregator_task() {
   init_aggregator_mutex();
   if (!s_cache_mutex) {
@@ -1902,8 +1966,8 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (strcmp(p, "/api/delete-data") == 0) return true;
 #if AGGREGATOR_ENABLED
     if (strcmp(p, "/api/system/reset-satellites") == 0) return true;
-    if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) return true;
-    if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) return true;
+    if (strncmp(p, "/api/aggregator/add-satellite", sizeof("/api/aggregator/add-satellite") - 1) == 0) return true;
+    if (strncmp(p, "/api/aggregator/test-satellite", sizeof("/api/aggregator/test-satellite") - 1) == 0) return true;
 #endif
     return false;
   }
@@ -1911,9 +1975,9 @@ class HistoryWebHandler : public AsyncWebHandler {
   bool is_post_or_options_route_(const char *p) const {
     if (is_management_post_route_(p)) return true;
     if (strcmp(p, "/api/import/begin") == 0) return true;
-    if (strncmp(p, "/api/import/begin/single/", 25) == 0) return true;
-    if (strncmp(p, "/api/import/d/", 14) == 0) return true;
-    if (strncmp(p, "/api/import/w/", 14) == 0) return true;
+    if (strncmp(p, "/api/import/begin/single/", sizeof("/api/import/begin/single/") - 1) == 0) return true;
+    if (strncmp(p, "/api/import/d/", sizeof("/api/import/d/") - 1) == 0) return true;
+    if (strncmp(p, "/api/import/w/", sizeof("/api/import/w/") - 1) == 0) return true;
     if (strcmp(p, "/api/import/finish") == 0) return true;
     return false;
   }
@@ -2464,15 +2528,14 @@ class HistoryWebHandler : public AsyncWebHandler {
 
   void handle_delete_data_(AsyncWebServerRequest *request) const {
     if (!authenticate_management_(request)) return;
-    bool ok = clear_persisted_history_();
+
+    // Respond immediately — NVS erase deferred to delete_data_task_
     auto *resp = request->beginResponseStream("application/json");
     add_common_headers_(resp);
-    if (ok) {
-      resp->print("{\"ok\":true,\"message\":\"Persisted and RAM history cleared\"}");
-    } else {
-      resp->print("{\"ok\":false,\"message\":\"Failed to clear history\"}");
-    }
+    resp->print("{\"ok\":true,\"message\":\"Persisted and RAM history cleared\"}");
     request->send(resp);
+
+    schedule_delete_data_();
   }
 
 
@@ -3518,63 +3581,21 @@ class HistoryWebHandler : public AsyncWebHandler {
       send_json_error_(request, 405, "Method not allowed");
       return;
     }
-
-    // 1. Authenticate
     if (!authenticate_management_(request)) return;
 
-    // 2. Erase the NVS namespace — fail honestly if it doesn't work
-    nvs_handle_t nvs;
-    esp_err_t err = nvs_open("agg_sats", NVS_READWRITE, &nvs);
-    if (err != ESP_OK) {
-      ESP_LOGE(TAG_AGG, "NVS agg_sats: open for erase failed (%s)", esp_err_to_name(err));
-      send_json_error_(request, 500, "NVS open failed");
-      return;
-    }
-    err = nvs_erase_all(nvs);
-    if (err != ESP_OK) {
-      nvs_close(nvs);
-      ESP_LOGE(TAG_AGG, "NVS agg_sats: erase failed (%s)", esp_err_to_name(err));
-      send_json_error_(request, 500, "NVS erase failed");
-      return;
-    }
-    err = nvs_commit(nvs);
-    nvs_close(nvs);
-    if (err != ESP_OK) {
-      ESP_LOGE(TAG_AGG, "NVS agg_sats: commit after erase failed (%s)", esp_err_to_name(err));
-      send_json_error_(request, 500, "NVS commit failed");
-      return;
-    }
-    ESP_LOGI(TAG_AGG, "NVS agg_sats: erased (factory reset)");
-
-    // 3. Reload compile-time defaults under mutex
-    if (AGG_LOCK() != pdTRUE) {
-      ESP_LOGE(TAG_AGG, "Factory reset: failed to acquire AGG_LOCK");
-      send_json_error_(request, 503, "Lock acquisition failed");
-      return;
-    }
-    for (int i = 0; i < MAX_SATELLITES; i++) {
-      satellite_caches[i].set_identity(
-          SATELLITE_IDS[i], SATELLITE_NAMES[i],
-          SATELLITE_URLS[i], SATELLITE_POLL_INTERVALS[i]);
-      satellite_caches[i].clear_cache();
-    }
-    runtime_satellite_count = MAX_SATELLITES;
-
-    // 4. Persist defaults to NVS so NVS is deterministic after reset
-    if (!save_satellites_to_nvs_()) {
-      ESP_LOGW(TAG_AGG, "NVS agg_sats: failed to persist defaults after reset (non-fatal)");
-    }
-    AGG_UNLOCK();
-
-    ESP_LOGI(TAG_AGG, "Factory reset: %d compile-time satellites restored", MAX_SATELLITES);
-
+    // Respond immediately — NVS work is deferred to reset_satellites_task_
+    // which runs on its own 8 KB stack (httpd task stack is hardcoded 4 KB
+    // by ESPHome and cannot be increased via sdkconfig).
     char body[128];
     snprintf(body, sizeof(body),
-             "{\"ok\":true,\"message\":\"Reset to compile-time defaults\",\"satellite_count\":%d}",
+             "{\"ok\":true,\"message\":\"Reset to compile-time defaults\","
+             "\"satellite_count\":%d}",
              MAX_SATELLITES);
     auto *resp = request->beginResponse(200, "application/json", body);
     add_common_headers_(resp);
     request->send(resp);
+
+    schedule_reset_satellites_();
   }
 #endif  // AGGREGATOR_ENABLED
 };
