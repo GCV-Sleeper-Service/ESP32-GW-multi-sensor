@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.6.0.0.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.6.0.1.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -496,7 +496,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.0.0) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.0.1) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -1593,6 +1593,68 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   return false;
 }
 
+// ── Satellite manifest probe helper (v7.6.0.1) ─────────────────────────────
+// Probe a satellite URL by fetching /api/manifest.
+// On success, extracts gateway.id and gateway.name into provided buffers.
+// Returns true on success, false on failure (unreachable, non-200, or unparseable manifest).
+//
+// MUST be called from web handler context only (uses s_proxy_tmp).
+// NOT safe to call from the polling task.
+static bool probe_satellite_manifest_(
+    const char* base_url,
+    char* out_id,   size_t id_size,
+    char* out_name, size_t name_size)
+{
+  char url_buf[256];
+  int url_len = snprintf(url_buf, sizeof(url_buf), "%s/api/manifest", base_url);
+  if (url_len < 0 || (size_t)url_len >= sizeof(url_buf)) return false;
+
+  uint16_t resp_len = 0;
+  // Use s_proxy_tmp (web handler context only — single-threaded ESPHome loop)
+  if (!fetch_to_buffer(url_buf, s_proxy_tmp, (uint16_t)(sizeof(s_proxy_tmp) - 1), &resp_len)
+      || resp_len == 0) {
+    return false;
+  }
+  s_proxy_tmp[resp_len] = '\0';
+
+  // Extract gateway.id — look for "gateway":{"id":"..." pattern
+  // Simple strstr parsing (no JSON library on ESP32)
+  out_id[0] = '\0';
+  out_name[0] = '\0';
+
+  const char* gw = strstr(s_proxy_tmp, "\"gateway\"");
+  if (!gw) return false;
+
+  // Find "id":"<value>" within the gateway object
+  const char* id_key = strstr(gw, "\"id\":\"");
+  if (id_key) {
+    id_key += 6; // skip past "id":"
+    const char* id_end = strchr(id_key, '"');
+    if (id_end) {
+      size_t len = (size_t)(id_end - id_key);
+      if (len >= id_size) len = id_size - 1;
+      memcpy(out_id, id_key, len);
+      out_id[len] = '\0';
+    }
+  }
+
+  // Find "name":"<value>" within the gateway object
+  const char* name_key = strstr(gw, "\"name\":\"");
+  if (name_key) {
+    name_key += 8; // skip past "name":"
+    const char* name_end = strchr(name_key, '"');
+    if (name_end) {
+      size_t len = (size_t)(name_end - name_key);
+      if (len >= name_size) len = name_size - 1;
+      memcpy(out_name, name_key, len);
+      out_name[len] = '\0';
+    }
+  }
+
+  // Must have at least an ID to be a valid manifest
+  return out_id[0] != '\0';
+}
+
 // ── NVS satellite persistence (v7.6.0.0) ───────────────────────────────────
 // Namespace: "agg_sats" (9 chars — under the 15-char NVS key limit)
 // Key scheme: count (u8), s{i}_id (str), s{i}_name (str), s{i}_url (str), s{i}_poll (u16)
@@ -2099,7 +2161,7 @@ class HistoryWebHandler : public AsyncWebHandler {
         return;
       }
       if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) {
-        handle_aggregator_stub_501_(request);
+        handle_add_satellite_(request);
         return;
       }
       if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) {
@@ -3580,6 +3642,101 @@ class HistoryWebHandler : public AsyncWebHandler {
     auto *resp = request->beginResponse(
         200, "text/plain",
         reinterpret_cast<const uint8_t*>(s_proxy_tmp), s_proxy_len);
+    add_common_headers_(resp);
+    request->send(resp);
+  }
+
+  // POST /api/aggregator/add-satellite (v7.6.0.1)
+  void handle_add_satellite_(AsyncWebServerRequest *request) const {
+    if (request->method() != HTTP_POST) {
+      send_json_error_(request, 405, "Method not allowed");
+      return;
+    }
+
+    // 1. Parse query params
+    if (!request->hasParam("url")) {
+      send_json_error_(request, 400, "Missing url parameter");
+      return;
+    }
+    String url_param = request->getParam("url")->value();
+    const char* url_str = url_param.c_str();
+
+    // 2. Validate URL format
+    if (strncmp(url_str, "http://", 7) != 0) {
+      send_json_error_(request, 400, "URL must start with http://");
+      return;
+    }
+
+    // 3. Check capacity
+    if (runtime_satellite_count >= MAX_SATELLITES) {
+      send_json_error_(request, 409, "Satellite list full");
+      return;
+    }
+
+    // 4. Check duplicate URL
+    for (int i = 0; i < runtime_satellite_count; i++) {
+      if (strcmp(satellite_caches[i].base_url, url_str) == 0) {
+        send_json_error_(request, 409, "URL already configured");
+        return;
+      }
+    }
+
+    // 5. Probe the candidate
+    char probe_id[32] = {0};
+    char probe_name[64] = {0};
+    if (!probe_satellite_manifest_(url_str, probe_id, sizeof(probe_id),
+                                    probe_name, sizeof(probe_name))) {
+      send_json_error_(request, 400, "Satellite unreachable or invalid manifest");
+      return;
+    }
+
+    // 6. Determine name: request param > manifest > derived from URL
+    char final_name[64];
+    if (request->hasParam("name") && request->getParam("name")->value().length() > 0) {
+      strncpy(final_name, request->getParam("name")->value().c_str(), sizeof(final_name) - 1);
+      final_name[sizeof(final_name) - 1] = '\0';
+    } else if (probe_name[0] != '\0') {
+      strncpy(final_name, probe_name, sizeof(final_name) - 1);
+      final_name[sizeof(final_name) - 1] = '\0';
+    } else {
+      snprintf(final_name, sizeof(final_name), "Satellite %d", runtime_satellite_count + 1);
+    }
+
+    // 7. Parse poll interval
+    int poll_s = 30;
+    if (request->hasParam("poll")) {
+      long p = strtol(request->getParam("poll")->value().c_str(), nullptr, 10);
+      if (p >= 10 && p <= 3600) poll_s = (int)p;
+    }
+
+    // 8. Add under mutex
+    int new_idx = -1;
+    if (AGG_LOCK() == pdTRUE) {
+      new_idx = runtime_satellite_count;
+      satellite_caches[new_idx].set_identity(probe_id, final_name, url_str, poll_s);
+      satellite_caches[new_idx].clear_cache();
+      runtime_satellite_count++;
+      AGG_UNLOCK();
+    } else {
+      send_json_error_(request, 503, "Mutex timeout");
+      return;
+    }
+
+    // 9. Persist to NVS (outside mutex — NVS operations can be slow)
+    save_single_satellite_to_nvs_(new_idx);
+
+    ESP_LOGI(TAG_AGG, "Added satellite[%d]: id=%s name=%s url=%s poll=%ds",
+             new_idx, probe_id, final_name, url_str, poll_s);
+
+    // 10. Success response
+    char body[256];
+    snprintf(body, sizeof(body),
+             "{\"ok\":true,\"satellite\":{\"id\":\"%s\",\"name\":\"%s\",\"url\":\"%s\",\"poll\":%d}}",
+             satellite_caches[new_idx].id,
+             satellite_caches[new_idx].name,
+             satellite_caches[new_idx].base_url,
+             poll_s);
+    auto *resp = request->beginResponse(200, "application/json", body);
     add_common_headers_(resp);
     request->send(resp);
   }

@@ -2,7 +2,22 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
-## [v7.6.0.0-fixup-1] — 2026-03-31 — httpd Stack Overflow Fix (BUG-075/076)
+## [v7.6.0.1] — 2026-03-31 — POST /api/aggregator/add-satellite (Phase D Step 1)
+
+### New Features
+
+- **`POST /api/aggregator/add-satellite`** — replaces the 501 stub with a working
+  implementation. Accepts `url` (required), `name` (optional), `poll` (optional,
+  default 30 s, min 10, max 3600) as query string parameters.
+  - Validates URL starts with `http://`
+  - Rejects full satellite list (409) and duplicate URLs (409)
+  - Probes the candidate via `GET /api/manifest` before adding
+  - Extracts `gateway.id` and `gateway.name` from manifest JSON
+  - Adds satellite under `AGG_LOCK()` mutex; persists via `save_single_satellite_to_nvs_()`
+  - Returns `200 {"ok":true,"satellite":{"id":"...","name":"...","url":"...","poll":N}}`
+- **`probe_satellite_manifest_()`** helper — factored out for reuse by v7.6.0.3
+  (`test-satellite`). Uses `s_proxy_tmp` (web handler context only, never `s_fetch_tmp`).
+
 
 ### Bug Fixes
 
