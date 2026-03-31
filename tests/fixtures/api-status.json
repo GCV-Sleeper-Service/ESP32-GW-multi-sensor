@@ -1,8 +1,21 @@
 {
   "ok": true,
   "version": "v7.6.0.0",
-  "sensor_count": 1,
-  "sensors": [],
+  "sensor_count": 5,
+  "sensors": [
+    {
+      "id": "office",
+      "name": "Office"
+    },
+    {
+      "id": "first_floor",
+      "name": "First Floor"
+    },
+    {
+      "id": "outside",
+      "name": "Outside"
+    }
+  ],
   "mode": "active-manifest",
   "connected": true,
   "free_heap": 81920,
