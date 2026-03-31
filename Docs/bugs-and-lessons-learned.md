@@ -1380,8 +1380,9 @@ Minimum task stack for NVS operations: 8192 bytes. Add
 `HTTPD_DEFAULT_CONFIG()` in ESP-IDF hardcodes `.stack_size = 4096` as a literal.
 ESPHome's `web_server_idf.cpp` never overrides this. `CONFIG_HTTPD_STACK_SIZE` in
 `sdkconfig_options` is completely inert — do not add it to any board profile.
-The only way to get more stack to an HTTP handler is to offload heavy work to a
-separately spawned `xTaskCreate` task. Codified as Critical Rules 40 and 41.
+The only way to increase the httpd stack is via a local ESPHome component override
+(see LESSON-OPS-102). NVS-heavy handlers must additionally use the deferred task
+pattern (see LESSON-OPS-101). Codified as Critical Rules 40, 41, and 42.
 
 ---
 
