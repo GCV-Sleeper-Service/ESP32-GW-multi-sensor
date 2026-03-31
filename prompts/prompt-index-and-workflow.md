@@ -1,7 +1,7 @@
 # Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-03-31 — v7.6.0.0 post-merge fixups complete; Critical Rules 38–41 added, LESSON-OPS-099–101_
+_Last updated: 2026-03-31 — v7.6.0.0 post-merge fixups complete; Critical Rules 38–42 added, LESSON-OPS-099–102_
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -317,7 +317,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 39 | All `curl` POST commands must use `-d 'a=1'`. Never use `-H "Content-Type: application/json"`, never use `-d ''`, never use bare `-X POST` without a body. | BUG-076 / LESSON-OPS-099 |
 | 40 | Any HTTP handler performing NVS operations must use the deferred task pattern (`xTaskCreate`, 8192+ byte stack). Never perform NVS work synchronously in an HTTP handler. | BUG-075 / LESSON-OPS-100/101 |
 | 41 | Never add `CONFIG_HTTPD_STACK_SIZE` to any board profile `sdkconfig_options` in `firmware/boards/*.yaml` or in generated board YAMLs. It has zero runtime effect — ESPHome hardcodes the httpd task stack at 4 KB and ignores this setting. The legacy `firmware/esp32-c3-multi-sensor.yaml` template is exempt from this rule. | BUG-075 / LESSON-OPS-100 |
-
+| 42 | All board profiles must include an `external_components` block referencing `firmware/local_components` for the patched `web_server_idf` component. Without this, the httpd task runs at 4 KB and all POST handlers crash. Run `scripts/patch-esphome-httpd-stack.sh --check` to verify. | BUG-075 / LESSON-OPS-102 |
 ---
 
 ## Prompt File Naming Convention
@@ -373,7 +373,7 @@ After each step completes:
 
 ## Revision History
 
-### 2026-03-31 — BUG-075/076 Root Cause Resolved; Critical Rules 38–41 Added
+### 2026-03-31 — BUG-075/076 Root Cause Resolved; Critical Rules 38–42 Added
 
 **Context:** PR #105 branch — dashboard content-type fixes, generated file regeneration, documentation updates.
 
@@ -381,7 +381,7 @@ After each step completes:
 
 | Change | Why |
 |--------|-----|
-| **Critical Rules 38–41 added** | httpd stack hardcoded at 4 KB by ESPHome — CONFIG_HTTPD_STACK_SIZE inert. Deferred task pattern required for NVS handlers. ESPHome only supports form-urlencoded POST. Rules 38/39 content-type corrected from application/json to application/x-www-form-urlencoded. |
+| **Critical Rules 38–42 added** | httpd stack hardcoded at 4 KB by ESPHome — CONFIG_HTTPD_STACK_SIZE inert. Local component override (`firmware/local_components/web_server_idf/`) patches stack to 16 KB. Deferred task pattern required for NVS handlers. ESPHome only supports form-urlencoded POST. |
 | **BUG-075/076 root cause resolved** | httpd task stack hardcoded at 4 KB by ESPHome; deferred task pattern (xTaskCreate 8192-byte stack) applied to management handlers |
 | **dashboard.js / dashboard.html content-type fixed** | Changed from `application/json` to `application/x-www-form-urlencoded`; `body: '{}'` → `body: 'a=1'` |
 | **LESSON-OPS-099–101 added** | ESPHome POST body consumption rules; httpd stack limit; deferred task pattern |
