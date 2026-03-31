@@ -1533,12 +1533,29 @@ fetch(url, {
 })
 ```
 
-### 16.2 httpd task stack hardcoded at 4 KB (Critical Rules 40–41)
+### 16.2 httpd task stack hardcoded at 4 KB (Critical Rules 40–42)
 
 `CONFIG_HTTPD_STACK_SIZE` in `sdkconfig_options` has no effect. ESPHome
-hardcodes `.stack_size = 4096`. Any handler touching NVS, mutexes, or
-heavy string ops will overflow it. Use the deferred task pattern.
-See LESSON-OPS-100/101.
+hardcodes `.stack_size = 4096`. Even the lightest handler (auth check +
+401 response) overflows 4 KB.
+
+**Primary fix:** Local component override. `scripts/patch-esphome-httpd-stack.sh`
+copies ESPHome's `web_server_idf` component into `firmware/local_components/`
+and patches `config.stack_size = 16384`. Every board profile must include:
+
+```yaml
+external_components:
+  - source:
+      type: local
+      path: local_components
+    components: [web_server_idf]
+```
+
+Re-run the script after every ESPHome upgrade. Use `--check` in CI/preflight.
+
+**Secondary fix:** Deferred task pattern for NVS-heavy handlers (still required
+even with 16 KB stack). See LESSON-OPS-100/101/102.
+```
 
 Prompt template for NVS-heavy POST handlers:
 ```cpp
@@ -1562,10 +1579,14 @@ void handle_my_endpoint_(AsyncWebServerRequest *request) const {
 
 ### 16.3 Pre-flight checklist additions (§9)
 
+```md
+- `bash scripts/patch-esphome-httpd-stack.sh --check` passes
+- Every board profile has `external_components` referencing `local_components`
 - Every `curl` POST → uses `-d 'a=1'`, NOT `-d '{}'`, NOT `-d ''`
 - Every `fetch()` POST → `Content-Type: application/x-www-form-urlencoded`, `body: 'a=1'`
 - Every new POST handler touching NVS → uses deferred task pattern with 8192+ bytes
-- No `CONFIG_HTTPD_STACK_SIZE` in any real board profile (i.e., none under `firmware/boards/*.yaml` or in generated board YAMLs; the legacy `firmware/esp32-c3-multi-sensor.yaml` template still contains it and will be cleaned up separately if the setting remains inert).
+- No `CONFIG_HTTPD_STACK_SIZE` in any board profile under `firmware/boards/*.yaml`
+```
 
 ---
 
