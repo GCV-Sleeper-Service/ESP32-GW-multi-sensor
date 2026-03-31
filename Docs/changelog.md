@@ -2,13 +2,37 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
-## [v7.6.0.0-fixup-1] — 2026-03-30 — httpd Stack Overflow Fix (BUG-049)
+## [v7.6.0.0-fixup-1] — 2026-03-31 — httpd Stack Overflow Fix (BUG-075/076)
 
 ### Bug Fixes
 
-- **BUG-049: httpd task stack overflow (aggregator boot loop):** The ESP32-S3 aggregator (`agg-s3-16m-1`) entered an infinite reboot loop after upgrading to v7.6.0.0. The root cause was the default 4096-byte httpd task stack being exhausted by the aggregator overlay's deep call chains: `handleRequest()` → `handle_aggregator_gateways_()` / `handle_aggregator_live_()` building large `std::string` responses, plus `authenticate_management_()` → `extract_basic_auth_()` → `base64_decode_()` with `std::string` temporaries. Added `CONFIG_HTTPD_STACK_SIZE: "8192"` to `sdkconfig_options` in `firmware/esp32-c3-multi-sensor.yaml`, doubling the httpd stack from 4KB to 8KB. Cost: ~4KB additional RAM.
+- **BUG-075/076: httpd task stack overflow — every POST with a body crashes S3
+  aggregator.** Root cause: ESP-IDF's `HTTPD_DEFAULT_CONFIG()` hardcodes
+  `.stack_size = 4096`. ESPHome never overrides it. `CONFIG_HTTPD_STACK_SIZE`
+  in `sdkconfig_options` is dead config with zero runtime effect.
+  - *Primary fix:* Local ESPHome component override via
+    `firmware/local_components/web_server_idf/` — patches `config.stack_size = 16384`.
+    Managed by `scripts/patch-esphome-httpd-stack.sh`.
+  - *Secondary fix:* `handle_reset_satellites_()` and `handle_delete_data_()` now use
+    deferred task pattern (`xTaskCreate`, 8192-byte stack) for NVS work.
+  - *Content-type fix:* Dashboard POST calls changed from `application/json` to
+    `application/x-www-form-urlencoded` with `body: 'a=1'`. ESPHome only consumes
+    form-encoded POST bodies.
+  - *Dead config removed:* `CONFIG_HTTPD_STACK_SIZE` removed from all board profiles.
+  - Board profiles now include `external_components` pointing to the patched component.
+  - `render_sensor_config.py` updated to emit `external_components` from board profiles.
 
-- **BUG-049: Missing Authorization header crash (early-return optimization):** `authenticate_management_()` previously checked lockout timestamps and allocated `std::string` temporaries before checking for the `Authorization` header. Requests from browsers (preflight), health probes, or any unauthenticated client would reach `extract_basic_auth_()` and trigger the full base64 decode path (with `std::string` temporaries) before returning 401 — adding unnecessary stack pressure at the worst possible moment. Added a fast-path check at the top of `authenticate_management_()` that returns 401 immediately when no `Authorization` header is present, before any lockout checks or string allocations. This significantly reduces stack usage for the common "no auth" case.
+### New Files
+
+- `scripts/patch-esphome-httpd-stack.sh` — copies and patches ESPHome's
+  `web_server_idf` component. Re-run after ESPHome upgrades.
+- `firmware/local_components/web_server_idf/` — patched component override.
+- `Docs/postmortem-BUG-075-076-httpd-stack.md` — full investigation post-mortem.
+
+### New Lessons & Critical Rules
+
+- LESSON-OPS-097 through LESSON-OPS-102
+- Critical Rules 38–42
 
 ### Architecture Notes
 
