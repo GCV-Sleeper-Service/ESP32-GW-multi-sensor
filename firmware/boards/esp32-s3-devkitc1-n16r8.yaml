@@ -21,4 +21,4 @@ capabilities:
   ram_kb: 512
 notes: "Recommended aggregator board. 16MB flash allows 4MB history partition."
 logger:
-  baud_rate: 0
+  baud_rate: 115200
