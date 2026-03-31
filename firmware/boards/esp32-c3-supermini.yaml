@@ -10,7 +10,6 @@ framework:
   type: "esp-idf"
 sdkconfig_options:
   CONFIG_LWIP_MAX_SOCKETS: "18"
-  CONFIG_HTTPD_STACK_SIZE: "8192"
 capabilities:
   ble: true
   psram: false

@@ -10,7 +10,6 @@ framework:
   type: "esp-idf"
 sdkconfig_options:
   CONFIG_LWIP_MAX_SOCKETS: "24"
-  CONFIG_HTTPD_STACK_SIZE: "24576"
 psram:
   mode: "octal"
   speed: "80MHz"
