@@ -1565,7 +1565,7 @@ void handle_my_endpoint_(AsyncWebServerRequest *request) const {
 - Every `curl` POST → uses `-d 'a=1'`, NOT `-d '{}'`, NOT `-d ''`
 - Every `fetch()` POST → `Content-Type: application/x-www-form-urlencoded`, `body: 'a=1'`
 - Every new POST handler touching NVS → uses deferred task pattern with 8192+ bytes
-- No `CONFIG_HTTPD_STACK_SIZE` in any board profile
+- No `CONFIG_HTTPD_STACK_SIZE` in any real board profile (i.e., none under `firmware/boards/*.yaml` or in generated board YAMLs; the legacy `firmware/esp32-c3-multi-sensor.yaml` template still contains it and will be cleaned up separately if the setting remains inert).
 
 ---
 
