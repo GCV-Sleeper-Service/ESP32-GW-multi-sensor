@@ -1183,16 +1183,23 @@ static void schedule_reboot_() {
 // ESPHome/ESP-IDF) is never exposed to NVS frames.
 // Pattern mirrors the existing schedule_reboot_() / reboot_task_ pair.
 
+static volatile bool s_delete_data_in_progress = false;
+
 static void delete_data_task_(void *) {
   bool ok = clear_persisted_history_();
   if (!ok) {
     ESP_LOGE(TAG, "delete_data task: clear_persisted_history_() failed");
   }
+  s_delete_data_in_progress = false;
   vTaskDelete(nullptr);
 }
 
 static void schedule_delete_data_() {
-  xTaskCreate(delete_data_task_, "hist_delete", 8192, nullptr, 1, nullptr);
+  BaseType_t ret = xTaskCreate(delete_data_task_, "hist_delete", 8192, nullptr, 1, nullptr);
+  if (ret != pdPASS) {
+    ESP_LOGE(TAG, "schedule_delete_data_: xTaskCreate failed (ret=%d)", (int)ret);
+    s_delete_data_in_progress = false;
+  }
 }
 
 
@@ -1893,6 +1900,8 @@ static void aggregator_poll_task(void* arg) {
 // Runs NVS-heavy satellite reset on its own 8 KB stack so the httpd task
 // (hardcoded 4 KB by ESPHome/ESP-IDF) is never exposed to NVS frames.
 
+static volatile bool s_reset_satellites_in_progress = false;
+
 static void reset_satellites_task_(void *) {
   // Erase the NVS satellite namespace
   nvs_handle_t nvs;
@@ -1929,11 +1938,16 @@ static void reset_satellites_task_(void *) {
 
   ESP_LOGI(TAG_AGG, "Factory reset complete: %d compile-time satellites restored",
            MAX_SATELLITES);
+  s_reset_satellites_in_progress = false;
   vTaskDelete(nullptr);
 }
 
 static void schedule_reset_satellites_() {
-  xTaskCreate(reset_satellites_task_, "agg_reset_sats", 8192, nullptr, 1, nullptr);
+  BaseType_t ret = xTaskCreate(reset_satellites_task_, "agg_reset_sats", 8192, nullptr, 1, nullptr);
+  if (ret != pdPASS) {
+    ESP_LOGE(TAG_AGG, "schedule_reset_satellites_: xTaskCreate failed (ret=%d)", (int)ret);
+    s_reset_satellites_in_progress = false;
+  }
 }
 
 static void start_aggregator_task() {
@@ -2529,10 +2543,16 @@ class HistoryWebHandler : public AsyncWebHandler {
   void handle_delete_data_(AsyncWebServerRequest *request) const {
     if (!authenticate_management_(request)) return;
 
+    if (s_delete_data_in_progress) {
+      send_json_error_(request, 409, "Delete already in progress");
+      return;
+    }
+    s_delete_data_in_progress = true;
+
     // Respond immediately — NVS erase deferred to delete_data_task_
     auto *resp = request->beginResponseStream("application/json");
     add_common_headers_(resp);
-    resp->print("{\"ok\":true,\"message\":\"Persisted and RAM history cleared\"}");
+    resp->print("{\"ok\":true,\"message\":\"History clearing scheduled\"}");
     request->send(resp);
 
     schedule_delete_data_();
@@ -3583,12 +3603,18 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
     if (!authenticate_management_(request)) return;
 
+    if (s_reset_satellites_in_progress) {
+      send_json_error_(request, 409, "Satellite reset already in progress");
+      return;
+    }
+    s_reset_satellites_in_progress = true;
+
     // Respond immediately — NVS work is deferred to reset_satellites_task_
     // which runs on its own 8 KB stack (httpd task stack is hardcoded 4 KB
     // by ESPHome and cannot be increased via sdkconfig).
     char body[128];
     snprintf(body, sizeof(body),
-             "{\"ok\":true,\"message\":\"Reset to compile-time defaults\","
+             "{\"ok\":true,\"message\":\"Satellite reset scheduled\","
              "\"satellite_count\":%d}",
              MAX_SATELLITES);
     auto *resp = request->beginResponse(200, "application/json", body);
