@@ -108,13 +108,13 @@ Before merging the v7.6.0.1 PR:
 
 - [ ] v7.6.0.0 merged and tagged (`v7.6.0.0`)
 - [ ] Device testing completed:
-  - [ ] Test 1: Add a satellite via curl (expected: 200 with satellite JSON)
+  - [ ] Test 1: Add a satellite via curl: `curl -d 'a=1' "http://192.168.120.191/api/aggregator/add-satellite?url=http://192.168.120.189&name=Test+Satellite"` (expected: 200 with satellite JSON)
   - [ ] Test 2: Verify new satellite appears in `/api/aggregator/gateways` after poll cycle
   - [ ] Test 3: Duplicate URL rejection (expected: 409 "URL already configured")
   - [ ] Test 4: Missing URL parameter (expected: 400 "Missing url parameter")
   - [ ] Test 5: Bad URL format (expected: 400 "URL must start with http://")
   - [ ] Test 6: Unreachable URL (expected: 400 "Satellite unreachable or invalid manifest")
-  - [ ] Test 7: Reboot persistence — added satellite still present after reboot
+  - [ ] Test 7: Reboot persistence: `curl -d 'a=1' -u ESPadmin:ESppass100 http://192.168.120.191/api/reboot` then verify
 - [ ] All Playwright fixture sets passing:
   ```bash
   FIXTURE_SET=3sensor npx playwright test --project=chromium
@@ -161,6 +161,33 @@ These are back-ported from the v7.6.0.0 PR #98 + PR #99 review. The v7.6.0.1 pro
 **Source:** v7.6.0.0 PR #98. Copilot reviewer noted that `init_satellite_caches_()` runs without acquiring `s_cache_mutex`. The ESPHome startup sequence guarantees `aggregator_poll_task()` init completes before the web server accepts connections, so the current implementation is safe. However, the absence of a mutex creates technical debt if startup ordering ever changes.
 
 **Rule:** For v7.6.0.1, the startup ordering guarantee holds. If init-time code is added in future steps, verify it runs before web handlers can fire. Future consideration: wrap init in the same mutex for defense-in-depth once runtime mutators are active.
+
+### Post-v7.6.0.0 stabilization (BUG-075/076, LESSON-OPS-097–102, Critical Rules 38–42)
+
+After v7.6.0.0 merged, device testing revealed that **every POST request with a body crashed the S3 aggregator**. Three days of investigation (PR #101, #102, #103, #104, #105) led to the root cause and fix:
+
+**Root cause:** ESP-IDF's `HTTPD_DEFAULT_CONFIG()` hardcodes `.stack_size = 4096`. ESPHome's `web_server_idf.cpp` never overrides it. `CONFIG_HTTPD_STACK_SIZE` in `sdkconfig_options` is dead config with zero runtime effect. Even the lightest handler (auth check + 401 response) overflows 4 KB.
+
+**Primary fix:** Local ESPHome component override in `firmware/local_components/web_server_idf/` patches `config.stack_size = 16384`. Managed by `scripts/patch-esphome-httpd-stack.sh` (re-run after ESPHome upgrades). Board profiles include `external_components` block.
+
+**Secondary fix:** Deferred task pattern for NVS-heavy handlers (`handle_reset_satellites_()`, `handle_delete_data_()`): authenticate → respond → `xTaskCreate` with 8192-byte stack for NVS work.
+
+**Content-type fix:** ESPHome only consumes `application/x-www-form-urlencoded` POST bodies. JSON bodies corrupt socket state. All dashboard `fetch()` POST calls use `Content-Type: application/x-www-form-urlencoded` with `body: 'a=1'`. All curl POST commands use `-d 'a=1'`.
+
+**New lessons (full text in `Docs/bugs-and-lessons-learned.md`):**
+- **LESSON-OPS-097:** Never commit generated files while operator configs are present
+- **LESSON-OPS-098:** `sdkconfig_options` must be in board profiles, not templates
+- **LESSON-OPS-099:** ESPHome only consumes `x-www-form-urlencoded` POST bodies
+- **LESSON-OPS-100:** `CONFIG_HTTPD_STACK_SIZE` is dead config
+- **LESSON-OPS-101:** Deferred task pattern for NVS-heavy HTTP handlers
+- **LESSON-OPS-102:** httpd stack must be patched via local component override
+
+**New Critical Rules (42 total — was 35):**
+- **Rule 38:** Dashboard POST → `x-www-form-urlencoded`, `body: 'a=1'`
+- **Rule 39:** curl POST → `-d 'a=1'`, never `-H "Content-Length: 0"`
+- **Rule 40:** NVS bulk ops in HTTP handler → deferred task pattern
+- **Rule 41:** Never add `CONFIG_HTTPD_STACK_SIZE` to board profiles
+- **Rule 42:** Board profiles must include `external_components` for patched `web_server_idf`
 
 ---
 
