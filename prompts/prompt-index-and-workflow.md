@@ -316,7 +316,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 38 | All dashboard `fetch()` POST calls must use `Content-Type: application/x-www-form-urlencoded` with `body: 'a=1'`. ESPHome does not consume JSON POST bodies. | BUG-076 / LESSON-OPS-099 |
 | 39 | All `curl` POST commands must use `-d 'a=1'`. Never use `-H "Content-Type: application/json"`, never use `-d ''`, never use bare `-X POST` without a body. | BUG-076 / LESSON-OPS-099 |
 | 40 | Any HTTP handler performing NVS operations must use the deferred task pattern (`xTaskCreate`, 8192+ byte stack). Never perform NVS work synchronously in an HTTP handler. | BUG-075 / LESSON-OPS-100/101 |
-| 41 | Never add `CONFIG_HTTPD_STACK_SIZE` to any board profile `sdkconfig_options`. It has zero runtime effect — ESPHome hardcodes the httpd task stack at 4 KB and ignores this setting. | BUG-075 / LESSON-OPS-100 |
+| 41 | Never add `CONFIG_HTTPD_STACK_SIZE` to any board profile `sdkconfig_options` in `firmware/boards/*.yaml` or in generated board YAMLs. It has zero runtime effect — ESPHome hardcodes the httpd task stack at 4 KB and ignores this setting. The legacy `firmware/esp32-c3-multi-sensor.yaml` template is exempt from this rule. | BUG-075 / LESSON-OPS-100 |
 
 ---
 
