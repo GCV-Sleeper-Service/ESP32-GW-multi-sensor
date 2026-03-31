@@ -195,9 +195,6 @@ var SENSOR_COLORS = ['#fbbf24', '#f87171', '#34d399', '#60a5fa'];
 
 // <<< SENSOR_MANIFEST:DEFAULT_SENSOR_META_BEGIN >>>
 var DEFAULT_SENSOR_META = [
-  { id: 'office', name: 'Office' },
-  { id: 'first_floor', name: 'First Floor' },
-  { id: 'outside', name: 'Outside' },
 ];
 // <<< SENSOR_MANIFEST:DEFAULT_SENSOR_META_END >>>
 

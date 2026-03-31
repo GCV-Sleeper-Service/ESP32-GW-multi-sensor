@@ -18,6 +18,11 @@ capabilities:
   psram: false
   dual_core: true
   ram_kb: 520
+external_components:
+  - source:
+      type: local
+      path: local_components
+    components: [web_server_idf]
 notes: "Original ESP32. Dual core with more RAM than C3 but older BLE. 4MB flash same as C3."
 logger:
   baud_rate: 0

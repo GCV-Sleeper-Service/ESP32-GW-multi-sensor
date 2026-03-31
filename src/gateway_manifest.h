@@ -10,10 +10,10 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
   "source": "active-manifest",
   "version": "v7.6.0.0",
   "gateway": {
-    "id": "gw-main",
-    "name": "Main Gateway",
-    "role": "satellite",
-    "hardware": "ESP32-C3",
+    "id": "agg-s3-16m-1",
+    "name": "S3 Aggregator",
+    "role": "aggregator",
+    "hardware": "ESP32-S3",
     "firmware_version": "v7.6.0.0",
     "api_version": "v2"
   },
@@ -23,7 +23,7 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
     "ram_window_hours": 24,
     "sample_interval_seconds": 900
   },
-  "sensor_count": 5,
+  "sensor_count": 1,
   "metrics": [
     {
       "key": "temp",
@@ -172,63 +172,6 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
   ],
   "sensors": [
     {
-      "id": "office",
-      "name": "Office",
-      "category": "environmental",
-      "adapter": "thermopro_ble",
-      "source": {
-        "mac": "DB:06:2C:58:8A:59"
-      },
-      "measurements": [
-        {
-          "key": "temp",
-          "history_url": "/history/office/temp"
-        },
-        {
-          "key": "hum",
-          "history_url": "/history/office/hum"
-        }
-      ]
-    },
-    {
-      "id": "first_floor",
-      "name": "First Floor",
-      "category": "environmental",
-      "adapter": "thermopro_ble",
-      "source": {
-        "mac": "D5:D8:4C:25:06:49"
-      },
-      "measurements": [
-        {
-          "key": "temp",
-          "history_url": "/history/first_floor/temp"
-        },
-        {
-          "key": "hum",
-          "history_url": "/history/first_floor/hum"
-        }
-      ]
-    },
-    {
-      "id": "outside",
-      "name": "Outside",
-      "category": "environmental",
-      "adapter": "thermopro_ble",
-      "source": {
-        "mac": "DF:EB:DE:19:11:6C"
-      },
-      "measurements": [
-        {
-          "key": "temp",
-          "history_url": "/history/outside/temp"
-        },
-        {
-          "key": "hum",
-          "history_url": "/history/outside/hum"
-        }
-      ]
-    },
-    {
       "id": "wan_ping",
       "name": "WAN Latency",
       "category": "network",
@@ -244,32 +187,6 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
         {
           "key": "success_pct",
           "history_url": "/api/v2/history/wan_ping/success_pct"
-        }
-      ]
-    },
-    {
-      "id": "nas01",
-      "name": "NAS Health",
-      "category": "system",
-      "adapter": "external_push",
-      "source": {
-        "description": "Pushed via /api/ingest from NAS cron job"
-      },
-      "measurements": [
-        {
-          "key": "cpu_pct",
-          "history_url": "/api/v2/history/nas01/cpu_pct"
-        },
-        {
-          "key": "ram_pct",
-          "history_url": "/api/v2/history/nas01/ram_pct"
-        },
-        {
-          "key": "disk_pct",
-          "history_url": "/api/v2/history/nas01/disk_pct"
-        },
-        {
-          "key": "uptime_hrs"
         }
       ]
     }

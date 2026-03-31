@@ -18,6 +18,11 @@ capabilities:
   psram: true
   dual_core: true
   ram_kb: 512
+external_components:
+  - source:
+      type: local
+      path: local_components
+    components: [web_server_idf]
 notes: "Recommended aggregator board. 16MB flash allows 4MB history partition."
 logger:
-  baud_rate: 115200
+  baud_rate: 0
