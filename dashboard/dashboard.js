@@ -1889,9 +1889,9 @@ function postManagementAction(path, busyText, actionLabel) {
           cache: 'no-store',
           headers: {
             'Authorization': 'Basic ' + btoa(creds.username + ':' + creds.password),
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/x-www-form-urlencoded'
           },
-          body: '{}'
+          body: 'a=1'
         });
     })
     .then(function(r) {
@@ -2248,9 +2248,9 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
             cache: 'no-store',
             headers: {
               'Authorization': authHeader,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: '{}'
+            body: 'a=1'
           },
           'begin',
           statusEl
@@ -2280,9 +2280,9 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
                 cache: 'no-store',
                 headers: {
                   'Authorization': authHeader,
-                  'Content-Type': 'application/json'
+                  'Content-Type': 'application/x-www-form-urlencoded'
                 },
-                body: '{}'
+                body: 'a=1'
               },
               'batch ' + (idx + 1) + ' of ' + batches.length,
               statusEl
@@ -2307,9 +2307,9 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
             cache: 'no-store',
             headers: {
               'Authorization': authHeader,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: '{}'
+            body: 'a=1'
           },
           'finish',
           statusEl
