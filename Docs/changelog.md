@@ -31,12 +31,15 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ### Post-merge v7.6.0.0 stabilization fixups (2026-03-30)
 
-- **BUG-076 mitigation:** Dashboard POST requests now send explicit JSON body and content-type for management/import actions (`body: '{}'`, `Content-Type: application/json`) in both `dashboard.js` and embedded `dashboard.html`.
-- **BUG-076 mitigation:** Route matching was refactored to share a POST/OPTIONS allowlist and zero-length POST rejection is scoped to management endpoints only (`/api/reboot`, `/api/delete-data`, `/api/system/reset-satellites`, and aggregator management stubs), preserving URL-bodyless import compatibility.
-- **BUG-075/076 hardening:** Runtime management stubs now require Basic auth via `authenticate_management_()`.
-- **BUG-075 follow-up:** Board profile `sdkconfig_options` aligned for runtime stability:
-  - S3: `CONFIG_LWIP_MAX_SOCKETS=24`, `CONFIG_HTTPD_STACK_SIZE=24576` (temporary high-water mitigation pending final hardware verification)
-  - C3/WROOM: `CONFIG_LWIP_MAX_SOCKETS=18`, `CONFIG_HTTPD_STACK_SIZE=8192`
+- **BUG-075/076 root-cause fix:** Management POST handlers (`/api/system/reset-satellites`,
+  `/api/delete-data`) now use the deferred task pattern — authenticate + respond immediately
+  on the httpd task, then spawn an `xTaskCreate` task (8192-byte stack) for all NVS work.
+  Root cause: ESPHome's `web_server_idf.cpp` hardcodes httpd task stack at 4 KB via
+  `HTTPD_DEFAULT_CONFIG()` and never overrides it. `CONFIG_HTTPD_STACK_SIZE` in
+  `sdkconfig_options` has no effect and has been removed from all board profiles.
+- **BUG-076 content-type fix:** Dashboard POST calls changed from `application/json`
+  to `application/x-www-form-urlencoded` with `body: 'a=1'`. ESPHome only consumes
+  form-encoded POST bodies; JSON bodies are not read, corrupting socket state.
 
 ### Architecture
 

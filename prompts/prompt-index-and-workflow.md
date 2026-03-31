@@ -1,7 +1,7 @@
 # Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-03-29 — v7.6.0.0 complete (Phase D Step 0), v7.6.0.1 prompt updated, Rules 36–37 added, LESSON-OPS-090–096_
+_Last updated: 2026-03-31 — v7.6.0.0 post-merge fixups complete; Critical Rules 38–41 added, LESSON-OPS-099–101_
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -313,6 +313,10 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 35 | Python network/file resources must use context managers (`with`) in long-running modes | Phase 6.3 audit finding |
 | 36 | Device testing firmware commands must reference the GENERATED YAML for the target board — never use the committed C3 template (`esp32-c3-multi-sensor.yaml`) for non-C3 boards. Generated YAMLs are gitignored and only exist after `render_sensor_config.py --write`. | LESSON-OPS-090 |
 | 37 | Regeneration pipeline must include `minify-dashboard.sh` before `generate-header.sh`. Full pipeline: `render_sensor_config.py --write` → `generate-fixtures.js` → `minify-dashboard.sh` → `generate-header.sh` → `render_sensor_config.py --check` | LESSON-OPS-091 |
+| 38 | All dashboard `fetch()` POST calls must use `Content-Type: application/x-www-form-urlencoded` with `body: 'a=1'`. ESPHome does not consume JSON POST bodies. | BUG-076 / LESSON-OPS-099 |
+| 39 | All `curl` POST commands must use `-d 'a=1'`. Never use `-H "Content-Type: application/json"`, never use `-d ''`, never use bare `-X POST` without a body. | BUG-076 / LESSON-OPS-099 |
+| 40 | Any HTTP handler performing NVS operations must use the deferred task pattern (`xTaskCreate`, 8192+ byte stack). Never perform NVS work synchronously in an HTTP handler. | BUG-075 / LESSON-OPS-100/101 |
+| 41 | Never add `CONFIG_HTTPD_STACK_SIZE` to any board profile `sdkconfig_options` in `firmware/boards/*.yaml` or in generated board YAMLs. It has zero runtime effect — ESPHome hardcodes the httpd task stack at 4 KB and ignores this setting. The legacy `firmware/esp32-c3-multi-sensor.yaml` template is exempt from this rule. | BUG-075 / LESSON-OPS-100 |
 
 ---
 
@@ -368,6 +372,19 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-03-31 — BUG-075/076 Root Cause Resolved; Critical Rules 38–41 Added
+
+**Context:** PR #105 branch — dashboard content-type fixes, generated file regeneration, documentation updates.
+
+**What was updated and why:**
+
+| Change | Why |
+|--------|-----|
+| **Critical Rules 38–41 added** | httpd stack hardcoded at 4 KB by ESPHome — CONFIG_HTTPD_STACK_SIZE inert. Deferred task pattern required for NVS handlers. ESPHome only supports form-urlencoded POST. Rules 38/39 content-type corrected from application/json to application/x-www-form-urlencoded. |
+| **BUG-075/076 root cause resolved** | httpd task stack hardcoded at 4 KB by ESPHome; deferred task pattern (xTaskCreate 8192-byte stack) applied to management handlers |
+| **dashboard.js / dashboard.html content-type fixed** | Changed from `application/json` to `application/x-www-form-urlencoded`; `body: '{}'` → `body: 'a=1'` |
+| **LESSON-OPS-099–101 added** | ESPHome POST body consumption rules; httpd stack limit; deferred task pattern |
 
 ### 2026-03-29 — v7.6.0.0 Complete (Phase D Step 0)
 
