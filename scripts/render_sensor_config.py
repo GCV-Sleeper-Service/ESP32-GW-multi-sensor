@@ -677,6 +677,7 @@ def generate_board_yaml(
     framework = board_profile['framework']
     sdkconfig = board_profile.get('sdkconfig_options', {})
     psram_config = board_profile.get('psram')
+    ext_components = board_profile.get('external_components')
     friendly_name = gateway_config.get('friendly_name', f'{board_id} Gateway')
     esphome_name = gateway_config['esphome_name']
     wifi_address = gateway_config['wifi_address']
@@ -779,6 +780,20 @@ def generate_board_yaml(
         lines.append("psram:")
         lines.append(f"  mode: {psram_config['mode']}")
         lines.append(f"  speed: {psram_config['speed']}")
+        lines.append("")
+
+
+    # External components (if present in profile)
+    if ext_components:
+        lines.append("external_components:")
+        for ec in ext_components:
+            source = ec.get("source", {})
+            lines.append("  - source:")
+            for sk, sv in source.items():
+                lines.append(f"      {sk}: {sv}")
+            if "components" in ec:
+                comp_list = ec["components"]
+                lines.append(f"    components: {comp_list}")
         lines.append("")
 
     # Logger

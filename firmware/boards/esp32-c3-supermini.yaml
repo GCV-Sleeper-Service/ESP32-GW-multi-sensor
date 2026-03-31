@@ -9,10 +9,15 @@ partitions: "../partitions/esp32-c3-multi-partitions.csv"
 framework:
   type: "esp-idf"
 sdkconfig_options:
-  CONFIG_LWIP_MAX_SOCKETS: "16"
+  CONFIG_LWIP_MAX_SOCKETS: "18"
 capabilities:
   ble: true
   psram: false
   dual_core: false
   ram_kb: 320
+external_components:
+  - source:
+      type: local
+      path: local_components
+    components: [web_server_idf]
 notes: "Default satellite board. Not recommended for aggregation (single core, limited RAM)."

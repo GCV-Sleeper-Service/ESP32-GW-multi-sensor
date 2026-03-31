@@ -2,8 +2,7 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
----
-## [v7.6.0.1] — 2026-03-30 — httpd Stack Overflow Fix (BUG-049)
+## [v7.6.0.0-fixup-1] — 2026-03-30 — httpd Stack Overflow Fix (BUG-049)
 
 ### Bug Fixes
 
@@ -29,6 +28,18 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 - **`save_satellites_to_nvs_()`:** Writes all satellites to NVS (full rewrite — erases stale keys first).
 - **`save_single_satellite_to_nvs_()`:** Writes a single satellite entry + updated count (optimisation for add operations in future steps).
 - **`POST /api/system/reset-satellites`:** Factory reset endpoint — erases the NVS satellite namespace and reloads compile-time defaults. Returns `{"ok":true,"message":"Reset to compile-time defaults","satellite_count":N}`.
+
+### Post-merge v7.6.0.0 stabilization fixups (2026-03-30)
+
+- **BUG-075/076 root-cause fix:** Management POST handlers (`/api/system/reset-satellites`,
+  `/api/delete-data`) now use the deferred task pattern — authenticate + respond immediately
+  on the httpd task, then spawn an `xTaskCreate` task (8192-byte stack) for all NVS work.
+  Root cause: ESPHome's `web_server_idf.cpp` hardcodes httpd task stack at 4 KB via
+  `HTTPD_DEFAULT_CONFIG()` and never overrides it. `CONFIG_HTTPD_STACK_SIZE` in
+  `sdkconfig_options` has no effect and has been removed from all board profiles.
+- **BUG-076 content-type fix:** Dashboard POST calls changed from `application/json`
+  to `application/x-www-form-urlencoded` with `body: 'a=1'`. ESPHome only consumes
+  form-encoded POST bodies; JSON bodies are not read, corrupting socket state.
 
 ### Architecture
 

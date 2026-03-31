@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-25 — v7.5.5.5-hotfix (fixture fragility guard, LESSON-OPS-077)._
+_Last updated: 2026-03-31 — v7.6.0.0 post-merge fixups (BUG-075/076, LESSON-OPS-097–101)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,59 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-076 — POST requests with any body crash S3 aggregator (v7.6.0.0 fixup)
+
+**Symptom:** Same crash as BUG-075 (`StoreProhibited` / `vPortYieldFromInt`).
+All POST requests with a body crash the board — `application/x-www-form-urlencoded`,
+`application/json`, any content type, any non-zero body size.
+
+**Root cause:** BUG-075 (httpd task stack overflow). The body presence is not
+the cause — it is what triggers our handler code, which then overflows the stack.
+
+**Secondary issue:** `dashboard.js` and `dashboard.html` sent
+`Content-Type: application/json` with `body: '{}'`. ESPHome's
+`request_post_handler` does not consume JSON POST bodies — it falls through to
+the GET handler path without reading the socket, corrupting socket state for
+subsequent responses. This is a secondary crash vector layered on top of BUG-075.
+
+**Fix:** (1) BUG-075 deferred task fix resolves the primary crash.
+(2) Dashboard POST calls changed to `Content-Type: application/x-www-form-urlencoded`
+with `body: 'a=1'` to use the only body type ESPHome actually consumes.
+
+**Prevention:** See LESSON-OPS-099, LESSON-OPS-100, LESSON-OPS-101.
+Critical Rules 38–41.
+
+### BUG-075 — httpd task stack overflow on S3 aggregator — management POST handlers (v7.6.0.0 fixup)
+
+**Symptom:** Every POST request with a body to any management endpoint
+(`/api/system/reset-satellites`, `/api/delete-data`) crashes the S3 aggregator
+with `StoreProhibited` in `vPortYieldFromInt`, `EXCVADDR: 0xfffffec0`, fully
+corrupted backtrace. 100% reproducible, independent of satellite polling state.
+
+**Root cause:** ESP-IDF's `HTTPD_DEFAULT_CONFIG()` macro hardcodes
+`.stack_size = 4096` as a literal integer. ESPHome's `web_server_idf.cpp`
+(confirmed at build path `src/esphome/components/web_server_idf/web_server_idf.cpp`,
+lines 123–133) calls `httpd_start()` with `HTTPD_DEFAULT_CONFIG()` and never
+overrides `stack_size`. The httpd task therefore runs at 4 KB regardless of any
+`CONFIG_HTTPD_STACK_SIZE` sdkconfig setting — that setting is dead code.
+`handle_reset_satellites_()` performed two full NVS open/write/commit cycles,
+AGG_LOCK/UNLOCK, a satellite loop with string copies, and save_satellites_to_nvs_() —
+far exceeding 4 KB. `handle_delete_data_()` called `nvs_flash_erase_partition()` —
+same overflow.
+
+**Non-fixes attempted:**
+- `CONFIG_HTTPD_STACK_SIZE: "24576"` in board profiles → no effect
+- `CONFIG_HTTPD_STACK_SIZE: "65536"` → same crash
+- Stopping satellite polling → same crash (race condition ruled out)
+
+**Fix:** Deferred task pattern. `handle_reset_satellites_()` and
+`handle_delete_data_()` now authenticate + send HTTP response immediately +
+spawn a dedicated `xTaskCreate` task (8192-byte stack) that performs all NVS
+work. Pattern mirrors the existing `schedule_reboot_()` implementation.
+`handle_reboot_()` was already correct.
+
+**Prevention:** See LESSON-OPS-100 and LESSON-OPS-101.
 
 ### BUG-074 — Aggregator manifest buffer truncation produces broken JSON (v7.5.7.0)
 
@@ -1214,6 +1267,43 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-098: `sdkconfig_options` must be updated in board profiles, not only templates (2026-03-30)
+
+For multi-board builds, generated YAMLs inherit `sdkconfig_options` from `firmware/boards/*.yaml`. Updating only a template YAML can appear to fix one local build while leaving other board builds unchanged. Apply socket/stack changes to all relevant board profiles and verify generated outputs before release testing.
+
+### LESSON-OPS-099: ESPHome IDF httpd only consumes x-www-form-urlencoded POST bodies (2026-03-30)
+
+ESPHome's `web_server_idf` component only reads POST body bytes for
+`Content-Type: application/x-www-form-urlencoded` and `multipart/form-data`.
+For `application/json`, it logs "Unsupported content type for POST" and routes
+to the GET handler path without consuming body bytes. Unconsumed bytes corrupt
+socket state when the response is sent. All dashboard POST calls and curl POST
+commands must use `Content-Type: application/x-www-form-urlencoded` with
+`body: 'a=1'`. Codified as Critical Rules 38 and 39.
+
+### LESSON-OPS-100: ESPHome httpd task stack is hardcoded at 4 KB — CONFIG_HTTPD_STACK_SIZE has no effect (2026-03-30)
+
+`HTTPD_DEFAULT_CONFIG()` in ESP-IDF hardcodes `.stack_size = 4096` as a literal.
+ESPHome's `web_server_idf.cpp` never overrides this. `CONFIG_HTTPD_STACK_SIZE` in
+`sdkconfig_options` is completely inert — do not add it to any board profile.
+The only way to get more stack to an HTTP handler is to offload heavy work to a
+separately spawned `xTaskCreate` task. Codified as Critical Rules 40 and 41.
+
+### LESSON-OPS-101: Deferred task pattern for NVS-heavy HTTP handlers (2026-03-30)
+
+HTTP request handlers share the httpd task's 4 KB stack. Any handler performing
+NVS operations, mutex acquisition, or substantial string work will overflow it.
+Use the deferred task pattern: handler authenticates, sends HTTP response, then
+calls `xTaskCreate` to spawn a task (minimum 8192 bytes for NVS work) that does
+the heavy lifting. The spawned task must call `vTaskDelete(nullptr)` when done.
+This is the pattern already used by `schedule_reboot_()` / `reboot_task_`.
+Minimum task stack for NVS operations: 8192 bytes. Add
+`uxTaskGetStackHighWaterMark()` logging before release to confirm sizing.
+
+### LESSON-OPS-097: Never commit generated artifacts while operator configs are present (2026-03-30)
+
+When local operator config files (`config/gateway.json`, `config/aggregator.json`) are present, running `render_sensor_config.py --write` can produce environment-specific generated files that diverge from CI defaults. Move operator configs aside before generating commit-bound artifacts to prevent accidental local-state leakage.
 
 ### LESSON-OPS-085: Validate fetched content wasn't truncated before embedding in composed JSON responses (2026-03-28)
 

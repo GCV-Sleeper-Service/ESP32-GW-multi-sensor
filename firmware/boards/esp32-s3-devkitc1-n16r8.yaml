@@ -9,7 +9,7 @@ partitions: "../partitions/esp32-s3-multi-partitions.csv"
 framework:
   type: "esp-idf"
 sdkconfig_options:
-  CONFIG_LWIP_MAX_SOCKETS: "16"
+  CONFIG_LWIP_MAX_SOCKETS: "24"
 psram:
   mode: "octal"
   speed: "80MHz"
@@ -18,6 +18,11 @@ capabilities:
   psram: true
   dual_core: true
   ram_kb: 512
+external_components:
+  - source:
+      type: local
+      path: local_components
+    components: [web_server_idf]
 notes: "Recommended aggregator board. 16MB flash allows 4MB history partition."
 logger:
   baud_rate: 0
