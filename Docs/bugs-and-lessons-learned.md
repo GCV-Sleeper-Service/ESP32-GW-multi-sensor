@@ -1529,7 +1529,7 @@ code comment whether auth is required and why. If omitted, auth is assumed requi
 
 ---
 
-## LESSON-OPS-089 (legacy) — Preflight checks must be environment-aware
+## LESSON-OPS-089-LEGACY — Preflight checks must be environment-aware
 
 **Context:** Historically (before PR #96), `scripts/preflight.sh` hardcoded `check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"sensor_count": 5'`. This was correct for the C3 satellite profile (3 ThermoPro + wan_ping + nas01 = 5 sensors) but broke when `config/gateway.json` pointed to the S3 aggregator sensor file (`config/sensors-agg-s3-16m-1.json`) which has only 1 sensor (wan_ping).
 
