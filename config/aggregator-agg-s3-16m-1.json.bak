@@ -15,6 +15,13 @@
       "name": "Second satellite - esp32 wroom 4mb flash",
       "base_url": "http://192.168.120.190",
       "poll_interval_seconds": 30
+    },
+    {
+      "id": "sat-esp32-4m-188",
+      "name": "Third satellite - c3 supermini 4mb flash",
+      "base_url": "http://192.168.120.188",
+      "poll_interval_seconds": 30
     }
+
   ]
 }

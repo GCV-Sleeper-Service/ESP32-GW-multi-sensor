@@ -37,6 +37,25 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
   - Board profiles now include `external_components` pointing to the patched component.
   - `render_sensor_config.py` updated to emit `external_components` from board profiles.
 
+### Post-Merge Fixups (v7.6.0.1 fixup — not a version bump)
+
+- **BUG-077: `handle_add_satellite_()` build failure — Arduino `String` type in
+  ESP-IDF code.** The coding agent generated `String url_param` (Arduino type)
+  which passes CI but breaks `esphome compile`. Fixed to `std::string url_param`.
+  Codified as Critical Rule 44.
+
+- **BUG-078: HTTP error responses return status 500 instead of 400/401/405/etc.**
+  `init_response_()` in the local `web_server_idf` component only mapped
+  200/404/409 status codes; everything else defaulted to HTTP 500. This is a
+  pre-existing ESPHome bug inherited by the local component override. Fixed with
+  expanded switch covering all used status codes plus `snprintf` fallback.
+  Codified as Critical Rule 43, LESSON-OPS-103.
+
+- **canHandle() GET routing for POST-only endpoints.** Added `/api/aggregator/add-satellite`
+  and `/api/aggregator/test-satellite` to `canHandle()`'s GET section so the handler
+  can return 405 Method Not Allowed instead of ESPHome dropping the connection.
+
+
 ### New Files
 
 - `scripts/patch-esphome-httpd-stack.sh` — copies and patches ESPHome's

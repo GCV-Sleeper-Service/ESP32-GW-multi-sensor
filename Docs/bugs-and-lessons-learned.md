@@ -9,6 +9,54 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 ## Bug Fixes
 
+### BUG-078 — Local component `init_response_()` maps all non-200/404/409 status codes to HTTP 500 (v7.6.0.1 fixup)
+
+**Symptom:** Device testing of `POST /api/aggregator/add-satellite` error paths
+showed correct JSON body (`"status":400`) but curl reported HTTP 500 for every
+error response. Only 200, 404, and 409 responses had correct HTTP status codes.
+
+**Root cause:** `firmware/local_components/web_server_idf/web_server_idf.cpp`,
+function `AsyncWebServerRequest::init_response_()`. The `switch(code)` block
+created during the BUG-075/076 local component override only had cases for
+200, 404, and 409. The `default` branch mapped to `HTTPD_500`. This is actually
+a pre-existing bug in stock ESPHome's `web_server_idf.cpp` — the local override
+inherited it, and we are the first to use 400/401/405 from handlers.
+
+**Impact:** Every `send_json_error_(request, 400, ...)` call across the entire
+codebase returned HTTP 500 to clients. Authentication failures (401), method
+rejections (405), rate limiting (429), and stub endpoints (501) were all affected.
+The JSON body was always correct — only the HTTP status line was wrong.
+
+**Fix:** Expanded the switch to cover 200, 204, 301, 302, 400, 401, 403, 404,
+405, 408, 409, 429, 500, 501, 503, with a `snprintf` fallback for any
+unrecognized code. Also updated `scripts/patch-esphome-httpd-stack.sh` awareness:
+after re-running the script on ESPHome upgrade, verify the status code switch
+is still intact (the script copies upstream and re-applies only the stack patch).
+
+**Introduced by:** PR #105 (BUG-075/076 fix). Present in stock ESPHome.
+Codified as Critical Rule 43, LESSON-OPS-103.
+
+### BUG-077 — `handle_add_satellite_()` uses Arduino `String` type — ESP-IDF build failure (v7.6.0.1)
+
+**Symptom:** After merging PR #108 and pulling locally, `esphome compile` fails
+at `sensor_history_multi.h` line 3622 (line number varies by local state):
+`error: 'String' was not declared in this scope`.
+
+**Root cause:** The coding agent generated `String url_param = request->getParam("url")->value();`
+using the Arduino `String` type. ESPHome's IDF build target does not have Arduino
+compatibility — only `std::string` is available. The agent's CI sandbox runs
+Playwright/preflight tests but does not perform actual ESP-IDF compilation, so
+the Arduino-ism passed CI.
+
+**Secondary issue:** A first manual fix changed `String` to bare `string` (no
+namespace qualifier), which also fails because the codebase has no
+`using namespace std;` directive.
+
+**Fix:** `std::string url_param = request->getParam("url")->value();`
+
+**Introduced by:** PR #108 (v7.6.0.1).
+Codified as Critical Rule 44, LESSON-OPS-104.
+
 ### BUG-076 — POST requests with any body crash S3 aggregator (v7.6.0.0 fixup)
 
 **Symptom:** Same crash as BUG-075 (`StoreProhibited` / `vPortYieldFromInt`).
@@ -1343,6 +1391,36 @@ The original validation helper silently normalized MAC addresses inside the call
 ---
 
 ## Operational Lessons
+
+### LESSON-OPS-104: Always use `std::string`, never Arduino `String` or bare `string`, in ESP-IDF code (2026-04-01)
+
+The coding agent's sandbox does not perform ESP-IDF compilation — it runs
+Playwright tests and preflight checks only. Arduino-isms like `String` (capital S)
+pass all CI checks but break the real build. When manually fixing, bare `string`
+(no namespace) also fails because this codebase has no `using namespace std;`.
+
+**Rule:** In all `.h`/`.cpp` files compiled under ESP-IDF: always use `std::string`,
+`std::vector`, etc. Never rely on `using namespace std`. Treat any capital-S
+`String` in agent-generated code as a review red flag during PR review.
+Codified as Critical Rule 44.
+
+---
+
+### LESSON-OPS-103: Local component `init_response_()` must map all HTTP status codes used by handlers (2026-04-01)
+
+The `web_server_idf` local component override (`firmware/local_components/web_server_idf/`)
+contains a `switch(code)` in `init_response_()` that maps integer status codes to
+`httpd_resp_set_status()` strings. If a handler uses a status code not in the switch,
+the response silently becomes HTTP 500 regardless of the JSON body content.
+
+**Rule:** After running `scripts/patch-esphome-httpd-stack.sh` (which copies
+upstream and re-applies only the stack patch), manually verify that
+`init_response_()` still contains the expanded status code switch with the
+`snprintf` fallback. The upstream copy may overwrite the expanded switch.
+Consider adding a verification step to the patch script.
+Codified as Critical Rule 43.
+
+---
 
 ### LESSON-OPS-102
 

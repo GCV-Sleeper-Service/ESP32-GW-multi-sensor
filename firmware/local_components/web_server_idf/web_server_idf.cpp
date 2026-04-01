@@ -280,20 +280,30 @@ void AsyncWebServerRequest::redirect(const std::string &url) {
 }
 
 void AsyncWebServerRequest::init_response_(AsyncWebServerResponse *rsp, int code, const char *content_type) {
-  // Set status code - use constants for common codes, default to 500 for unknown codes
+  // Set status code - use ESP-IDF constants for common codes, snprintf for any others.
+  // BUG-078: the original switch only mapped 200/404/409 and defaulted everything else
+  // to 500, silently breaking all 400/401/405/429/501/503 responses.
   const char *status;
+  char status_buf[40];
   switch (code) {
-    case 200:
-      status = HTTPD_200;
-      break;
-    case 404:
-      status = HTTPD_404;
-      break;
-    case 409:
-      status = HTTPD_409;
-      break;
+    case 200: status = HTTPD_200; break;
+    case 204: status = "204 No Content"; break;
+    case 301: status = "301 Moved Permanently"; break;
+    case 302: status = "302 Found"; break;
+    case 400: status = HTTPD_400; break;
+    case 401: status = "401 Unauthorized"; break;
+    case 403: status = "403 Forbidden"; break;
+    case 404: status = HTTPD_404; break;
+    case 405: status = "405 Method Not Allowed"; break;
+    case 408: status = "408 Request Timeout"; break;
+    case 409: status = HTTPD_409; break;
+    case 429: status = "429 Too Many Requests"; break;
+    case 500: status = HTTPD_500; break;
+    case 501: status = "501 Not Implemented"; break;
+    case 503: status = "503 Service Unavailable"; break;
     default:
-      status = HTTPD_500;
+      snprintf(status_buf, sizeof(status_buf), "%d Unknown", code);
+      status = status_buf;
       break;
   }
   httpd_resp_set_status(*this, status);

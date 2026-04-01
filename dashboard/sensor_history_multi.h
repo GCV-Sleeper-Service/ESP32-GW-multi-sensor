@@ -2106,6 +2106,9 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (strcmp(p, "/api/aggregator/gateways") == 0) return true;
       if (strcmp(p, "/api/aggregator/live") == 0) return true;
       if (len > 22 && strncmp(p, "/api/aggregator/proxy/", 22) == 0) return true;
+      // Accept GET so handler can return 405 Method Not Allowed (BUG-078 T4 fix)
+      if (strncmp(p, "/api/aggregator/add-satellite", sizeof("/api/aggregator/add-satellite") - 1) == 0) return true;
+      if (strncmp(p, "/api/aggregator/test-satellite", sizeof("/api/aggregator/test-satellite") - 1) == 0) return true;
 #endif
       return false;
     }
@@ -2206,6 +2209,17 @@ class HistoryWebHandler : public AsyncWebHandler {
         return;
       }
       request->send(404);
+      return;
+    }
+#endif
+    // Route GET to POST-only aggregator endpoints — handlers return 405 (BUG-078 T4)
+#if AGGREGATOR_ENABLED
+    if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) {
+      handle_add_satellite_(request);
+      return;
+    }
+    if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) {
+      handle_aggregator_stub_501_(request);
       return;
     }
 #endif
@@ -3691,7 +3705,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       send_json_error_(request, 400, "Missing url parameter");
       return;
     }
-    String url_param = request->getParam("url")->value();
+    std::string url_param = request->getParam("url")->value();
     const char* url_str = url_param.c_str();
 
     // 2. Validate URL format

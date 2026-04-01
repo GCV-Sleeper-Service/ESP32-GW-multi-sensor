@@ -218,7 +218,7 @@ All steps shipped. No prompts needed.
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
 | v7.6.0.0 | NVS satellite persistence layer | `prompts/phaseD/v7.6.0.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-29 |
-| v7.6.0.1 | POST /api/aggregator/add-satellite | `prompts/phaseD/v7.6.0.1-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.0.1 | POST /api/aggregator/add-satellite | `prompts/phaseD/v7.6.0.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-31 |
 | v7.6.0.2 | DELETE /api/aggregator/satellite/{id} | `prompts/phaseD/v7.6.0.2-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.0.3 | POST /api/aggregator/test-satellite | `prompts/phaseD/v7.6.0.3-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.0.4 | Dashboard add/remove/test UI | `prompts/phaseD/v7.6.0.4-implementation-instructions-for-coding-agent.md` | Pending |
@@ -318,6 +318,9 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 40 | Any HTTP handler performing NVS operations must use the deferred task pattern (`xTaskCreate`, 8192+ byte stack). Never perform NVS work synchronously in an HTTP handler. | BUG-075 / LESSON-OPS-100/101 |
 | 41 | Never add `CONFIG_HTTPD_STACK_SIZE` to any board profile `sdkconfig_options` in `firmware/boards/*.yaml` or in generated board YAMLs. It has zero runtime effect — ESPHome hardcodes the httpd task stack at 4 KB and ignores this setting. The legacy `firmware/esp32-c3-multi-sensor.yaml` template is exempt from this rule. | BUG-075 / LESSON-OPS-100 |
 | 42 | All board profiles must include an `external_components` block referencing `firmware/local_components` for the patched `web_server_idf` component. Without this, the httpd task runs at 4 KB and all POST handlers crash. Run `scripts/patch-esphome-httpd-stack.sh --check` to verify. | BUG-075 / LESSON-OPS-102 |
+| 43 | After re-running `scripts/patch-esphome-httpd-stack.sh` (ESPHome upgrade), verify that `init_response_()` in the local component still contains the expanded HTTP status code switch with `snprintf` fallback. The patch script only applies the stack size line — the status code fix must be preserved manually. | BUG-078 / LESSON-OPS-103 |
+| 44 | Never use Arduino `String` (capital S) or bare `string` in ESP-IDF code. Always use `std::string`. The coding agent's CI does not perform ESP-IDF compilation — Arduino-isms pass CI but break the real build. Treat `String` in agent-generated code as a PR review red flag. | BUG-077 / LESSON-OPS-104 |
+
 ---
 
 ## Prompt File Naming Convention
@@ -372,6 +375,10 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-04-01 — v7.6.0.0 Complete (Phase D Step 1)
+
+| 2026-04-01 | v7.6.0.1 marked complete. Critical Rules 43–44 added (BUG-077/078). PR #108 audit and v7.6.0.2 handoff produced. |
 
 ### 2026-03-31 — BUG-075/076 Root Cause Resolved; Critical Rules 38–42 Added
 
