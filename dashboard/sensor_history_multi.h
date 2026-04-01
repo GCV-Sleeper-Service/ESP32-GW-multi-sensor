@@ -3706,21 +3706,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    // 3. Check capacity
-    if (runtime_satellite_count >= MAX_SATELLITES) {
-      send_json_error_(request, 409, "Satellite list full");
-      return;
-    }
-
-    // 4. Check duplicate URL
-    for (int i = 0; i < runtime_satellite_count; i++) {
-      if (strcmp(satellite_caches[i].base_url, url_str) == 0) {
-        send_json_error_(request, 409, "URL already configured");
-        return;
-      }
-    }
-
-    // 5. Probe the candidate
+    // 3. Probe the candidate
     char probe_id[32] = {0};
     char probe_name[64] = {0};
     if (!probe_satellite_manifest_(url_str, probe_id, sizeof(probe_id),
@@ -3729,7 +3715,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    // 6. Determine name: request param > manifest > derived from URL
+    // 4. Determine name: request param > manifest > derived from URL host[:port]
     char final_name[64];
     if (request->hasParam("name") && request->getParam("name")->value().length() > 0) {
       strncpy(final_name, request->getParam("name")->value().c_str(), sizeof(final_name) - 1);
@@ -3738,17 +3724,35 @@ class HistoryWebHandler : public AsyncWebHandler {
       strncpy(final_name, probe_name, sizeof(final_name) - 1);
       final_name[sizeof(final_name) - 1] = '\0';
     } else {
-      snprintf(final_name, sizeof(final_name), "Satellite %d", runtime_satellite_count + 1);
+      // URL-derived fallback: extract host[:port] from "http://host[:port][/path][?query][#fragment]"
+      constexpr size_t kHttpPrefixLen = sizeof("http://") - 1;
+      const char* host_start = url_str + kHttpPrefixLen;  // URL format validated above
+      const char* host_end = host_start + strlen(host_start);
+      const char* slash = strchr(host_start, '/');
+      const char* qmark = strchr(host_start, '?');
+      const char* hash  = strchr(host_start, '#');
+      if (slash && slash < host_end) host_end = slash;
+      if (qmark && qmark < host_end) host_end = qmark;
+      if (hash  && hash  < host_end) host_end = hash;
+      size_t host_len = (size_t)(host_end - host_start);
+      if (host_len == 0) {
+        strncpy(final_name, "Satellite", sizeof(final_name) - 1);
+        final_name[sizeof(final_name) - 1] = '\0';
+      } else {
+        if (host_len >= sizeof(final_name)) host_len = sizeof(final_name) - 1;
+        memcpy(final_name, host_start, host_len);
+        final_name[host_len] = '\0';
+      }
     }
 
-    // 7. Parse poll interval
+    // 5. Parse poll interval
     int poll_s = 30;
     if (request->hasParam("poll")) {
       long p = strtol(request->getParam("poll")->value().c_str(), nullptr, 10);
       if (p >= 10 && p <= 3600) poll_s = (int)p;
     }
 
-    // 8. Add under mutex
+    // 6. Add under mutex
     int new_idx = -1;
     if (AGG_LOCK() == pdTRUE) {
       // Re-validate capacity and duplicate under lock (TOCTOU protection)
@@ -3775,7 +3779,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    // 9. Persist to NVS (outside mutex — NVS operations can be slow)
+    // 7. Persist to NVS (outside mutex — NVS operations can be slow)
     if (!save_single_satellite_to_nvs_(new_idx)) {
       ESP_LOGE(TAG_AGG, "Failed to persist satellite[%d] to NVS — rolling back", new_idx);
       // Roll back the runtime state: clear the slot and decrement count
@@ -3792,7 +3796,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     ESP_LOGI(TAG_AGG, "Added satellite[%d]: id=%s name=%s url=%s poll=%ds",
              new_idx, probe_id, final_name, url_str, poll_s);
 
-    // 10. Success response
+    // 8. Success response
     // Buffer sized for worst-case: framing(50) + id(31) + name(63) + url(127) + poll(4) + margin
     char body[512];
     snprintf(body, sizeof(body),

@@ -67,8 +67,8 @@ prompt `prompts/phaseD/v7.6.0.1-implementation-instructions-for-coding-agent.md`
 | 6 | Mutex held only during cache mutation, not I/O | ✅ | Probe precedes `AGG_LOCK()` |
 | 7 | Query string params, not JSON body | ✅ | `request->getParam()` only |
 | 8 | No auth on add-satellite | ✅ | Per prompt contract (no auth) |
-| 9 | No dashboard changes | ✅ | |
-| 10 | No test changes | ✅ | |
+| 9 | No functional dashboard changes | ✅ | Version/regeneration artifacts only |
+| 10 | No functional test changes | ✅ | Fixture/version regeneration only |
 | 11 | Version bumped to 7.6.0.1 | ✅ | `bump-version.sh 7.6.0.1` |
 | 12 | `render_sensor_config.py --write` | ✅ | No changes needed |
 | 13 | `generate-fixtures.js` | ✅ | All fixture variants regenerated |
