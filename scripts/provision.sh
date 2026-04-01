@@ -18,7 +18,9 @@ BAK_SENSORS_AGG="$CONFIG_DIR/sensors-agg-s3-16m-1.json.bak"
 BAK_GATEWAY_WROOM="$CONFIG_DIR/gateway-sat-esp32-4m-190.json.bak"
 BAK_SENSORS_WROOM="$CONFIG_DIR/sensors-sat-esp32-4m-190.json.bak"
 
-# Active config file paths (gitignored; created/removed by this script)
+# Active config file paths (created/removed by this script)
+# Note: gateway.json, aggregator.json, and WROOM sensors are gitignored.
+#       sensors-agg-s3-16m-1.json is git-tracked and should never be removed by clean_active_configs.
 ACTIVE_GATEWAY="$CONFIG_DIR/gateway.json"
 ACTIVE_AGGREGATOR="$CONFIG_DIR/aggregator.json"
 ACTIVE_SENSORS_AGG="$CONFIG_DIR/sensors-agg-s3-16m-1.json"
@@ -53,7 +55,13 @@ require_python3() {
 # ---------------------------------------------------------------------------
 detect_current_config() {
   if [[ ! -f "$ACTIVE_GATEWAY" ]]; then
-    echo "c3-default"
+    # If there's an aggregator config without a gateway config, we're in a
+    # partial/unknown state rather than the clean C3 default.
+    if [[ -f "$ACTIVE_AGGREGATOR" ]]; then
+      echo "unknown"
+    else
+      echo "c3-default"
+    fi
     return
   fi
 
@@ -87,6 +95,16 @@ validate_backup_files() {
     if [[ ! -f "$BAK_GATEWAY_WROOM" ]]; then
       echo "ERROR: Required backup file missing: $BAK_GATEWAY_WROOM" >&2
       missing=1
+    else
+      # If the WROOM gateway backup references a sensors_file, ensure the corresponding
+      # WROOM sensors backup also exists so we can fail early instead of during render.
+      require_python3
+      local sensors_file
+      sensors_file=$(python3 -c "import json; c=json.load(open('$BAK_GATEWAY_WROOM')); print(c.get('sensors_file',''))" 2>/dev/null || echo "")
+      if [[ -n "$sensors_file" && ! -f "$BAK_SENSORS_WROOM" ]]; then
+        echo "ERROR: WROOM gateway backup references a sensors_file but sensors backup is missing: $BAK_SENSORS_WROOM" >&2
+        missing=1
+      fi
     fi
   fi
 
@@ -451,7 +469,7 @@ activate_wroom() {
     if [[ -n "$sf" ]]; then
       if [[ -f "$BAK_SENSORS_WROOM" ]]; then
         echo "  Copying WROOM sensors backup (sensors_file: $sf)..."
-        cp "$BAK_SENSORS_WROOM" "$ACTIVE_SENSORS_WROOM"
+        cp "$BAK_SENSORS_WROOM" "$sf"
       else
         echo "  WARNING: gateway references sensors_file but $BAK_SENSORS_WROOM is missing." >&2
       fi
