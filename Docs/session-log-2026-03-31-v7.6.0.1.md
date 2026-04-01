@@ -114,3 +114,28 @@ prompt `prompts/phaseD/v7.6.0.1-implementation-instructions-for-coding-agent.md`
 ## Device Testing (for human post-merge)
 
 See problem statement §11 for full device test sequence (7 tests).
+
+---
+
+## Fix Session — 2026-03-31 (Post-Review)
+
+Applied fixes based on automated review findings from PR #108 reviews.
+
+### Fixes Applied
+- Fix 1: Whitespace-tolerant manifest parser in `probe_satellite_manifest_()` [BLOCKING]
+- Fix 2: Response buffer increased from 256 to 512 bytes [HIGH]
+- Fix 3: In-lock re-validation of capacity and duplicate URL [HIGH]
+- Fix 4: NVS save failure now rolls back runtime state and returns 500 [HIGH]
+- Fix 5: URL length validation before `set_identity()` [MEDIUM]
+- Fix 6: No-auth policy documented in code comment and LESSON-OPS-089 [MEDIUM]
+- Fix 7: `ESP_LOGW` on probe failure (included in Fix 1) [LOW]
+- Fix 8: PR description updated with compliance table and validation evidence [MEDIUM]
+
+### Not Fixed (with rationale)
+- Auth on add-satellite: intentional per prompt contract; documented in LESSON-OPS-089
+- Scope drift of generated files: expected per Critical Rule 28
+- 405 unreachability via canHandle(): deferred to v7.6.0.5 mock contract clarification
+- Free static function accessing s_proxy_tmp: verified s_proxy_tmp is file-scope static (safe)
+- const on handle_add_satellite_(): verified mutation targets are file-scope statics (safe)
+- poll out-of-range defaulting: matches prompt contract (optional param)
+- No Playwright tests: deferred to v7.6.0.5 per prompt constraint

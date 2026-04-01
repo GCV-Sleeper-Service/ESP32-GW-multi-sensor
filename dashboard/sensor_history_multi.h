@@ -1613,11 +1613,12 @@ static bool probe_satellite_manifest_(
   // Use s_proxy_tmp (web handler context only — single-threaded ESPHome loop)
   if (!fetch_to_buffer(url_buf, s_proxy_tmp, (uint16_t)(sizeof(s_proxy_tmp) - 1), &resp_len)
       || resp_len == 0) {
+    ESP_LOGW(TAG_AGG, "probe_satellite_manifest_: unreachable or non-200 at %s", url_buf);
     return false;
   }
   s_proxy_tmp[resp_len] = '\0';
 
-  // Extract gateway.id — look for "gateway":{"id":"..." pattern
+  // Extract gateway.id and gateway.name from the gateway object.
   // Simple strstr parsing (no JSON library on ESP32)
   out_id[0] = '\0';
   out_name[0] = '\0';
@@ -1625,33 +1626,58 @@ static bool probe_satellite_manifest_(
   const char* gw = strstr(s_proxy_tmp, "\"gateway\"");
   if (!gw) return false;
 
-  // Find "id":"<value>" within the gateway object
-  const char* id_key = strstr(gw, "\"id\":\"");
-  if (id_key) {
-    id_key += 6; // skip past "id":"
-    const char* id_end = strchr(id_key, '"');
-    if (id_end) {
-      size_t len = (size_t)(id_end - id_key);
-      if (len >= id_size) len = id_size - 1;
-      memcpy(out_id, id_key, len);
-      out_id[len] = '\0';
+  // Find the closing brace of the gateway object to bound searches.
+  // We look for the next '}' after the "gateway" key — simple but sufficient
+  // for this project's manifest structure (gateway object is shallow).
+  const char* gw_end = strchr(gw + 9, '}');  // 9 = strlen("\"gateway\"")
+  if (!gw_end) gw_end = s_proxy_tmp + resp_len;  // fallback: end of buffer
+
+  // --- Extract "id" ---
+  const char* id_key = strstr(gw, "\"id\"");
+  if (id_key && id_key < gw_end) {
+    const char* p = id_key + 4;  // skip past "id"
+    while (p < gw_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+    if (p < gw_end && *p == ':') {
+      ++p;
+      while (p < gw_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+      if (p < gw_end && *p == '"') {
+        const char* id_val = p + 1;
+        const char* id_end = strchr(id_val, '"');
+        if (id_end && id_end < gw_end + 32) {  // allow small overshoot for closing quote
+          size_t len = (size_t)(id_end - id_val);
+          if (len >= id_size) len = id_size - 1;
+          memcpy(out_id, id_val, len);
+          out_id[len] = '\0';
+        }
+      }
     }
   }
 
-  // Find "name":"<value>" within the gateway object
-  const char* name_key = strstr(gw, "\"name\":\"");
-  if (name_key) {
-    name_key += 8; // skip past "name":"
-    const char* name_end = strchr(name_key, '"');
-    if (name_end) {
-      size_t len = (size_t)(name_end - name_key);
-      if (len >= name_size) len = name_size - 1;
-      memcpy(out_name, name_key, len);
-      out_name[len] = '\0';
+  // --- Extract "name" ---
+  const char* name_key = strstr(gw, "\"name\"");
+  if (name_key && name_key < gw_end) {
+    const char* p = name_key + 6;  // skip past "name"
+    while (p < gw_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+    if (p < gw_end && *p == ':') {
+      ++p;
+      while (p < gw_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+      if (p < gw_end && *p == '"') {
+        const char* name_val = p + 1;
+        const char* name_end = strchr(name_val, '"');
+        if (name_end && name_end < gw_end + 32) {
+          size_t len = (size_t)(name_end - name_val);
+          if (len >= name_size) len = name_size - 1;
+          memcpy(out_name, name_val, len);
+          out_name[len] = '\0';
+        }
+      }
     }
   }
 
   // Must have at least an ID to be a valid manifest
+  if (out_id[0] == '\0') {
+    ESP_LOGW(TAG_AGG, "probe_satellite_manifest_: no gateway.id found in manifest at %s", base_url);
+  }
   return out_id[0] != '\0';
 }
 
@@ -3653,6 +3679,13 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
+    // NOTE: add-satellite intentionally does NOT require authenticate_management_().
+    // Rationale: adding a satellite is a low-risk constructive operation — it only
+    // adds a polling target and does not erase or modify existing data.
+    // Destructive endpoints (reset-satellites, reboot, delete-history) ARE auth-guarded.
+    // This exception is deliberate per v7.6.0.1 prompt contract.
+    // Security follow-up tracked in Docs/bugs-and-lessons-learned.md LESSON-OPS-089.
+
     // 1. Parse query params
     if (!request->hasParam("url")) {
       send_json_error_(request, 400, "Missing url parameter");
@@ -3664,6 +3697,12 @@ class HistoryWebHandler : public AsyncWebHandler {
     // 2. Validate URL format
     if (strncmp(url_str, "http://", 7) != 0) {
       send_json_error_(request, 400, "URL must start with http://");
+      return;
+    }
+
+    // Validate URL length fits the destination buffer (url_buf[128])
+    if (strlen(url_str) >= 128) {
+      send_json_error_(request, 400, "URL too long (max 127 characters)");
       return;
     }
 
@@ -3712,6 +3751,20 @@ class HistoryWebHandler : public AsyncWebHandler {
     // 8. Add under mutex
     int new_idx = -1;
     if (AGG_LOCK() == pdTRUE) {
+      // Re-validate capacity and duplicate under lock (TOCTOU protection)
+      if (runtime_satellite_count >= MAX_SATELLITES) {
+        AGG_UNLOCK();
+        send_json_error_(request, 409, "Satellite list full");
+        return;
+      }
+      for (int i = 0; i < runtime_satellite_count; i++) {
+        if (strcmp(satellite_caches[i].base_url, url_str) == 0) {
+          AGG_UNLOCK();
+          send_json_error_(request, 409, "URL already configured");
+          return;
+        }
+      }
+      // Safe to proceed
       new_idx = runtime_satellite_count;
       satellite_caches[new_idx].set_identity(probe_id, final_name, url_str, poll_s);
       satellite_caches[new_idx].clear_cache();
@@ -3723,13 +3776,25 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
 
     // 9. Persist to NVS (outside mutex — NVS operations can be slow)
-    save_single_satellite_to_nvs_(new_idx);
+    if (!save_single_satellite_to_nvs_(new_idx)) {
+      ESP_LOGE(TAG_AGG, "Failed to persist satellite[%d] to NVS — rolling back", new_idx);
+      // Roll back the runtime state: clear the slot and decrement count
+      if (AGG_LOCK() == pdTRUE) {
+        satellite_caches[new_idx].clear_cache();
+        satellite_caches[new_idx].set_identity("", "", "", 30);
+        runtime_satellite_count--;
+        AGG_UNLOCK();
+      }
+      send_json_error_(request, 500, "Failed to persist satellite to NVS");
+      return;
+    }
 
     ESP_LOGI(TAG_AGG, "Added satellite[%d]: id=%s name=%s url=%s poll=%ds",
              new_idx, probe_id, final_name, url_str, poll_s);
 
     // 10. Success response
-    char body[256];
+    // Buffer sized for worst-case: framing(50) + id(31) + name(63) + url(127) + poll(4) + margin
+    char body[512];
     snprintf(body, sizeof(body),
              "{\"ok\":true,\"satellite\":{\"id\":\"%s\",\"name\":\"%s\",\"url\":\"%s\",\"poll\":%d}}",
              satellite_caches[new_idx].id,
