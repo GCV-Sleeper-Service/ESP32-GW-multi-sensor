@@ -1399,6 +1399,8 @@ static const char* TAG_AGG = "aggregator";
 // the manifest was likely truncated by fetch_to_buffer().
 static constexpr uint16_t AGG_MANIFEST_BUF_SIZE = 8192;
 #endif
+static constexpr size_t AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN =
+    sizeof("/api/aggregator/satellite/") - 1;
 
 struct SatelliteCache {
   const char* id;
@@ -2135,7 +2137,8 @@ class HistoryWebHandler : public AsyncWebHandler {
 
 #if AGGREGATOR_ENABLED
     if (request->method() == HTTP_DELETE) {
-      if (strncmp(p, "/api/aggregator/satellite/", 26) == 0) return true;
+      if (strncmp(p, "/api/aggregator/satellite/",
+                  AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) return true;
     }
 #endif
 
@@ -2216,7 +2219,8 @@ class HistoryWebHandler : public AsyncWebHandler {
 
 #if AGGREGATOR_ENABLED
     if (request->method() == HTTP_DELETE) {
-      if (strncmp(p, "/api/aggregator/satellite/", 26) == 0) {
+      if (strncmp(p, "/api/aggregator/satellite/",
+                  AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) {
         handle_delete_satellite_(request);
         return;
       }
@@ -3847,7 +3851,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
     auto url = request->url_to(url_buf);
     const char* p = url.c_str();
-    const char* id_start = p + 26;  // "/api/aggregator/satellite/"
+    const char* id_start = p + AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN;
     if (*id_start == '\0') {
       send_json_error_(request, 400, "Missing satellite ID");
       return;
