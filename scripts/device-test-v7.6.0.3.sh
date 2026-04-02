@@ -113,7 +113,7 @@ echo ""
 # ── Diagnostics ──────────────────────────────────────────────────────────────
 echo -e "${CYAN}─── Pre-flight diagnostics ───${NC}"
 PRE_SATS=$(get_gateway_ids)
-PRE_COUNT=$(echo "$PRE_SATS" | grep -c '|' || echo "0")
+PRE_COUNT=$(echo "$PRE_SATS" | grep -c '|' || true)
 echo "  Current satellites (${PRE_COUNT}):"
 while IFS='|' read -r sid surl sreachable; do
   [[ -z "$sid" ]] && continue
@@ -177,16 +177,21 @@ echo ""
 
 # ── T4: Verify no side effects ───────────────────────────────────────────────
 echo -e "${CYAN}─── T4: Verify no side effects (satellite count unchanged) ───${NC}"
-POST_SATS=$(get_gateway_ids)
-POST_COUNT=$(echo "$POST_SATS" | grep -c '|' || echo "0")
-echo "  Satellite count before test-satellite: ${PRE_COUNT}"
-echo "  Satellite count after  test-satellite: ${POST_COUNT}"
-if [[ "$PRE_COUNT" == "$POST_COUNT" ]]; then
-  echo -e "  ${GREEN}NO SIDE EFFECTS${NC}: count unchanged (${PRE_COUNT})"
-  record_result "T4: No side effects" "count unchanged" "count unchanged"
+if [[ "$T1_OK" != "true" ]]; then
+  record_skip "T4: No side effects" "T1 did not pass — side-effect check requires a successful test-satellite call"
+  echo -e "  ${YELLOW}SKIP${NC}: T1 did not pass"
 else
-  echo -e "  ${RED}SIDE EFFECT DETECTED${NC}: count changed ${PRE_COUNT} → ${POST_COUNT}"
-  record_result "T4: No side effects" "count unchanged" "count changed (${PRE_COUNT}→${POST_COUNT})"
+  POST_SATS=$(get_gateway_ids)
+  POST_COUNT=$(echo "$POST_SATS" | grep -c '|' || true)
+  echo "  Satellite count before test-satellite: ${PRE_COUNT}"
+  echo "  Satellite count after  test-satellite: ${POST_COUNT}"
+  if [[ "$PRE_COUNT" == "$POST_COUNT" ]]; then
+    echo -e "  ${GREEN}NO SIDE EFFECTS${NC}: count unchanged (${PRE_COUNT})"
+    record_result "T4: No side effects" "count unchanged" "count unchanged"
+  else
+    echo -e "  ${RED}SIDE EFFECT DETECTED${NC}: count changed ${PRE_COUNT} → ${POST_COUNT}"
+    record_result "T4: No side effects" "count unchanged" "count changed (${PRE_COUNT}→${POST_COUNT})"
+  fi
 fi
 echo ""
 
