@@ -215,6 +215,47 @@ Mark v7.6.0.2 as complete with date.
 
 ---
 
+## Forward-Looking Deliverable: v7.6.0.3 Device Test Script
+
+### What was delivered
+
+The automated device test script for v7.6.0.3 (`POST /api/aggregator/test-satellite`) has been created ahead of the v7.6.0.3 implementation:
+
+**File:** `scripts/device-test-v7.6.0.3.sh`
+**Usage:** `bash scripts/device-test-v7.6.0.3.sh [aggregator_ip] [satellite_url]`
+
+This script was derived from:
+1. `prompts/phaseD/v7.6.0.3-implementation-instructions-for-coding-agent.md` — §11 (Device Testing) and §12 (Contract-Lock for Mock)
+2. `scripts/device-test-v7.6.0.2.sh` — structural template
+
+### Tests covered
+
+| # | Test | Source | Expected |
+|---|------|--------|----------|
+| T1 | Test reachable satellite | §11 Test 1 | 200 + ok=true + gateway object with id, name, hardware, sensor_count |
+| T2 | Test unreachable URL | §11 Test 2 | 400 + "Satellite unreachable or invalid manifest" |
+| T3 | Missing URL parameter | §11 Test 3 | 400 + "Missing url parameter" |
+| T4 | Verify no side effects | §11 Test 4 | Gateway count unchanged after test-satellite call |
+| T5 | Bad URL format | §12 contract row | 400 + "URL must start with http://" |
+| T6 | Wrong method (GET) | §12 contract row | 405 + "Method not allowed" |
+| T7 | Wrong method (DELETE) | §12 contract row | 405 + "Method not allowed" |
+
+### ⚠️ Section 11 update caveat
+
+This script was written based on the v7.6.0.3 prompt's §11 as it exists today. **During v7.6.0.3 implementation and review, the coding agent or reviewers may identify additional error paths, edge cases, or contract changes that require updates to §11.**
+
+If the v7.6.0.3 PR review reveals that Section 11 needs to be updated or modified (e.g., new error responses, changed messages, additional test scenarios from review fixes), then **`scripts/device-test-v7.6.0.3.sh` MUST be updated to match** before device testing begins.
+
+The v7.6.0.3 session handoff document (`prompts/handoff/session-handoff-v7.6.0.3.md`) should include a reconciliation step:
+1. Compare the implemented handler's response branches against the test script's expectations
+2. Identify any gaps introduced by review fixes or implementation decisions
+3. Update the test script if needed
+4. Document any changes in the gap analysis table
+
+This follows the same pattern established by BUG-079 in v7.6.0.2, where fixup commits changed routing behavior that was not anticipated by the original test script.
+
+---
+
 ## Device Testing Audit & Automated Script
 
 > **⚠️ MANDATORY SECTION — required in every handoff document.**
