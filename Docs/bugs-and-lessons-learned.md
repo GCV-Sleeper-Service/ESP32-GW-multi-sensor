@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-31 — v7.6.0.0 post-merge fixups (BUG-075/076, LESSON-OPS-097–102)._
+_Last updated: 2026-04-02 — v7.6.0.2 BUG-079 fix (HTTP DELETE routing)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,43 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-079 — `HTTP_DELETE` for `/api/aggregator/satellite/` returns ESP-IDF 405 (v7.6.0.2 fix)
+
+**Symptom:** `DELETE /api/aggregator/satellite/{id}` returns HTTP 405 with plain-text body
+`"Specified method is invalid for this resource"` — the ESP-IDF httpd framework rejecting
+the request before our handler runs.
+
+**Root cause:** Commit `1751649` ("fix: wire 405 for wrong methods") either removed or shadowed
+the `HTTP_DELETE` check in `canHandle()` for the satellite route, causing `canHandle()` to return
+`false` for DELETE requests. The framework then rejects the request with its own plain-text 405
+before our handler ever runs.
+
+Additionally, the `handleRequest()` HTTP_DELETE block called `handle_aggregator_stub_501_()`
+instead of the real `handle_delete_satellite_()` implementation. The GET/POST fallthrough in
+`handleRequest()` was also missing routing for the satellite route (needed to return our JSON 405).
+
+**Evidence:**
+- `GET /api/aggregator/satellite/any-id` → 405 JSON (canHandle true, handler returns 405 — correct)
+- `POST /api/aggregator/satellite/any-id` → 405 JSON (canHandle true, handler returns 405 — correct)
+- `DELETE /api/aggregator/satellite/any-id` → 405 plain-text (canHandle false — BROKEN)
+
+**Fix (PR #110 / BUG-079-fix branch):**
+1. Added `AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN` constant (`sizeof("/api/aggregator/satellite/") - 1`)
+   to replace magic number 26 throughout.
+2. Restored standalone top-level `HTTP_DELETE` block in `canHandle()` (not nested inside any other
+   method's `if`); uses `AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN`.
+3. Added `/api/aggregator/satellite/` to the GET section of `canHandle()` so GET returns our JSON 405.
+4. Added `/api/aggregator/satellite/` to `is_post_or_options_route_()` so POST/OPTIONS return our JSON 405.
+5. Fixed `handleRequest()` HTTP_DELETE block to call `handle_delete_satellite_()` (not the stub).
+6. Added GET/POST→satellite fallthrough in `handleRequest()` so those methods reach `handle_delete_satellite_()`
+   which responds with JSON 405.
+7. Implemented `handle_delete_satellite_()`: auth → find by ID under AGG_LOCK → array compact → send 200 →
+   `schedule_save_satellites_nvs_()` deferred NVS rewrite.
+8. Added `save_satellites_nvs_task_` / `schedule_save_satellites_nvs_()` deferred task scaffold near
+   `schedule_reset_satellites_()` (Critical Rule 40 compliance).
+
+**Introduced by:** Commit `1751649` in PR #110 (`copilot/implement-v7-6-0-2-changes`).
 
 ### BUG-078 — Local component `init_response_()` maps all non-200/404/409 status codes to HTTP 500 (v7.6.0.1 fixup)
 

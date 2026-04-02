@@ -1398,6 +1398,7 @@ static const char* TAG_AGG = "aggregator";
 // Truncation detection: if manifest_len >= AGG_MANIFEST_BUF_SIZE - 1,
 // the manifest was likely truncated by fetch_to_buffer().
 static constexpr uint16_t AGG_MANIFEST_BUF_SIZE = 8192;
+static constexpr size_t AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN = sizeof("/api/aggregator/satellite/") - 1;
 #endif
 
 struct SatelliteCache {
@@ -2038,6 +2039,17 @@ static void schedule_reset_satellites_() {
   }
 }
 
+static void save_satellites_nvs_task_(void *) {
+  save_satellites_to_nvs_();
+  vTaskDelete(nullptr);
+}
+static void schedule_save_satellites_nvs_() {
+  BaseType_t ret = xTaskCreate(save_satellites_nvs_task_, "agg_nvs_save", 8192, nullptr, 1, nullptr);
+  if (ret != pdPASS) {
+    ESP_LOGE(TAG_AGG, "schedule_save_satellites_nvs_: xTaskCreate failed (ret=%d)", (int)ret);
+  }
+}
+
 static void start_aggregator_task() {
   init_aggregator_mutex();
   if (!s_cache_mutex) {
@@ -2081,6 +2093,10 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (strncmp(p, "/api/import/d/", sizeof("/api/import/d/") - 1) == 0) return true;
     if (strncmp(p, "/api/import/w/", sizeof("/api/import/w/") - 1) == 0) return true;
     if (strcmp(p, "/api/import/finish") == 0) return true;
+#if AGGREGATOR_ENABLED
+    // Accept POST/OPTIONS on satellite route so handler can return 405
+    if (strncmp(p, "/api/aggregator/satellite/", AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) return true;
+#endif
     return false;
   }
 
@@ -2109,6 +2125,8 @@ class HistoryWebHandler : public AsyncWebHandler {
       // Accept GET so handler can return 405 Method Not Allowed (BUG-078 T4 fix)
       if (strncmp(p, "/api/aggregator/add-satellite", sizeof("/api/aggregator/add-satellite") - 1) == 0) return true;
       if (strncmp(p, "/api/aggregator/test-satellite", sizeof("/api/aggregator/test-satellite") - 1) == 0) return true;
+      // Accept GET so handler can return 405 Method Not Allowed (BUG-079 fix)
+      if (strncmp(p, "/api/aggregator/satellite/", AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) return true;
 #endif
       return false;
     }
@@ -2123,7 +2141,7 @@ class HistoryWebHandler : public AsyncWebHandler {
 
 #if AGGREGATOR_ENABLED
     if (request->method() == HTTP_DELETE) {
-      if (strncmp(p, "/api/aggregator/satellite/", 26) == 0) return true;
+      if (strncmp(p, "/api/aggregator/satellite/", AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) return true;
     }
 #endif
 
@@ -2204,8 +2222,8 @@ class HistoryWebHandler : public AsyncWebHandler {
 
 #if AGGREGATOR_ENABLED
     if (request->method() == HTTP_DELETE) {
-      if (strncmp(p, "/api/aggregator/satellite/", 26) == 0) {
-        handle_aggregator_stub_501_(request);
+      if (strncmp(p, "/api/aggregator/satellite/", AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) {
+        handle_delete_satellite_(request);
         return;
       }
       request->send(404);
@@ -2220,6 +2238,11 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
     if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) {
       handle_aggregator_stub_501_(request);
+      return;
+    }
+    // Route GET/POST to satellite delete endpoint — handler returns 405 (BUG-079 fix)
+    if (strncmp(p, "/api/aggregator/satellite/", AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) {
+      handle_delete_satellite_(request);
       return;
     }
 #endif
@@ -3833,6 +3856,91 @@ class HistoryWebHandler : public AsyncWebHandler {
         "\"message\":\"Runtime satellite management is planned for v7.6\"}");
     add_common_headers_(resp);
     request->send(resp);
+  }
+
+  // DELETE /api/aggregator/satellite/{id} — remove a satellite by ID (v7.6.0.2)
+  void handle_delete_satellite_(AsyncWebServerRequest *request) const {
+    if (request->method() != HTTP_DELETE) {
+      send_json_error_(request, 405, "Method not allowed");
+      return;
+    }
+
+    if (!authenticate_management_(request)) return;
+
+    char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
+    auto url = request->url_to(url_buf);
+    const char *p = url.c_str();
+    const char *id_start = p + AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN;
+    if (*id_start == '\0') {
+      send_json_error_(request, 400, "Missing satellite ID");
+      return;
+    }
+
+    int del_idx = -1;
+    if (AGG_LOCK() == pdTRUE) {
+      for (int i = 0; i < runtime_satellite_count; i++) {
+        if (strcmp(satellite_caches[i].id, id_start) == 0) {
+          del_idx = i;
+          break;
+        }
+      }
+
+      if (del_idx < 0) {
+        AGG_UNLOCK();
+        send_json_error_(request, 404, "Unknown satellite");
+        return;
+      }
+
+      ESP_LOGI(TAG_AGG, "Deleting satellite[%d]: id=%s", del_idx, satellite_caches[del_idx].id);
+
+      // Compact: shift remaining satellites down
+      for (int j = del_idx; j < runtime_satellite_count - 1; j++) {
+        satellite_caches[j].set_identity(
+            satellite_caches[j + 1].id,
+            satellite_caches[j + 1].name,
+            satellite_caches[j + 1].base_url,
+            satellite_caches[j + 1].poll_interval_seconds);
+        memcpy(satellite_caches[j].manifest_json, satellite_caches[j + 1].manifest_json,
+               satellite_caches[j + 1].manifest_len + 1);
+        satellite_caches[j].manifest_len = satellite_caches[j + 1].manifest_len;
+        memcpy(satellite_caches[j].live_json, satellite_caches[j + 1].live_json,
+               satellite_caches[j + 1].live_len + 1);
+        satellite_caches[j].live_len = satellite_caches[j + 1].live_len;
+        memcpy(satellite_caches[j].status_json, satellite_caches[j + 1].status_json,
+               satellite_caches[j + 1].status_len + 1);
+        satellite_caches[j].status_len = satellite_caches[j + 1].status_len;
+        satellite_caches[j].last_manifest_fetch = satellite_caches[j + 1].last_manifest_fetch;
+        satellite_caches[j].last_live_fetch = satellite_caches[j + 1].last_live_fetch;
+        satellite_caches[j].last_status_fetch = satellite_caches[j + 1].last_status_fetch;
+        satellite_caches[j].reachable = satellite_caches[j + 1].reachable;
+        satellite_caches[j].last_seen_epoch = satellite_caches[j + 1].last_seen_epoch;
+        satellite_caches[j].consecutive_failures = satellite_caches[j + 1].consecutive_failures;
+      }
+
+      // Clear the vacated last slot
+      int last = runtime_satellite_count - 1;
+      satellite_caches[last].id_buf[0] = '\0';
+      satellite_caches[last].name_buf[0] = '\0';
+      satellite_caches[last].url_buf[0] = '\0';
+      satellite_caches[last].id = satellite_caches[last].id_buf;
+      satellite_caches[last].name = satellite_caches[last].name_buf;
+      satellite_caches[last].base_url = satellite_caches[last].url_buf;
+      satellite_caches[last].poll_interval_seconds = 0;
+      satellite_caches[last].clear_cache();
+
+      runtime_satellite_count--;
+      AGG_UNLOCK();
+    } else {
+      send_json_error_(request, 503, "Mutex timeout");
+      return;
+    }
+
+    // Respond immediately — bulk NVS rewrite deferred to its own task
+    auto *resp = request->beginResponse(200, "application/json", "{\"ok\":true}");
+    add_common_headers_(resp);
+    request->send(resp);
+
+    schedule_save_satellites_nvs_();
   }
 
   // POST /api/system/reset-satellites — erase NVS satellite namespace and reload compile-time defaults
