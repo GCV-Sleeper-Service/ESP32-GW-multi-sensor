@@ -41,7 +41,7 @@ when re-running after an ESPHome upgrade.
 registering a DELETE handler. Present throughout v7.6.0.0 and v7.6.0.1; first exposed by
 the DELETE satellite endpoint added in PR #110 (v7.6.0.2).
 
-**Fixed by:** This PR. See LESSON-OPS-108, LESSON-OPS-109.
+**Fixed by:** PR #114. See LESSON-OPS-108, LESSON-OPS-109.
 
 ---
 

@@ -77,7 +77,7 @@ if [[ "${1:-}" == "--check" ]]; then
         echo "FAIL: Stack size patch line is missing."
         FAIL=1
     fi
-    if grep -q 'HTTP_DELETE' "$TARGET_DIR/web_server_idf.cpp"; then
+    if grep -q 'httpd_register_uri_handler(this->server_, &handler_delete);' "$TARGET_DIR/web_server_idf.cpp"; then
         echo "OK: HTTP_DELETE handler registration patch is applied"
     else
         echo "FAIL: HTTP_DELETE handler registration is missing."
@@ -91,7 +91,8 @@ if [[ "${1:-}" == "--check" ]]; then
         UPSTREAM="$ESPHOME_COMPONENT/web_server_idf.cpp"
         LOCAL="$TARGET_DIR/web_server_idf.cpp"
         DIFF_COUNT=$(diff \
-            <(grep -v -e 'config\.stack_size = 16384;' -e 'HTTP_DELETE' -e 'handler_delete' -e 'BUG-079' "$LOCAL") \
+            <(sed -e '/config\.stack_size = 16384;/d' \
+                  -e '/PATCH2-BEGIN/,/PATCH2-END/d' "$LOCAL") \
             "$UPSTREAM" | grep -c '^[<>]' || true)
         if [[ "$DIFF_COUNT" -gt 0 ]]; then
             echo "WARNING: Upstream web_server_idf.cpp has diverged ($DIFF_COUNT line differences)."
@@ -153,7 +154,7 @@ fi
 # ── Patch 2: HTTP_DELETE handler registration (BUG-079) ───────────────────────
 # Stock ESPHome only registers GET, POST, OPTIONS. DELETE requests are blocked
 # at the ESP-IDF httpd layer (plain-text 405) unless we register a handler.
-if grep -q 'HTTP_DELETE' "$CPP_FILE"; then
+if grep -q 'httpd_register_uri_handler(this->server_, &handler_delete);' "$CPP_FILE"; then
     echo "Patch 2 (HTTP_DELETE handler) already present — skipping."
 else
     # Insert the DELETE handler block after the OPTIONS handler registration line.
@@ -168,6 +169,7 @@ with open(path, 'r') as f:
 anchor = '    httpd_register_uri_handler(this->server_, &handler_options);'
 new_block = """
 
+    // PATCH2-BEGIN: BUG-079 HTTP_DELETE registration
     // PATCHED: BUG-079 — Register DELETE so ESP-IDF httpd routes DELETE requests
     // to our handler chain instead of returning plain-text 405.
     // DELETE requests have no body, so they use the same request_handler as GET.
@@ -177,7 +179,8 @@ new_block = """
         .handler = AsyncWebServer::request_handler,
         .user_ctx = this,
     };
-    httpd_register_uri_handler(this->server_, &handler_delete);"""
+    httpd_register_uri_handler(this->server_, &handler_delete);
+    // PATCH2-END: BUG-079 HTTP_DELETE registration"""
 
 if anchor not in content:
     print("ERROR: anchor not found", file=sys.stderr)

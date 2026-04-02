@@ -156,6 +156,7 @@ void AsyncWebServer::begin() {
     };
     httpd_register_uri_handler(this->server_, &handler_options);
 
+    // PATCH2-BEGIN: BUG-079 HTTP_DELETE registration
     // PATCHED: BUG-079 — Register DELETE so ESP-IDF httpd routes DELETE requests
     // to our handler chain instead of returning plain-text 405.
     // DELETE requests have no body, so they use the same request_handler as GET.
@@ -166,6 +167,7 @@ void AsyncWebServer::begin() {
         .user_ctx = this,
     };
     httpd_register_uri_handler(this->server_, &handler_delete);
+    // PATCH2-END: BUG-079 HTTP_DELETE registration
   }
 }
 
