@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-31 — v7.6.0.0 post-merge fixups (BUG-075/076, LESSON-OPS-097–102)._
+_Last updated: 2026-04-02 — v7.6.0.2 BUG-079 fix (HTTP DELETE routing, PR #113)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -31,6 +31,12 @@ block (not nested inside HTTP_GET or HTTP_POST). Verified the `HTTP_DELETE` disp
 `handleRequest()` exists and runs before the unguarded GET fallthrough section.
 
 **Prevention:** See LESSON-OPS-108, LESSON-OPS-109.
+
+**Introduced by:** Commit `1751649` in PR #110 (fixup commit that added GET/POST → 405 wiring
+but accidentally broke the `HTTP_DELETE` block in `canHandle()`).
+
+**Fixed by:** PR #110 (later fixup in the same PR restored DELETE routing). PR #113 adds
+this provenance clarification.
 
 ---
 
