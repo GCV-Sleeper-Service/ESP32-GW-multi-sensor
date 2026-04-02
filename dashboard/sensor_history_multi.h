@@ -2151,6 +2151,7 @@ static void aggregator_poll_task(void* arg) {
 // (hardcoded 4 KB by ESPHome/ESP-IDF) is never exposed to NVS frames.
 
 static volatile bool s_reset_satellites_in_progress = false;
+static volatile bool s_nvs_save_in_progress = false;
 
 static void reset_satellites_task_(void *) {
   // Erase the NVS satellite namespace
@@ -2207,14 +2208,22 @@ static void save_satellites_nvs_task_(void *param) {
     save_satellites_snapshot_to_nvs_(snapshot);
     delete snapshot;
   }
+  s_nvs_save_in_progress = false;
   vTaskDelete(nullptr);
 }
 
 static void schedule_save_satellites_nvs_() {
+  if (s_nvs_save_in_progress) {
+    ESP_LOGW(TAG_AGG, "schedule_save_satellites_nvs_: save already in progress, skipping");
+    return;
+  }
+  s_nvs_save_in_progress = true;
+
   // Capture snapshot under lock
   SatelliteNVSSnapshot* snapshot = new SatelliteNVSSnapshot();
   if (!snapshot) {
     ESP_LOGE(TAG_AGG, "schedule_save_satellites_nvs_: failed to allocate snapshot");
+    s_nvs_save_in_progress = false;
     return;
   }
 
@@ -2233,6 +2242,7 @@ static void schedule_save_satellites_nvs_() {
   } else {
     ESP_LOGE(TAG_AGG, "schedule_save_satellites_nvs_: failed to acquire lock");
     delete snapshot;
+    s_nvs_save_in_progress = false;
     return;
   }
 
@@ -2240,6 +2250,7 @@ static void schedule_save_satellites_nvs_() {
   if (ret != pdPASS) {
     ESP_LOGE(TAG_AGG, "schedule_save_satellites_nvs_: xTaskCreate failed (ret=%d)", (int)ret);
     delete snapshot;
+    s_nvs_save_in_progress = false;
   }
 }
 
@@ -2318,6 +2329,8 @@ class HistoryWebHandler : public AsyncWebHandler {
       // Accept GET so handler can return 405 Method Not Allowed (BUG-078 T4 fix)
       if (strncmp(p, "/api/aggregator/add-satellite", sizeof("/api/aggregator/add-satellite") - 1) == 0) return true;
       if (strncmp(p, "/api/aggregator/test-satellite", sizeof("/api/aggregator/test-satellite") - 1) == 0) return true;
+      if (strncmp(p, "/api/aggregator/satellite/",
+                  AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) return true;
 #endif
       return false;
     }
@@ -2327,6 +2340,11 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
 
     if (request->method() == HTTP_POST) {
+#if AGGREGATOR_ENABLED
+      // Accept POST on DELETE-only route so handler can return 405
+      if (strncmp(p, "/api/aggregator/satellite/",
+                  AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) return true;
+#endif
       return is_post_or_options_route_(p);
     }
 
@@ -2407,6 +2425,11 @@ class HistoryWebHandler : public AsyncWebHandler {
         handle_aggregator_stub_501_(request);
         return;
       }
+      if (strncmp(p, "/api/aggregator/satellite/",
+                  AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) {
+        handle_delete_satellite_(request);
+        return;
+      }
 #endif
       request->send(404);
       return;
@@ -2431,6 +2454,11 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
     if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) {
       handle_aggregator_stub_501_(request);
+      return;
+    }
+    if (strncmp(p, "/api/aggregator/satellite/",
+                AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) {
+      handle_delete_satellite_(request);
       return;
     }
 #endif

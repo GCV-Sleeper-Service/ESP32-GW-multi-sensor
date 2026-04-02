@@ -2705,6 +2705,56 @@ This reduces accidental truncation, missing execute bits, and inconsistent file 
 
 ---
 
+### LESSON-OPS-105 — Snapshot-based deferred NVS persistence (2026-04-02)
+
+**Context:** v7.6.0.2 DELETE endpoint needs to persist satellite config to NVS after
+array compaction, but NVS write is too slow for the HTTP handler stack (Critical Rule 40).
+The initial implementation called `save_satellites_to_nvs_()` directly from a deferred
+FreeRTOS task, which reads global state (`satellite_caches[]`, `runtime_satellite_count`)
+without holding the mutex — creating a torn-read race condition.
+
+**Solution:** Capture a `SatelliteNVSSnapshot` struct under `AGG_LOCK()` in the caller
+(HTTP handler context), then pass the heap-allocated snapshot to the deferred task as
+`pvParameters`. The task writes the snapshot to NVS and frees it. No lock needed during
+the slow flash write.
+
+**Pattern:** snapshot-under-lock → heap-allocate → pass to task → write → free → delete task.
+Applicable anywhere a slow I/O operation needs a consistent view of mutex-protected state.
+
+---
+
+### LESSON-OPS-106 — Config-generation counter for poll-task safety (2026-04-02)
+
+**Context:** `aggregator_poll_task()` iterates `satellite_caches[]` by index, performs
+HTTP fetches (slow, outside lock), then writes results back under `AGG_LOCK()`. If a
+delete compacts the array during the fetch, the poll task writes data to the wrong slot
+(index shifted) or a removed satellite.
+
+**Solution:** Added `satellite_config_generation` counter (incremented under `AGG_LOCK()`
+on every add/delete/reset). The poll task snapshots `{id, base_url, generation}` under
+lock before fetching. After fetch, re-acquires lock and verifies generation matches before
+writing results. If generation changed, discards fetched data (logs warning) and re-reads
+on next cycle.
+
+**Trade-off:** Discards one poll cycle of data on config change. Acceptable because config
+changes (add/delete) are rare human-initiated operations, not high-frequency events.
+
+---
+
+### LESSON-OPS-107 — NVS save failure after delete is a known limitation (2026-04-02)
+
+**Context:** After DELETE compacts the satellite array and decrements
+`runtime_satellite_count`, the deferred NVS save may fail (flash error, task creation
+failure). If NVS is not updated, the deleted satellite reappears after reboot (NVS still
+has the old config).
+
+**Status:** Accepted known limitation for v7.6.0.2. Rollback after compaction is
+impractical — would require re-inserting the deleted entry at its original position and
+re-expanding the array. The deferred snapshot pattern minimizes but cannot eliminate this
+window. A future improvement could retry NVS writes or add a "dirty" flag checked at boot.
+
+---
+
 ### LESSON-OPS-005: Raw logs and curated docs stay separate
 
 - Raw logs → `build-logs/` (gitignored)

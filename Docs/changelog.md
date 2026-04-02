@@ -27,9 +27,21 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
   any index-holding changes in the polling task, gateways endpoint, live endpoint, or proxy
   handler.
 
+### Fixups (commits 1aabd93, final)
+
+- `canHandle()` wired for GET/POST on DELETE satellite route — wrong-method requests now return 405 (not 404)
+- NVS snapshot-based deferred persistence — prevents torn reads during concurrent config mutations
+- Config-generation counter in `aggregator_poll_task()` — prevents writing fetched data to wrong cache slot after array compaction
+- NVS save-task serialization flag — prevents multiple concurrent deferred save tasks
+- CORS `Access-Control-Allow-Methods` includes `DELETE`
+- OPTIONS preflight handling for DELETE satellite route
+
 ### Documentation
 
 - Added `Docs/session-log-2026-04-02-v7.6.0.2.md`
+- Added LESSON-OPS-105 (snapshot-based deferred NVS persistence)
+- Added LESSON-OPS-106 (config-generation counter for poll-task safety)
+- Added LESSON-OPS-107 (NVS save failure after delete is a known limitation)
 
 ---
 ## [v7.6.0.1] — 2026-03-31 — POST /api/aggregator/add-satellite (Phase D Step 1)

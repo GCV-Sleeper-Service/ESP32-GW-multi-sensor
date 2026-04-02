@@ -1,7 +1,7 @@
 # Session Log — v7.6.0.2: DELETE /api/aggregator/satellite/{id}
 
-**Date:** 2026-04-02  
-**Branch:** `copilot/implement-v7-6-0-2-changes`  
+**Date:** 2026-04-02
+**Branch:** `copilot/implement-v7-6-0-2-changes`
 **Prerequisite:** v7.6.0.1 merged and green
 
 ---
@@ -14,6 +14,35 @@ and no later-step work.
 
 ---
 
+## Commit History
+
+### c6a6ee4 — Initial implementation
+- Implemented `handle_delete_satellite_()` with array compaction
+- Added deferred NVS save helpers (`save_satellites_nvs_task_`, `schedule_save_satellites_nvs_`)
+- Wired DELETE route in `canHandle()` and `handleRequest()`
+- Bumped version to 7.6.0.2
+- Added changelog entry and session log
+
+### 1aabd93 — Review feedback fixes
+- Fixed 404 error message: "Unknown satellite" → "Unknown satellite ID"
+- Added DELETE to CORS `Access-Control-Allow-Methods` header
+- Added OPTIONS handling for DELETE route in `is_post_or_options_route_()`
+- Removed const from `handle_delete_satellite_()` (mutates global state)
+- Added mutex-protected snapshot for NVS save task to prevent torn reads
+- Added `satellite_config_generation` counter to detect config changes during polling
+- Poll task now verifies generation before writing results to prevent cache corruption
+
+### Final commit — Fixup for 405 routing and serialization
+- Wired GET/POST on `/api/aggregator/satellite/{id}` in `canHandle()` so wrong-method requests reach the handler (returns 405 instead of 404)
+- Added GET/POST routing to `handleRequest()` for the DELETE satellite route
+- Added `s_nvs_save_in_progress` flag to prevent concurrent NVS save tasks from rapid successive deletes
+- Added LESSON-OPS-105 (snapshot-based deferred NVS persistence)
+- Added LESSON-OPS-106 (config-generation counter for poll-task safety)
+- Added LESSON-OPS-107 (NVS save failure after delete is a known limitation)
+- Updated changelog with all fixup items
+
+---
+
 ## Changes Made
 
 ### `dashboard/sensor_history_multi.h`
@@ -21,27 +50,42 @@ and no later-step work.
 1. Added deferred bulk-save helpers:
    - `save_satellites_nvs_task_()`
    - `schedule_save_satellites_nvs_()`
+   - `s_nvs_save_in_progress` serialization flag
 
 2. Replaced the DELETE route stub in `handleRequest()`:
    - `/api/aggregator/satellite/{id}` now calls `handle_delete_satellite_(request)`
+   - Wired GET and POST to return 405 for wrong methods
 
 3. Added `handle_delete_satellite_()`:
    - Enforces `HTTP_DELETE`
    - Requires `authenticate_management_()`
    - Parses the satellite ID from the URL path
    - Returns `400` for missing ID
-   - Returns `404` for unknown ID
+   - Returns `404` for unknown satellite ID
    - Performs dense-array compaction under `AGG_LOCK()`
    - Clears the vacated last slot
    - Decrements `runtime_satellite_count`
+   - Increments `satellite_config_generation`
    - Sends `200 {"ok":true}`
    - Defers the full `save_satellites_to_nvs_()` rewrite to an `xTaskCreate` task
 
+4. Enhanced concurrency safety:
+   - `SatelliteNVSSnapshot` struct for mutex-protected snapshot capture
+   - Config generation counter to prevent poll task cache corruption
+   - NVS save serialization to prevent concurrent tasks
+
 ### Documentation / versioning
 
-- Added `Docs/changelog.md` entry for v7.6.0.2
+- Added `Docs/changelog.md` entry for v7.6.0.2 with fixup items
 - Added this session log
+- Updated `Docs/bugs-and-lessons-learned.md` with LESSON-OPS-105/106/107
 - Bumped version to `7.6.0.2`
+
+---
+
+## Prompt Discrepancy Note
+
+**P-level (non-blocking):** The implementation prompt (`prompts/phaseD/v7.6.0.2-implementation-instructions-for-coding-agent.md`) §12 Contract-Lock table specified `"Unknown satellite"` for the 404 message, but the handoff document §5a API contract specified `"Unknown satellite ID"`. The code was corrected to match the handoff spec in commit 1aabd93. This discrepancy does not block progress — it was a documentation inconsistency resolved by following the authoritative handoff document.
 
 ---
 
