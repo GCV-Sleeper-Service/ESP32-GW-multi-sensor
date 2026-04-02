@@ -32,7 +32,7 @@ and no later-step work.
 - Added `satellite_config_generation` counter to detect config changes during polling
 - Poll task now verifies generation before writing results to prevent cache corruption
 
-### Final commit — Fixup for 405 routing and serialization
+### 1751649 — Fixup for 405 routing and serialization
 - Wired GET/POST on `/api/aggregator/satellite/{id}` in `canHandle()` so wrong-method requests reach the handler (returns 405 instead of 404)
 - Added GET/POST routing to `handleRequest()` for the DELETE satellite route
 - Added `s_nvs_save_in_progress` flag to prevent concurrent NVS save tasks from rapid successive deletes
@@ -40,6 +40,12 @@ and no later-step work.
 - Added LESSON-OPS-106 (config-generation counter for poll-task safety)
 - Added LESSON-OPS-107 (NVS save failure after delete is a known limitation)
 - Updated changelog with all fixup items
+
+### BUG-079 fixup — canHandle() HTTP_DELETE routing missing
+- **Root cause:** `canHandle()` lacked HTTP_DELETE check for DELETE satellite route, causing plain-text 405 responses before reaching handler
+- **Fix:** Added HTTP_DELETE method check to `canHandle()` for `/api/aggregator/satellite/{id}` route
+- **Documentation:** Added BUG-079, LESSON-OPS-108 (handleRequest GET fallthrough has no method guard), LESSON-OPS-109 (plain-text 405 diagnostic rule)
+- **Verification:** Device test suite (scripts/device-test-v7.6.0.2.sh) now passes
 
 ---
 
@@ -78,7 +84,7 @@ and no later-step work.
 
 - Added `Docs/changelog.md` entry for v7.6.0.2 with fixup items
 - Added this session log
-- Updated `Docs/bugs-and-lessons-learned.md` with LESSON-OPS-105/106/107
+- Updated `Docs/bugs-and-lessons-learned.md` with LESSON-OPS-105/106/107/108/109 and BUG-079
 - Bumped version to `7.6.0.2`
 
 ---
