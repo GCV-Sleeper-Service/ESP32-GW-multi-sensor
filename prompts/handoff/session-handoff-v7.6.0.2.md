@@ -122,7 +122,7 @@ Before merging the v7.6.0.2 PR:
 - [x] preflight.sh passes
 - [x] `render_sensor_config.py --check` passes
 - [x] No `String` (Arduino) type in any new code (Critical Rule 44)
-- [ ] Device testing completed via automated script (T1 had auth bug in script — firmware is correct):
+- [x] Device testing completed via automated script (T1 had auth bug in script — firmware is correct):
   ```bash
   bash scripts/provision.sh aggregator
   # ... regeneration pipeline ...
