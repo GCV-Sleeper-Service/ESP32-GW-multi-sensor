@@ -2,7 +2,7 @@
 
 _Date: 2026-04-02_
 _Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
-_Status: v7.6.0.2 is COMPLETE. Implementation (PR #110), BUG-079 fix (PR #114), device testing all done._
+_Status: v7.6.0.2 planning notes. As of this handoff, DELETE /api/aggregator/satellite/{id} remains a 501 stub in main; PRs #110/#114 are not yet merged here, and completion is pending._
 
 ---
 
