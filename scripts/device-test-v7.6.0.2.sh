@@ -158,7 +158,7 @@ echo ""
 
 # ── T1: Empty satellite ID ───────────────────────────────────────────────────
 echo -e "${CYAN}─── T1: Empty satellite ID ───${NC}"
-do_curl "${AGG_HOST}/api/aggregator/satellite/" -X DELETE
+do_curl "${AGG_HOST}/api/aggregator/satellite/" -X DELETE -u "${AUTH_USER}:${AUTH_PASS}"
 echo "  HTTP ${RESP_CODE}: ${RESP_BODY}"
 T1_MSG=$(json_field "$RESP_BODY" "message")
 if [[ "$RESP_CODE" == "400" ]] && echo "$T1_MSG" | grep -qiF "Missing satellite ID"; then
