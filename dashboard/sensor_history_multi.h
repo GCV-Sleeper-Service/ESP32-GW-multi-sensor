@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.6.0.2.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.6.0.3.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -496,7 +496,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.0.2) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.0.3) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -1399,6 +1399,10 @@ static const char* TAG_AGG = "aggregator";
 // the manifest was likely truncated by fetch_to_buffer().
 static constexpr uint16_t AGG_MANIFEST_BUF_SIZE = 8192;
 #endif
+static constexpr const char AGGREGATOR_TEST_SATELLITE_ROUTE[] =
+    "/api/aggregator/test-satellite";
+static constexpr size_t AGGREGATOR_TEST_SATELLITE_ROUTE_LEN =
+    sizeof(AGGREGATOR_TEST_SATELLITE_ROUTE) - 1;
 static constexpr size_t AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN =
     sizeof("/api/aggregator/satellite/") - 1;
 
@@ -2328,7 +2332,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (len > 22 && strncmp(p, "/api/aggregator/proxy/", 22) == 0) return true;
       // Accept GET so handler can return 405 Method Not Allowed (BUG-078 T4 fix)
       if (strncmp(p, "/api/aggregator/add-satellite", sizeof("/api/aggregator/add-satellite") - 1) == 0) return true;
-      if (strncmp(p, "/api/aggregator/test-satellite", sizeof("/api/aggregator/test-satellite") - 1) == 0) return true;
+      if (strncmp(p, AGGREGATOR_TEST_SATELLITE_ROUTE, AGGREGATOR_TEST_SATELLITE_ROUTE_LEN) == 0) return true;
       if (strncmp(p, "/api/aggregator/satellite/",
                   AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) return true;
 #endif
@@ -2421,8 +2425,9 @@ class HistoryWebHandler : public AsyncWebHandler {
         handle_add_satellite_(request);
         return;
       }
-      if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) {
-        handle_aggregator_stub_501_(request);
+      if (strncmp(p, AGGREGATOR_TEST_SATELLITE_ROUTE,
+                  AGGREGATOR_TEST_SATELLITE_ROUTE_LEN) == 0) {
+        handle_test_satellite_(request);
         return;
       }
       if (strncmp(p, "/api/aggregator/satellite/",
@@ -2448,16 +2453,17 @@ class HistoryWebHandler : public AsyncWebHandler {
 #endif
     // Route GET to POST-only aggregator endpoints — handlers return 405 (BUG-078 T4)
 #if AGGREGATOR_ENABLED
-    if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) {
-      handle_add_satellite_(request);
-      return;
-    }
-    if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) {
-      handle_aggregator_stub_501_(request);
-      return;
-    }
-    if (strncmp(p, "/api/aggregator/satellite/",
-                AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) {
+      if (strncmp(p, "/api/aggregator/add-satellite", 29) == 0) {
+        handle_add_satellite_(request);
+        return;
+      }
+      if (strncmp(p, AGGREGATOR_TEST_SATELLITE_ROUTE,
+                  AGGREGATOR_TEST_SATELLITE_ROUTE_LEN) == 0) {
+        handle_test_satellite_(request);
+        return;
+      }
+      if (strncmp(p, "/api/aggregator/satellite/",
+                  AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) {
       handle_delete_satellite_(request);
       return;
     }
@@ -4147,13 +4153,100 @@ class HistoryWebHandler : public AsyncWebHandler {
     schedule_save_satellites_nvs_();
   }
 
-  // ── Stubbed management endpoints (v7.5.5.3) — reserved for v7.6 runtime mgmt ──
-  // Returns 501 to signal "planned but not yet implemented".
-  void handle_aggregator_stub_501_(AsyncWebServerRequest *request) const {
+  // POST /api/aggregator/test-satellite (v7.6.0.3)
+  // Probe a candidate URL without adding it — no side effects, no NVS writes.
+  void handle_test_satellite_(AsyncWebServerRequest *request) const {
+    if (request->method() != HTTP_POST) {
+      send_json_error_(request, 405, "Method not allowed");
+      return;
+    }
     if (!authenticate_management_(request)) return;
-    auto *resp = request->beginResponse(501, "application/json",
-        "{\"error\":\"not implemented\","
-        "\"message\":\"Runtime satellite management is planned for v7.6\"}");
+
+    if (!request->hasParam("url")) {
+      send_json_error_(request, 400, "Missing url parameter");
+      return;
+    }
+    std::string url_param(request->getParam("url")->value().c_str());
+    const char* url_str = url_param.c_str();
+
+    if (strncmp(url_str, "http://", 7) != 0) {
+      send_json_error_(request, 400, "URL must start with http://");
+      return;
+    }
+    if (strlen(url_str) > 200) {  // 200 + strlen(\"/api/manifest\") < sizeof(url_buf) in probe
+      send_json_error_(request, 400, "URL too long");
+      return;
+    }
+
+    // Probe — no side effects
+    char probe_id[32] = {0};
+    char probe_name[64] = {0};
+    if (!probe_satellite_manifest_(url_str, probe_id, sizeof(probe_id),
+                                    probe_name, sizeof(probe_name))) {
+      send_json_error_(request, 400, "Satellite unreachable or invalid manifest");
+      return;
+    }
+
+    // s_proxy_tmp still contains the manifest — extract additional fields
+    /*
+     * s_proxy_tmp is safe to read here without a mutex — ESP-IDF's httpd task
+     * processes requests sequentially (single-threaded). The buffer was populated
+     * by probe_satellite_manifest_() above and will not be modified until the
+     * next request is dispatched.
+     */
+    char hw_str[32] = "unknown";
+    const char* manifest_end = s_proxy_tmp + strlen(s_proxy_tmp);
+    const char* hw_key = strstr(s_proxy_tmp, "\"hardware\"");
+    if (hw_key) {
+      const char* p = hw_key + 10;  // skip past "hardware"
+      while (p < manifest_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+      if (p < manifest_end && *p == ':') {
+        ++p;
+        while (p < manifest_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+        if (p < manifest_end && *p == '"') {
+          const char* hw_val = p + 1;
+          const char* hw_end = strchr(hw_val, '"');
+          if (hw_end) {
+            size_t len = (size_t)(hw_end - hw_val);
+            if (len >= sizeof(hw_str)) len = sizeof(hw_str) - 1;
+            memcpy(hw_str, hw_val, len);
+            hw_str[len] = '\0';
+          }
+        }
+      }
+    }
+
+    // --- sensor_count (whitespace-tolerant) ---
+    int sensor_count = 0;
+    const char *sc_key = strstr(s_proxy_tmp, "\"sensor_count\"");
+    if (sc_key) {
+      sc_key += 14;  // skip past "sensor_count"
+      while (*sc_key == ' ' || *sc_key == '\t' || *sc_key == '\n' || *sc_key == '\r') sc_key++;
+      if (*sc_key == ':') {
+        sc_key++;
+        while (*sc_key == ' ' || *sc_key == '\t' || *sc_key == '\n' || *sc_key == '\r') sc_key++;
+        sensor_count = (int)strtol(sc_key, nullptr, 10);
+      }
+    }
+
+    // Build response — no mutation, no NVS
+    /*
+     * NOTE: probe_id, probe_name, and hw_str are not JSON-escaped.
+     * Satellite names follow the project naming convention (alphanumeric +
+     * hyphens only), so special characters are not expected. If the naming
+     * convention changes, add json_escape() here.
+     */
+    char body[256];
+    int body_len = snprintf(body, sizeof(body),
+                            "{\"ok\":true,\"gateway\":{\"id\":\"%s\",\"name\":\"%s\","
+                            "\"hardware\":\"%s\",\"sensor_count\":%d}}",
+                            probe_id, probe_name, hw_str, sensor_count);
+    if (body_len < 0 || static_cast<size_t>(body_len) >= sizeof(body)) {
+      send_json_error_(request, 500, "Response too large");
+      return;
+    }
+
+    auto *resp = request->beginResponse(200, "application/json", body);
     add_common_headers_(resp);
     request->send(resp);
   }

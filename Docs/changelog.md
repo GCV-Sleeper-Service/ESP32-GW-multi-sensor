@@ -2,6 +2,27 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.0.3] — 2026-04-02 — POST /api/aggregator/test-satellite (Phase D Step 3)
+
+### New Features
+
+- **`POST /api/aggregator/test-satellite`** — replaces the 501 stub with a working probe endpoint.
+  - Requires management authentication
+  - Accepts `?url=http://...` query parameter
+  - Inherits management POST guard — body must be non-empty (e.g. `Content-Type: application/x-www-form-urlencoded`, body `a=1`)
+  - Validates URL format (must start with `http://`)
+  - Calls `probe_satellite_manifest_()` to fetch `/api/manifest` from the candidate
+  - Extracts `hardware` and `sensor_count` from the manifest buffer (`s_proxy_tmp`)
+  - Returns `200 {"ok":true,"gateway":{"id":"...","name":"...","hardware":"...","sensor_count":N}}`
+  - Returns `400` for missing URL, bad format, empty body, or unreachable/invalid manifest
+  - Returns `405` for wrong HTTP method
+  - **No side effects:** does not add to `satellite_caches[]`, does not write NVS
+
+### Cleanup
+
+- Removed `handle_aggregator_stub_501_()` — all three Phase D management endpoints now have
+  working implementations (add in v7.6.0.1, delete in v7.6.0.2, test in v7.6.0.3).
+
 ## [v7.6.0.2] — 2026-04-02 — DELETE /api/aggregator/satellite/{id} (Phase D Step 2)
 
 ### New Features
