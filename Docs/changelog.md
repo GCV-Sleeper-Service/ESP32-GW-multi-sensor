@@ -2,6 +2,36 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.0.2] — 2026-04-02 — DELETE /api/aggregator/satellite/{id} (Phase D Step 2)
+
+### New Features
+
+- **`DELETE /api/aggregator/satellite/{id}`** — replaces the 501 stub with a working
+  delete endpoint for runtime satellite management.
+  - Requires management authentication
+  - Parses the satellite ID from the URL path
+  - Returns `400` for a missing ID and `404` for an unknown ID
+  - Compacts `satellite_caches[]` under `AGG_LOCK()` so the runtime array stays dense
+  - Clears the vacated last slot after compaction
+  - Decrements `runtime_satellite_count`
+  - Returns `200 {"ok":true}` on success
+
+### Architecture
+
+- **Deferred NVS rewrite for delete:** Added `save_satellites_nvs_task_()` and
+  `schedule_save_satellites_nvs_()` so the destructive delete path follows Critical Rule 40:
+  mutate runtime state under the mutex, send the HTTP response, then perform the bulk
+  `save_satellites_to_nvs_()` rewrite on a dedicated 8192-byte task stack.
+- **Dense array invariant preserved:** All remaining satellites shift down after delete, so
+  every runtime loop that iterates `0..runtime_satellite_count-1` continues to work without
+  any index-holding changes in the polling task, gateways endpoint, live endpoint, or proxy
+  handler.
+
+### Documentation
+
+- Added `Docs/session-log-2026-04-02-v7.6.0.2.md`
+
+---
 ## [v7.6.0.1] — 2026-03-31 — POST /api/aggregator/add-satellite (Phase D Step 1)
 
 ### New Features

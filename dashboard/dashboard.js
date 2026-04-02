@@ -39,7 +39,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.6.0.1';
+App.version = 'v7.6.0.2';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
