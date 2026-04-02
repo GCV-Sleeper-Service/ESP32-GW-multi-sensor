@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.6.0.2.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.6.0.3.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -496,7 +496,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.0.2) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.0.3) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -2422,7 +2422,7 @@ class HistoryWebHandler : public AsyncWebHandler {
         return;
       }
       if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) {
-        handle_aggregator_stub_501_(request);
+        handle_test_satellite_(request);
         return;
       }
       if (strncmp(p, "/api/aggregator/satellite/",
@@ -2453,7 +2453,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
     if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) {
-      handle_aggregator_stub_501_(request);
+      handle_test_satellite_(request);
       return;
     }
     if (strncmp(p, "/api/aggregator/satellite/",
@@ -4147,13 +4147,64 @@ class HistoryWebHandler : public AsyncWebHandler {
     schedule_save_satellites_nvs_();
   }
 
-  // ── Stubbed management endpoints (v7.5.5.3) — reserved for v7.6 runtime mgmt ──
-  // Returns 501 to signal "planned but not yet implemented".
-  void handle_aggregator_stub_501_(AsyncWebServerRequest *request) const {
-    if (!authenticate_management_(request)) return;
-    auto *resp = request->beginResponse(501, "application/json",
-        "{\"error\":\"not implemented\","
-        "\"message\":\"Runtime satellite management is planned for v7.6\"}");
+  // POST /api/aggregator/test-satellite (v7.6.0.3)
+  // Probe a candidate URL without adding it — no side effects, no NVS writes.
+  void handle_test_satellite_(AsyncWebServerRequest *request) const {
+    if (request->method() != HTTP_POST) {
+      send_json_error_(request, 405, "Method not allowed");
+      return;
+    }
+
+    if (!request->hasParam("url")) {
+      send_json_error_(request, 400, "Missing url parameter");
+      return;
+    }
+    std::string url_param(request->getParam("url")->value().c_str());
+    const char* url_str = url_param.c_str();
+
+    if (strncmp(url_str, "http://", 7) != 0) {
+      send_json_error_(request, 400, "URL must start with http://");
+      return;
+    }
+
+    // Probe — no side effects
+    char probe_id[32] = {0};
+    char probe_name[64] = {0};
+    if (!probe_satellite_manifest_(url_str, probe_id, sizeof(probe_id),
+                                    probe_name, sizeof(probe_name))) {
+      send_json_error_(request, 400, "Satellite unreachable or invalid manifest");
+      return;
+    }
+
+    // s_proxy_tmp still contains the manifest — extract additional fields
+    char hw_str[32] = "unknown";
+    const char* hw_key = strstr(s_proxy_tmp, "\"hardware\":\"");
+    if (hw_key) {
+      hw_key += 12;
+      const char* hw_end = strchr(hw_key, '"');
+      if (hw_end) {
+        size_t len = (size_t)(hw_end - hw_key);
+        if (len >= sizeof(hw_str)) len = sizeof(hw_str) - 1;
+        memcpy(hw_str, hw_key, len);
+        hw_str[len] = '\0';
+      }
+    }
+
+    int sensor_count = 0;
+    const char* sc_key = strstr(s_proxy_tmp, "\"sensor_count\":");
+    if (sc_key) {
+      sc_key += 15;
+      sensor_count = (int)strtol(sc_key, nullptr, 10);
+    }
+
+    // Build response — no mutation, no NVS
+    char body[256];
+    snprintf(body, sizeof(body),
+             "{\"ok\":true,\"gateway\":{\"id\":\"%s\",\"name\":\"%s\","
+             "\"hardware\":\"%s\",\"sensor_count\":%d}}",
+             probe_id, probe_name, hw_str, sensor_count);
+
+    auto *resp = request->beginResponse(200, "application/json", body);
     add_common_headers_(resp);
     request->send(resp);
   }
