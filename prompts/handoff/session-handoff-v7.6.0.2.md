@@ -122,6 +122,21 @@ Before merging the v7.6.0.2 PR:
 - [ ] preflight.sh passes
 - [ ] `render_sensor_config.py --check` passes
 - [ ] No `String` (Arduino) type in any new code (Critical Rule 44)
+- [ ] Device testing completed via automated script:
+  ```bash
+  bash scripts/provision.sh aggregator
+  # ... regeneration pipeline ...
+  esphome clean firmware/esp32-s3-devkitc1-n16r8-gw.yaml
+  esphome run firmware/esp32-s3-devkitc1-n16r8-gw.yaml
+  bash scripts/device-test-v7.6.0.2.sh 192.168.120.191
+  ```
+  - [ ] T1-T3: Error paths pass (empty ID, unknown ID, no auth)
+  - [ ] T4-T7: Delete happy path + verification + compaction
+  - [ ] T8: Reboot persistence (deleted satellite stays deleted)
+  - [ ] T10: Compaction stress (delete first, second shifts to first)
+  - [ ] T11: State restored to initial
+- [ ] Switched back to CI-safe mode: `bash scripts/provision.sh satellite`
+
 
 ### v7.6.0.2 prompt corrections needed
 
@@ -200,6 +215,59 @@ Mark v7.6.0.2 as complete with date.
 
 ---
 
+## Device Testing Audit & Automated Script
+
+> **⚠️ MANDATORY SECTION — required in every handoff document.**
+> Audits the implementation prompt's §11 device tests, identifies gaps, and provides an automated script.
+
+### Why this section exists
+
+Experience from Phase D (v7.6.0.1 PR #108) established that:
+1. Prompt-provided device tests may have gaps vs. actual implementation (review fixes add branches)
+2. Manual curl sequences are error-prone (missing `-d 'a=1'`, wrong timing, no cleanup)
+3. Test results must be machine-parseable for audit documentation
+4. curl flags must comply with Critical Rules 38/39 — prompts written before those rules may violate them
+
+### Checklist for this section
+
+- [ ] **Read §11** of `prompts/phaseD/v<VERSION>-implementation-instructions-for-coding-agent.md`
+- [ ] **Read §12** (Contract-Lock for Mock) — every contract row should have a corresponding test
+- [ ] **Read the implementation** in `dashboard/sensor_history_multi.h` — identify all response branches
+- [ ] **Read review findings** (if PR already reviewed) — fixes may add new branches not in §11
+- [ ] **Cross-reference** §11 tests against contract table + implementation branches + review findings
+- [ ] **Verify curl flags**: all POST/DELETE must use `-d 'a=1'` (Rule 39), correct `-X` method
+- [ ] **Verify timing**: reboot tests must account for async NVS saves, poll cycle delays
+- [ ] **Produce gap analysis table** (severity: 🔴 BLOCKING / 🟡 MEDIUM / 🟠 LOW)
+- [ ] **Produce corrected test sequence** (replaces §11 if gaps found)
+- [ ] **Produce automated bash script** at `scripts/device-test-v<VERSION>.sh`
+
+### Gap Analysis — v<VERSION>
+
+| # | Finding | Severity | Issue |
+|---|---------|----------|-------|
+| G1 | ... | 🔴/🟡/🟠 | ... |
+
+### Corrected §11 Tests
+
+(Only if gaps were found — provide complete corrected test sequence)
+
+### Automated Script
+
+**File:** `scripts/device-test-v<VERSION>.sh`
+**Usage:** `bash scripts/device-test-v<VERSION>.sh [aggregator_ip] [satellite_url]`
+
+Script requirements:
+- Pre-flight reachability check
+- Cleanup of prior test state (idempotent re-runs)
+- All tests from corrected §11 + gap-fill tests
+- Proper timing (NVS save waits, reboot waits, poll cycle waits)
+- `-d 'a=1'` on ALL POST/DELETE per Rule 39
+- Post-test cleanup (factory reset or targeted removal)
+- Markdown results table output
+- Exit code 0/1 for pass/fail
+
+---
+
 ## Device Testing Resources
 
 - **S3 aggregator** (ESP32-S3-DevKitC-1 at 192.168.120.191, PSRAM-equipped, serial `/dev/ttyACM0`)
@@ -218,6 +286,18 @@ Device testing for v7.6.0.2 requires at least one deletable satellite. The place
 4. Add .188 back (will fail probe — unreachable) or add a different URL
 5. Reset to compile-time defaults to restore the placeholder
 
+### Provisioning workflow
+
+```bash
+# Before device testing:
+bash scripts/provision.sh aggregator   # switch to S3 aggregator mode
+# ... regeneration + compile + flash ...
+bash scripts/device-test-v7.6.0.2.sh 192.168.120.191
+
+# After device testing, before push:
+bash scripts/provision.sh satellite    # switch back to CI-safe mode
+bash scripts/provision.sh status       # verify CI-safe=YES
+```
 ---
 
 _End of session handoff document._
