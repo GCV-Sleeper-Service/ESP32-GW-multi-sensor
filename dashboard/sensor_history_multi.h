@@ -4154,6 +4154,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       send_json_error_(request, 405, "Method not allowed");
       return;
     }
+    if (!authenticate_management_(request)) return;
 
     if (!request->hasParam("url")) {
       send_json_error_(request, 400, "Missing url parameter");
@@ -4178,15 +4179,24 @@ class HistoryWebHandler : public AsyncWebHandler {
 
     // s_proxy_tmp still contains the manifest — extract additional fields
     char hw_str[32] = "unknown";
-    const char* hw_key = strstr(s_proxy_tmp, "\"hardware\":\"");
+    const char* manifest_end = s_proxy_tmp + strlen(s_proxy_tmp);
+    const char* hw_key = strstr(s_proxy_tmp, "\"hardware\"");
     if (hw_key) {
-      hw_key += 12;
-      const char* hw_end = strchr(hw_key, '"');
-      if (hw_end) {
-        size_t len = (size_t)(hw_end - hw_key);
-        if (len >= sizeof(hw_str)) len = sizeof(hw_str) - 1;
-        memcpy(hw_str, hw_key, len);
-        hw_str[len] = '\0';
+      const char* p = hw_key + 10;  // skip past "hardware"
+      while (p < manifest_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+      if (p < manifest_end && *p == ':') {
+        ++p;
+        while (p < manifest_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+        if (p < manifest_end && *p == '"') {
+          const char* hw_val = p + 1;
+          const char* hw_end = strchr(hw_val, '"');
+          if (hw_end) {
+            size_t len = (size_t)(hw_end - hw_val);
+            if (len >= sizeof(hw_str)) len = sizeof(hw_str) - 1;
+            memcpy(hw_str, hw_val, len);
+            hw_str[len] = '\0';
+          }
+        }
       }
     }
 

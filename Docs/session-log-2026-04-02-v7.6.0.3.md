@@ -20,11 +20,13 @@ and no later-step work.
 
 1. Added `handle_test_satellite_()`:
    - Enforces `HTTP_POST` — returns 405 for wrong method
+   - Requires management authentication (matches delete/reset)
+   - Inherits management POST guard — non-empty body required (body `a=1`, content-type form-encoded)
    - Returns 400 for missing `url` parameter
    - Returns 400 if URL does not start with `http://`
    - Calls `probe_satellite_manifest_()` to fetch `/api/manifest` from the candidate — no side effects
    - Returns 400 if probe fails
-   - After successful probe, extracts `hardware` and `sensor_count` from `s_proxy_tmp` using `strstr`
+   - After successful probe, extracts `hardware` and `sensor_count` from `s_proxy_tmp` using whitespace-tolerant parsing
    - Returns `200 {"ok":true,"gateway":{"id":"...","name":"...","hardware":"...","sensor_count":N}}`
    - **No mutation** of `satellite_caches[]` or `runtime_satellite_count`
    - **No NVS writes**

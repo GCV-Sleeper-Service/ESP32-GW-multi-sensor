@@ -7,12 +7,14 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 ### New Features
 
 - **`POST /api/aggregator/test-satellite`** — replaces the 501 stub with a working probe endpoint.
+  - Requires management authentication
   - Accepts `?url=http://...` query parameter
+  - Inherits management POST guard — body must be non-empty (e.g. `Content-Type: application/x-www-form-urlencoded`, body `a=1`)
   - Validates URL format (must start with `http://`)
   - Calls `probe_satellite_manifest_()` to fetch `/api/manifest` from the candidate
   - Extracts `hardware` and `sensor_count` from the manifest buffer (`s_proxy_tmp`)
   - Returns `200 {"ok":true,"gateway":{"id":"...","name":"...","hardware":"...","sensor_count":N}}`
-  - Returns `400` for missing URL, bad format, or unreachable/invalid manifest
+  - Returns `400` for missing URL, bad format, empty body, or unreachable/invalid manifest
   - Returns `405` for wrong HTTP method
   - **No side effects:** does not add to `satellite_caches[]`, does not write NVS
 
