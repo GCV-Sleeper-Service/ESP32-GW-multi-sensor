@@ -2,6 +2,52 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.0.2] — 2026-04-02 — DELETE /api/aggregator/satellite/{id} (Phase D Step 2)
+
+### New Features
+
+- **`DELETE /api/aggregator/satellite/{id}`** — replaces the 501 stub with a working
+  delete endpoint for runtime satellite management.
+  - Requires management authentication
+  - Parses the satellite ID from the URL path
+  - Returns `400` for a missing ID and `404` for an unknown ID
+  - Compacts `satellite_caches[]` under `AGG_LOCK()` so the runtime array stays dense
+  - Clears the vacated last slot after compaction
+  - Decrements `runtime_satellite_count`
+  - Returns `200 {"ok":true}` on success
+
+### Architecture
+
+- **Deferred NVS rewrite for delete:** Added `save_satellites_nvs_task_()` and
+  `schedule_save_satellites_nvs_()` so the destructive delete path follows Critical Rule 40:
+  mutate runtime state under the mutex, send the HTTP response, then perform the bulk
+  `save_satellites_to_nvs_()` rewrite on a dedicated 8192-byte task stack.
+- **Dense array invariant preserved:** All remaining satellites shift down after delete, so
+  every runtime loop that iterates `0..runtime_satellite_count-1` continues to work without
+  any index-holding changes in the polling task, gateways endpoint, live endpoint, or proxy
+  handler.
+
+### Fixups (commits 1aabd93, 1751649, final)
+
+- **BUG-079 fixup:** `canHandle()` now wires HTTP_DELETE for DELETE satellite route — plain-text 405 responses eliminated
+- `canHandle()` wired for GET/POST on DELETE satellite route — wrong-method requests now return 405 (not 404)
+- NVS snapshot-based deferred persistence — prevents torn reads during concurrent config mutations
+- Config-generation counter in `aggregator_poll_task()` — prevents writing fetched data to wrong cache slot after array compaction
+- NVS save-task serialization flag — prevents multiple concurrent deferred save tasks
+- CORS `Access-Control-Allow-Methods` includes `DELETE`
+- OPTIONS preflight handling for DELETE satellite route
+
+### Documentation
+
+- Added `Docs/session-log-2026-04-02-v7.6.0.2.md`
+- Added BUG-079 (DELETE satellite returns plain-text 405 instead of reaching handler)
+- Added LESSON-OPS-105 (snapshot-based deferred NVS persistence)
+- Added LESSON-OPS-106 (config-generation counter for poll-task safety)
+- Added LESSON-OPS-107 (NVS save failure after delete is a known limitation)
+- Added LESSON-OPS-108 (handleRequest() GET fallthrough has no method guard)
+- Added LESSON-OPS-109 (plain-text 405 = canHandle() returned false)
+
+---
 ## [v7.6.0.1] — 2026-03-31 — POST /api/aggregator/add-satellite (Phase D Step 1)
 
 ### New Features

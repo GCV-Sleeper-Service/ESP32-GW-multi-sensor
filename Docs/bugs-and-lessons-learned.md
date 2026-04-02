@@ -9,6 +9,31 @@ Both sections are in **reverse chronological order** — most recent entry first
 
 ## Bug Fixes
 
+### BUG-079 — DELETE requests rejected by httpd layer with 405 before reaching handler (v7.6.0.2 fixup)
+
+**Symptom:** Every `curl -X DELETE` to `/api/aggregator/satellite/{id}` returned HTTP 405
+with plain-text `"Specified method is invalid for this resource"`. All device test DELETE
+cases (T1-T4, T10) failed. GET and POST to the same URL correctly returned JSON 405 from
+the handler.
+
+**Root cause:** The v7.6.0.2 final fixup commit, which added GET/POST → 405 wiring for
+the delete satellite route, accidentally broke the `HTTP_DELETE` section in `canHandle()`
+and/or `handleRequest()`. Without `canHandle()` returning `true` for `HTTP_DELETE`, the
+ESPHome AsyncWebServer never registered a handler for DELETE on that path. The ESP-IDF
+httpd layer then returned its built-in 405 before our code ever ran.
+
+**Diagnostic signature:** A plain-text 405 (not JSON) means `canHandle()` returned `false`
+and the request never reached `handleRequest()`. Our handler's `send_json_error_()` always
+returns `application/json`.
+
+**Fix:** Restored the standalone `HTTP_DELETE` check in `canHandle()` as a peer-level `if`
+block (not nested inside HTTP_GET or HTTP_POST). Verified the `HTTP_DELETE` dispatch in
+`handleRequest()` exists and runs before the unguarded GET fallthrough section.
+
+**Prevention:** See LESSON-OPS-108, LESSON-OPS-109.
+
+---
+
 ### BUG-078 — Local component `init_response_()` maps all non-200/404/409 status codes to HTTP 500 (v7.6.0.1 fixup)
 
 **Symptom:** Device testing of `POST /api/aggregator/add-satellite` error paths
@@ -2702,6 +2727,92 @@ Increasing it increases per-connection cost. On this device class, overly large 
 ### LESSON-OPS-006: Prefer local CLI or editor-driven updates over ad hoc web editing
 
 This reduces accidental truncation, missing execute bits, and inconsistent file state.
+
+---
+
+### LESSON-OPS-108 — handleRequest() GET fallthrough has no method guard (2026-04-02)
+
+**Context:** In AsyncWebServer handlers, `handleRequest()` typically has a series of early-return
+method guards (`if (request->method() == HTTP_DELETE) { ... return; }`), followed by a "fallthrough"
+section that assumes the method is GET. If any DELETE/POST/OPTIONS check is missing from `canHandle()`,
+the request falls through to the GET section, which sends a generic 404 or attempts to serve a GET
+resource, producing confusing behavior.
+
+**Rule:** Every `handleRequest()` method should have explicit method guards for ALL supported methods
+before the GET fallthrough section. If a method is checked in `canHandle()` but the corresponding
+dispatch is missing or out-of-order in `handleRequest()`, the request will reach the GET fallthrough
+and produce incorrect responses.
+
+**Diagnostic signature:** Plain-text 405 responses (not JSON) indicate `canHandle()` returned false,
+so the request never reached the handler. See LESSON-OPS-109.
+
+---
+
+### LESSON-OPS-109 — Plain-text 405 = canHandle() returned false (2026-04-02)
+
+**Observation:** ESPAsyncWebServer (built on ESP-IDF httpd layer) sends plain-text 405 responses when
+NO registered handler returns `true` from `canHandle()` for a given {method, path} combination. If the
+handler sends JSON 405, it means `canHandle()` returned true but `handleRequest()` explicitly rejected
+the method. If the handler sends **plain-text** 405, it means `canHandle()` returned false and the
+request never reached the handler at all.
+
+**Diagnostic rule:**
+- **Plain-text 405:** Bug is in `canHandle()` (method/path check missing or incorrect)
+- **JSON 405:** Bug is in `handleRequest()` (method dispatch logic)
+
+**Example:** BUG-079 — DELETE to `/api/aggregator/satellite/{id}` returned plain-text 405 because
+the `canHandle()` HTTP_DELETE check was missing, even though `handleRequest()` had proper DELETE
+dispatch code.
+
+---
+
+### LESSON-OPS-105 — Snapshot-based deferred NVS persistence (2026-04-02)
+
+**Context:** v7.6.0.2 DELETE endpoint needs to persist satellite config to NVS after
+array compaction, but NVS write is too slow for the HTTP handler stack (Critical Rule 40).
+The initial implementation called `save_satellites_to_nvs_()` directly from a deferred
+FreeRTOS task, which reads global state (`satellite_caches[]`, `runtime_satellite_count`)
+without holding the mutex — creating a torn-read race condition.
+
+**Solution:** Capture a `SatelliteNVSSnapshot` struct under `AGG_LOCK()` in the caller
+(HTTP handler context), then pass the heap-allocated snapshot to the deferred task as
+`pvParameters`. The task writes the snapshot to NVS and frees it. No lock needed during
+the slow flash write.
+
+**Pattern:** snapshot-under-lock → heap-allocate → pass to task → write → free → delete task.
+Applicable anywhere a slow I/O operation needs a consistent view of mutex-protected state.
+
+---
+
+### LESSON-OPS-106 — Config-generation counter for poll-task safety (2026-04-02)
+
+**Context:** `aggregator_poll_task()` iterates `satellite_caches[]` by index, performs
+HTTP fetches (slow, outside lock), then writes results back under `AGG_LOCK()`. If a
+delete compacts the array during the fetch, the poll task writes data to the wrong slot
+(index shifted) or a removed satellite.
+
+**Solution:** Added `satellite_config_generation` counter (incremented under `AGG_LOCK()`
+on every add/delete/reset). The poll task snapshots `{id, base_url, generation}` under
+lock before fetching. After fetch, re-acquires lock and verifies generation matches before
+writing results. If generation changed, discards fetched data (logs warning) and re-reads
+on next cycle.
+
+**Trade-off:** Discards one poll cycle of data on config change. Acceptable because config
+changes (add/delete) are rare human-initiated operations, not high-frequency events.
+
+---
+
+### LESSON-OPS-107 — NVS save failure after delete is a known limitation (2026-04-02)
+
+**Context:** After DELETE compacts the satellite array and decrements
+`runtime_satellite_count`, the deferred NVS save may fail (flash error, task creation
+failure). If NVS is not updated, the deleted satellite reappears after reboot (NVS still
+has the old config).
+
+**Status:** Accepted known limitation for v7.6.0.2. Rollback after compaction is
+impractical — would require re-inserting the deleted entry at its original position and
+re-expanding the array. The deferred snapshot pattern minimizes but cannot eliminate this
+window. A future improvement could retry NVS writes or add a "dirty" flag checked at boot.
 
 ---
 

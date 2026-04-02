@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.6.0.1.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.6.0.2.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -496,7 +496,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.0.1) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.0.2) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -1399,6 +1399,8 @@ static const char* TAG_AGG = "aggregator";
 // the manifest was likely truncated by fetch_to_buffer().
 static constexpr uint16_t AGG_MANIFEST_BUF_SIZE = 8192;
 #endif
+static constexpr size_t AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN =
+    sizeof("/api/aggregator/satellite/") - 1;
 
 struct SatelliteCache {
   const char* id;
@@ -1457,6 +1459,18 @@ struct SatelliteCache {
 
 static SatelliteCache satellite_caches[MAX_SATELLITES];
 static int runtime_satellite_count = 0;   // actual count at runtime (≤ MAX_SATELLITES)
+static uint32_t satellite_config_generation = 0;  // Incremented on add/delete/reset to detect config changes
+
+// Snapshot structure for safe NVS writes from deferred task
+struct SatelliteNVSSnapshot {
+  int count;
+  struct {
+    char id[32];
+    char name[64];
+    char url[128];
+    uint16_t poll_interval_seconds;
+  } satellites[MAX_SATELLITES];
+};
 
 static SemaphoreHandle_t s_cache_mutex = nullptr;
 
@@ -1795,6 +1809,59 @@ static bool save_satellites_to_nvs_() {
   return all_ok;
 }
 
+// Write satellite config snapshot to NVS — used by deferred task
+static bool save_satellites_snapshot_to_nvs_(const SatelliteNVSSnapshot* snapshot) {
+  if (!snapshot) return false;
+
+  nvs_handle_t nvs;
+  esp_err_t err = nvs_open("agg_sats", NVS_READWRITE, &nvs);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG_AGG, "NVS agg_sats: open for write failed (%s)", esp_err_to_name(err));
+    return false;
+  }
+
+  // Erase all keys first to avoid stale entries after delete+compact
+  nvs_erase_all(nvs);
+
+  err = nvs_set_u8(nvs, "count", (uint8_t)snapshot->count);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG_AGG, "NVS agg_sats: failed to write count (%s)", esp_err_to_name(err));
+    nvs_close(nvs);
+    return false;
+  }
+
+  bool all_ok = true;
+  for (int i = 0; i < snapshot->count; i++) {
+    char key_id[16], key_name[16], key_url[16], key_poll[16];
+    snprintf(key_id,   sizeof(key_id),   "s%d_id",   i);
+    snprintf(key_name, sizeof(key_name), "s%d_name", i);
+    snprintf(key_url,  sizeof(key_url),  "s%d_url",  i);
+    snprintf(key_poll, sizeof(key_poll), "s%d_poll", i);
+
+    const auto& sat = snapshot->satellites[i];
+    if (nvs_set_str(nvs, key_id, sat.id) != ESP_OK ||
+        nvs_set_str(nvs, key_name, sat.name) != ESP_OK ||
+        nvs_set_str(nvs, key_url, sat.url) != ESP_OK ||
+        nvs_set_u16(nvs, key_poll, sat.poll_interval_seconds) != ESP_OK) {
+      ESP_LOGE(TAG_AGG, "NVS agg_sats: write failed for satellite %d", i);
+      all_ok = false;
+      // Continue writing remaining satellites — partial save is better than none
+    }
+  }
+
+  err = nvs_commit(nvs);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG_AGG, "NVS agg_sats: commit failed (%s)", esp_err_to_name(err));
+    all_ok = false;
+  }
+  nvs_close(nvs);
+
+  if (all_ok) {
+    ESP_LOGI(TAG_AGG, "NVS agg_sats: saved %d satellites from snapshot", snapshot->count);
+  }
+  return all_ok;
+}
+
 // Optimization for add — writes one satellite entry + count without erasing all
 static bool save_single_satellite_to_nvs_(int index) {
   if (index < 0 || index >= runtime_satellite_count) return false;
@@ -1865,10 +1932,40 @@ static void aggregator_poll_task(void* arg) {
     uint32_t epoch_now = (uint32_t)::time(nullptr);
 
     for (int i = 0; i < runtime_satellite_count; i++) {
-      SatelliteCache& sat = satellite_caches[i];
+      // Capture satellite info and generation under lock
+      char sat_id[32];
+      char sat_base_url[128];
+      int sat_poll_interval;
+      bool sat_reachable;
+      uint32_t sat_last_live;
+      uint32_t sat_last_status;
+      uint32_t sat_last_manifest;
+      uint32_t config_gen;
+
+      if (AGG_LOCK() == pdTRUE) {
+        if (i >= runtime_satellite_count) {
+          AGG_UNLOCK();
+          break;  // Config changed, index no longer valid
+        }
+        SatelliteCache& sat = satellite_caches[i];
+        strncpy(sat_id, sat.id, sizeof(sat_id) - 1);
+        sat_id[sizeof(sat_id) - 1] = '\0';
+        strncpy(sat_base_url, sat.base_url, sizeof(sat_base_url) - 1);
+        sat_base_url[sizeof(sat_base_url) - 1] = '\0';
+        sat_poll_interval = sat.poll_interval_seconds;
+        sat_reachable = sat.reachable;
+        sat_last_live = sat.last_live_fetch;
+        sat_last_status = sat.last_status_fetch;
+        sat_last_manifest = sat.last_manifest_fetch;
+        config_gen = satellite_config_generation;
+        AGG_UNLOCK();
+      } else {
+        continue;  // Couldn't get lock, skip this satellite
+      }
+
       // Back off unreachable satellites to 5-minute polling (saves CPU on C3)
-      uint32_t effective_interval = sat.reachable
-          ? (uint32_t)sat.poll_interval_seconds
+      uint32_t effective_interval = sat_reachable
+          ? (uint32_t)sat_poll_interval
           : 300;  // 5 min for unreachable
       bool any_failed = false;
 
@@ -1876,74 +1973,126 @@ static void aggregator_poll_task(void* arg) {
       uint16_t tmp_len;
 
       // ── Fetch /api/v2/live (every poll_interval_seconds) ──
-      bool live_due = (sat.last_live_fetch == 0) ||
-                      (uptime_s - sat.last_live_fetch >= effective_interval);
+      bool live_due = (sat_last_live == 0) ||
+                      (uptime_s - sat_last_live >= effective_interval);
       if (live_due) {
-        snprintf(url_buf, sizeof(url_buf), "%s/api/v2/live", sat.base_url);
+        snprintf(url_buf, sizeof(url_buf), "%s/api/v2/live", sat_base_url);
         tmp_len = 0;
-        if (fetch_to_buffer(url_buf, s_fetch_tmp, (uint16_t)sizeof(sat.live_json), &tmp_len)
+        if (fetch_to_buffer(url_buf, s_fetch_tmp, 2048, &tmp_len)
             && tmp_len > 0) {
           if (AGG_LOCK() == pdTRUE) {
-            bool was_unreachable = !sat.reachable;
-            memcpy(sat.live_json, s_fetch_tmp, tmp_len + 1);
-            sat.live_len = tmp_len;
-            sat.last_live_fetch = uptime_s;
-            sat.reachable = true;
-            sat.consecutive_failures = 0;
-            sat.last_seen_epoch = epoch_now;
-            AGG_UNLOCK();
-            if (was_unreachable) {
-              ESP_LOGI(TAG_AGG, "[%s] recovered (was unreachable)", sat.id);
+            // Verify config unchanged and find satellite by ID
+            if (config_gen == satellite_config_generation) {
+              int idx = -1;
+              for (int j = 0; j < runtime_satellite_count; j++) {
+                if (strcmp(satellite_caches[j].id, sat_id) == 0) {
+                  idx = j;
+                  break;
+                }
+              }
+              if (idx >= 0) {
+                SatelliteCache& sat = satellite_caches[idx];
+                bool was_unreachable = !sat.reachable;
+                memcpy(sat.live_json, s_fetch_tmp, tmp_len + 1);
+                sat.live_len = tmp_len;
+                sat.last_live_fetch = uptime_s;
+                sat.reachable = true;
+                sat.consecutive_failures = 0;
+                sat.last_seen_epoch = epoch_now;
+                if (was_unreachable) {
+                  ESP_LOGI(TAG_AGG, "[%s] recovered (was unreachable)", sat_id);
+                }
+                ESP_LOGI(TAG_AGG, "[%s] live: %u bytes", sat_id, (unsigned)tmp_len);
+              } else {
+                ESP_LOGW(TAG_AGG, "[%s] satellite removed during fetch, discarding live data", sat_id);
+              }
+            } else {
+              ESP_LOGW(TAG_AGG, "[%s] config changed during fetch (gen %u->%u), discarding live data",
+                       sat_id, config_gen, satellite_config_generation);
             }
+            AGG_UNLOCK();
           }
-          ESP_LOGI(TAG_AGG, "[%s] live: %u bytes", sat.id, (unsigned)tmp_len);
         } else {
           any_failed = true;
-          ESP_LOGW(TAG_AGG, "[%s] live fetch failed", sat.id);
+          ESP_LOGW(TAG_AGG, "[%s] live fetch failed", sat_id);
         }
         vTaskDelay(pdMS_TO_TICKS(500));
       }
 
       // ── Fetch /api/status (every poll_interval_seconds) ──
-      bool status_due = (sat.last_status_fetch == 0) ||
-                        (uptime_s - sat.last_status_fetch >= effective_interval);
+      bool status_due = (sat_last_status == 0) ||
+                        (uptime_s - sat_last_status >= effective_interval);
       if (status_due) {
-        snprintf(url_buf, sizeof(url_buf), "%s/api/status", sat.base_url);
+        snprintf(url_buf, sizeof(url_buf), "%s/api/status", sat_base_url);
         tmp_len = 0;
-        if (fetch_to_buffer(url_buf, s_fetch_tmp, (uint16_t)sizeof(sat.status_json), &tmp_len)
+        if (fetch_to_buffer(url_buf, s_fetch_tmp, 512, &tmp_len)
             && tmp_len > 0) {
           if (AGG_LOCK() == pdTRUE) {
-            memcpy(sat.status_json, s_fetch_tmp, tmp_len + 1);
-            sat.status_len = tmp_len;
-            sat.last_status_fetch = uptime_s;
+            // Verify config unchanged and find satellite by ID
+            if (config_gen == satellite_config_generation) {
+              int idx = -1;
+              for (int j = 0; j < runtime_satellite_count; j++) {
+                if (strcmp(satellite_caches[j].id, sat_id) == 0) {
+                  idx = j;
+                  break;
+                }
+              }
+              if (idx >= 0) {
+                SatelliteCache& sat = satellite_caches[idx];
+                memcpy(sat.status_json, s_fetch_tmp, tmp_len + 1);
+                sat.status_len = tmp_len;
+                sat.last_status_fetch = uptime_s;
+                ESP_LOGI(TAG_AGG, "[%s] status: %u bytes", sat_id, (unsigned)tmp_len);
+              } else {
+                ESP_LOGW(TAG_AGG, "[%s] satellite removed during fetch, discarding status data", sat_id);
+              }
+            } else {
+              ESP_LOGW(TAG_AGG, "[%s] config changed during fetch, discarding status data", sat_id);
+            }
             AGG_UNLOCK();
           }
-          ESP_LOGI(TAG_AGG, "[%s] status: %u bytes", sat.id, (unsigned)tmp_len);
         } else {
           any_failed = true;
-          ESP_LOGW(TAG_AGG, "[%s] status fetch failed", sat.id);
+          ESP_LOGW(TAG_AGG, "[%s] status fetch failed", sat_id);
         }
         vTaskDelay(pdMS_TO_TICKS(500));
       }
 
       // ── Fetch /api/manifest (every 5 minutes) ──
-      bool manifest_due = (sat.last_manifest_fetch == 0) ||
-                          (uptime_s - sat.last_manifest_fetch >= 300);
+      bool manifest_due = (sat_last_manifest == 0) ||
+                          (uptime_s - sat_last_manifest >= 300);
       if (manifest_due) {
-        snprintf(url_buf, sizeof(url_buf), "%s/api/manifest", sat.base_url);
+        snprintf(url_buf, sizeof(url_buf), "%s/api/manifest", sat_base_url);
         tmp_len = 0;
-        if (fetch_to_buffer(url_buf, s_fetch_tmp, (uint16_t)sizeof(sat.manifest_json), &tmp_len)
+        if (fetch_to_buffer(url_buf, s_fetch_tmp, (uint16_t)AGG_MANIFEST_BUF_SIZE, &tmp_len)
             && tmp_len > 0) {
           if (AGG_LOCK() == pdTRUE) {
-            memcpy(sat.manifest_json, s_fetch_tmp, tmp_len + 1);
-            sat.manifest_len = tmp_len;
-            sat.last_manifest_fetch = uptime_s;
+            // Verify config unchanged and find satellite by ID
+            if (config_gen == satellite_config_generation) {
+              int idx = -1;
+              for (int j = 0; j < runtime_satellite_count; j++) {
+                if (strcmp(satellite_caches[j].id, sat_id) == 0) {
+                  idx = j;
+                  break;
+                }
+              }
+              if (idx >= 0) {
+                SatelliteCache& sat = satellite_caches[idx];
+                memcpy(sat.manifest_json, s_fetch_tmp, tmp_len + 1);
+                sat.manifest_len = tmp_len;
+                sat.last_manifest_fetch = uptime_s;
+                ESP_LOGI(TAG_AGG, "[%s] manifest: %u bytes", sat_id, (unsigned)tmp_len);
+              } else {
+                ESP_LOGW(TAG_AGG, "[%s] satellite removed during fetch, discarding manifest data", sat_id);
+              }
+            } else {
+              ESP_LOGW(TAG_AGG, "[%s] config changed during fetch, discarding manifest data", sat_id);
+            }
             AGG_UNLOCK();
           }
-          ESP_LOGI(TAG_AGG, "[%s] manifest: %u bytes", sat.id, (unsigned)tmp_len);
         } else {
           any_failed = true;
-          ESP_LOGW(TAG_AGG, "[%s] manifest fetch failed", sat.id);
+          ESP_LOGW(TAG_AGG, "[%s] manifest fetch failed", sat_id);
         }
         vTaskDelay(pdMS_TO_TICKS(500));
       }
@@ -1952,24 +2101,37 @@ static void aggregator_poll_task(void* arg) {
       if (any_failed) {
         uint8_t failures = 0;
         if (AGG_LOCK() == pdTRUE) {
-          sat.consecutive_failures++;
-          failures = sat.consecutive_failures;
-          if (failures >= 3) {
-            sat.reachable = false;
-            // BUG-058: Seed timestamps for never-fetched endpoints so the
-            // 300s backoff interval starts counting. Only after 3 failures
-            // (satellite declared unreachable) — not on transient failures
-            // which should retry at normal frequency to handle boot-order
-            // races where the satellite comes up seconds after the aggregator.
-            if (sat.last_live_fetch == 0)     sat.last_live_fetch = uptime_s;
-            if (sat.last_status_fetch == 0)   sat.last_status_fetch = uptime_s;
-            if (sat.last_manifest_fetch == 0) sat.last_manifest_fetch = uptime_s;
+          // Verify config unchanged and find satellite by ID
+          if (config_gen == satellite_config_generation) {
+            int idx = -1;
+            for (int j = 0; j < runtime_satellite_count; j++) {
+              if (strcmp(satellite_caches[j].id, sat_id) == 0) {
+                idx = j;
+                break;
+              }
+            }
+            if (idx >= 0) {
+              SatelliteCache& sat = satellite_caches[idx];
+              sat.consecutive_failures++;
+              failures = sat.consecutive_failures;
+              if (failures >= 3) {
+                sat.reachable = false;
+                // BUG-058: Seed timestamps for never-fetched endpoints so the
+                // 300s backoff interval starts counting. Only after 3 failures
+                // (satellite declared unreachable) — not on transient failures
+                // which should retry at normal frequency to handle boot-order
+                // races where the satellite comes up seconds after the aggregator.
+                if (sat.last_live_fetch == 0)     sat.last_live_fetch = uptime_s;
+                if (sat.last_status_fetch == 0)   sat.last_status_fetch = uptime_s;
+                if (sat.last_manifest_fetch == 0) sat.last_manifest_fetch = uptime_s;
+              }
+              if (failures >= 3) {
+                ESP_LOGW(TAG_AGG, "[%s] unreachable (failures=%u)",
+                         sat_id, (unsigned)failures);
+              }
+            }
           }
           AGG_UNLOCK();
-        }
-        if (failures >= 3) {
-          ESP_LOGW(TAG_AGG, "[%s] unreachable (failures=%u)",
-                   sat.id, (unsigned)failures);
         }
       }
 
@@ -1989,6 +2151,7 @@ static void aggregator_poll_task(void* arg) {
 // (hardcoded 4 KB by ESPHome/ESP-IDF) is never exposed to NVS frames.
 
 static volatile bool s_reset_satellites_in_progress = false;
+static volatile bool s_nvs_save_in_progress = false;
 
 static void reset_satellites_task_(void *) {
   // Erase the NVS satellite namespace
@@ -2016,6 +2179,7 @@ static void reset_satellites_task_(void *) {
       satellite_caches[i].clear_cache();
     }
     runtime_satellite_count = MAX_SATELLITES;
+    satellite_config_generation++;  // Config changed — invalidate in-flight poll operations
     if (!save_satellites_to_nvs_()) {
       ESP_LOGW(TAG_AGG, "reset_sats task: failed to persist defaults (non-fatal)");
     }
@@ -2035,6 +2199,58 @@ static void schedule_reset_satellites_() {
   if (ret != pdPASS) {
     ESP_LOGE(TAG_AGG, "schedule_reset_satellites_: xTaskCreate failed (ret=%d)", (int)ret);
     s_reset_satellites_in_progress = false;
+  }
+}
+
+static void save_satellites_nvs_task_(void *param) {
+  SatelliteNVSSnapshot* snapshot = static_cast<SatelliteNVSSnapshot*>(param);
+  if (snapshot) {
+    save_satellites_snapshot_to_nvs_(snapshot);
+    delete snapshot;
+  }
+  s_nvs_save_in_progress = false;
+  vTaskDelete(nullptr);
+}
+
+static void schedule_save_satellites_nvs_() {
+  if (s_nvs_save_in_progress) {
+    ESP_LOGW(TAG_AGG, "schedule_save_satellites_nvs_: save already in progress, skipping");
+    return;
+  }
+  s_nvs_save_in_progress = true;
+
+  // Capture snapshot under lock
+  SatelliteNVSSnapshot* snapshot = new SatelliteNVSSnapshot();
+  if (!snapshot) {
+    ESP_LOGE(TAG_AGG, "schedule_save_satellites_nvs_: failed to allocate snapshot");
+    s_nvs_save_in_progress = false;
+    return;
+  }
+
+  if (AGG_LOCK() == pdTRUE) {
+    snapshot->count = runtime_satellite_count;
+    for (int i = 0; i < runtime_satellite_count; i++) {
+      strncpy(snapshot->satellites[i].id, satellite_caches[i].id, sizeof(snapshot->satellites[i].id) - 1);
+      snapshot->satellites[i].id[sizeof(snapshot->satellites[i].id) - 1] = '\0';
+      strncpy(snapshot->satellites[i].name, satellite_caches[i].name, sizeof(snapshot->satellites[i].name) - 1);
+      snapshot->satellites[i].name[sizeof(snapshot->satellites[i].name) - 1] = '\0';
+      strncpy(snapshot->satellites[i].url, satellite_caches[i].base_url, sizeof(snapshot->satellites[i].url) - 1);
+      snapshot->satellites[i].url[sizeof(snapshot->satellites[i].url) - 1] = '\0';
+      snapshot->satellites[i].poll_interval_seconds = satellite_caches[i].poll_interval_seconds;
+    }
+    AGG_UNLOCK();
+  } else {
+    ESP_LOGE(TAG_AGG, "schedule_save_satellites_nvs_: failed to acquire lock");
+    delete snapshot;
+    s_nvs_save_in_progress = false;
+    return;
+  }
+
+  BaseType_t ret = xTaskCreate(save_satellites_nvs_task_, "agg_nvs_save", 8192, snapshot, 1, nullptr);
+  if (ret != pdPASS) {
+    ESP_LOGE(TAG_AGG, "schedule_save_satellites_nvs_: xTaskCreate failed (ret=%d)", (int)ret);
+    delete snapshot;
+    s_nvs_save_in_progress = false;
   }
 }
 
@@ -2081,6 +2297,10 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (strncmp(p, "/api/import/d/", sizeof("/api/import/d/") - 1) == 0) return true;
     if (strncmp(p, "/api/import/w/", sizeof("/api/import/w/") - 1) == 0) return true;
     if (strcmp(p, "/api/import/finish") == 0) return true;
+#if AGGREGATOR_ENABLED
+    // DELETE routes also need OPTIONS for CORS preflight
+    if (strncmp(p, "/api/aggregator/satellite/", sizeof("/api/aggregator/satellite/") - 1) == 0) return true;
+#endif
     return false;
   }
 
@@ -2109,6 +2329,8 @@ class HistoryWebHandler : public AsyncWebHandler {
       // Accept GET so handler can return 405 Method Not Allowed (BUG-078 T4 fix)
       if (strncmp(p, "/api/aggregator/add-satellite", sizeof("/api/aggregator/add-satellite") - 1) == 0) return true;
       if (strncmp(p, "/api/aggregator/test-satellite", sizeof("/api/aggregator/test-satellite") - 1) == 0) return true;
+      if (strncmp(p, "/api/aggregator/satellite/",
+                  AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) return true;
 #endif
       return false;
     }
@@ -2118,12 +2340,18 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
 
     if (request->method() == HTTP_POST) {
+#if AGGREGATOR_ENABLED
+      // Accept POST on DELETE-only route so handler can return 405
+      if (strncmp(p, "/api/aggregator/satellite/",
+                  AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) return true;
+#endif
       return is_post_or_options_route_(p);
     }
 
 #if AGGREGATOR_ENABLED
     if (request->method() == HTTP_DELETE) {
-      if (strncmp(p, "/api/aggregator/satellite/", 26) == 0) return true;
+      if (strncmp(p, "/api/aggregator/satellite/",
+                  AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) return true;
     }
 #endif
 
@@ -2197,6 +2425,11 @@ class HistoryWebHandler : public AsyncWebHandler {
         handle_aggregator_stub_501_(request);
         return;
       }
+      if (strncmp(p, "/api/aggregator/satellite/",
+                  AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) {
+        handle_delete_satellite_(request);
+        return;
+      }
 #endif
       request->send(404);
       return;
@@ -2204,8 +2437,9 @@ class HistoryWebHandler : public AsyncWebHandler {
 
 #if AGGREGATOR_ENABLED
     if (request->method() == HTTP_DELETE) {
-      if (strncmp(p, "/api/aggregator/satellite/", 26) == 0) {
-        handle_aggregator_stub_501_(request);
+      if (strncmp(p, "/api/aggregator/satellite/",
+                  AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) {
+        handle_delete_satellite_(request);
         return;
       }
       request->send(404);
@@ -2220,6 +2454,11 @@ class HistoryWebHandler : public AsyncWebHandler {
     }
     if (strncmp(p, "/api/aggregator/test-satellite", 30) == 0) {
       handle_aggregator_stub_501_(request);
+      return;
+    }
+    if (strncmp(p, "/api/aggregator/satellite/",
+                AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN) == 0) {
+      handle_delete_satellite_(request);
       return;
     }
 #endif
@@ -2351,7 +2590,7 @@ class HistoryWebHandler : public AsyncWebHandler {
 
   void add_common_headers_(AsyncWebServerResponse *resp) const {
     resp->addHeader("Cache-Control", "no-store");
-    resp->addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    resp->addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE");
     resp->addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
   }
 
@@ -3787,6 +4026,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       satellite_caches[new_idx].set_identity(probe_id, final_name, url_str, poll_s);
       satellite_caches[new_idx].clear_cache();
       runtime_satellite_count++;
+      satellite_config_generation++;  // Config changed — invalidate in-flight poll operations
       AGG_UNLOCK();
     } else {
       send_json_error_(request, 503, "Mutex timeout");
@@ -3801,6 +4041,7 @@ class HistoryWebHandler : public AsyncWebHandler {
         satellite_caches[new_idx].clear_cache();
         satellite_caches[new_idx].set_identity("", "", "", 30);
         runtime_satellite_count--;
+        satellite_config_generation++;  // Config changed — invalidate in-flight poll operations
         AGG_UNLOCK();
       }
       send_json_error_(request, 500, "Failed to persist satellite to NVS");
@@ -3822,6 +4063,88 @@ class HistoryWebHandler : public AsyncWebHandler {
     auto *resp = request->beginResponse(200, "application/json", body);
     add_common_headers_(resp);
     request->send(resp);
+  }
+
+  void handle_delete_satellite_(AsyncWebServerRequest *request) {
+    if (request->method() != HTTP_DELETE) {
+      send_json_error_(request, 405, "Method not allowed");
+      return;
+    }
+
+    if (!authenticate_management_(request)) return;
+
+    char url_buf[AsyncWebServerRequest::URL_BUF_SIZE];
+    auto url = request->url_to(url_buf);
+    const char* p = url.c_str();
+    const char* id_start = p + AGGREGATOR_SATELLITE_ROUTE_PREFIX_LEN;
+    if (*id_start == '\0') {
+      send_json_error_(request, 400, "Missing satellite ID");
+      return;
+    }
+
+    int del_idx = -1;
+    if (AGG_LOCK() == pdTRUE) {
+      for (int i = 0; i < runtime_satellite_count; i++) {
+        if (strcmp(satellite_caches[i].id, id_start) == 0) {
+          del_idx = i;
+          break;
+        }
+      }
+
+      if (del_idx < 0) {
+        AGG_UNLOCK();
+        send_json_error_(request, 404, "Unknown satellite ID");
+        return;
+      }
+
+      ESP_LOGI(TAG_AGG, "Deleting satellite[%d]: id=%s", del_idx, satellite_caches[del_idx].id);
+
+      for (int j = del_idx; j < runtime_satellite_count - 1; j++) {
+        satellite_caches[j].set_identity(
+            satellite_caches[j + 1].id,
+            satellite_caches[j + 1].name,
+            satellite_caches[j + 1].base_url,
+            satellite_caches[j + 1].poll_interval_seconds);
+        memcpy(satellite_caches[j].manifest_json, satellite_caches[j + 1].manifest_json,
+               satellite_caches[j + 1].manifest_len + 1);
+        satellite_caches[j].manifest_len = satellite_caches[j + 1].manifest_len;
+        memcpy(satellite_caches[j].live_json, satellite_caches[j + 1].live_json,
+               satellite_caches[j + 1].live_len + 1);
+        satellite_caches[j].live_len = satellite_caches[j + 1].live_len;
+        memcpy(satellite_caches[j].status_json, satellite_caches[j + 1].status_json,
+               satellite_caches[j + 1].status_len + 1);
+        satellite_caches[j].status_len = satellite_caches[j + 1].status_len;
+        satellite_caches[j].last_manifest_fetch = satellite_caches[j + 1].last_manifest_fetch;
+        satellite_caches[j].last_live_fetch = satellite_caches[j + 1].last_live_fetch;
+        satellite_caches[j].last_status_fetch = satellite_caches[j + 1].last_status_fetch;
+        satellite_caches[j].reachable = satellite_caches[j + 1].reachable;
+        satellite_caches[j].last_seen_epoch = satellite_caches[j + 1].last_seen_epoch;
+        satellite_caches[j].consecutive_failures = satellite_caches[j + 1].consecutive_failures;
+      }
+
+      int last = runtime_satellite_count - 1;
+      satellite_caches[last].id_buf[0] = '\0';
+      satellite_caches[last].name_buf[0] = '\0';
+      satellite_caches[last].url_buf[0] = '\0';
+      satellite_caches[last].id = satellite_caches[last].id_buf;
+      satellite_caches[last].name = satellite_caches[last].name_buf;
+      satellite_caches[last].base_url = satellite_caches[last].url_buf;
+      satellite_caches[last].poll_interval_seconds = 0;
+      satellite_caches[last].clear_cache();
+
+      runtime_satellite_count--;
+      satellite_config_generation++;  // Config changed — invalidate in-flight poll operations
+      AGG_UNLOCK();
+    } else {
+      send_json_error_(request, 503, "Mutex timeout");
+      return;
+    }
+
+    auto *resp = request->beginResponse(200, "application/json", "{\"ok\":true}");
+    add_common_headers_(resp);
+    request->send(resp);
+
+    schedule_save_satellites_nvs_();
   }
 
   // ── Stubbed management endpoints (v7.5.5.3) — reserved for v7.6 runtime mgmt ──
