@@ -69,17 +69,30 @@ if [[ "${1:-}" == "--check" ]]; then
         echo "FAIL: Local override not found at $TARGET_DIR"
         exit 1
     fi
+    FAIL=0
     if grep -q 'config\.stack_size = 16384;' "$TARGET_DIR/web_server_idf.cpp"; then
         ESPHOME_VERSION=$(esphome version 2>/dev/null || echo "unknown")
         echo "OK: httpd stack patch is applied (ESPHome $ESPHOME_VERSION)"
+    else
+        echo "FAIL: Stack size patch line is missing."
+        FAIL=1
+    fi
+    if grep -q 'httpd_register_uri_handler(this->server_, &handler_delete);' "$TARGET_DIR/web_server_idf.cpp"; then
+        echo "OK: HTTP_DELETE handler registration patch is applied"
+    else
+        echo "FAIL: HTTP_DELETE handler registration is missing."
+        FAIL=1
+    fi
+    if [[ "$FAIL" -eq 0 ]]; then
         echo "    $TARGET_DIR/web_server_idf.cpp"
 
         # Check for upstream drift — warn if installed copy differs from our
-        # base (ignoring the patch line itself)
+        # base (ignoring both patch lines)
         UPSTREAM="$ESPHOME_COMPONENT/web_server_idf.cpp"
         LOCAL="$TARGET_DIR/web_server_idf.cpp"
         DIFF_COUNT=$(diff \
-            <(grep -v 'config\.stack_size = 16384;' "$LOCAL") \
+            <(sed -e '/config\.stack_size = 16384;/d' \
+                  -e '/PATCH2-BEGIN/,/PATCH2-END/d' "$LOCAL") \
             "$UPSTREAM" | grep -c '^[<>]' || true)
         if [[ "$DIFF_COUNT" -gt 0 ]]; then
             echo "WARNING: Upstream web_server_idf.cpp has diverged ($DIFF_COUNT line differences)."
@@ -87,7 +100,6 @@ if [[ "${1:-}" == "--check" ]]; then
         fi
         exit 0
     else
-        echo "FAIL: Local override exists but patch line is missing."
         exit 1
     fi
 fi
@@ -105,10 +117,10 @@ for ext in cpp h py; do
     done
 done
 
-# ── Apply patch ───────────────────────────────────────────────────────────────
+# ── Apply patches ─────────────────────────────────────────────────────────────
 CPP_FILE="$TARGET_DIR/web_server_idf.cpp"
 
-# Verify the patch target exists
+# Verify the patch targets exist
 if ! grep -q 'httpd_config_t config = HTTPD_DEFAULT_CONFIG();' "$CPP_FILE"; then
     echo "ERROR: Cannot find HTTPD_DEFAULT_CONFIG() in $CPP_FILE"
     echo "       ESPHome may have changed the httpd init code."
@@ -116,17 +128,72 @@ if ! grep -q 'httpd_config_t config = HTTPD_DEFAULT_CONFIG();' "$CPP_FILE"; then
     exit 1
 fi
 
+if ! grep -q 'httpd_register_uri_handler(this->server_, &handler_options);' "$CPP_FILE"; then
+    echo "ERROR: Cannot find handler_options registration anchor in $CPP_FILE"
+    echo "       ESPHome may have changed the URI handler registration code."
+    echo "       Manual inspection required."
+    exit 1
+fi
+
+# ── Patch 1: Stack size ────────────────────────────────────────────────────────
 # Check if already patched (re-run after copy means it's not)
 if grep -q 'config\.stack_size = 16384;' "$CPP_FILE"; then
-    echo "Patch already present — nothing to do."
+    echo "Patch 1 (stack size) already present — skipping."
 else
     sed -i '/httpd_config_t config = HTTPD_DEFAULT_CONFIG();/a\  config.stack_size = 16384;  // PATCHED: BUG-076 — ESPHome default 4KB overflows with any non-trivial handler' \
         "$CPP_FILE"
 
     if grep -q 'config\.stack_size = 16384;' "$CPP_FILE"; then
-        echo "Patch applied successfully."
+        echo "Patch 1 (stack size) applied successfully."
     else
-        echo "ERROR: Patch application failed — sed did not produce expected output."
+        echo "ERROR: Patch 1 (stack size) application failed — sed did not produce expected output."
+        exit 1
+    fi
+fi
+
+# ── Patch 2: HTTP_DELETE handler registration (BUG-079) ───────────────────────
+# Stock ESPHome only registers GET, POST, OPTIONS. DELETE requests are blocked
+# at the ESP-IDF httpd layer (plain-text 405) unless we register a handler.
+if grep -q 'httpd_register_uri_handler(this->server_, &handler_delete);' "$CPP_FILE"; then
+    echo "Patch 2 (HTTP_DELETE handler) already present — skipping."
+else
+    # Insert the DELETE handler block after the OPTIONS handler registration line.
+    # Use a Python script for reliable multi-line insertion.
+    python3 - "$CPP_FILE" << 'PYEOF'
+import sys
+
+path = sys.argv[1]
+with open(path, 'r') as f:
+    content = f.read()
+
+anchor = '    httpd_register_uri_handler(this->server_, &handler_options);'
+new_block = """
+
+    // PATCH2-BEGIN: BUG-079 HTTP_DELETE registration
+    // PATCHED: BUG-079 — Register DELETE so ESP-IDF httpd routes DELETE requests
+    // to our handler chain instead of returning plain-text 405.
+    // DELETE requests have no body, so they use the same request_handler as GET.
+    const httpd_uri_t handler_delete = {
+        .uri = "",
+        .method = HTTP_DELETE,
+        .handler = AsyncWebServer::request_handler,
+        .user_ctx = this,
+    };
+    httpd_register_uri_handler(this->server_, &handler_delete);
+    // PATCH2-END: BUG-079 HTTP_DELETE registration"""
+
+if anchor not in content:
+    print("ERROR: anchor not found", file=sys.stderr)
+    sys.exit(1)
+
+content = content.replace(anchor, anchor + new_block, 1)
+with open(path, 'w') as f:
+    f.write(content)
+print("Patch 2 (HTTP_DELETE handler) applied successfully.")
+PYEOF
+
+    if [[ $? -ne 0 ]]; then
+        echo "ERROR: Patch 2 (HTTP_DELETE handler) application failed."
         exit 1
     fi
 fi
@@ -137,10 +204,17 @@ cat > "$TARGET_DIR/PATCH_INFO.md" << EOF
 # web_server_idf local component override
 
 ## What
-One-line patch: \`config.stack_size = 16384\` after \`HTTPD_DEFAULT_CONFIG()\`
-in \`web_server_idf.cpp\`, method \`AsyncWebServer::begin()\`.
+Two patches to \`web_server_idf.cpp\`, method \`AsyncWebServer::begin()\`:
+
+**Patch 1 — Stack size (BUG-076):** \`config.stack_size = 16384\` after \`HTTPD_DEFAULT_CONFIG()\`
+
+**Patch 2 — DELETE handler (BUG-079):** Register an \`HTTP_DELETE\` URI handler so
+ESP-IDF httpd routes DELETE requests to the AsyncWebServer handler chain instead
+of returning a plain-text 405 "Specified method is invalid for this resource".
 
 ## Why
+
+### Patch 1 — Stack size
 ESP-IDF's \`HTTPD_DEFAULT_CONFIG()\` hardcodes \`.stack_size = 4096\`.
 ESPHome never overrides it. 4 KB is insufficient for any handler that
 performs authentication + HTTP response formatting. Stack overflow crashes
@@ -148,10 +222,20 @@ with \`StoreProhibited\` in \`vPortYieldFromInt\`.
 
 \`CONFIG_HTTPD_STACK_SIZE\` in \`sdkconfig_options\` has zero runtime effect.
 
+### Patch 2 — DELETE handler
+Stock ESPHome's \`AsyncWebServer::begin()\` registers only GET, POST, and OPTIONS
+URI handlers. When a DELETE request arrives, ESP-IDF httpd finds no registered
+handler for that method and immediately returns its built-in plain-text 405,
+before calling any \`canHandle()\` or \`handleRequest()\` on our handler objects.
+Adding an explicit DELETE handler registration routes DELETE requests through the
+same \`request_handler\` path as GET (no body to read).
+
 ## Reference
-- BUG-075, BUG-076
-- LESSON-OPS-100, LESSON-OPS-101
-- Critical Rules 40, 41
+- BUG-075, BUG-076 (stack size)
+- LESSON-OPS-100, LESSON-OPS-101 (stack size)
+- Critical Rules 40, 41 (stack size)
+- BUG-079 (DELETE handler)
+- LESSON-OPS-108, LESSON-OPS-109 (DELETE handler)
 
 ## Upstream source
 - ESPHome version: ${ESPHOME_VERSION}

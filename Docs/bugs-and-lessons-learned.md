@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-03-31 — v7.6.0.0 post-merge fixups (BUG-075/076, LESSON-OPS-097–102)._
+_Last updated: 2026-04-02 — v7.6.0.2 fixup (BUG-079 — HTTP DELETE handler registration)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -16,21 +16,32 @@ with plain-text `"Specified method is invalid for this resource"`. All device te
 cases (T1-T4, T10) failed. GET and POST to the same URL correctly returned JSON 405 from
 the handler.
 
-**Root cause:** The v7.6.0.2 final fixup commit, which added GET/POST → 405 wiring for
-the delete satellite route, accidentally broke the `HTTP_DELETE` section in `canHandle()`
-and/or `handleRequest()`. Without `canHandle()` returning `true` for `HTTP_DELETE`, the
-ESPHome AsyncWebServer never registered a handler for DELETE on that path. The ESP-IDF
-httpd layer then returned its built-in 405 before our code ever ran.
+**Root cause:** `firmware/local_components/web_server_idf/web_server_idf.cpp`,
+function `AsyncWebServer::begin()`. The local component (introduced in PR #105 as the
+BUG-075/076 stack-size fix) copied stock ESPHome's `begin()` which registers URI handlers
+only for `HTTP_GET`, `HTTP_POST`, and `HTTP_OPTIONS`. No `HTTP_DELETE` handler was ever
+registered. When a DELETE request arrives, ESP-IDF httpd finds no registered handler for
+that method and immediately returns its built-in plain-text 405 — before calling any
+`canHandle()` or `handleRequest()` on our handler objects. The `canHandle()` and
+`handleRequest()` routing in `dashboard/sensor_history_multi.h` was correct; they were
+simply never reached for DELETE requests.
 
-**Diagnostic signature:** A plain-text 405 (not JSON) means `canHandle()` returned `false`
-and the request never reached `handleRequest()`. Our handler's `send_json_error_()` always
-returns `application/json`.
+**Diagnostic signature:** A plain-text 405 (not JSON) means the request never reached
+our handler at all. Our handler's `send_json_error_()` always returns `application/json`.
+GET and POST returning JSON 405 (method-not-allowed from our handler) confirmed the
+transport layer was selectively blocking only DELETE.
 
-**Fix:** Restored the standalone `HTTP_DELETE` check in `canHandle()` as a peer-level `if`
-block (not nested inside HTTP_GET or HTTP_POST). Verified the `HTTP_DELETE` dispatch in
-`handleRequest()` exists and runs before the unguarded GET fallthrough section.
+**Fix:** Added `HTTP_DELETE` URI handler registration in `AsyncWebServer::begin()` in
+`firmware/local_components/web_server_idf/web_server_idf.cpp`, after the existing OPTIONS
+handler. DELETE requests have no body, so they use the same `request_handler` path as GET.
+Also updated `scripts/patch-esphome-httpd-stack.sh` to apply this patch automatically
+when re-running after an ESPHome upgrade.
 
-**Prevention:** See LESSON-OPS-108, LESSON-OPS-109.
+**Introduced by:** PR #105 (BUG-075/076 fix) — the local component was created without
+registering a DELETE handler. Present throughout v7.6.0.0 and v7.6.0.1; first exposed by
+the DELETE satellite endpoint added in PR #110 (v7.6.0.2).
+
+**Fixed by:** PR #114. See LESSON-OPS-108, LESSON-OPS-109.
 
 ---
 
