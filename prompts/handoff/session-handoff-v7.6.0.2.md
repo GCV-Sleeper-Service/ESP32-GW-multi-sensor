@@ -221,12 +221,8 @@ Mark v7.6.0.2 as complete with date.
 
 - **PR #110** — `handle_delete_satellite_()` implementation replacing the 501 stub
   - Array compaction with `set_identity` + field-by-field copy
-  - `SatelliteNVSSnapshot` pattern to prevent torn reads during deferred NVS save
-  - Generation counter (`s_satellite_config_gen`) to detect config changes during poll cycles
-  - `s_nvs_save_in_progress` flag to prevent concurrent deferred NVS save tasks
-  - GET/POST → 405 wiring for wrong-method requests
-  - CORS `Access-Control-Allow-Methods` updated to include DELETE
-  - 6 commits, 2 files changed
+  - Runtime delete path aligned with existing add-satellite validation and NVS behavior
+  - GET/POST → 405 wiring for wrong-method requests on the DELETE URI
 
 ### BUG-079 — HTTP DELETE handler registration
 
