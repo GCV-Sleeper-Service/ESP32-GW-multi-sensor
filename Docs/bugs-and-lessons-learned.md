@@ -2827,6 +2827,29 @@ window. A future improvement could retry NVS writes or add a "dirty" flag checke
 
 ---
 
+### LESSON-OPS-110 — Prompt code snippets for endpoint handlers must include explicit auth policy (2026-04-03)
+
+**Observation:** When a prompt replaces an existing stub handler with a new implementation,
+omitting `authenticate_management_()` from the prompt's code block is a prompt defect that
+coding agents will faithfully reproduce. The replaced stub's auth call is the authoritative
+reference — if the replacement prompt omits it, the agent will drop it.
+
+**Root cause (v7.6.0.3):** The `handle_test_satellite_()` prompt snippet did not include an
+explicit auth decision. The agent produced an unauthenticated handler. Auth was added
+during the Copilot review pass (`b43340c`), but the defect originated in the prompt.
+
+**Rule:** From v7.6.0.4 onward, every endpoint handler code block in a prompt must include
+an explicit auth decision in one of these forms:
+```
+Auth: REQUIRED — call authenticate_management_() before any logic
+Auth: NOT REQUIRED — [one-sentence rationale]
+```
+
+**Corollary:** Destructive or topology-revealing management endpoints require auth.
+Add/discovery endpoints may be open with documented rationale.
+
+---
+
 ### LESSON-OPS-005: Raw logs and curated docs stay separate
 
 - Raw logs → `build-logs/` (gitignored)
