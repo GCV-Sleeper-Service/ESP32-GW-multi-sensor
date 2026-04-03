@@ -2,6 +2,38 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.0.4] — 2026-04-03 — Dashboard Add/Remove/Test Satellite UI (Phase D Step 4)
+
+### New Features
+
+- **Interactive Settings Panel** — `renderSettingsPanel()` in `dashboard.js` (and mirrored in `dashboard.html`) replaces the read-only satellite list with full management controls:
+  - **Add Satellite form** at the top of the settings panel:
+    - URL text input (`http://192.168.x.x`) and optional friendly name input
+    - `Test` button → `POST /api/aggregator/test-satellite?url=...` with management auth and form-encoded body
+    - `Add` button → `POST /api/aggregator/add-satellite?url=...&name=...` (no auth required) with form-encoded body
+    - Inline status area — no `alert()` calls
+  - **Per-satellite Remove button** on each satellite card:
+    - `confirm()` dialog: "Remove satellite {name}? This cannot be undone."
+    - → `DELETE /api/aggregator/satellite/{id}` with management auth
+    - On success: re-fetches gateway list and re-renders settings panel
+  - **Enhanced per-satellite status**: last-seen timestamp (`gw.last_seen`), consecutive failure count when `> 0`, preserved online/unreachable indicator
+
+- **New helper functions** (all programmatic event binding, no inline `onclick`):
+  - `_handleTestSatellite(urlInput, statusEl)` — in-flight guarded, uses `requestManagementCredentials()`
+  - `_handleAddSatellite(urlInput, nameInput, statusEl)` — in-flight guarded, no auth
+  - `_handleRemoveSatellite(satId, satName, statusEl)` — in-flight guarded, uses `requestManagementCredentials()`
+  - `_refreshSettingsPanel()` — re-fetches `/api/aggregator/gateways`, rebuilds selector, restores settings tab active state
+
+### CSS
+
+- Added new CSS classes to `dashboard.html` `<style>` section: `.settings-add-form`, `.settings-add-row`, `.settings-input`, `.settings-input-name`, `.settings-add-actions`, `.settings-btn`, `.settings-btn-test`, `.settings-btn-add`, `.settings-btn-remove`, `.settings-status`, `.settings-warning`, `.settings-empty`
+- All new `<input>` and `<button>` elements include `color-scheme: light dark`
+
+### Regenerated Artifacts
+
+- `dashboard/dashboard.h` regenerated from minified `dashboard.html` (v7.6.0.4)
+- All fixture variants and version strings updated
+
 ## [v7.6.0.3] — 2026-04-02 — POST /api/aggregator/test-satellite (Phase D Step 3)
 
 ### New Features
