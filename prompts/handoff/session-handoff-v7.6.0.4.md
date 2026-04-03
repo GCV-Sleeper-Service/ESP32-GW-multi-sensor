@@ -309,7 +309,7 @@ The `URL too long` row is relevant if users paste long URLs in the dashboard URL
 ### POST /api/aggregator/add-satellite
 
 ```
-POST /api/aggregator/add-satellite?url=...&name=...&poll=...
+POST /api/aggregator/add-satellite?url=...&name=...
 Content-Type: application/x-www-form-urlencoded
 Body: a=1
 ```
