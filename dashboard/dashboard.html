@@ -497,6 +497,18 @@
     .settings-sat-id { color:var(--text-muted); font-weight:400; }
     .settings-sat-details { font-family:'JetBrains Mono',monospace; font-size:.72rem; color:var(--text-secondary); display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; }
     .settings-sat-details code { color:#60a5fa; }
+    .settings-add-form { margin-bottom:16px; padding:12px; border:1px solid var(--border-color,#ccc); border-radius:8px; }
+    .settings-add-row { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+    .settings-input { flex:1; min-width:180px; padding:6px 10px; border:1px solid var(--border-color,#ccc); border-radius:4px; font-size:14px; color-scheme:light dark; }
+    .settings-input-name { flex:0.6; min-width:120px; }
+    .settings-add-actions { display:flex; gap:8px; }
+    .settings-btn { padding:6px 16px; border:1px solid var(--border-color,#ccc); border-radius:4px; cursor:pointer; font-size:14px; color-scheme:light dark; }
+    .settings-btn-test { background:var(--btn-secondary-bg,#e0e0e0); }
+    .settings-btn-add { background:var(--btn-primary-bg,#4CAF50); color:white; }
+    .settings-btn-remove { background:var(--btn-danger-bg,#f44336); color:white; margin-top:8px; font-size:12px; padding:4px 12px; }
+    .settings-status { margin-top:8px; font-size:13px; min-height:20px; }
+    .settings-warning { color:var(--warning-color,#ff9800); font-size:13px; }
+    .settings-empty { color:var(--text-muted,#999); font-style:italic; }
     :root.light .gw-tab { background:transparent; color:var(--text-muted); }
     :root.light .gw-tab.active { background:rgba(37,99,235,.1); color:#2563eb; border-color:rgba(37,99,235,.4); }
     :root.light .settings-satellite-card { background:rgba(0,0,0,.02); }
@@ -963,7 +975,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.6.0.3';
+App.version = 'v7.6.0.4';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -4479,27 +4491,199 @@ function renderSettingsPanel(gateways) {
   grid.innerHTML = '';
   var html = '<div class="settings-panel">';
   html += '<h3 class="settings-title">Satellite Configuration</h3>';
-  html += '<p class="settings-subtitle">Configured satellites (read-only \u2014 runtime management coming in a future update)</p>';
-  gateways.forEach(function(gw) {
-    var statusDot = gw.reachable ? '\uD83D\uDFE2' : '\uD83D\uDD34';
-    var fwVersion = '\u2014';
-    var deviceCount = '\u2014';
-    if (gw.firmware_version) fwVersion = gw.firmware_version;
-    if (gw.device_count !== undefined) deviceCount = gw.device_count;
-    else if (gw.sensor_count !== undefined) deviceCount = gw.sensor_count;
-    html += '<div class="settings-satellite-card">';
-    html += '<div class="settings-sat-header">' + statusDot + ' ' + escHtml(gw.name) +
-      ' <span class="settings-sat-id">(' + escHtml(gw.id) + ')</span></div>';
-    html += '<div class="settings-sat-details">';
-    html += '<div>URL: <code>' + escHtml(gw.base_url || '\u2014') + '</code></div>';
-    html += '<div>Firmware: ' + escHtml(fwVersion) + '</div>';
-    html += '<div>Devices: ' + escHtml(String(deviceCount)) + '</div>';
-    html += '<div>Status: ' + (gw.reachable ? 'Online' : 'Unreachable') + '</div>';
-    html += '</div>';
-    html += '</div>';
-  });
+  // Add Satellite form
+  html += '<div class="settings-add-form">';
+  html += '<div class="settings-add-row">';
+  html += '<input type="text" class="settings-input" id="sat-url-input" placeholder="http://192.168.x.x">';
+  html += '<input type="text" class="settings-input settings-input-name" id="sat-name-input" placeholder="Friendly name (optional)">';
+  html += '</div>';
+  html += '<div class="settings-add-actions">';
+  html += '<button class="settings-btn settings-btn-test" id="sat-test-btn">Test</button>';
+  html += '<button class="settings-btn settings-btn-add" id="sat-add-btn">Add</button>';
+  html += '</div>';
+  html += '<div class="settings-status" id="sat-add-status"></div>';
+  html += '</div>';
+  // Satellite cards
+  if (!gateways || gateways.length === 0) {
+    html += '<p class="settings-empty">No satellites configured.</p>';
+  } else {
+    gateways.forEach(function(gw) {
+      var statusDot = gw.reachable ? '\uD83D\uDFE2' : '\uD83D\uDD34';
+      var fwVersion = '\u2014';
+      var deviceCount = '\u2014';
+      if (gw.firmware_version) fwVersion = gw.firmware_version;
+      if (gw.device_count !== undefined && gw.device_count !== null) deviceCount = String(gw.device_count);
+      else if (gw.sensor_count !== undefined && gw.sensor_count !== null) deviceCount = String(gw.sensor_count);
+      var lastSeenStr = (gw.last_seen !== undefined && gw.last_seen !== null)
+        ? new Date(gw.last_seen * 1000).toLocaleString() : '\u2014';
+      html += '<div class="settings-satellite-card">';
+      html += '<div class="settings-sat-header">' + statusDot + ' ' + escHtml(gw.name) +
+        ' <span class="settings-sat-id">(' + escHtml(gw.id) + ')</span></div>';
+      html += '<div class="settings-sat-details">';
+      html += '<div>URL: <code>' + escHtml(gw.base_url || '\u2014') + '</code></div>';
+      html += '<div>Firmware: ' + escHtml(fwVersion) + '</div>';
+      html += '<div>Devices: ' + escHtml(deviceCount) + '</div>';
+      html += '<div>Status: ' + (gw.reachable ? 'Online' : 'Unreachable') + '</div>';
+      html += '<div>Last seen: ' + escHtml(lastSeenStr) + '</div>';
+      if (gw.consecutive_failures !== undefined && gw.consecutive_failures !== null && gw.consecutive_failures > 0) {
+        html += '<div class="settings-warning">Failures: ' + escHtml(String(gw.consecutive_failures)) + '</div>';
+      }
+      html += '</div>';
+      html += '<button class="settings-btn settings-btn-remove" data-sat-id="' + escAttr(gw.id) + '" data-sat-name="' + escAttr(gw.name) + '">Remove</button>';
+      html += '<div class="settings-status" id="sat-status-' + escAttr(gw.id) + '"></div>';
+      html += '</div>';
+    });
+  }
   html += '</div>';
   grid.innerHTML = html;
+  // Bind Test button
+  var testBtn = document.getElementById('sat-test-btn');
+  if (testBtn) {
+    testBtn.addEventListener('click', function() {
+      var urlInput = document.getElementById('sat-url-input');
+      var statusEl = document.getElementById('sat-add-status');
+      _handleTestSatellite(urlInput, statusEl);
+    });
+  }
+  // Bind Add button
+  var addBtn = document.getElementById('sat-add-btn');
+  if (addBtn) {
+    addBtn.addEventListener('click', function() {
+      var urlInput = document.getElementById('sat-url-input');
+      var nameInput = document.getElementById('sat-name-input');
+      var statusEl = document.getElementById('sat-add-status');
+      _handleAddSatellite(urlInput, nameInput, statusEl);
+    });
+  }
+  // Bind Remove buttons
+  document.querySelectorAll('.settings-btn-remove').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var satId = btn.getAttribute('data-sat-id');
+      var satName = btn.getAttribute('data-sat-name');
+      var statusEl = document.getElementById('sat-status-' + satId);
+      _handleRemoveSatellite(satId, satName, statusEl);
+    });
+  });
+}
+
+var _satTestInFlight = false;
+function _handleTestSatellite(urlInput, statusEl) {
+  if (_satTestInFlight) return;
+  var url = String(urlInput ? urlInput.value || '' : '').trim();
+  if (!url) {
+    if (statusEl) statusEl.textContent = 'Enter a URL to test.';
+    return;
+  }
+  _satTestInFlight = true;
+  if (statusEl) statusEl.textContent = 'Authenticating...';
+  requestManagementCredentials('satellite test')
+    .then(function(creds) {
+      if (!creds) {
+        if (statusEl) statusEl.textContent = 'Test cancelled';
+        return null;
+      }
+      if (statusEl) statusEl.textContent = 'Testing...';
+      return fetch(ESP_HOST + '/api/aggregator/test-satellite?url=' + encodeURIComponent(url), {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {
+          'Authorization': 'Basic ' + btoa(creds.username + ':' + creds.password),
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'a=1'
+      })
+      .then(safeJsonResponse)
+      .then(function(data) {
+        var gw = data.gateway || {};
+        var sensorCount = (gw.sensor_count !== undefined && gw.sensor_count !== null) ? gw.sensor_count : '\u2014';
+        if (statusEl) statusEl.textContent = '\u2713 Found: ' + escHtml(gw.name || '\u2014') +
+          ' (' + escHtml(gw.hardware || '\u2014') + ', ' + escHtml(String(sensorCount)) + ' devices)';
+      });
+    })
+    .catch(function(err) {
+      if (statusEl) statusEl.textContent = '\u2717 ' + escHtml(err.message || 'Test failed');
+    })
+    .finally(function() { _satTestInFlight = false; });
+}
+
+var _satAddInFlight = false;
+function _handleAddSatellite(urlInput, nameInput, statusEl) {
+  if (_satAddInFlight) return;
+  var url = String(urlInput ? urlInput.value || '' : '').trim();
+  var name = String(nameInput ? nameInput.value || '' : '').trim();
+  if (!url) {
+    if (statusEl) statusEl.textContent = 'Enter a URL to add.';
+    return;
+  }
+  _satAddInFlight = true;
+  if (statusEl) statusEl.textContent = 'Adding...';
+  var query = 'url=' + encodeURIComponent(url);
+  if (name) query += '&name=' + encodeURIComponent(name);
+  fetch(ESP_HOST + '/api/aggregator/add-satellite?' + query, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'a=1'
+  })
+  .then(safeJsonResponse)
+  .then(function() {
+    if (urlInput) urlInput.value = '';
+    if (nameInput) nameInput.value = '';
+    if (statusEl) statusEl.textContent = 'Satellite added.';
+    _refreshSettingsPanel();
+  })
+  .catch(function(err) {
+    if (statusEl) statusEl.textContent = '\u2717 ' + escHtml(err.message || 'Add failed');
+  })
+  .finally(function() { _satAddInFlight = false; });
+}
+
+var _satRemoveInFlight = false;
+function _handleRemoveSatellite(satId, satName, statusEl) {
+  if (_satRemoveInFlight) return;
+  if (!confirm('Remove satellite ' + satName + '? This cannot be undone.')) return;
+  _satRemoveInFlight = true;
+  if (statusEl) statusEl.textContent = 'Authenticating...';
+  requestManagementCredentials('satellite removal')
+    .then(function(creds) {
+      if (!creds) {
+        if (statusEl) statusEl.textContent = 'Remove cancelled';
+        return null;
+      }
+      if (statusEl) statusEl.textContent = 'Removing...';
+      return fetch(ESP_HOST + '/api/aggregator/satellite/' + encodeURIComponent(satId), {
+        method: 'DELETE',
+        cache: 'no-store',
+        headers: { 'Authorization': 'Basic ' + btoa(creds.username + ':' + creds.password) }
+      })
+      .then(safeJsonResponse)
+      .then(function() { _refreshSettingsPanel(); });
+    })
+    .catch(function(err) {
+      var msg = err.message || 'Remove failed';
+      if (msg.indexOf('404') !== -1) {
+        if (statusEl) statusEl.textContent = 'Satellite not found';
+      } else {
+        if (statusEl) statusEl.textContent = '\u2717 ' + escHtml(msg);
+      }
+    })
+    .finally(function() { _satRemoveInFlight = false; });
+}
+
+function _refreshSettingsPanel() {
+  fetch(ESP_HOST + '/api/aggregator/gateways', {cache: 'no-store'})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data && data.gateways) {
+        window._aggregatorGateways = data.gateways;
+        renderGatewaySelector(window._aggregatorGateways);
+        document.querySelectorAll('.gw-tab').forEach(function(t) { t.classList.remove('active'); });
+        var settingsTab = document.querySelector('.gw-tab[data-gw="settings"]');
+        if (settingsTab) settingsTab.classList.add('active');
+        renderSettingsPanel(window._aggregatorGateways);
+      }
+    })
+    .catch(function() { /* silent */ });
 }
 
 async function initAggregatorDashboard() {
