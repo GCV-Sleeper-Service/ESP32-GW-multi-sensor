@@ -1,6 +1,6 @@
-<img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
 
-# Thank you. A question - could you tell me, based on this scope:
+
+# A question - could you tell me, based on this scope:
 
 Replacing the entire body of renderSettingsPanel() in dashboard.js
 Three new handler functions (_handleTestSatellite, _handleAddSatellite, _handleRemoveSatellite)
