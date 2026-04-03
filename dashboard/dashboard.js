@@ -3653,9 +3653,11 @@ function _handleTestSatellite(urlInput, statusEl) {
       .then(safeJsonResponse)
       .then(function(data) {
         var gw = data.gateway || {};
-        var sensorCount = (gw.sensor_count !== undefined && gw.sensor_count !== null) ? gw.sensor_count : '\u2014';
+        var deviceCount = '\u2014';
+        if (gw.device_count !== undefined && gw.device_count !== null) deviceCount = String(gw.device_count);
+        else if (gw.sensor_count !== undefined && gw.sensor_count !== null) deviceCount = String(gw.sensor_count);
         if (statusEl) statusEl.innerHTML = '\u2713 Found: ' + escHtml(gw.name || '\u2014') +
-          ' (' + escHtml(gw.hardware || '\u2014') + ', ' + escHtml(String(sensorCount)) + ' devices)';
+          ' (' + escHtml(gw.hardware || '\u2014') + ', ' + escHtml(deviceCount) + ' devices)';
       });
     })
     .catch(function(err) {
