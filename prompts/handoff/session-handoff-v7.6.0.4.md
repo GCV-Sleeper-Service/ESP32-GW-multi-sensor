@@ -67,7 +67,7 @@ No code fix required — the endpoint is POST-only and DELETE is correctly rejec
 | v7.6.0.0 | NVS satellite persistence layer | ✅ Complete 2026-03-29 |
 | v7.6.0.1 | POST /api/aggregator/add-satellite | ✅ Complete 2026-03-31 |
 | v7.6.0.2 | DELETE /api/aggregator/satellite/{id} | ✅ Complete 2026-04-02 |
-| v7.6.0.3 | POST /api/aggregator/test-satellite | ✅ Complete 2026-04-03 |
+| v7.6.0.3 | POST /api/aggregator/test-satellite | ✅ Complete 2026-04-02 |
 | **v7.6.0.4** | **Dashboard add/remove/test UI** | **⬅️ This session** |
 | v7.6.0.5 | Playwright tests + Phase D closure | Pending |
 
@@ -80,7 +80,7 @@ No code fix required — the endpoint is POST-only and DELETE is correctly rejec
 | v7.6.0.0 | NVS satellite persistence layer | ✅ Complete 2026-03-29 |
 | v7.6.0.1 | POST /api/aggregator/add-satellite | ✅ Complete 2026-03-31 |
 | v7.6.0.2 | DELETE /api/aggregator/satellite/{id} | ✅ Complete 2026-04-02 |
-| v7.6.0.3 | POST /api/aggregator/test-satellite | ✅ Complete 2026-04-03 |
+| v7.6.0.3 | POST /api/aggregator/test-satellite | ✅ Complete 2026-04-02 |
 | **v7.6.0.4** | **Dashboard add/remove/test satellite UI** | **⬅️ Next** |
 | v7.6.0.5 | Playwright tests + Phase D closure | Pending |
 
@@ -113,9 +113,9 @@ management endpoints (add, delete, test-satellite) are already operational in fi
   endpoints — all `fetch()` calls to them **MUST** use `Content-Type:
   application/x-www-form-urlencoded` and `body: 'a=1'` (Critical Rule 38).
 - `DELETE /api/aggregator/satellite/{id}` requires no body but does require auth. The dashboard
-  currently sends credentials via the browser session (Basic Auth cookies or pre-auth from
-  ESPHome). Verify how existing management fetch calls handle auth before following the same
-  pattern.
+  currently sends credentials via browser-managed auth/session state (for example, a cached
+  Basic Auth `Authorization` header or pre-auth from ESPHome). Verify how existing management
+  fetch calls handle auth before following the same pattern.
 - `POST /api/aggregator/test-satellite` is subject to the **inherited management POST
   non-empty-body guard** — `handleRequest()` rejects empty bodies with `400 "Non-empty body
   required for management POST"`. The `body: 'a=1'` pattern satisfies this guard.
@@ -152,7 +152,7 @@ and must know v7.6.0.3 is now complete on `main`.
 ```
 ## 3. Current Status
 
-- v7.6.0.3 complete and merged 2026-04-03 (test-satellite endpoint)
+- v7.6.0.3 complete and merged 2026-04-02 (test-satellite endpoint)
 - All three management endpoints operational:
   - POST /api/aggregator/add-satellite (200/400/409)
   - DELETE /api/aggregator/satellite/{id} (200/404)
@@ -193,7 +193,7 @@ body: 'a=1'
 This satisfies Critical Rule 38 and the inherited management POST non-empty-body guard.
 No correction needed — note for the record.
 
-### P4 — §5d prompt code block is a skeleton, marked as such ✅
+### P4 — §5e prompt code block is a skeleton, marked as such ✅
 
 Unlike v7.6.0.3's §5d which was a copy-ready snippet with production defects (P1: auth missing,
 P2: compact JSON), the v7.6.0.4 §5e is explicitly a **skeleton**. The `// ── Add Satellite
@@ -211,20 +211,22 @@ add the following preamble comment to §5e and §5f:
 Prompt states "All 44 Critical Rules" — this matches the current count (Rules 43–44 added
 during v7.6.0.1 era for BUG-078/077). No correction needed.
 
-### P6 — §11 Device Testing section references `minify-dashboard.sh` — verify it exists
+### P6 — §11 Device Testing section references `minify-dashboard.sh` — verify it is executable and deps are installed
 
 **Location:** §11 Prerequisites:
 ```bash
 bash scripts/minify-dashboard.sh
 ```
 
-This script is referenced as "CRITICAL for this step" but was not mentioned in prior prompts
-or session logs. Verify the script exists at `scripts/minify-dashboard.sh` before the agent
-runs. If it does not exist, either create it or update §11 to use `generate-header.sh` alone
-(which is referenced in §5i and §10).
+`scripts/minify-dashboard.sh` exists in the repository. The preflight check is **not** about
+existence — it is about confirming:
+1. The script is executable (`chmod +x scripts/minify-dashboard.sh` if needed).
+2. `html-minifier-terser` is installed globally or locally (the script depends on it).
+3. The minification step succeeds end-to-end before the agent proceeds to validation.
 
-**Action:** Confirm `scripts/minify-dashboard.sh` exists. If not, flag to human before
-invoking the agent.
+**Action:** Before invoking the agent, run `bash scripts/minify-dashboard.sh` and confirm it
+exits cleanly. If it fails due to missing `html-minifier-terser`, install it (`npm install -g
+html-minifier-terser`) and re-run. Do not proceed to the agent if this step fails.
 
 ### P7 — §13 Session log filename format — verify consistency with prior sessions
 
