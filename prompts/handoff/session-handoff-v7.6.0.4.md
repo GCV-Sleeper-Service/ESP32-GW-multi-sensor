@@ -461,7 +461,7 @@ After the v7.6.0.4 PR is merged:
 ### 2. PR and Prompt Audit Document
 
 **File:** `prompts/phaseD/v7.6.0.4-PR<NN>-consolidated-audit-and-lessons.md`
-**Format:** Same structure as `prompts/phaseD/v7.6.0.3-PR119-consolidated-audit-and-lessons-UPDATE.md`
+**Format:** Same structure as `prompts/phaseD/v7.6.0.3-PR119-consolidated-audit-and-lessons.md`
 
 **Must answer:**
 - Did the coding agent deliver properly and accurately what was required?
@@ -471,6 +471,7 @@ After the v7.6.0.4 PR is merged:
 - PR comment review and disposition
 - Fixes implemented (per-commit if multiple rounds)
 - Remaining issues and deferred fixes
+- New Lessons and Lessons Carried Forward
 
 **Additional quality check specific to v7.6.0.4:**
 - Was LESSON-OPS-043 (JS/HTML mirror) correctly followed?
