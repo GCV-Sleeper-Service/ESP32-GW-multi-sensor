@@ -519,7 +519,7 @@ should at minimum verify:
 
 | # | Test | Method | Expected |
 |---|------|--------|----------|
-| T1 | Settings panel HTML includes new elements | curl `/` | `add-sat-form` and `add-sat-btn` present in response |
+| T1 | Settings panel HTML includes new elements | Manual | add-sat-form and add-sat-btn present in browser |
 | T2 | Test satellite via dashboard endpoint | curl POST test-satellite | 200 + gateway JSON |
 | T3 | Add satellite via dashboard | curl POST add-satellite | 200 + new satellite in gateways |
 | T4 | Remove satellite via dashboard | curl DELETE | 200 + satellite gone from gateways |
