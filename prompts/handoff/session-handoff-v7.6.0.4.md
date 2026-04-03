@@ -3,6 +3,7 @@
 _Date: 2026-04-03_
 _Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
 _Status: v7.6.0.3 is COMPLETE and merged to main. PR #119 merged 2026-04-02. Dashboard satellite management UI remains read-only placeholder._
+_Prompt audit fixes P1/P2/P4/P7 applied to main in commit 4530d909 (2026-04-03). Prompt is ready for coding agent invocation._
 
 ---
 
@@ -134,21 +135,17 @@ The `_refreshSettingsPanel()` helper in the prompt handles this correctly.
 
 ---
 
-## ⚠️ v7.6.0.4 Prompt Audit
+## ✅ v7.6.0.4 Prompt Audit — ALL ISSUES RESOLVED
 
-> Based on the v7.6.0.3 PR #119 audit findings, the v7.6.0.4 prompt
-> (`prompts/phaseD/v7.6.0.4-implementation-instructions-for-coding-agent.md`) was inspected
-> against `Docs/writing-prompts-for-coding-agents-guide.md`. The following issues must be
-> corrected **before** the coding agent is invoked.
+> Fixes P1, P2, P4, and P7 were applied to
+> `prompts/phaseD/v7.6.0.4-implementation-instructions-for-coding-agent.md` on `main`
+> in commit **4530d909** (2026-04-03). The prompt is ready for coding agent invocation.
 
-### P1 — §3 Current Status date is stale (MUST FIX)
+### P1 — ✅ FIXED (commit 4530d909)
 
-**Location:** §3 line: `Current date: <INSERT_DATE>`
+**Was:** `Current date: <INSERT_DATE>` placeholder in §3.
 
-The `<INSERT_DATE>` placeholder was never filled in. The agent must be told the current date
-and must know v7.6.0.3 is now complete on `main`.
-
-**Correction:** Replace the current §3 block with:
+**Applied:** §3 replaced with full status block:
 ```
 ## 3. Current Status
 
@@ -163,79 +160,44 @@ and must know v7.6.0.3 is now complete on `main`.
 - Current date: 2026-04-03
 ```
 
-### P2 — §5f `_handleRemoveSatellite()` sends DELETE without `body: 'a=1'` — verify correct
+### P2 — ✅ FIXED (commit 4530d909)
 
-**Location:** §5f, `_handleRemoveSatellite()`:
-```javascript
-fetch(ESP_HOST + '/api/aggregator/satellite/' + encodeURIComponent(satId), {
-  method: 'DELETE', cache: 'no-store'
-})
-```
+**Was:** `_handleRemoveSatellite()` in §6c had no inline comment about auth delivery.
 
-The DELETE endpoint does **not** use `is_management_post_route_()`, so it does not inherit the
-non-empty-body guard. Critical Rule 38 applies to POST/PUT — DELETE with no body is correct.
-However, the DELETE endpoint **requires** `authenticate_management_()`. Confirm that the
-existing ESPHome dashboard auth pattern passes credentials on the DELETE request. If the
-dashboard uses session-based Basic Auth (token in header from prior login), it is already
-included by the browser. If not, this fetch needs explicit auth headers.
+**Applied:** `_handleRemoveSatellite()` requirements block in §6c now explicitly states:
+- DELETE auth is **REQUIRED** — uses `requestManagementCredentials()` + `Authorization: Basic ...` header
+- **No request body** required (non-empty-body guard is management POST only)
+- Pattern is identical to `_handleTestSatellite()` for auth delivery
 
-**Action:** Update §5f to ensure the DELETE request uses the same authentication pattern as other
-management actions (modal + Authorization header). Note that DELETE does not need body: a=1.
-This prevents the agent from skipping auth or incorrectly adding a body to DELETE.
+### P3 — ✅ Non-issue (confirmed, no change needed)
 
-### P3 — §5f `_handleTestSatellite()` and `_handleAddSatellite()` use POST correctly ✅
+POST calls correctly use `body: 'a=1'` as confirmed in original audit.
 
-Both functions correctly include:
-```javascript
-headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-body: 'a=1'
-```
-This satisfies Critical Rule 38 and the inherited management POST non-empty-body guard.
-No correction needed — note for the record.
+### P4 — ✅ FIXED (commit 4530d909)
 
-### P4 — §5e prompt code block is a skeleton, marked as such ✅
+**Was:** Code blocks in §6a and §6c had no "cross-check before use" preamble.
 
-Unlike v7.6.0.3's §5d which was a copy-ready snippet with production defects (P1: auth missing,
-P2: compact JSON), the v7.6.0.4 §5e is explicitly a **skeleton**. The `// ── Add Satellite
-form ──` comments make the illustrative intent clear.
+**Applied:** A preamble block added at the top of §6 (Recommended implementation shape) and §6c (Handler functions):
+> *"Code blocks in §6a and §6c are production-quality skeletons. Cross-check all event
+> bindings, fetch patterns, and auth handling against the existing dashboard.js and
+> dashboard.html before using. Do not copy without reading §2 and §16 (Snippet Quality
+> Gates) first."*
 
-However, per the writing guide improvement identified in the v7.6.0.3 audit (G-Audit-1):
-add the following preamble comment to §5e and §5f:
+### P5 — ✅ Non-issue (confirmed, no change needed)
 
-> **NOTE for coding agent:** Code blocks in §5e and §5f are **production-quality skeletons**.
-> Cross-check all event bindings and fetch patterns against the existing dashboard before using.
-> Do not copy without reading §2 and §12 (Snippet Quality Gates) first.
+44 Critical Rules count confirmed correct.
 
-### P5 — §7 Critical Rules count is correct ✅
+### P6 — ✅ Human pre-flight task (no prompt text change required)
 
-Prompt states "All 44 Critical Rules" — this matches the current count (Rules 43–44 added
-during v7.6.0.1 era for BUG-078/077). No correction needed.
+`scripts/minify-dashboard.sh` confirmed to exist in repo. Human must verify it is executable
+and `html-minifier-terser` is installed before invoking the coding agent. No prompt text
+change needed — this is a procedural pre-flight check.
 
-### P6 — §11 Device Testing section references `minify-dashboard.sh` — verify it is executable and deps are installed
+### P7 — ✅ FIXED (commit 4530d909)
 
-**Location:** §11 Prerequisites:
-```bash
-bash scripts/minify-dashboard.sh
-```
+**Was:** `Docs/session-log-<DATE>-v7.6.0.4.md` placeholder in §17.
 
-`scripts/minify-dashboard.sh` exists in the repository. The preflight check is **not** about
-existence — it is about confirming:
-1. The script is executable (`chmod +x scripts/minify-dashboard.sh` if needed).
-2. `html-minifier-terser` is installed globally or locally (the script depends on it).
-3. The minification step succeeds end-to-end before the agent proceeds to validation.
-
-**Action:** Before invoking the agent, run `bash scripts/minify-dashboard.sh` and confirm it
-exits cleanly. If it fails due to missing `html-minifier-terser`, install it (`npm install -g
-html-minifier-terser`) and re-run. Do not proceed to the agent if this step fails.
-
-### P7 — §13 Session log filename format — verify consistency with prior sessions
-
-Prior session logs follow: `Docs/session-log-YYYY-MM-DD-v7.6.0.3.md`
-§13 instructs: `Docs/session-log-<DATE>-v7.6.0.4.md`
-
-The `<DATE>` placeholder needs to be pre-filled with today's date (`2026-04-03`) or instructed
-to use the current date. Note that the agent wrote the v7.6.0.3 session log correctly without
-being told the date — but being explicit avoids filename inconsistency.
+**Applied:** Pre-filled to `Docs/session-log-2026-04-03-v7.6.0.4.md`.
 
 ---
 
@@ -259,10 +221,9 @@ to a management endpoint must have an explicit note about whether it inherits au
 browser session or requires explicit headers.
 
 **Applied to v7.6.0.4:**
-- `POST test-satellite` — requires auth (authenticated via ESPHome session cookies; no
-  explicit header needed if ESPHome Basic Auth is in use, but must verify)
+- `POST test-satellite` — requires auth (authenticated via `requestManagementCredentials()` + explicit `Authorization: Basic ...` header)
 - `POST add-satellite` — does NOT require auth (intentional policy from v7.6.0.1)
-- `DELETE satellite/{id}` — requires auth (same session-cookie pattern)
+- `DELETE satellite/{id}` — requires auth (same `requestManagementCredentials()` pattern)
 
 ### Whitespace-tolerant parsing reminder
 
@@ -343,10 +304,10 @@ DELETE /api/aggregator/satellite/{satellite_id}
 
 ## Pre-merge Checklist for v7.6.0.4
 
-- [ ] v7.6.0.3 merged, tagged (`v7.6.0.3`), all fixups committed
+- [x] v7.6.0.3 merged, tagged (`v7.6.0.3`), all fixups committed
 - [ ] PR #122 (audit UPDATE) merged or noted as open
-- [ ] Prompt audit issues P1–P7 addressed (see section above)
-- [ ] `scripts/minify-dashboard.sh` confirmed to exist
+- [x] Prompt audit issues P1–P7 addressed (P1, P2, P4, P7 fixed in commit 4530d909; P3 and P5 confirmed non-issues; P6 is human pre-flight)
+- [x] `scripts/minify-dashboard.sh` confirmed to exist
 - [ ] Playwright CI all passing:
   - [ ] 3sensor chromium
   - [ ] 3sensor firefox
@@ -365,17 +326,17 @@ DELETE /api/aggregator/satellite/{satellite_id}
 
 ---
 
-## v7.6.0.4 Prompt Known Issues (Must Address Before Invoking Agent)
+## v7.6.0.4 Prompt Known Issues — STATUS
 
-| # | Issue | Location | Correction |
-|---|-------|----------|------------|
-| P1 | `<INSERT_DATE>` placeholder not filled | §3 | Replace with `2026-04-03`, update status to reflect v7.6.0.3 complete |
-| P2 | DELETE fetch auth not documented | §5f | Add inline comment noting auth is inherited from ESPHome session |
-| P4 | Code blocks not marked as illustrative | §5e/§5f preamble | Add "cross-check before use" note per G-Audit-1 writing guide improvement |
-| P6 | `minify-dashboard.sh` existence not verified | §11 Prerequisites | Confirm script exists before running agent |
-| P7 | `<DATE>` in session log filename | §13 | Pre-fill with `2026-04-03` |
-
-> **P3 and P5 are non-issues** (confirmed correct as-is). See detail in Prompt Audit section.
+| # | Issue | Location | Status |
+|---|-------|----------|--------|
+| P1 | `<INSERT_DATE>` placeholder not filled | §3 | ✅ **FIXED** in commit 4530d909 |
+| P2 | DELETE fetch auth not documented | §6c | ✅ **FIXED** in commit 4530d909 |
+| P3 | POST calls use `body: 'a=1'` correctly | §6c | ✅ Non-issue, confirmed correct |
+| P4 | Code blocks not marked as illustrative | §6 preamble | ✅ **FIXED** in commit 4530d909 |
+| P5 | 44 Critical Rules count correct | §11 | ✅ Non-issue, confirmed correct |
+| P6 | `minify-dashboard.sh` existence not verified | §15 Prerequisites | ⚠️ Human pre-flight task (no prompt change needed) |
+| P7 | `<DATE>` in session log filename | §17 | ✅ **FIXED** in commit 4530d909 |
 
 ---
 
@@ -399,12 +360,12 @@ DELETE /api/aggregator/satellite/{satellite_id}
 
 For dashboard JS: every `fetch()` to a management endpoint must have a documented auth
 intention. This prevents the agent from accidentally omitting credentials (as happened in
-v7.6.0.3's initial commit on the firmware side).
+v7.6.0.3's initial commit on the firmware side). **Applied to prompt in commit 4530d909.**
 
 Auth summary for dashboard calls:
-- `test-satellite` POST → auth required → inherited from ESPHome session
+- `test-satellite` POST → auth required → `requestManagementCredentials()` + `Authorization: Basic ...`
 - `add-satellite` POST → **no auth required** (intentional policy)
-- `satellite/{id}` DELETE → auth required → inherited from ESPHome session
+- `satellite/{id}` DELETE → auth required → `requestManagementCredentials()` + `Authorization: Basic ...`
 
 ### LESSON-OPS-043 — JS/HTML mirror (pre-existing, elevated to top concern)
 
@@ -422,7 +383,8 @@ remove `body: 'a=1'` thinking it is unnecessary padding.
 The coding agent for v7.6.0.3 faithfully reproduced the prompt's code block, including its
 defects. For v7.6.0.4, the risk is the same: if the agent copies the `_handleRemoveSatellite()`
 scaffold without checking auth behavior against the actual ESPHome session pattern, it may
-omit or incorrectly handle credentials.
+omit or incorrectly handle credentials. The P2 fix and the §6 preamble (P4 fix) directly
+mitigate this risk.
 
 ---
 
@@ -434,12 +396,11 @@ omit or incorrectly handle credentials.
 > **⚠️ IMPORTANT: If something is not clear when reading instructions, stop and ask for
 > clarification.**
 
-1. Verify `scripts/minify-dashboard.sh` exists — if not, flag to human before proceeding
-2. Apply prompt corrections P1, P2, P4, P6, P7 to
-   `prompts/phaseD/v7.6.0.4-implementation-instructions-for-coding-agent.md`
+1. ✅ Verify `scripts/minify-dashboard.sh` exists — confirmed present in repo (P6 pre-flight done)
+2. ✅ Prompt corrections P1, P2, P4, P7 applied to main in commit 4530d909
 3. Ask human if PR for v7.6.0.4 has been opened and ask to provide the PR number
 4. If PR has not been opened, **open a NEW coding agent session outside of this chat** and
-   paste the corrected prompt
+   paste the corrected prompt (from main)
 5. Wait for the agent to create the PR
 6. Copilot PR reviewer reviews automatically and additional reviews might be posted
 7. Human reviews PR against the Review Checklist in the prompt (§12 quality gates)
