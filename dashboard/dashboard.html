@@ -4596,12 +4596,12 @@ function _handleTestSatellite(urlInput, statusEl) {
       .then(function(data) {
         var gw = data.gateway || {};
         var sensorCount = (gw.sensor_count !== undefined && gw.sensor_count !== null) ? gw.sensor_count : '\u2014';
-        if (statusEl) statusEl.textContent = '\u2713 Found: ' + escHtml(gw.name || '\u2014') +
+        if (statusEl) statusEl.innerHTML = '\u2713 Found: ' + escHtml(gw.name || '\u2014') +
           ' (' + escHtml(gw.hardware || '\u2014') + ', ' + escHtml(String(sensorCount)) + ' devices)';
       });
     })
     .catch(function(err) {
-      if (statusEl) statusEl.textContent = '\u2717 ' + escHtml(err.message || 'Test failed');
+      if (statusEl) statusEl.innerHTML = '\u2717 ' + escHtml(err.message || 'Test failed');
     })
     .finally(function() { _satTestInFlight = false; });
 }
@@ -4633,7 +4633,7 @@ function _handleAddSatellite(urlInput, nameInput, statusEl) {
     _refreshSettingsPanel();
   })
   .catch(function(err) {
-    if (statusEl) statusEl.textContent = '\u2717 ' + escHtml(err.message || 'Add failed');
+    if (statusEl) statusEl.innerHTML = '\u2717 ' + escHtml(err.message || 'Add failed');
   })
   .finally(function() { _satAddInFlight = false; });
 }
@@ -4664,7 +4664,7 @@ function _handleRemoveSatellite(satId, satName, statusEl) {
       if (msg.indexOf('404') !== -1) {
         if (statusEl) statusEl.textContent = 'Satellite not found';
       } else {
-        if (statusEl) statusEl.textContent = '\u2717 ' + escHtml(msg);
+        if (statusEl) statusEl.innerHTML = '\u2717 ' + escHtml(msg);
       }
     })
     .finally(function() { _satRemoveInFlight = false; });
@@ -4672,7 +4672,7 @@ function _handleRemoveSatellite(satId, satName, statusEl) {
 
 function _refreshSettingsPanel() {
   fetch(ESP_HOST + '/api/aggregator/gateways', {cache: 'no-store'})
-    .then(function(r) { return r.json(); })
+    .then(safeJsonResponse)
     .then(function(data) {
       if (data && data.gateways) {
         window._aggregatorGateways = data.gateways;
