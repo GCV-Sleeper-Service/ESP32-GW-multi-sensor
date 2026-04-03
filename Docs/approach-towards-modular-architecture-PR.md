@@ -1,6 +1,6 @@
 
 
-# A question - could you tell me, based on this scope:
+# Question about context window and problem description:
 
 Replacing the entire body of renderSettingsPanel() in dashboard.js
 Three new handler functions (_handleTestSatellite, _handleAddSatellite, _handleRemoveSatellite)
@@ -11,9 +11,10 @@ Run minify-dashboard.sh → generate-header.sh
 Changelog + session log
 Playwright validation
 
-you said - This is medium scope — not trivially small, not dangerously large. Then how many tokens in the context window (100K? 200K? more) such a scope would require while holding two files in context simultaneously at the end without degradation?
+How many tokens in the context window (100K? 200K? more) such a scope would require while holding two files in context simultaneously at the end without degradation?
 
-I also would like to ask a little bit broader question and you can think seriously about it - what kind of refactoring can be done with JS and HTML files in future  to avoid context window saturation? How they can be split up effectively so this problem does not arise its ugly head?
+A bit broader question - what kind of refactoring can be done with JS and HTML files in future  to avoid context window saturation? 
+How they can be split up effectively so this problem does not arise its ugly head?
 
 These are two distinct questions worth answering carefully and honestly.
 
