@@ -179,9 +179,9 @@ existing ESPHome dashboard auth pattern passes credentials on the DELETE request
 dashboard uses session-based Basic Auth (token in header from prior login), it is already
 included by the browser. If not, this fetch needs explicit auth headers.
 
-**Action:** Add a note in §5f that the DELETE request inherits auth from the browser session and
-does not need `body: 'a=1'`. This prevents the agent from either (a) skipping auth on DELETE or
-(b) incorrectly adding `body: 'a=1'` to DELETE.
+**Action:** Update §5f to ensure the DELETE request uses the same authentication pattern as other
+management actions (modal + Authorization header). Note that DELETE does not need body: a=1.
+This prevents the agent from skipping auth or incorrectly adding a body to DELETE.
 
 ### P3 — §5f `_handleTestSatellite()` and `_handleAddSatellite()` use POST correctly ✅
 
