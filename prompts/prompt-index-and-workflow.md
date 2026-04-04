@@ -1,7 +1,7 @@
 # Coding Agent Prompt Index and Workflow
 
 _Single source of truth for implementation-prompt status._
-_Last updated: 2026-04-03 — v7.6.0.4 closed via PR #126 + PR #128 follow-up; v7.6.0.5 next._
+_Last updated: 2026-04-04 — v7.6.0.4 closure references consolidated into PR #126 + PR #128 audit; v7.6.0.5 next._
 
 ---
 
@@ -35,7 +35,7 @@ The final v7.6.0.4 shipped state is:
 - post-merge regression correction in PR #128.
 
 The corrected closure audit for continuing work is:
-- `prompts/phaseD/v7.6.0.4-PR126-consolidated-audit-and-lessons-GP.md`
+- `prompts/phaseD/v7.6.0.4-PR126-PR128-consolidated-audit-and-lessons-GP.md`
 
 ---
 
