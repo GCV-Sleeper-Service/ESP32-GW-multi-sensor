@@ -3629,7 +3629,12 @@ function renderSettingsPanel(gateways) {
 
 var _satTestInFlight = false;
 function _handleTestSatellite(urlInput, statusEl) {
-  if (_satTestInFlight) return;
+  if (_satTestInFlight) {
+    var liveStatusEl = document.getElementById('sat-add-status');
+    if (statusEl) statusEl.textContent = 'Test already in progress...';
+    if (liveStatusEl && liveStatusEl !== statusEl) liveStatusEl.textContent = 'Test already in progress...';
+    return;
+  }
   // Capture URL value synchronously before any async work
   var capturedUrl = String(urlInput ? urlInput.value || '' : '').trim();
   if (!capturedUrl) {
@@ -3792,12 +3797,14 @@ function pollAggregatorLive() {
           var gwId = activeTab.getAttribute('data-gw');
           if (gwId === 'all') renderAllGatewaysSummary(data.gateways);
           else if (gwId === 'settings') {
-            // Guard: skip re-render if a satellite test is in-flight or an input has focus (R2 fix)
+            // Guard: skip re-render while any satellite settings async op is in-flight
+            // or while the settings inputs are being edited.
             var urlInput  = document.getElementById('sat-url-input');
             var nameInput = document.getElementById('sat-name-input');
             var inputFocused = (document.activeElement === urlInput ||
                                 document.activeElement === nameInput);
-            if (!_satTestInFlight && !inputFocused) {
+            var settingsOpInFlight = !!(_satTestInFlight || _satAddInFlight || _satRemoveInFlight);
+            if (!settingsOpInFlight && !inputFocused) {
               renderSettingsPanel(data.gateways);
             }
           }
