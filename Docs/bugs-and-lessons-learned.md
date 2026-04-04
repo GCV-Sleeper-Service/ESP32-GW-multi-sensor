@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-04-04 — v7.6.0.4 fixup (BUG-080, BUG-081 — Satellite Configuration Panel regressions)._
+_Last updated: 2026-04-04 — v7.6.0.4 fixup (PR #128 follow-up — R1/R2/R3 Copilot review items)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -17,23 +17,25 @@ further happened — no "Testing..." message, no success/failure result, no netw
 request visible in DevTools.
 
 **Root cause:** `_handleTestSatellite(urlInput, statusEl)` used `statusEl` (a DOM element
-reference) inside `.then()` callbacks of `requestManagementCredentials()`. If the settings
-panel was re-rendered between the button click and the Promise resolution (e.g. via the
-aggregator polling path at `pollAggregatorLive()` → `renderSettingsPanel()`), `statusEl`
-became a detached element. Assignments to a detached element succeed silently in the DOM
-API but produce no visible output. Combined with Bug 1 (BUG-080) causing an immediate
-re-render on every button click, `statusEl` was reliably detached before the `.then()`
-callbacks ran.
+reference captured at click time) inside `.then()` callbacks of
+`requestManagementCredentials()`. If `pollAggregatorLive()` fired during the async wait
+(auth modal open or network fetch in progress), `renderSettingsPanel()` replaced the
+settings panel's `innerHTML`, detaching the original element. Assignments to a detached
+element succeed in JavaScript but have zero visible effect on the rendered page.
 
-**Fix:** In `_handleTestSatellite()`, renamed all uses of `urlInput`/`statusEl` to
-`capturedUrl` (a plain string, trimmed from `urlInput.value`) and `capturedStatusEl`
-(a snapshot reference). All DOM reads and value captures now occur synchronously at the
-top of the function body, before `requestManagementCredentials()` is called. The `.then()`
-and `.catch()` callbacks reference only these closed-over local variables.
+**Fix (PR #128):** Renamed the URL input read to `capturedUrl` (a plain string), and
+renamed `statusEl` to `capturedStatusEl` (a snapshot reference) to make the synchronous
+capture intent explicit.
+
+**Follow-up fix (PR #128 Copilot R1):** Replaced `capturedStatusEl` with fresh
+`document.getElementById('sat-add-status')` re-queries at every write point inside the
+async callbacks. If `pollAggregatorLive()` has rebuilt the panel in the meantime, the
+new element in the live document is used — ensuring the status message is always
+visible regardless of how many poll cycles have fired.
 
 **Files changed:** `dashboard/dashboard.js`, `dashboard/dashboard.html`, `dashboard/dashboard.h`
 
-Related: BUG-080, LESSON-OPS-043
+Related: BUG-080, LESSON-OPS-043, LESSON-OPS-111
 
 ---
 
@@ -43,22 +45,67 @@ Related: BUG-080, LESSON-OPS-043
 clicking Test or Add, wiped both fields before the handler ran. The only workaround was to
 click a neutral area of the page first to "commit" the focus, then click the button.
 
-**Root cause:** The `click` events on `sat-test-btn`, `sat-add-btn`, and `.settings-btn-remove`
-buttons bubbled up through the DOM after the element-level handler returned. The global
-`document.addEventListener('click', ...)` router in `bindEvents()` received the bubbled
-event. When no matching `[data-action]` / `[data-toggle-target]` / etc. attribute was found
-and the event reached unguarded fallthrough logic, it triggered re-render paths (including
-the aggregator live-poll watcher at `pollAggregatorLive()`) that called `renderSettingsPanel()`
-— rebuilding the entire panel with empty `innerHTML` and destroying both input elements
-before the async credential prompt could resolve.
+**Root cause:** The regression was caused by the satellite Settings panel being rebuilt
+while a button-initiated workflow was still in progress, not by a fallthrough in the global
+`document.addEventListener('click', ...)` router in `bindEvents()`. The panel already had an
+existing re-render path via the aggregator live-poll watcher (`pollAggregatorLive()` →
+`renderSettingsPanel()`), and the Settings tab's own click handling was therefore operating
+against DOM that could be replaced underneath it. When `renderSettingsPanel()` rebuilt the
+panel with fresh `innerHTML`, the active URL/name input elements were destroyed and
+recreated, so the in-progress interaction observed cleared fields before the async
+credential prompt could resolve.
 
-**Fix:** Added `e.stopPropagation()` as the very first statement in the `click` event
-listeners for `sat-test-btn`, `sat-add-btn`, and each `.settings-btn-remove` button inside
-`renderSettingsPanel()`. This prevents the click from reaching the global router.
+**Fix (PR #128):** Added `e.stopPropagation()` as the very first statement in the `click`
+event listeners for `sat-test-btn`, `sat-add-btn`, and each `.settings-btn-remove` button
+inside `renderSettingsPanel()`. This prevents the click event from reaching the global
+`bindEvents()` router, which addresses the immediate click-interaction case.
+
+**Follow-up fix (PR #128 Copilot R2):** Added guards to the `pollAggregatorLive()` →
+`renderSettingsPanel()` call path: the settings panel is now skipped when
+`_satTestInFlight === true` (a satellite test is actively in progress) or when either
+`sat-url-input` / `sat-name-input` has keyboard focus (the user is actively typing). This
+addresses the 15-second periodic re-render case that `stopPropagation()` alone cannot
+prevent.
 
 **Files changed:** `dashboard/dashboard.js`, `dashboard/dashboard.html`, `dashboard/dashboard.h`
 
-Related: BUG-081, LESSON-OPS-043
+Related: BUG-081, LESSON-OPS-043, LESSON-OPS-111
+
+---
+
+### LESSON-OPS-111 — Captured DOM references become stale across innerHTML re-renders (2026-04-04)
+
+**Date:** 2026-04-04
+**Scope:** Dashboard JS — async handlers, settings panel
+**Trigger:** PR #128 Copilot review comments r3034831162, r3034831171
+
+**Lesson:**
+Capturing a DOM element reference before an async operation (e.g.,
+`var el = document.getElementById(...)`) is unsafe if any code path can replace the
+containing element's `innerHTML` before the async callbacks fire. The captured reference
+remains a valid JS object but is detached from the live document; writes to `.textContent`
+or `.classList` succeed silently with no visible effect.
+
+**Rule:** In async callbacks that update UI status, always re-query by stable `id` at
+write time:
+```js
+var liveEl = document.getElementById('known-stable-id');
+if (liveEl) liveEl.textContent = '...';
+```
+
+**Companion rule:** Any periodic re-render (timer, poll loop) that replaces `innerHTML`
+must guard against active user interaction (focused inputs, in-flight async state) before
+tearing down the DOM:
+```js
+var urlInput  = document.getElementById('sat-url-input');
+var nameInput = document.getElementById('sat-name-input');
+var inputFocused = (document.activeElement === urlInput ||
+                    document.activeElement === nameInput);
+if (!_satTestInFlight && !inputFocused) {
+  renderSettingsPanel(data.gateways);
+}
+```
+See BUG-080/BUG-081 and the PR #128 follow-up for the full guard pattern.
 
 ---
 
