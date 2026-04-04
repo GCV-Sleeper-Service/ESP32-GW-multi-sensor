@@ -1610,3 +1610,211 @@ test.describe('20. System Devices and Data Ingest', () => {
   });
 });
 
+// ── 21. Satellite Management ───────────────────────────────────────
+
+test.describe('21. Satellite Management', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(process.env.FIXTURE_SET !== 'aggregator',
+      'Satellite management tests require FIXTURE_SET=aggregator');
+  });
+
+  // ── API Tests (request-only, no page needed) ──
+
+  test('POST add-satellite: valid URL returns 200', async ({ request }) => {
+    const resp = await request.post('/api/aggregator/add-satellite?url=http://192.168.1.100&name=Test+Sat', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    expect(resp.ok()).toBeTruthy();
+    const body = await resp.json();
+    expect(body.ok).toBe(true);
+    expect(body.satellite).toBeDefined();
+    expect(body.satellite.url).toBe('http://192.168.1.100');
+  });
+
+  test('POST add-satellite: duplicate URL returns 409', async ({ request }) => {
+    await request.post('/api/system/reset-satellites', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    // Add first
+    await request.post('/api/aggregator/add-satellite?url=http://unique-dup-test.local', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    // Add duplicate
+    const resp = await request.post('/api/aggregator/add-satellite?url=http://unique-dup-test.local', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    expect(resp.status()).toBe(409);
+    const body = await resp.json();
+    expect(body.ok).toBe(false);
+  });
+
+  test('POST add-satellite: missing URL returns 400', async ({ request }) => {
+    const resp = await request.post('/api/aggregator/add-satellite', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    expect(resp.status()).toBe(400);
+  });
+
+  test('POST add-satellite: full list returns 409', async ({ request }) => {
+    // Reset to known state
+    await request.post('/api/system/reset-satellites', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    // Fill to capacity
+    for (let i = 0; i < 8; i++) {
+      await request.post('/api/aggregator/add-satellite?url=http://fill-' + i + '.local', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    }
+    const resp = await request.post('/api/aggregator/add-satellite?url=http://overflow.local', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    expect(resp.status()).toBe(409);
+    // Reset after test
+    await request.post('/api/system/reset-satellites', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+  });
+
+  test('POST add-satellite: unreachable URL returns 400', async ({ request }) => {
+    const resp = await request.post('/api/aggregator/add-satellite?url=http://unreachable.local', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    expect(resp.status()).toBe(400);
+    const body = await resp.json();
+    expect(body.message).toContain('unreachable');
+  });
+
+  test('DELETE satellite: valid ID returns 200', async ({ request }) => {
+    await request.post('/api/system/reset-satellites', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    // Add one first
+    const addResp = await request.post('/api/aggregator/add-satellite?url=http://192.168.1.201', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    const addBody = await addResp.json();
+    const satId = addBody.satellite.id;
+    // Delete it
+    const resp = await request.delete('/api/aggregator/satellite/' + satId);
+    expect(resp.ok()).toBeTruthy();
+    const body = await resp.json();
+    expect(body.ok).toBe(true);
+  });
+
+  test('DELETE satellite: unknown ID returns 404', async ({ request }) => {
+    const resp = await request.delete('/api/aggregator/satellite/nonexistent-id');
+    expect(resp.status()).toBe(404);
+  });
+
+  test('POST test-satellite: valid URL returns gateway info', async ({ request }) => {
+    const resp = await request.post('/api/aggregator/test-satellite?url=http://192.168.1.100', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    expect(resp.ok()).toBeTruthy();
+    const body = await resp.json();
+    expect(body.ok).toBe(true);
+    expect(body.gateway).toBeDefined();
+    expect(body.gateway.id).toBeDefined();
+    expect(body.gateway.hardware).toBeDefined();
+  });
+
+  test('POST test-satellite: missing URL returns 400', async ({ request }) => {
+    const resp = await request.post('/api/aggregator/test-satellite', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    expect(resp.status()).toBe(400);
+  });
+
+  test('POST test-satellite: unreachable URL returns 400', async ({ request }) => {
+    const resp = await request.post('/api/aggregator/test-satellite?url=http://unreachable.local', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    expect(resp.status()).toBe(400);
+  });
+
+  test('POST test-satellite: URL without http:// returns 400', async ({ request }) => {
+    const resp = await request.post('/api/aggregator/test-satellite?url=192.168.1.100', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    expect(resp.status()).toBe(400);
+  });
+
+  test('POST reset-satellites: resets to fixture defaults', async ({ request }) => {
+    await request.post('/api/aggregator/add-satellite?url=http://192.168.1.250', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    const resp = await request.post('/api/system/reset-satellites', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    expect(resp.ok()).toBeTruthy();
+    const body = await resp.json();
+    expect(body.ok).toBe(true);
+    expect(body.satellite_count).toBeDefined();
+  });
+
+  // ── UI Tests (need page) ──
+
+  test('Settings panel renders add form', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForAggregatorReady(page);
+    await page.locator('.gw-tab[data-gw="settings"]').click();
+    const urlInput = page.locator('#sat-url-input');
+    await expect(urlInput).toBeVisible();
+    const addBtn = page.locator('#sat-add-btn');
+    await expect(addBtn).toBeVisible();
+    const testBtn = page.locator('#sat-test-btn');
+    await expect(testBtn).toBeVisible();
+  });
+
+  test('Settings panel renders remove buttons for each satellite', async ({ page, request }) => {
+    await request.post('/api/system/reset-satellites', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForAggregatorReady(page);
+    await page.locator('.gw-tab[data-gw="settings"]').click();
+    await page.waitForSelector('.settings-satellite-card', { timeout: 10000 });
+    const removeBtns = page.locator('.settings-btn-remove');
+    // Count should match number of satellites in aggregator fixture
+    const count = await removeBtns.count();
+    expect(count).toBeGreaterThan(0);
+  });
+
+  // ── PR #128 Regression Tests (MANDATORY) ──
+
+  test('PR128-regression: URL input value preserved across poll-driven rerender', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForAggregatorReady(page);
+    await page.locator('.gw-tab[data-gw="settings"]').click();
+    const urlInput = page.locator('#sat-url-input');
+    await urlInput.fill('http://192.168.1.250');
+    // Allow time for at least one poll cycle that would trigger a rerender attempt
+    await page.waitForTimeout(2000);
+    // Value must still be present — poll guard must have blocked the destructive rerender
+    await expect(urlInput).toHaveValue('http://192.168.1.250');
+  });
+
+  test('PR128-regression: test-satellite result appears in live panel after action', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForAggregatorReady(page);
+    await page.locator('.gw-tab[data-gw="settings"]').click();
+    const urlInput = page.locator('#sat-url-input');
+    await urlInput.fill('http://192.168.1.100');
+    const testBtn = page.locator('#sat-test-btn');
+    await testBtn.click();
+    // The mock does not require auth; status area should show a result
+    const statusEl = page.locator('#sat-add-status');
+    await expect(statusEl).not.toBeEmpty({ timeout: 5000 });
+  });
+
+  test('PR128-regression: settings panel not destroyed during in-flight add', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForAggregatorReady(page);
+    await page.locator('.gw-tab[data-gw="settings"]').click();
+    const urlInput = page.locator('#sat-url-input');
+    await urlInput.fill('http://192.168.1.130');
+    const addBtn = page.locator('#sat-add-btn');
+    await addBtn.click();
+    // While the action is processing, the URL input must still be in the DOM
+    await expect(urlInput).toBeVisible();
+    // Wait for the action to complete
+    await page.waitForTimeout(1000);
+    // Panel must still be usable — no crash/blank
+    await expect(page.locator('#sat-add-btn')).toBeVisible();
+  });
+
+  test('PR128-regression: panel remains usable after completed add', async ({ page, request }) => {
+    await request.post('/api/system/reset-satellites', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForAggregatorReady(page);
+    await page.locator('.gw-tab[data-gw="settings"]').click();
+    const urlInput = page.locator('#sat-url-input');
+    await urlInput.fill('http://192.168.1.140');
+    await page.locator('#sat-add-btn').click();
+    await page.waitForTimeout(1000);
+    // After add completes, user must be able to type in the URL field again without reload
+    await urlInput.fill('http://192.168.1.141');
+    await expect(urlInput).toHaveValue('http://192.168.1.141');
+  });
+
+  test('PR128-regression: panel remains usable after completed delete', async ({ page, request }) => {
+    await request.post('/api/system/reset-satellites', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForAggregatorReady(page);
+    await page.locator('.gw-tab[data-gw="settings"]').click();
+    await page.waitForSelector('.settings-satellite-card', { timeout: 10000 });
+    const removeBtns = page.locator('.settings-btn-remove');
+    const count = await removeBtns.count();
+    if (count > 0) {
+      page.once('dialog', dialog => dialog.accept());
+      await removeBtns.first().click();
+      await page.waitForTimeout(1000);
+      // Panel must still render after delete — test button still visible
+      await expect(page.locator('#sat-test-btn')).toBeVisible();
+    }
+  });
+});
+

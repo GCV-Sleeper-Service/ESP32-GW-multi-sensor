@@ -86,6 +86,35 @@ const SHARED_SENSOR = {
   'loop time': 12,
 };
 
+// ────────────────────────────────────────────────────────────────────────────────
+// Stateful satellite management (Phase D mock — v7.6.0.5)
+// Initialized from the aggregator fixture on server start.
+// ────────────────────────────────────────────────────────────────────────────────
+let managedSatellites = [];
+const MOCK_MAX_SATELLITES = 8;
+
+function initManagedSatellites() {
+  const gateways = loadFixtureJson('aggregator-gateways.json', { gateways: [] });
+  managedSatellites = (gateways.gateways || []).map(function(gw) {
+    return {
+      id: gw.id,
+      name: gw.name,
+      base_url: gw.base_url || 'http://mock-satellite',
+      poll: 30,
+      reachable: gw.reachable !== undefined ? gw.reachable : true,
+      last_seen: gw.last_seen || Math.floor(Date.now() / 1000),
+      consecutive_failures: gw.consecutive_failures || 0,
+      firmware_version: gw.firmware_version || '7.6.0.5',
+      sensor_count: gw.sensor_count || 0,
+      device_count: gw.device_count,
+      manifest: gw.manifest || null
+    };
+  });
+}
+
+// Initialize on server load
+initManagedSatellites();
+
 function json(res, data, status) {
   const body = typeof data === 'string' ? data : JSON.stringify(data);
   res.writeHead(status || 200, {
@@ -252,8 +281,11 @@ const server = http.createServer(function(req, res) {
   // Aggregator endpoints — return empty gateways in satellite fixture sets (no 404
   // to avoid browser console errors in tests). detectAggregatorMode() handles empty
   // gateways list as satellite mode. In aggregator mode (FIXTURE_SET=aggregator),
-  // loadFixture() resolves the variant fixture and returns real gateway data.
+  // use managed satellite state (Phase D v7.6.0.5).
   if (pathname === '/api/aggregator/gateways') {
+    if (FIXTURE_SET === 'aggregator') {
+      return json(res, { gateways: managedSatellites });
+    }
     return json(res, loadFixtureJson('aggregator-gateways.json', { gateways: [] }));
   }
   if (pathname === '/api/aggregator/live') {
@@ -275,6 +307,89 @@ const server = http.createServer(function(req, res) {
       }
     }
     return notFound(res, pathname);
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────────
+  // Satellite Management Endpoints (Phase D v7.6.0.5)
+  // Contract mirrors firmware handlers in dashboard/sensor_history_multi.h
+  // ────────────────────────────────────────────────────────────────────────────────
+
+  // POST /api/aggregator/add-satellite
+  if (pathname === '/api/aggregator/add-satellite' && req.method === 'POST') {
+    const params = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams;
+    const satUrl = params.get('url');
+    const satName = params.get('name');
+    const satPoll = parseInt(params.get('poll') || '30', 10);
+
+    if (!satUrl) return json(res, { ok: false, message: 'Missing url parameter', status: 400 }, 400);
+    if (!satUrl.startsWith('http://')) return json(res, { ok: false, message: 'URL must start with http://', status: 400 }, 400);
+    if (satUrl.length >= 128) return json(res, { ok: false, message: 'URL too long (max 127 characters)', status: 400 }, 400);
+    if (managedSatellites.length >= MOCK_MAX_SATELLITES) return json(res, { ok: false, message: 'Satellite list full', status: 409 }, 409);
+    if (managedSatellites.some(s => s.base_url === satUrl)) return json(res, { ok: false, message: 'URL already configured', status: 409 }, 409);
+
+    // Simulate probe — URLs containing 'unreachable' fail
+    if (satUrl.includes('unreachable')) return json(res, { ok: false, message: 'Satellite unreachable or invalid manifest', status: 400 }, 400);
+
+    // Probe succeeds — add satellite
+    const newId = 'mock-sat-' + (managedSatellites.length + 1);
+    const newName = satName || 'Mock Satellite ' + (managedSatellites.length + 1);
+    const newSat = {
+      id: newId,
+      name: newName,
+      base_url: satUrl,
+      poll: satPoll,
+      reachable: true,
+      last_seen: Math.floor(Date.now() / 1000),
+      consecutive_failures: 0,
+      firmware_version: '7.6.0.5',
+      sensor_count: 0,
+      device_count: 0
+    };
+    managedSatellites.push(newSat);
+
+    return json(res, { ok: true, satellite: { id: newId, name: newName, url: satUrl, poll: satPoll } });
+  }
+
+  // DELETE /api/aggregator/satellite/{id}
+  const deleteSatMatch = pathname.match(/^\/api\/aggregator\/satellite\/(.+)$/);
+  if (deleteSatMatch && req.method === 'DELETE') {
+    const satId = decodeURIComponent(deleteSatMatch[1]);
+    const idx = managedSatellites.findIndex(s => s.id === satId);
+    if (idx < 0) return json(res, { ok: false, message: 'Unknown satellite ID', status: 404 }, 404);
+    managedSatellites.splice(idx, 1);
+    return json(res, { ok: true });
+  }
+
+  // POST /api/aggregator/test-satellite
+  if (pathname === '/api/aggregator/test-satellite' && req.method === 'POST') {
+    const params = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams;
+    const testUrl = params.get('url');
+
+    if (!testUrl) return json(res, { ok: false, message: 'Missing url parameter', status: 400 }, 400);
+    if (!testUrl.startsWith('http://')) return json(res, { ok: false, message: 'URL must start with http://', status: 400 }, 400);
+    if (testUrl.length > 200) return json(res, { ok: false, message: 'URL too long', status: 400 }, 400);
+    if (testUrl.includes('unreachable')) return json(res, { ok: false, message: 'Satellite unreachable or invalid manifest', status: 400 }, 400);
+
+    // Probe succeeds — return mock gateway info
+    return json(res, {
+      ok: true,
+      gateway: {
+        id: 'mock-probe-id',
+        name: 'Mock Probed Gateway',
+        hardware: 'ESP32-C3',
+        sensor_count: 3
+      }
+    });
+  }
+
+  // POST /api/system/reset-satellites
+  if (pathname === '/api/system/reset-satellites' && req.method === 'POST') {
+    initManagedSatellites(); // Reset to fixture defaults
+    return json(res, {
+      ok: true,
+      message: 'Reset to compile-time defaults',
+      satellite_count: managedSatellites.length
+    });
   }
 
   notFound(res, pathname);
