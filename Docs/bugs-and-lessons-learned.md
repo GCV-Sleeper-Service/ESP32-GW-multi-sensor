@@ -73,42 +73,6 @@ Related: BUG-081, LESSON-OPS-043, LESSON-OPS-111
 
 ---
 
-### LESSON-OPS-111 — Captured DOM references become stale across innerHTML re-renders (2026-04-04)
-
-**Date:** 2026-04-04
-**Scope:** Dashboard JS — async handlers, settings panel
-**Trigger:** PR #128 Copilot review comments r3034831162, r3034831171
-
-**Lesson:**
-Capturing a DOM element reference before an async operation (e.g.,
-`var el = document.getElementById(...)`) is unsafe if any code path can replace the
-containing element's `innerHTML` before the async callbacks fire. The captured reference
-remains a valid JS object but is detached from the live document; writes to `.textContent`
-or `.classList` succeed silently with no visible effect.
-
-**Rule:** In async callbacks that update UI status, always re-query by stable `id` at
-write time:
-```js
-var liveEl = document.getElementById('known-stable-id');
-if (liveEl) liveEl.textContent = '...';
-```
-
-**Companion rule:** Any periodic re-render (timer, poll loop) that replaces `innerHTML`
-must guard against active user interaction (focused inputs, in-flight async state) before
-tearing down the DOM:
-```js
-var urlInput  = document.getElementById('sat-url-input');
-var nameInput = document.getElementById('sat-name-input');
-var inputFocused = (document.activeElement === urlInput ||
-                    document.activeElement === nameInput);
-if (!_satTestInFlight && !_satAddInFlight && !_satRemoveInFlight && !inputFocused) {
-  renderSettingsPanel(data.gateways);
-}
-```
-See BUG-080/BUG-081 and the PR #128 follow-up for the full guard pattern.
-
----
-
 ### BUG-079 — DELETE requests rejected by httpd layer with 405 before reaching handler (v7.6.0.2 fixup)
 
 **Symptom:** Every `curl -X DELETE` to `/api/aggregator/satellite/{id}` returned HTTP 405
@@ -1528,6 +1492,42 @@ The original validation helper silently normalized MAC addresses inside the call
 
 ## Operational Lessons
 
+### LESSON-OPS-111 — Captured DOM references become stale across innerHTML re-renders (2026-04-04)
+
+**Date:** 2026-04-04
+**Scope:** Dashboard JS — async handlers, settings panel
+**Trigger:** PR #128 Copilot review comments r3034831162, r3034831171
+
+**Lesson:**
+Capturing a DOM element reference before an async operation (e.g.,
+`var el = document.getElementById(...)`) is unsafe if any code path can replace the
+containing element's `innerHTML` before the async callbacks fire. The captured reference
+remains a valid JS object but is detached from the live document; writes to `.textContent`
+or `.classList` succeed silently with no visible effect.
+
+**Rule:** In async callbacks that update UI status, always re-query by stable `id` at
+write time:
+```js
+var liveEl = document.getElementById('known-stable-id');
+if (liveEl) liveEl.textContent = '...';
+```
+
+**Companion rule:** Any periodic re-render (timer, poll loop) that replaces `innerHTML`
+must guard against active user interaction (focused inputs, in-flight async state) before
+tearing down the DOM:
+```js
+var urlInput  = document.getElementById('sat-url-input');
+var nameInput = document.getElementById('sat-name-input');
+var inputFocused = (document.activeElement === urlInput ||
+                    document.activeElement === nameInput);
+if (!_satTestInFlight && !_satAddInFlight && !_satRemoveInFlight && !inputFocused) {
+  renderSettingsPanel(data.gateways);
+}
+```
+See BUG-080/BUG-081 and the PR #128 follow-up for the full guard pattern.
+
+---
+
 ### LESSON-OPS-104: Always use `std::string`, never Arduino `String` or bare `string`, in ESP-IDF code (2026-04-01)
 
 The coding agent's sandbox does not perform ESP-IDF compilation — it runs
@@ -1560,8 +1560,7 @@ Codified as Critical Rule 43.
 
 ### LESSON-OPS-102
 
-INSERT after the LESSON-OPS-101 block (before LESSON-OPS-097):
-```markdown
+
 ### LESSON-OPS-102: ESPHome httpd stack must be patched via local component override (2026-03-31)
 
 Because `CONFIG_HTTPD_STACK_SIZE` is inert (LESSON-OPS-100), the only way to
@@ -1572,7 +1571,6 @@ component into `firmware/local_components/web_server_idf/` and patches
 include an `external_components` block pointing to `local_components`. The script
 must be re-run after every ESPHome version upgrade. Use `--check` to verify.
 Codified as Critical Rule 42.
-```
 
 ---
 
