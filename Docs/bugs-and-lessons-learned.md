@@ -101,7 +101,7 @@ var urlInput  = document.getElementById('sat-url-input');
 var nameInput = document.getElementById('sat-name-input');
 var inputFocused = (document.activeElement === urlInput ||
                     document.activeElement === nameInput);
-if (!_satTestInFlight && !inputFocused) {
+if (!_satTestInFlight && !_satAddInFlight && !_satRemoveInFlight && !inputFocused) {
   renderSettingsPanel(data.gateways);
 }
 ```

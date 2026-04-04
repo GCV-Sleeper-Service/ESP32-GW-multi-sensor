@@ -3649,7 +3649,7 @@ function _handleTestSatellite(urlInput, statusEl) {
       var liveStatusEl = document.getElementById('sat-add-status');
       if (!creds) {
         if (liveStatusEl) liveStatusEl.textContent = 'Test cancelled';
-        return null;
+        return Promise.reject(new Error('AUTH_CANCELLED'));
       }
       if (liveStatusEl) liveStatusEl.textContent = 'Testing...';
       return fetch(ESP_HOST + '/api/aggregator/test-satellite?url=' + encodeURIComponent(capturedUrl), {
@@ -3674,7 +3674,7 @@ function _handleTestSatellite(urlInput, statusEl) {
     })
     .catch(function(err) {
       var liveStatusEl = document.getElementById('sat-add-status');
-      if (liveStatusEl) liveStatusEl.innerHTML = '\u2717 ' + escHtml(err.message || 'Test failed');
+      if (liveStatusEl && err.message !== 'AUTH_CANCELLED') liveStatusEl.innerHTML = '\u2717 ' + escHtml(err.message || 'Test failed');
     })
     .finally(function() { _satTestInFlight = false; });
 }
