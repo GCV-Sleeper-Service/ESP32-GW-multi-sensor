@@ -3597,7 +3597,8 @@ function renderSettingsPanel(gateways) {
   // Bind Test button
   var testBtn = document.getElementById('sat-test-btn');
   if (testBtn) {
-    testBtn.addEventListener('click', function() {
+    testBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       var urlInput = document.getElementById('sat-url-input');
       var statusEl = document.getElementById('sat-add-status');
       _handleTestSatellite(urlInput, statusEl);
@@ -3606,7 +3607,8 @@ function renderSettingsPanel(gateways) {
   // Bind Add button
   var addBtn = document.getElementById('sat-add-btn');
   if (addBtn) {
-    addBtn.addEventListener('click', function() {
+    addBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       var urlInput = document.getElementById('sat-url-input');
       var nameInput = document.getElementById('sat-name-input');
       var statusEl = document.getElementById('sat-add-status');
@@ -3615,7 +3617,8 @@ function renderSettingsPanel(gateways) {
   }
   // Bind Remove buttons
   document.querySelectorAll('.settings-btn-remove').forEach(function(btn) {
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
       var satId = btn.getAttribute('data-sat-id');
       var satName = btn.getAttribute('data-sat-name');
       var statusEl = document.getElementById('sat-status-' + satId);
@@ -3626,9 +3629,15 @@ function renderSettingsPanel(gateways) {
 
 var _satTestInFlight = false;
 function _handleTestSatellite(urlInput, statusEl) {
-  if (_satTestInFlight) return;
-  var url = String(urlInput ? urlInput.value || '' : '').trim();
-  if (!url) {
+  if (_satTestInFlight) {
+    var liveStatusEl = document.getElementById('sat-add-status');
+    if (statusEl) statusEl.textContent = 'Test already in progress...';
+    if (liveStatusEl && liveStatusEl !== statusEl) liveStatusEl.textContent = 'Test already in progress...';
+    return;
+  }
+  // Capture URL value synchronously before any async work
+  var capturedUrl = String(urlInput ? urlInput.value || '' : '').trim();
+  if (!capturedUrl) {
     if (statusEl) statusEl.textContent = 'Enter a URL to test.';
     return;
   }
@@ -3636,12 +3645,14 @@ function _handleTestSatellite(urlInput, statusEl) {
   if (statusEl) statusEl.textContent = 'Authenticating...';
   requestManagementCredentials('satellite test')
     .then(function(creds) {
+      // Re-query status element by stable id — panel may have been re-rendered since click (R1 fix)
+      var liveStatusEl = document.getElementById('sat-add-status');
       if (!creds) {
-        if (statusEl) statusEl.textContent = 'Test cancelled';
-        return null;
+        if (liveStatusEl) liveStatusEl.textContent = 'Test cancelled';
+        return Promise.reject(new Error('AUTH_CANCELLED'));
       }
-      if (statusEl) statusEl.textContent = 'Testing...';
-      return fetch(ESP_HOST + '/api/aggregator/test-satellite?url=' + encodeURIComponent(url), {
+      if (liveStatusEl) liveStatusEl.textContent = 'Testing...';
+      return fetch(ESP_HOST + '/api/aggregator/test-satellite?url=' + encodeURIComponent(capturedUrl), {
         method: 'POST',
         cache: 'no-store',
         headers: {
@@ -3652,16 +3663,18 @@ function _handleTestSatellite(urlInput, statusEl) {
       })
       .then(safeJsonResponse)
       .then(function(data) {
+        var liveStatusEl = document.getElementById('sat-add-status');
         var gw = data.gateway || {};
         var deviceCount = '\u2014';
         if (gw.device_count !== undefined && gw.device_count !== null) deviceCount = String(gw.device_count);
         else if (gw.sensor_count !== undefined && gw.sensor_count !== null) deviceCount = String(gw.sensor_count);
-        if (statusEl) statusEl.innerHTML = '\u2713 Found: ' + escHtml(gw.name || '\u2014') +
+        if (liveStatusEl) liveStatusEl.innerHTML = '\u2713 Found: ' + escHtml(gw.name || '\u2014') +
           ' (' + escHtml(gw.hardware || '\u2014') + ', ' + escHtml(deviceCount) + ' devices)';
       });
     })
     .catch(function(err) {
-      if (statusEl) statusEl.innerHTML = '\u2717 ' + escHtml(err.message || 'Test failed');
+      var liveStatusEl = document.getElementById('sat-add-status');
+      if (liveStatusEl && err.message !== 'AUTH_CANCELLED') liveStatusEl.innerHTML = '\u2717 ' + escHtml(err.message || 'Test failed');
     })
     .finally(function() { _satTestInFlight = false; });
 }
@@ -3783,7 +3796,18 @@ function pollAggregatorLive() {
         if (activeTab) {
           var gwId = activeTab.getAttribute('data-gw');
           if (gwId === 'all') renderAllGatewaysSummary(data.gateways);
-          else if (gwId === 'settings') renderSettingsPanel(data.gateways);
+          else if (gwId === 'settings') {
+            // Guard: skip re-render while any satellite settings async op is in-flight
+            // or while the settings inputs are being edited.
+            var urlInput  = document.getElementById('sat-url-input');
+            var nameInput = document.getElementById('sat-name-input');
+            var inputFocused = (document.activeElement === urlInput ||
+                                document.activeElement === nameInput);
+            var settingsOpInFlight = !!(_satTestInFlight || _satAddInFlight || _satRemoveInFlight);
+            if (!settingsOpInFlight && !inputFocused) {
+              renderSettingsPanel(data.gateways);
+            }
+          }
           else if (gwId && _currentGwId === gwId && _currentGwSensors) {
             // Refresh live values for the currently displayed per-gateway device view
             _populateGatewayDeviceLive(gwId, _currentGwSensors);
