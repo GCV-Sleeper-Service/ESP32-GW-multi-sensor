@@ -1752,14 +1752,8 @@ test.describe('21. Satellite Management', () => {
     await urlInput.fill('http://192.168.1.250');
 
     // Deterministic wait: poll_interval is 1000ms in aggregator mode
-    // Wait for 1.5 poll cycles to ensure at least one poll has completed
-    await page.waitForFunction(() => {
-      const panel = document.getElementById('aggregator-panel');
-      return panel && panel.dataset.lastPoll && (Date.now() - parseInt(panel.dataset.lastPoll)) >= 1500;
-    }, { timeout: 5000 }).catch(() => {
-      // Fallback: just wait for time if dataset tracking not available
-      return page.waitForTimeout(2000);
-    });
+    // Wait for 2 seconds to allow at least one poll cycle to complete
+    await page.waitForTimeout(2000);
 
     // Value must still be present — poll guard must have blocked the destructive rerender
     await expect(urlInput).toHaveValue('http://192.168.1.250');
