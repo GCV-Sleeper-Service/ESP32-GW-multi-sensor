@@ -1492,6 +1492,76 @@ The original validation helper silently normalized MAC addresses inside the call
 
 ## Operational Lessons
 
+### LESSON-OPS-114 — When stubbing `window.requestManagementCredentials` in Playwright tests, stub before the click (2026-04-04)
+
+**Context:** PR #129 Round 2 fix for the delete regression test (test 19). The original test
+structure was:
+1. Click the Remove button
+2. `page.evaluate(() => window.requestManagementCredentials = ...)` to stub the function
+
+This ordering failed because `dashboard.js` may invoke `requestManagementCredentials` synchronously
+on the click event — before the `evaluate` promise resolves. The function stub never took effect,
+the auth dialog was shown instead, the test timed out.
+
+**Fix:** Stub `window.requestManagementCredentials` with `page.evaluate()` **before** triggering
+any click that could invoke it. The correct sequence is:
+1. `await page.evaluate(() => { window.requestManagementCredentials = ... })`
+2. `page.on('dialog', handler)` if a browser dialog may also appear
+3. Click the button
+
+**Rule:** Any Playwright test that needs to stub a JS function called in response to a user
+interaction must complete the stub BEFORE the interaction. Async evaluation (`page.evaluate`)
+is not instantaneous — the click handler may fire between the click and the evaluate completing.
+Stub-then-click is the only ordering that is deterministically safe.
+
+**Applies to:** All Playwright tests that stub `window.requestManagementCredentials`,
+`window.confirm`, or any other synchronously-invoked window function in `dashboard.js`.
+
+---
+
+### LESSON-OPS-113 — `page.waitForResponse()` with URL predicate is always preferable to `waitForTimeout()` for network-triggered state changes (2026-04-04)
+
+**Context:** PR #129 initial implementation used `waitForTimeout(2000)` to wait for a poll cycle
+to rerender the Settings panel. Round 1 review replaced it with `waitForTimeout(2000)` on the
+grounds of simplicity. Round 2 review then correctly replaced all `waitForTimeout` calls with
+`page.waitForResponse(url => url.includes('/api/aggregator/gateways'))` because:
+
+1. The timeout is arbitrary — it may pass vacuously on fast CI or fail spuriously on slow CI.
+2. The `waitForResponse()` call guarantees the network round-trip has completed, meaning the
+   dashboard has received the response and had the opportunity to update state.
+3. `waitForResponse()` is no more complex to write and is self-documenting about what event the
+   test is actually waiting for.
+
+**Rule:** Never use `waitForTimeout(N)` as a proxy for "wait for a network response to arrive."
+Use `page.waitForResponse(urlPredicate)` instead. `waitForTimeout` is only appropriate when:
+- testing that something does NOT happen within a time window
+- adding intentional breathing room between user-input actions that are not network-gated
+
+**Exception:** `waitForTimeout` may be used in regression tests that verify timing behavior
+(e.g., confirming an action does not fire prematurely), but must be accompanied by a comment
+explaining why a response-based wait is not sufficient.
+
+---
+
+### LESSON-OPS-112 — Response shape mismatch between mock and firmware contract (2026-04-04)
+
+**Context:** PR #129 Round 2 — Mock `POST /api/aggregator/add-satellite` returned nested
+`{ok, satellite:{id,name,url,poll}}`. The firmware handler's `httpd_resp_sendstr` payload is flat:
+`{ok, id, name, satellite_count}`. Three test assertions also expected the wrong shape. The
+mismatch survived all four review passes before being caught in the Round 2 review.
+
+**Rule:** When implementing a mock endpoint, always locate the firmware handler's literal
+`httpd_resp_sendstr(...)` call and copy the response JSON from there — not from the prompt
+description, not from a prior audit table, not from memory. If any prompt example differs from
+the live firmware string, the **firmware wins**. Verify both the field names and the nesting level
+(flat vs nested). Tests that assert only status codes without checking response body shape will
+miss this class of mismatch entirely.
+
+**Scope:** Applies to all mock implementations in `tests/mock-server/server.js` and any future
+mock infrastructure added in Phase 7.
+
+---
+
 ### LESSON-OPS-111 — Captured DOM references become stale across innerHTML re-renders (2026-04-04)
 
 **Date:** 2026-04-04
