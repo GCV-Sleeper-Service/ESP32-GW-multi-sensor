@@ -1,13 +1,13 @@
 # Coding Agent Prompt Index and Workflow
 
 _Single source of truth for implementation-prompt status._
-_Last updated: 2026-04-04 — v7.6.0.4 closure complete (PR #126 + PR #128); v7.6.0.5 next._
+_Last updated: 2026-04-04 — v7.6.0.5 complete (PR #129); Phase D CLOSED. Next: v7.7.0.0 (Phase 7)._
 
 ---
 
 ## Current status snapshot
 
-### Phase D — Runtime Satellite Management (v7.6.0.x)
+### Phase D — Runtime Satellite Management (v7.6.0.x) ✅ COMPLETE
 
 | Version | Scope | Primary Prompt | Status | Notes |
 |---------|-------|---------------|--------|-------|
@@ -15,18 +15,24 @@ _Last updated: 2026-04-04 — v7.6.0.4 closure complete (PR #126 + PR #128); v7.
 | v7.6.0.1 | `POST /api/aggregator/add-satellite` | `prompts/phaseD/v7.6.0.1-implementation-instructions-for-coding-agent.md` | ✅ Complete | merged |
 | v7.6.0.2 | `DELETE /api/aggregator/satellite/{id}` | `prompts/phaseD/v7.6.0.2-implementation-instructions-for-coding-agent.md` | ✅ Complete | merged |
 | v7.6.0.3 | `POST /api/aggregator/test-satellite` | `prompts/phaseD/v7.6.0.3-implementation-instructions-for-coding-agent.md` | ✅ Complete | merged |
-| v7.6.0.4 | Dashboard add/remove/test UI | `prompts/phaseD/v7.6.0.4-implementation-instructions-for-coding-agent.md` | ✅ Complete | shipped as PR #126 + PR #128; see canonical audit below |
-| v7.6.0.5 | Playwright tests + Phase D closure | `prompts/phaseD/v7.6.0.5-implementation-instructions-for-coding-agent.md` | ▶ Next | see session handoff and two-session workflow below |
+| v7.6.0.4 | Dashboard add/remove/test UI | `prompts/phaseD/v7.6.0.4-implementation-instructions-for-coding-agent.md` | ✅ Complete | shipped as PR #126 + PR #128; canonical audit below |
+| v7.6.0.5 | Playwright tests + Phase D closure | `prompts/phaseD/v7.6.0.5-implementation-instructions-for-coding-agent.md` | ✅ Complete | shipped as PR #129; canonical audit below |
+
+**Phase D is fully closed. All six steps merged to `main`. Final HEAD: `188aa40`.**
 
 ---
 
-## Required files for the next step (v7.6.0.5)
+## Phase D closure artifacts
 
-Read these together before starting any session:
+| Artifact | File |
+|----------|------|
+| v7.6.0.4 canonical audit (PR #126 + PR #128) | `prompts/phaseD/v7.6.0.4-PR126-PR128-consolidated-audit-and-lessons.md` |
+| v7.6.0.5 canonical audit (PR #129) | `prompts/phaseD/v7.6.0.5-PR129-consolidated-audit-and-lessons.md` |
+| v7.6.0.5 session handoff (pre-PR) | `prompts/handoff/session-handoff-v7.6.0.5.md` |
+| Phase 7 session handoff | `prompts/handoff/session-handoff-v7.7.0.0.md` |
 
-1. `prompts/phaseD/v7.6.0.5-implementation-instructions-for-coding-agent.md` — primary prompt
-2. `prompts/handoff/session-handoff-v7.6.0.5.md` — canonical handoff with pre-merge checklist and device testing audit
-3. `prompts/phaseD/v7.6.0.4-PR126-PR128-consolidated-audit-and-lessons.md` — canonical v7.6.0.4 closure audit (PR #126 + PR #128 together)
+> **Note:** `session-handoff-v7.7.0.0.md` is the Task 3 deliverable — see post-Phase D
+> completion context in `prompts/handoff/session-prompt-post-phaseD-completion.md`.
 
 ---
 
@@ -43,11 +49,14 @@ The canonical closure audit for continuing work is:
 
 ---
 
-## Two-session workflow for v7.6.0.5
+## Required files for the next step (v7.7.0.0 — Phase 7)
 
-v7.6.0.5 introduces stateful mock-server routes and a new Playwright test group. The two-session
-review pattern used for v7.6.0.4 applies here as well. See session-handoff-v7.6.0.5.md §Workflow
-for the exact framing prompts.
+Read these together before starting any Phase 7 session:
+
+1. `prompts/handoff/session-handoff-v7.7.0.0.md` — primary handoff for Phase 7 baseline
+2. `prompts/phaseD/v7.6.0.5-PR129-consolidated-audit-and-lessons.md` — Phase D final closure audit, lessons 112–114, open item OI-001
+3. `prompts/phaseD/v7.6.0.4-PR126-PR128-consolidated-audit-and-lessons.md` — v7.6.0.4 canonical audit (LESSON-OPS-111, BUG-080, BUG-081)
+4. `prompts/handoff/session-prompt-post-phaseD-completion.md` — post-Phase D context and Phase 7 scope framing
 
 ---
 
@@ -66,5 +75,9 @@ For each implementation step:
 
 ## Next action
 
-Execute **v7.6.0.5** against the final shipped v7.6.0.4 baseline to add Playwright test coverage
-for satellite management and close Phase D.
+Execute **v7.7.0.0** (Phase 7 baseline step) against the final shipped Phase D state.
+Phase D is complete. `main` is green. 402 Playwright tests pass across all 4 fixture sets.
+
+Before starting v7.7.0.0, resolve **OI-001** from the v7.6.0.5 audit:
+update the `managedSatellites` parallelism comment in `tests/mock-server/server.js`
+to accurately reflect that all workers share a single server instance (port 3737).
