@@ -2,7 +2,93 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.0.5] — 2026-04-04 (PR #129) — Phase D Closure: Playwright Tests + Stateful Mock Server
+
+### New Features
+
+- **Stateful satellite management mock server** (`tests/mock-server/server.js`)
+  - Runtime `managedSatellites[]` array initialized from aggregator fixture (`aggregator-gateways.json`)
+  - `POST /api/aggregator/add-satellite` — full validation branch coverage:
+    - Non-empty body guard (mirrors firmware lines 2381-2384)
+    - URL validation (must start with `http://`, max 127 chars)
+    - Capacity check (max 8 satellites)
+    - Duplicate URL detection (returns 409)
+    - Probe simulation (URLs containing "unreachable" fail with 400)
+    - Poll interval clamping (10-3600 seconds, default 30)
+    - Monotonic ID generation (`nextSatelliteId++`)
+    - Returns 405 for wrong HTTP method
+  - `DELETE /api/aggregator/satellite/{id}` — auth-gated destructive endpoint:
+    - Requires `?auth=mock` query parameter in mock (mirrors firmware authenticate_management_)
+    - Empty ID guard (returns 400 instead of 404)
+    - Returns 404 for unknown satellite ID
+    - Returns 405 for wrong HTTP method
+  - `POST /api/aggregator/test-satellite` — auth-gated probe endpoint:
+    - Requires `?auth=mock` query parameter in mock
+    - Non-empty body guard
+    - URL validation (must start with `http://`, max 200 chars)
+    - Probe simulation (returns mock gateway info on success)
+    - Returns 405 for wrong HTTP method
+  - `POST /api/system/reset-satellites` — auth-gated reset endpoint:
+    - Requires `?auth=mock` query parameter in mock
+    - Non-empty body guard
+    - Resets `managedSatellites[]` to fixture defaults
+    - Returns 405 for wrong HTTP method
+  - `/api/aggregator/gateways` now returns live managed state when `FIXTURE_SET=aggregator`
+
+- **Playwright Test Group 21: Satellite Management** (19 tests, `tests/browser/dashboard.spec.js`)
+  - **12 API contract tests:**
+    - `POST add-satellite: valid URL returns 200`
+    - `POST add-satellite: duplicate URL returns 409`
+    - `POST add-satellite: missing URL returns 400`
+    - `POST add-satellite: full list returns 409`
+    - `POST add-satellite: unreachable URL returns 400`
+    - `DELETE satellite: valid ID returns 200`
+    - `DELETE satellite: unknown ID returns 404`
+    - `POST test-satellite: valid URL returns gateway info`
+    - `POST test-satellite: missing URL returns 400`
+    - `POST test-satellite: unreachable URL returns 400`
+    - `POST test-satellite: URL without http:// returns 400`
+    - `POST reset-satellites: resets to fixture defaults`
+  - **2 UI rendering tests:**
+    - `Settings panel renders add form`
+    - `Settings panel renders remove buttons for each satellite`
+  - **5 PR #128 regression guards (BUG-080 / BUG-081 / LESSON-OPS-111):**
+    - `PR128-regression: URL input value preserved across poll-driven rerender`
+    - `PR128-regression: test-satellite result appears in live panel after action`
+    - `PR128-regression: settings panel not destroyed during in-flight add`
+    - `PR128-regression: panel remains usable after completed add`
+    - `PR128-regression: panel remains usable after completed delete`
+  - **Stateful test isolation:** `beforeEach` hook resets satellites to fixture defaults before each test
+  - **Deterministic waits:** Replaced flaky `waitForFunction` with reliable `waitForTimeout`, added auth token injection for authenticated flows
+
+### Testing
+
+- Full CI-exact validation suite: **402 tests passed, 0 failed** across all four fixture sets
+  - 3sensor: 99 passed, 45 skipped
+  - mixed: 96 passed, 48 skipped
+  - system: 100 passed, 44 skipped
+  - aggregator: 107 passed, 37 skipped
+
+### Documentation
+
+- Added `Docs/session-log-2026-04-04-v7.6.0.5.md` — comprehensive implementation log with PR review fixes
+- Updated `Docs/phase-d-implementation-plan.md` — v7.6.0.5 marked complete, Phase D closure confirmed
+- Updated `Docs/v7.5-v7.6-architecture-plan.md` — Phase D status table added
+- Updated `Docs/aggregator-setup.md` — mock server test routes documented
+
+### Important Notes
+
+- **v7.6.0.4 final shipped state** = PR #126 + PR #128 (not PR #126 alone)
+  - PR #126: Interactive settings panel with add/test/remove controls
+  - PR #128: Stale-DOM fixes (BUG-080, BUG-081, LESSON-OPS-111)
+- **Phase D complete:** All 6 steps (v7.6.0.0–v7.6.0.5) delivered
+- Satellite configuration is now runtime-manageable via dashboard UI — no YAML editing, no reflashing required
+
+---
+
 ## [v7.6.0.4] — 2026-04-03 — Dashboard Add/Remove/Test Satellite UI (Phase D Step 4)
+
+**Note:** Final shipped v7.6.0.4 state includes PR #126 + PR #128 (stale-DOM fixes for BUG-080, BUG-081, LESSON-OPS-111).
 
 ### New Features
 

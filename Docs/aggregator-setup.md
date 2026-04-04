@@ -219,7 +219,32 @@ esphome run firmware/esp32-wroom-32d-gw.yaml
 | Generated YAML not found after `--write` | Missing or incorrect `config/gateway.json` | Verify `gateway.json` exists and `board` field matches a board profile |
 | `AGGREGATOR_ENABLED 0` on S3 board | Missing `config/aggregator.json` or board profile has `psram: false` | Verify both config files are present and board profile is correct |
 
-## 12) Reverting to Satellite Mode
+## 12) Testing and Validation (v7.6.0.5+)
+
+The satellite management mock server routes are now implemented and tested as of v7.6.0.5 (PR #129). The Playwright test suite covers add/test/delete workflows and all firmware error branches.
+
+### Running aggregator fixture tests
+
+```bash
+FIXTURE_SET=aggregator npx playwright test --project=chromium
+```
+
+This runs Test Group 21 (Satellite Management) with 19 tests:
+- 12 API contract tests (all validation branches)
+- 2 UI rendering tests (Settings panel form and remove buttons)
+- 5 PR #128 regression guards (BUG-080 / BUG-081 / LESSON-OPS-111)
+
+### Mock server endpoints
+
+The mock server (`tests/mock-server/server.js`) provides stateful satellite management for test automation:
+- `POST /api/aggregator/add-satellite?url=...&name=...&poll=30` — add satellite to managed list
+- `DELETE /api/aggregator/satellite/{id}?auth=mock` — remove satellite (auth required)
+- `POST /api/aggregator/test-satellite?url=...&auth=mock` — probe without adding (auth required)
+- `POST /api/system/reset-satellites?auth=mock` — restore fixture defaults (auth required)
+
+All endpoints include full validation: body guard, URL format checks, capacity limits, poll clamping (10-3600s), method 405 handling, and monotonic ID generation.
+
+## 13) Reverting to Satellite Mode
 
 ```bash
 rm -f config/aggregator.json

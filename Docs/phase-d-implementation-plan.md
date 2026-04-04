@@ -1,5 +1,7 @@
 # Phase D — Runtime Satellite Management
 
+**Status: COMPLETE** (v7.6.0.5, 2026-04-04). All 6 steps shipped. See changelog for details.
+
 _Implementation Plan for v7.6.0.x_
 _Date: 2026-03-25_
 _Prerequisite: Phase 6 Complete (v7.5.6.4 on `main`)_
@@ -326,15 +328,15 @@ The Settings panel gets three new elements:
 **Risk:** Medium. Dashboard JS changes are always the highest-risk due to the mirroring requirement.
 **Estimated effort:** 2 sessions.
 
----
+### v7.6.0.5 — Playwright Tests + Phase D Closure ✅ COMPLETE
 
-### v7.6.0.5 — Playwright Tests + Phase D Closure
+**Delivered:** PR #129, branch `claude/add-new-validation-tests`, 2026-04-04
 
 **Scope:** Test fixtures and Playwright tests for satellite management. Phase D closure documentation.
 
 **Files modified:**
-- `tests/browser/dashboard.spec.js` — new test group for satellite management
-- `tests/mock-server/server.js` — mock routes for add/remove/test endpoints
+- `tests/browser/dashboard.spec.js` — new Test Group 21: Satellite Management (19 tests)
+- `tests/mock-server/server.js` — stateful mock routes for add/delete/test/reset endpoints
 - `tests/fixtures/variants/aggregator/` — updated fixtures if needed
 - `.github/workflows/browser-tests.yml` — CI matrix update if needed
 - `Docs/v7.5-v7.6-architecture-plan.md` — Phase D COMPLETE status
@@ -342,21 +344,20 @@ The Settings panel gets three new elements:
 - `Docs/aggregator-setup.md` — update with runtime management workflow
 - Version bump
 
-**Test scenarios:**
-- `POST /api/aggregator/add-satellite` returns 200 for valid probe
-- `POST /api/aggregator/add-satellite` returns 409 for duplicate
-- `DELETE /api/aggregator/satellite/{id}` returns 200
-- `DELETE /api/aggregator/satellite/nonexistent` returns 404
-- `POST /api/aggregator/test-satellite` returns gateway info
-- Settings panel renders add form
-- Settings panel renders remove buttons
+**Deliverables:**
+- Stateful mock server routes: `POST /api/aggregator/add-satellite`, `DELETE /api/aggregator/satellite/{id}`, `POST /api/aggregator/test-satellite`, `POST /api/system/reset-satellites`
+- Test Group 21: 19 tests (12 API contract + 2 UI rendering + 5 PR #128 regression guards)
+- Full validation branch coverage: body guard, auth, method 405, poll clamping, empty ID, monotonic IDs
+- All four fixture sets green: 3sensor, mixed, system, aggregator
+- PR #128 regression guards: BUG-080 / BUG-081 / LESSON-OPS-111 locked down
 
 **Closure gate:**
-- [ ] All management endpoints functional
-- [ ] NVS persistence survives reboot
-- [ ] Dashboard add/remove/test UI operational
-- [ ] All CI-exact Playwright runs pass
-- [ ] Aggregator-setup.md updated with runtime management workflow
+- [x] All management endpoints functional
+- [x] NVS persistence survives reboot
+- [x] Dashboard add/remove/test UI operational (v7.6.0.4 = PR #126 + PR #128)
+- [x] All CI-exact Playwright runs pass (402 tests passed, 0 failed)
+- [x] Aggregator-setup.md updated with runtime management workflow
+- [x] **Phase D complete**
 
 **Risk:** Low. Standard test infrastructure work.
 **Estimated effort:** 1–2 sessions.

@@ -86,6 +86,71 @@ const SHARED_SENSOR = {
   'loop time': 12,
 };
 
+// ────────────────────────────────────────────────────────────────────────────────
+// Stateful satellite management (Phase D mock — v7.6.0.5)
+// Initialized from the aggregator fixture on server start.
+// WARNING: managedSatellites is shared global state. With playwright fullyParallel: true,
+// each worker gets its own mock server instance, so tests do NOT conflict across workers.
+// However, tests within the same worker share this state and must use beforeEach reset.
+// ────────────────────────────────────────────────────────────────────────────────
+let managedSatellites = [];
+let nextSatelliteId = 1;  // Monotonic ID counter for unique satellite IDs
+const MOCK_MAX_SATELLITES = 8;
+
+function initManagedSatellites() {
+  const gateways = loadFixtureJson('aggregator-gateways.json', { gateways: [] });
+  managedSatellites = (gateways.gateways || []).map(function(gw) {
+    return {
+      id: gw.id,
+      name: gw.name,
+      base_url: gw.base_url || 'http://mock-satellite',
+      poll: gw.poll || 30,  // Use poll field (default 30s if not present)
+      reachable: gw.reachable !== undefined ? gw.reachable : true,
+      last_seen: gw.last_seen || Math.floor(Date.now() / 1000),
+      consecutive_failures: gw.consecutive_failures || 0,
+      firmware_version: gw.firmware_version || '7.6.0.5',
+      sensor_count: gw.sensor_count || 0,
+      device_count: gw.device_count !== undefined ? gw.device_count : 0,  // Preserve fixture device_count
+      manifest: gw.manifest || null
+    };
+  });
+  // Reset monotonic ID counter
+  nextSatelliteId = managedSatellites.length + 1;
+}
+
+// Initialize on server load
+initManagedSatellites();
+
+// ────────────────────────────────────────────────────────────────────────────────
+// Mock auth and validation helpers (mirrors firmware contract)
+// ────────────────────────────────────────────────────────────────────────────────
+
+// Check if request has non-empty body (mirrors firmware lines 2381-2384)
+function hasNonEmptyBody(req) {
+  const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+  return contentLength > 0;
+}
+
+// Mock auth check (mirrors firmware authenticate_management_)
+// Mock accepts any request without auth query param as unauthenticated
+// Real firmware checks session cookie or ?auth=<digest> query param
+function checkAuth(req) {
+  const parsedUrl = url.parse(req.url, true);
+  // In mock: require ?auth=mock for destructive operations
+  // Real firmware validates session or HMAC digest
+  return parsedUrl.query.auth === 'mock';
+}
+
+// List of management POST routes requiring non-empty body
+function isManagementPostRoute(pathname) {
+  if (pathname === '/api/reboot') return true;
+  if (pathname === '/api/delete-data') return true;
+  if (pathname === '/api/system/reset-satellites') return true;
+  if (pathname.startsWith('/api/aggregator/add-satellite')) return true;
+  if (pathname.startsWith('/api/aggregator/test-satellite')) return true;
+  return false;
+}
+
 function json(res, data, status) {
   const body = typeof data === 'string' ? data : JSON.stringify(data);
   res.writeHead(status || 200, {
@@ -252,8 +317,11 @@ const server = http.createServer(function(req, res) {
   // Aggregator endpoints — return empty gateways in satellite fixture sets (no 404
   // to avoid browser console errors in tests). detectAggregatorMode() handles empty
   // gateways list as satellite mode. In aggregator mode (FIXTURE_SET=aggregator),
-  // loadFixture() resolves the variant fixture and returns real gateway data.
+  // use managed satellite state (Phase D v7.6.0.5).
   if (pathname === '/api/aggregator/gateways') {
+    if (FIXTURE_SET === 'aggregator') {
+      return json(res, { gateways: managedSatellites });
+    }
     return json(res, loadFixtureJson('aggregator-gateways.json', { gateways: [] }));
   }
   if (pathname === '/api/aggregator/live') {
@@ -275,6 +343,147 @@ const server = http.createServer(function(req, res) {
       }
     }
     return notFound(res, pathname);
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────────
+  // Satellite Management Endpoints (Phase D v7.6.0.5)
+  // Contract mirrors firmware handlers in dashboard/sensor_history_multi.h
+  // ────────────────────────────────────────────────────────────────────────────────
+
+  // POST /api/aggregator/add-satellite
+  if (pathname === '/api/aggregator/add-satellite') {
+    // Method validation (firmware line 3936-3939)
+    if (req.method !== 'POST') {
+      return json(res, { ok: false, message: 'Method not allowed', status: 405 }, 405);
+    }
+    // Non-empty body guard (firmware lines 2381-2384)
+    if (!hasNonEmptyBody(req)) {
+      return json(res, { ok: false, message: 'Non-empty body required for management POST', status: 400 }, 400);
+    }
+
+    // NOTE: add-satellite intentionally does NOT require auth (firmware lines 3941-3946)
+
+    const params = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams;
+    const satUrl = params.get('url');
+    const satName = params.get('name');
+    const satPollParam = params.get('poll');
+
+    if (!satUrl) return json(res, { ok: false, message: 'Missing url parameter', status: 400 }, 400);
+    if (!satUrl.startsWith('http://')) return json(res, { ok: false, message: 'URL must start with http://', status: 400 }, 400);
+    if (satUrl.length >= 128) return json(res, { ok: false, message: 'URL too long (max 127 characters)', status: 400 }, 400);
+    if (managedSatellites.length >= MOCK_MAX_SATELLITES) return json(res, { ok: false, message: 'Satellite list full', status: 409 }, 409);
+    if (managedSatellites.some(s => s.base_url === satUrl)) return json(res, { ok: false, message: 'URL already configured', status: 409 }, 409);
+
+    // Simulate probe — URLs containing 'unreachable' fail
+    if (satUrl.includes('unreachable')) return json(res, { ok: false, message: 'Satellite unreachable or invalid manifest', status: 400 }, 400);
+
+    // Parse poll interval with firmware-matching validation (firmware lines 4007-4012)
+    let satPoll = 30;
+    if (satPollParam) {
+      const p = parseInt(satPollParam, 10);
+      if (p >= 10 && p <= 3600) satPoll = p;
+    }
+
+    // Probe succeeds — add satellite with monotonic ID
+    const newId = 'mock-sat-' + nextSatelliteId++;
+    const newName = satName || 'Mock Satellite ' + managedSatellites.length;
+    const newSat = {
+      id: newId,
+      name: newName,
+      base_url: satUrl,
+      poll: satPoll,
+      reachable: true,
+      last_seen: Math.floor(Date.now() / 1000),
+      consecutive_failures: 0,
+      firmware_version: '7.6.0.5',
+      sensor_count: 0,
+      device_count: 0
+    };
+    managedSatellites.push(newSat);
+
+    return json(res, { ok: true, id: newId, name: newName, satellite_count: managedSatellites.length });
+  }
+
+  // DELETE /api/aggregator/satellite/{id}
+  const deleteSatMatch = pathname.match(/^\/api\/aggregator\/satellite\/(.*)$/);
+  if (deleteSatMatch) {
+    // Method validation (firmware lines 4075-4078)
+    if (req.method !== 'DELETE') {
+      return json(res, { ok: false, message: 'Method not allowed', status: 405 }, 405);
+    }
+    // Auth enforcement (firmware line 4080)
+    if (!checkAuth(req)) {
+      return json(res, { ok: false, message: 'Unauthorized', status: 401 }, 401);
+    }
+
+    const satId = decodeURIComponent(deleteSatMatch[1]);
+    // Empty ID validation (firmware lines 4086-4089)
+    if (satId === '') {
+      return json(res, { ok: false, message: 'Missing satellite ID', status: 400 }, 400);
+    }
+
+    const idx = managedSatellites.findIndex(s => s.id === satId);
+    if (idx < 0) return json(res, { ok: false, message: 'Unknown satellite ID', status: 404 }, 404);
+    managedSatellites.splice(idx, 1);
+    return json(res, { ok: true });
+  }
+
+  // POST /api/aggregator/test-satellite
+  if (pathname === '/api/aggregator/test-satellite') {
+    // Method validation (firmware lines 4159-4162)
+    if (req.method !== 'POST') {
+      return json(res, { ok: false, message: 'Method not allowed', status: 405 }, 405);
+    }
+    // Non-empty body guard (firmware lines 2381-2384)
+    if (!hasNonEmptyBody(req)) {
+      return json(res, { ok: false, message: 'Non-empty body required for management POST', status: 400 }, 400);
+    }
+    // Auth enforcement (firmware line 4163)
+    if (!checkAuth(req)) {
+      return json(res, { ok: false, message: 'Unauthorized', status: 401 }, 401);
+    }
+
+    const params = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams;
+    const testUrl = params.get('url');
+
+    if (!testUrl) return json(res, { ok: false, message: 'Missing url parameter', status: 400 }, 400);
+    if (!testUrl.startsWith('http://')) return json(res, { ok: false, message: 'URL must start with http://', status: 400 }, 400);
+    if (testUrl.length > 200) return json(res, { ok: false, message: 'URL too long', status: 400 }, 400);
+    if (testUrl.includes('unreachable')) return json(res, { ok: false, message: 'Satellite unreachable or invalid manifest', status: 400 }, 400);
+
+    // Probe succeeds — return mock gateway info
+    return json(res, {
+      ok: true,
+      gateway: {
+        id: 'mock-probe-id',
+        name: 'Mock Probed Gateway',
+        hardware: 'ESP32-C3',
+        sensor_count: 3
+      }
+    });
+  }
+
+  // POST /api/system/reset-satellites
+  if (pathname === '/api/system/reset-satellites') {
+    // Method validation (firmware lines 4256-4259)
+    if (req.method !== 'POST') {
+      return json(res, { ok: false, message: 'Method not allowed', status: 405 }, 405);
+    }
+    // Non-empty body guard (firmware lines 2381-2384)
+    if (!hasNonEmptyBody(req)) {
+      return json(res, { ok: false, message: 'Non-empty body required for management POST', status: 400 }, 400);
+    }
+    // Auth enforcement (firmware line 4260)
+    if (!checkAuth(req)) {
+      return json(res, { ok: false, message: 'Unauthorized', status: 401 }, 401);
+    }
+
+    initManagedSatellites(); // Reset to fixture defaults
+    return json(res, {
+      ok: true,
+      message: 'Reset to compile-time defaults',
+      satellite_count: managedSatellites.length
+    });
   }
 
   notFound(res, pathname);
