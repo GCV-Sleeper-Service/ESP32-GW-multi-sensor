@@ -89,6 +89,9 @@ const SHARED_SENSOR = {
 // ────────────────────────────────────────────────────────────────────────────────
 // Stateful satellite management (Phase D mock — v7.6.0.5)
 // Initialized from the aggregator fixture on server start.
+// WARNING: managedSatellites is shared global state. With playwright fullyParallel: true,
+// each worker gets its own mock server instance, so tests do NOT conflict across workers.
+// However, tests within the same worker share this state and must use beforeEach reset.
 // ────────────────────────────────────────────────────────────────────────────────
 let managedSatellites = [];
 let nextSatelliteId = 1;  // Monotonic ID counter for unique satellite IDs
@@ -398,7 +401,7 @@ const server = http.createServer(function(req, res) {
     };
     managedSatellites.push(newSat);
 
-    return json(res, { ok: true, satellite: { id: newId, name: newName, url: satUrl, poll: satPoll } });
+    return json(res, { ok: true, id: newId, name: newName, satellite_count: managedSatellites.length });
   }
 
   // DELETE /api/aggregator/satellite/{id}

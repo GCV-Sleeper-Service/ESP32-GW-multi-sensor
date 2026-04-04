@@ -1631,8 +1631,9 @@ test.describe('21. Satellite Management', () => {
     expect(resp.ok()).toBeTruthy();
     const body = await resp.json();
     expect(body.ok).toBe(true);
-    expect(body.satellite).toBeDefined();
-    expect(body.satellite.url).toBe('http://192.168.1.100');
+    expect(body.id).toBeDefined();
+    expect(body.name).toBe('Test Sat');
+    expect(body.satellite_count).toBeGreaterThan(0);
   });
 
   test('POST add-satellite: duplicate URL returns 409', async ({ request }) => {
@@ -1670,7 +1671,7 @@ test.describe('21. Satellite Management', () => {
     // Add one first
     const addResp = await request.post('/api/aggregator/add-satellite?url=http://192.168.1.201', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, data: 'a=1' });
     const addBody = await addResp.json();
-    const satId = addBody.satellite.id;
+    const satId = addBody.id;
     // Delete it with auth
     const resp = await request.delete('/api/aggregator/satellite/' + satId + '?auth=mock');
     expect(resp.ok()).toBeTruthy();
@@ -1751,9 +1752,8 @@ test.describe('21. Satellite Management', () => {
     const urlInput = page.locator('#sat-url-input');
     await urlInput.fill('http://192.168.1.250');
 
-    // Deterministic wait: poll_interval is 1000ms in aggregator mode
-    // Wait for 2 seconds to allow at least one poll cycle to complete
-    await page.waitForTimeout(2000);
+    // Deterministic wait: Wait for an actual poll cycle to complete by waiting for live API response
+    await page.waitForResponse(resp => resp.url().includes('/api/aggregator/live') && resp.status() === 200);
 
     // Value must still be present — poll guard must have blocked the destructive rerender
     await expect(urlInput).toHaveValue('http://192.168.1.250');
@@ -1796,8 +1796,8 @@ test.describe('21. Satellite Management', () => {
     await addBtn.click();
     await expect(urlInput).toBeVisible();
 
-    // Wait for the action to complete
-    await page.waitForTimeout(1000);
+    // Wait for the add-satellite API response to complete
+    await page.waitForResponse(resp => resp.url().includes('/api/aggregator/add-satellite') && resp.status() === 200);
 
     // Panel must still be usable — no crash/blank
     await expect(page.locator('#sat-add-btn')).toBeVisible();
@@ -1810,7 +1810,8 @@ test.describe('21. Satellite Management', () => {
     const urlInput = page.locator('#sat-url-input');
     await urlInput.fill('http://192.168.1.140');
     await page.locator('#sat-add-btn').click();
-    await page.waitForTimeout(1000);
+    // Wait for add-satellite request to complete
+    await page.waitForResponse(resp => resp.url().includes('/api/aggregator/add-satellite') && resp.status() === 200);
     // After add completes, user must be able to type in the URL field again without reload
     await urlInput.fill('http://192.168.1.141');
     await expect(urlInput).toHaveValue('http://192.168.1.141');
@@ -1821,21 +1822,25 @@ test.describe('21. Satellite Management', () => {
     await waitForAggregatorReady(page);
     await page.locator('.gw-tab[data-gw="settings"]').click();
 
-    // Inject mock auth token into page context (simulates logged-in user)
+    // Stub requestManagementCredentials to auto-resolve with mock credentials
     await page.evaluate(() => {
-      sessionStorage.setItem('auth_token', 'mock');
+      window.requestManagementCredentials = () => Promise.resolve({ username: 'admin', password: 'mock' });
     });
 
     await page.waitForSelector('.settings-satellite-card', { timeout: 10000 });
     const removeBtns = page.locator('.settings-btn-remove');
-    const count = await removeBtns.count();
-    if (count > 0) {
+    const initialCount = await removeBtns.count();
+    if (initialCount > 0) {
       // Accept confirmation dialog
       page.once('dialog', dialog => dialog.accept());
       await removeBtns.first().click();
 
-      // Wait for delete to complete
-      await page.waitForTimeout(1000);
+      // Wait for delete API response to complete
+      await page.waitForResponse(resp => resp.url().includes('/api/aggregator/satellite/') && resp.request().method() === 'DELETE');
+
+      // Verify card count decreased (delete actually completed)
+      const finalCount = await page.locator('.settings-satellite-card').count();
+      expect(finalCount).toBe(initialCount - 1);
 
       // Panel must still render after delete — test button still visible
       await expect(page.locator('#sat-test-btn')).toBeVisible();
