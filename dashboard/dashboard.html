@@ -4539,7 +4539,8 @@ function renderSettingsPanel(gateways) {
   // Bind Test button
   var testBtn = document.getElementById('sat-test-btn');
   if (testBtn) {
-    testBtn.addEventListener('click', function() {
+    testBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       var urlInput = document.getElementById('sat-url-input');
       var statusEl = document.getElementById('sat-add-status');
       _handleTestSatellite(urlInput, statusEl);
@@ -4548,7 +4549,8 @@ function renderSettingsPanel(gateways) {
   // Bind Add button
   var addBtn = document.getElementById('sat-add-btn');
   if (addBtn) {
-    addBtn.addEventListener('click', function() {
+    addBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       var urlInput = document.getElementById('sat-url-input');
       var nameInput = document.getElementById('sat-name-input');
       var statusEl = document.getElementById('sat-add-status');
@@ -4557,7 +4559,8 @@ function renderSettingsPanel(gateways) {
   }
   // Bind Remove buttons
   document.querySelectorAll('.settings-btn-remove').forEach(function(btn) {
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
       var satId = btn.getAttribute('data-sat-id');
       var satName = btn.getAttribute('data-sat-name');
       var statusEl = document.getElementById('sat-status-' + satId);
@@ -4569,21 +4572,23 @@ function renderSettingsPanel(gateways) {
 var _satTestInFlight = false;
 function _handleTestSatellite(urlInput, statusEl) {
   if (_satTestInFlight) return;
-  var url = String(urlInput ? urlInput.value || '' : '').trim();
-  if (!url) {
-    if (statusEl) statusEl.textContent = 'Enter a URL to test.';
+  // Capture values synchronously before any async work (Bug 2 fix)
+  var capturedUrl = String(urlInput ? urlInput.value || '' : '').trim();
+  var capturedStatusEl = statusEl;
+  if (!capturedUrl) {
+    if (capturedStatusEl) capturedStatusEl.textContent = 'Enter a URL to test.';
     return;
   }
   _satTestInFlight = true;
-  if (statusEl) statusEl.textContent = 'Authenticating...';
+  if (capturedStatusEl) capturedStatusEl.textContent = 'Authenticating...';
   requestManagementCredentials('satellite test')
     .then(function(creds) {
       if (!creds) {
-        if (statusEl) statusEl.textContent = 'Test cancelled';
+        if (capturedStatusEl) capturedStatusEl.textContent = 'Test cancelled';
         return null;
       }
-      if (statusEl) statusEl.textContent = 'Testing...';
-      return fetch(ESP_HOST + '/api/aggregator/test-satellite?url=' + encodeURIComponent(url), {
+      if (capturedStatusEl) capturedStatusEl.textContent = 'Testing...';
+      return fetch(ESP_HOST + '/api/aggregator/test-satellite?url=' + encodeURIComponent(capturedUrl), {
         method: 'POST',
         cache: 'no-store',
         headers: {
@@ -4598,12 +4603,12 @@ function _handleTestSatellite(urlInput, statusEl) {
         var deviceCount = '\u2014';
         if (gw.device_count !== undefined && gw.device_count !== null) deviceCount = String(gw.device_count);
         else if (gw.sensor_count !== undefined && gw.sensor_count !== null) deviceCount = String(gw.sensor_count);
-        if (statusEl) statusEl.innerHTML = '\u2713 Found: ' + escHtml(gw.name || '\u2014') +
+        if (capturedStatusEl) capturedStatusEl.innerHTML = '\u2713 Found: ' + escHtml(gw.name || '\u2014') +
           ' (' + escHtml(gw.hardware || '\u2014') + ', ' + escHtml(deviceCount) + ' devices)';
       });
     })
     .catch(function(err) {
-      if (statusEl) statusEl.innerHTML = '\u2717 ' + escHtml(err.message || 'Test failed');
+      if (capturedStatusEl) capturedStatusEl.innerHTML = '\u2717 ' + escHtml(err.message || 'Test failed');
     })
     .finally(function() { _satTestInFlight = false; });
 }

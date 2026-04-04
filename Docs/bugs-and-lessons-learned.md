@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-04-02 — v7.6.0.2 fixup (BUG-079 — HTTP DELETE handler registration)._
+_Last updated: 2026-04-04 — v7.6.0.4 fixup (BUG-080, BUG-081 — Satellite Configuration Panel regressions)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -8,6 +8,59 @@ It is also the place where project guardrails are recorded so they are not re-le
 Both sections are in **reverse chronological order** — most recent entry first.
 
 ## Bug Fixes
+
+### BUG-081 — Auth dialog resolves but no status update or network request fires (v7.6.0.4 fixup)
+
+**Symptom:** After clicking Test in the satellite configuration panel and entering valid
+management credentials in the auth dialog, the dialog dismissed correctly but nothing
+further happened — no "Testing..." message, no success/failure result, no network
+request visible in DevTools.
+
+**Root cause:** `_handleTestSatellite(urlInput, statusEl)` used `statusEl` (a DOM element
+reference) inside `.then()` callbacks of `requestManagementCredentials()`. If the settings
+panel was re-rendered between the button click and the Promise resolution (e.g. via the
+aggregator polling path at `pollAggregatorLive()` → `renderSettingsPanel()`), `statusEl`
+became a detached element. Assignments to a detached element succeed silently in the DOM
+API but produce no visible output. Combined with Bug 1 (BUG-080) causing an immediate
+re-render on every button click, `statusEl` was reliably detached before the `.then()`
+callbacks ran.
+
+**Fix:** In `_handleTestSatellite()`, renamed all uses of `urlInput`/`statusEl` to
+`capturedUrl` (a plain string, trimmed from `urlInput.value`) and `capturedStatusEl`
+(a snapshot reference). All DOM reads and value captures now occur synchronously at the
+top of the function body, before `requestManagementCredentials()` is called. The `.then()`
+and `.catch()` callbacks reference only these closed-over local variables.
+
+**Files changed:** `dashboard/dashboard.js`, `dashboard/dashboard.html`, `dashboard/dashboard.h`
+
+Related: BUG-080, LESSON-OPS-043
+
+---
+
+### BUG-080 — Input fields cleared when clicking Test or Add in satellite configuration panel (v7.6.0.4 fixup)
+
+**Symptom:** Typing a URL and friendly name into the satellite configuration inputs, then
+clicking Test or Add, wiped both fields before the handler ran. The only workaround was to
+click a neutral area of the page first to "commit" the focus, then click the button.
+
+**Root cause:** The `click` events on `sat-test-btn`, `sat-add-btn`, and `.settings-btn-remove`
+buttons bubbled up through the DOM after the element-level handler returned. The global
+`document.addEventListener('click', ...)` router in `bindEvents()` received the bubbled
+event. When no matching `[data-action]` / `[data-toggle-target]` / etc. attribute was found
+and the event reached unguarded fallthrough logic, it triggered re-render paths (including
+the aggregator live-poll watcher at `pollAggregatorLive()`) that called `renderSettingsPanel()`
+— rebuilding the entire panel with empty `innerHTML` and destroying both input elements
+before the async credential prompt could resolve.
+
+**Fix:** Added `e.stopPropagation()` as the very first statement in the `click` event
+listeners for `sat-test-btn`, `sat-add-btn`, and each `.settings-btn-remove` button inside
+`renderSettingsPanel()`. This prevents the click from reaching the global router.
+
+**Files changed:** `dashboard/dashboard.js`, `dashboard/dashboard.html`, `dashboard/dashboard.h`
+
+Related: BUG-081, LESSON-OPS-043
+
+---
 
 ### BUG-079 — DELETE requests rejected by httpd layer with 405 before reaching handler (v7.6.0.2 fixup)
 
