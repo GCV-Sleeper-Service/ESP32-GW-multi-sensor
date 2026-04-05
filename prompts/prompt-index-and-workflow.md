@@ -31,7 +31,7 @@ Your job as the human operator is to:
 | Bugs & Lessons Learned | `Docs/bugs-and-lessons-learned.md` | Project guardrails and failure history |
 | **Prompt Writing Guide** | `Docs/writing-prompts-for-coding-agents-guide.md` | How to create and audit prompts |
 | Architecture Forward-Looking Notes | `Docs/architecture-forward-looking-notes.md` | Post-Phase-6 architectural decisions and risks |
-| **Phase D Results and Summary** | `prompts/phaseD/phaseD-results.md` | Phase D delivery record, lessons, API contracts |
+| **Phase D Results and Summary** | `prompts/handoff/phaseD-results.md` | Phase D delivery record, lessons, API contracts |
 
 ---
 
@@ -219,7 +219,7 @@ All steps shipped. No prompts needed.
 
 **Phase D delivered runtime satellite management — satellites can be added, removed, and tested via the dashboard UI at runtime, with no YAML editing or reflashing required.**
 
-**Phase D results and summary:** `prompts/phaseD/phaseD-results.md` — delivery record, API contracts, active lessons, delivery metrics, retrospective.
+**Phase D results and summary:** `prompts/handoff/phaseD-results.md` — delivery record, API contracts, active lessons, delivery metrics, retrospective.
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
@@ -250,7 +250,7 @@ All steps shipped. No prompts needed.
 
 **`main` is at v7.6.0.5. Phase 7 starts at v7.7.0.0.**
 
-Before starting Phase 7, read `prompts/phaseD/phaseD-results.md` for the active lessons and API contracts that Phase 7 must remain compatible with. Also read `prompts/handoff/session-handoff-v7.7.0.0.md` for the full Phase 7 entry context.
+Before starting Phase 7, read `prompts/handoff/phaseD-results.md` for the active lessons and API contracts that Phase 7 must remain compatible with. Also read `prompts/handoff/session-handoff-v7.7.0.0.md` for the full Phase 7 entry context.
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
@@ -403,7 +403,7 @@ After each step completes:
 |--------|-----|
 | **Phase D steps v7.6.0.3–v7.6.0.5 marked complete** | All six steps confirmed shipped; 402/0 tests green across all four fixture sets |
 | **Phase D COMPLETE banner added to Step Index** | Phase D is closed; Phase 7 is now the active next milestone |
-| **`prompts/phaseD/phaseD-results.md` added to Related Documents** | New canonical Phase D delivery record; Phase 7 prompts must read this before authoring |
+| **`prompts/handoff/phaseD-results.md` added to Related Documents** | New canonical Phase D delivery record; Phase 7 prompts must read this before authoring |
 | **Phase D delivery summary added to Step Index** | Quick-reference for operator: bug count, test count, fixup rate, open items |
 | **Open Item OI-001 noted** | Inaccurate parallelism comment in `server.js` lines 92–95; must be fixed in first Phase 7 PR touching that file |
 | **Critical Rule 45 added** | BUG-080/081 / LESSON-OPS-111: DOM staleness after async auth flows — re-query after `await`, suppress poll rerenders during in-flight actions |
