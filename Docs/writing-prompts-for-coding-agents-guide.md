@@ -1555,7 +1555,6 @@ Re-run the script after every ESPHome upgrade. Use `--check` in CI/preflight.
 
 **Secondary fix:** Deferred task pattern for NVS-heavy handlers (still required
 even with 16 KB stack). See LESSON-OPS-100/101/102.
-```
 
 Prompt template for NVS-heavy POST handlers:
 ```cpp
@@ -1577,9 +1576,10 @@ void handle_my_endpoint_(AsyncWebServerRequest *request) const {
 }
 ```
 
+
 ### 16.3 Pre-flight checklist additions (§9)
 
-```md
+```markdown
 - `bash scripts/patch-esphome-httpd-stack.sh --check` passes
 - Every board profile has `external_components` referencing `local_components`
 - Every `curl` POST → uses `-d 'a=1'`, NOT `-d '{}'`, NOT `-d ''`
@@ -1587,6 +1587,87 @@ void handle_my_endpoint_(AsyncWebServerRequest *request) const {
 - Every new POST handler touching NVS → uses deferred task pattern with 8192+ bytes
 - No `CONFIG_HTTPD_STACK_SIZE` in any board profile under `firmware/boards/*.yaml`
 ```
+
+
+### 16.4 Dashboard async safety requirements (Critical Rule 45 / LESSON-OPS-111)
+
+```markdown
+When a dashboard handler calls `requestManagementCredentials()` (or any async
+function that yields control), `pollAggregatorLive()` may fire during the wait
+and replace `innerHTML`. DOM references captured before the `await` become stale.
+
+**Rule for prompt authors:** Any prompt that adds or modifies a dashboard handler
+containing `await requestManagementCredentials()` or any similar async auth flow
+must explicitly require:
+
+1. In-flight flag (`_<action>InFlight = true`) set before the async call and
+   cleared in the `finally` block.
+2. Poll rerender suppression while any in-flight flag is true or while a
+   management input has focus.
+3. Synchronous capture of input values BEFORE the async boundary.
+4. Re-query of stable `id` nodes AFTER the async boundary — never reuse
+   a pre-captured element reference.
+```
+
+**Checklist addition for §9:**
+```
+
+- Every dashboard handler with `await requestManagementCredentials()` →
+  in-flight flag, rerender suppression, sync value capture, post-await re-query
+- Regression tests for the async safety pattern (see PR #128 guards)
+```
+
+### 16.5 Stateful mock server patterns for Playwright tests
+
+Phase D added managed server state (`managedSatellites[]`) to the mock server.
+Tests that mutate state (add/delete satellite) require test isolation via reset
+hooks. Prompts that add stateful mock endpoints must specify:
+
+1. **State initialization** — where the state comes from (fixture file, hardcoded
+   default) and how it's populated on server start.
+2. **Reset hook** — a `beforeEach` block that calls a reset endpoint or reinitializes
+   state before every test in the group. Without this, test ordering becomes a
+   hidden dependency.
+3. **Response shape verification** — the mock response must match the firmware's
+   literal `httpd_resp_sendstr()` call, not the prompt description or audit table.
+   Include the exact JSON shape in the prompt (Critical Rule 46 / LESSON-OPS-112).
+4. **Network wait pattern** — use `page.waitForResponse(urlPredicate)` for
+   network-triggered state changes, never `waitForTimeout(N)` (LESSON-OPS-113).
+5. **Stub-before-click** — when stubbing window functions, stub BEFORE the click
+   that triggers the handler (LESSON-OPS-114).
+
+**Checklist addition for §9:**
+
+```
+- Every new stateful mock endpoint → reset hook in beforeEach
+- Mock response shape → verified against firmware httpd_resp_sendstr()
+- Network-triggered assertions → waitForResponse(predicate), not waitForTimeout
+- Window function stubs → page.evaluate() BEFORE the triggering click
+```
+
+### 16.6 NVS-specific device testing patterns
+
+Prompts that add or modify NVS persistence must specify reboot-persistence
+testing in the device testing section:
+
+1. **Write → reboot → verify** cycle: After any NVS write (add, delete, reset),
+   reboot the device and verify the state was persisted.
+2. **Namespace isolation** — NVS operations for satellite config use namespace
+   `"agg_sats"`, separate from history storage (`"sensor_hist"`). Prompt device
+   testing must verify that operations on one namespace don't corrupt the other.
+3. **Deferred persistence verification** — management handlers use the deferred
+   task pattern (xTaskCreate). The HTTP response arrives before the NVS write
+   completes. Add a short delay or a subsequent GET to verify persistence
+   completed.
+4. **Factory reset endpoint** — always test `POST /api/system/reset-satellites`
+   as the final device test step to restore compile-time defaults.
+
+**Checklist addition for §9:**
+```
+- Every NVS-writing endpoint → write + reboot + verify persistence cycle
+- Every deferred-task handler → HTTP response timing vs NVS completion noted
+```
+
 
 ---
 
