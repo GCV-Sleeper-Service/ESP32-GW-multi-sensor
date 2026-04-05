@@ -32,6 +32,8 @@ Your job as the human operator is to:
 | **Prompt Writing Guide** | `Docs/writing-prompts-for-coding-agents-guide.md` | How to create and audit prompts |
 | Architecture Forward-Looking Notes | `Docs/architecture-forward-looking-notes.md` | Post-Phase-6 architectural decisions and risks |
 | **Phase D Results and Summary** | `prompts/handoff/phaseD-results.md` | Phase D delivery record, lessons, API contracts |
+| Phase X Architecture Plan | `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` | Dashboard refactor design and step details |
+| Phase X Audit Template | `prompts/phaseX/pr-audit-question-template.md` | Stable core + level-specific PR audit questions |
 
 ---
 
@@ -246,7 +248,26 @@ All steps shipped. No prompts needed.
 - v7.6.0.4: full dashboard add/remove/test workflow via browser; verify async safety (no stale panel during poll)
 - v7.6.0.5: Playwright + Phase D closure verification (all 4 fixture sets)
 
-### Phase 7 — Per-Device Persistence Engine ⬅ NEXT
+### Phase X — Dashboard Architecture Refactor ⬅ NEXT
+
+**Phase X plan:** `Docs/phase-X-architecture-and-refactor-plan-dashboard.md`
+
+| Version | Scope | Prompt File | Status |
+|---------|-------|-------------|--------|
+| v7.6.4.0 | Documentation restructuring | `prompts/phaseX/v7.6.4.0-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.0 | Module split (21 modules) | `prompts/phaseX/v7.6.5.0-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.1 | CI + preflight wiring | `prompts/phaseX/v7.6.5.1-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.2 | Template creation | `prompts/phaseX/v7.6.5.2-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.3 | Retire manual mirror | `prompts/phaseX/v7.6.5.3-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.4 | Component directories | `prompts/phaseX/v7.6.5.4-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.5 | HTML template extraction | `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.6 | CSS extraction | `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | Pending |
+
+
+### Phase 7 — Per-Device Persistence Engine - After Phase Y (Phase Y Not Scoped Yet)
+
 
 **`main` is at v7.6.0.5. Phase 7 starts at v7.7.0.0.**
 
@@ -281,6 +302,8 @@ Before starting Phase 7, read `prompts/handoff/phaseD-results.md` for the active
 | Phase 5 | v7.5.5.x | Aggregator MVP | `Docs/phase5-implementation-plan.md` |
 | Phase 6 | v7.5.6.x | Data ingest + system metrics | `Docs/phase6-implementation-plan.md` |
 | **Phase D** | **v7.6.0.x** | **Runtime satellite management** | **`Docs/phase-d-implementation-plan.md`** |
+| **Phase X** | **v7.6.4.0** | **Documentation restructuring (pre-step)** | **`Docs/phase-X-architecture-and-refactor-plan-dashboard.md`** |
+| **Phase X** | **v7.6.5.0–v7.6.5.8** | **Dashboard architecture refactor** | **Same** |
 | **Phase 7** | **v7.7.0.x–v7.7.2.x** | **Per-device persistence engine** | **`Docs/v7.7-v7.8-persistence-architecture.md`** |
 | Phase E | v8.0.x | Captive portal + WiFi config | _Not yet planned_ |
 
@@ -394,6 +417,15 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-04-05 — Phase X Prompts Produced
+
+| Change | Why |
+|--------|-----|
+| **Phase X section added to Step Index** | 10 steps (v7.6.4.0 + v7.6.5.0–v7.6.5.8) with prompt file paths |
+| **Phase X added to Version Number ↔ Phase Mapping** | v7.6.4.0 and v7.6.5.x ranges |
+| **Phase X plan and audit template added to Related Documents** | Cross-reference |
+| **Phase 7 ⬅ NEXT moved to Phase X** | Phase X executes before Phase 7 |
 
 ### 2026-04-04 — Phase D Complete; Critical Rules 45–46 Added; Phase D Results Document Produced
 
