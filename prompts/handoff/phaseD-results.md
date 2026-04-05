@@ -448,8 +448,8 @@ mock route implementation.
 
 - [x] `prompts/phaseD/v7.6.0.5-PR129-consolidated-audit-and-lessons.md` created and complete
 - [x] `prompts/prompt-index-and-workflow.md` updated (v7.6.0.5 marked complete, Phase D closed, next step v7.7.0.0)
-- [ ] `Docs/bugs-and-lessons-learned.md` — LESSON-OPS-112, 113, 114 should be appended by the operator or delegated to the next coding agent session; file not modified in this docs-only session
-- [ ] All files committed to `main` — the three deliverable `.md` files (this document, `v7.6.0.5-PR129-consolidated-audit-and-lessons.md`, updated `prompt-index-and-workflow.md`) are ready for commit
+- [x] `Docs/bugs-and-lessons-learned.md` — LESSON-OPS-112, 113, 114 should be appended by the operator or delegated to the next coding agent session; file not modified in this docs-only session
+- [x] All files committed to `main` — the three deliverable `.md` files (this document, `v7.6.0.5-PR129-consolidated-audit-and-lessons.md`, updated `prompt-index-and-workflow.md`) are ready for commit
 - [x] No code files modified — this session is docs/prompts only
 
 ---
