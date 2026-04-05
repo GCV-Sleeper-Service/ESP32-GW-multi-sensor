@@ -23,7 +23,7 @@ During Phase 4 (v7.5.4.x) and Phase 5 (v7.5.5.x) of the ESP32-GW Multi-Sensor Ga
 
 The gap between the second and third iteration is where the most instructive lessons live. The expanded prompts *looked* comprehensive — they had required reading lists, code examples, do-not lists, review checklists, and device testing sections. But they missed things that could only be caught by reading the actual implementation code line by line and tracing the data flow end to end.
 
-Phase 6 (v7.5.6.x) added a second layer of lessons. The Phase 6 prompts were written with the Phase 4/5 lessons already incorporated, and the structural quality was good — zero scope violations, correct data flow tracing in most steps, strong CI-exact pre-conditions. The new failure mode Phase 6 exposed was **the quality of code and specifications within the instructions**: prompt-authored code blocks that contained bugs, mock specifications that omitted validation branches, and reference code patterns that carried latent defects. Section 14 documents these lessons.
+Phase 6 (v7.5.6.x) added a second layer of lessons. The Phase 6 prompts were written with the Phase 4/5 lessons already incorporated, and the structural quality was good — zero scope violations, correct data flow tracing in most steps, strong CI-exact pre-conditions. The new failure mode Phase 6 exposed was **the quality of code and specifications within the instructions**: prompt-authored code blocks that contained bugs, mock specifications that omitted validation branches, and reference code patterns that carried latent defects. See `gap-catalog.md` Gaps 14-18 for these lessons.
 
 This document captures both layers as a reusable methodology.
 

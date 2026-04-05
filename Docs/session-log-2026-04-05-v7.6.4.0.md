@@ -9,7 +9,7 @@
 
 ## Summary
 
-This session successfully split two large documentation monoliths into domain-scoped files to reduce token burden for future coding agent prompts. This is a zero-risk, documentation-only change with no code, test, or build pipeline modifications.
+This session successfully split two large documentation monoliths into domain-scoped files to reduce token burden for future coding agent prompts. This is a zero-risk, documentation-only change with no production code, test, or build pipeline modifications. The helper script `Docs/split-lessons.py` was created to automate the split.
 
 ## Changes Made
 

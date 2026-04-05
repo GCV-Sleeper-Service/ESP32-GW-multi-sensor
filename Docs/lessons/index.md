@@ -1,11 +1,12 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-04-04 — v7.6.0.4 fixup (PR #128 follow-up — R1/R2/R3 Copilot review items)._
+_Last updated: 2026-04-05 — v7.6.4.0 documentation restructuring._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
 
-Both sections are in **reverse chronological order** — most recent entry first.
+Entries within each domain file are in reverse chronological order (most recent first).
+This index is sorted by entry number.
 
 _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
 
@@ -144,6 +145,7 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-058 | operations.md |
 | LESSON-OPS-059 | firmware.md |
 | LESSON-OPS-060 | firmware.md |
+| LESSON-OPS-061 | firmware.md |
 | LESSON-OPS-062 | dashboard.md |
 | LESSON-OPS-063 | testing.md |
 | LESSON-OPS-064 | testing.md |
@@ -152,7 +154,7 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-068 | firmware.md |
 | LESSON-OPS-069 | firmware.md |
 | LESSON-OPS-070 | firmware.md |
-| LESSON-OPS-071 | firmware.md |
+| LESSON-OPS-071 | build-pipeline.md |
 | LESSON-OPS-072 | firmware.md |
 | LESSON-OPS-073 | firmware.md |
 | LESSON-OPS-074 | firmware.md |
@@ -179,3 +181,4 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-112 | testing.md |
 | LESSON-OPS-113 | testing.md |
 | LESSON-OPS-114 | testing.md |
+| LESSON-OPS-115 | build-pipeline.md |

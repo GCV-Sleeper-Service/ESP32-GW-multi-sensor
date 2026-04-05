@@ -18,14 +18,14 @@ lines = content.split('\n')
 i = 0
 while i < len(lines):
     line = lines[i]
-    match = re.match(r'^### (BUG-\d+|LESSON-OPS-\d+)[\s:—]', line)
+    match = re.match(r'^##+ (BUG-\d+|LESSON-OPS-\d+)[\s:—]', line)
     if match:
         entry_id = match.group(1)
         entry_lines = [line]
         i += 1
         while i < len(lines):
             next_line = lines[i]
-            if re.match(r'^### (BUG-\d+|LESSON-OPS-\d+)[\s:—]', next_line):
+            if re.match(r'^##+ (BUG-\d+|LESSON-OPS-\d+)[\s:—]', next_line):
                 break
             if re.match(r'^##+ (Bug Fixes|Operational Lessons|Known Open Issues)', next_line):
                 break
@@ -46,7 +46,7 @@ dashboard_required = {
 
 firmware_required = {
     'LESSON-OPS-056', 'LESSON-OPS-068', 'LESSON-OPS-069', 'LESSON-OPS-070',
-    'LESSON-OPS-071', 'LESSON-OPS-072', 'LESSON-OPS-073', 'LESSON-OPS-074',
+    'LESSON-OPS-072', 'LESSON-OPS-073', 'LESSON-OPS-074',
     'LESSON-OPS-100', 'LESSON-OPS-101', 'LESSON-OPS-102', 'LESSON-OPS-103',
     'LESSON-OPS-104', 'LESSON-OPS-105', 'LESSON-OPS-106', 'LESSON-OPS-107',
     'LESSON-OPS-108', 'LESSON-OPS-109',
@@ -181,11 +181,14 @@ _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
         domain_content += "## Lessons Learned\n\n"
         for lesson_id in lessons:
             if lesson_id in entries:
-                domain_content += entries[lesson_id] + "\n\n---\n\n"
+                domain_content += entries[lesson_id] + "\n\n---\n"
+
+    # Remove trailing separator from last entry
+    domain_content = domain_content.rstrip() + '\n'
 
     filepath = f'Docs/lessons/{domain_file}'
     with open(filepath, 'w') as f:
-        f.write(domain_content.rstrip() + '\n')
+        f.write(domain_content)
 
     print(f"✓ Created {domain_file}: {len(bugs)} bugs, {len(lessons)} lessons")
 

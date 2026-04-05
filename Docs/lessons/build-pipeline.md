@@ -346,6 +346,13 @@ grep -q "free_heap" tests/fixtures/api-status.json # sanity check
 
 Related: BUG-062, LESSON-OPS-072
 
+---
+
+
+---
+
+### LESSON-OPS-115: Aggregator fixture `live` field must be a JSON object, not a JSON string (2026-03-25)
+
 **Context:** The v7.5.5.4 prompt example showed `"live": "{...JSON string...}"` in
 `aggregator-live.json`. This is the actual wire format from the firmware (the satellite's
 cached `/api/v2/live` response is stored as a raw string in `SatelliteCache`).
@@ -361,6 +368,8 @@ both change together.
 
 **Detection:** Tests 7 and 8 (env + network live values) stay in "—"/waiting state if
 the live field is a string instead of an object.
+
+Related: BUG-071
 
 ---
 

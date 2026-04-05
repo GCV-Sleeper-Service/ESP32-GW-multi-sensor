@@ -836,6 +836,40 @@ Related: BUG-046, BUG-045
 
 ---
 
+### LESSON-OPS-061: Never change compile-time constants that dimension persisted NVS structs without a migration plan (2026-03-19)
+
+**Date:** 2026-03-19
+
+When a compile-time constant (e.g., `NUM_SENSORS`) is used to size arrays inside a
+struct that is written to NVS as a blob (e.g., `SegmentSnapshot`), changing that constant
+changes the struct's `sizeof()`. All existing blobs become a different byte length than
+the new struct layout. `nvs_get_blob()` returns `ESP_ERR_NVS_INVALID_LENGTH` — the data
+is not just schema-invalid, it is **physically unreadable** without a cross-schema deserializer.
+
+This is worse than a schema mismatch in a metadata header (which BUG-046/LESSON-OPS-060
+addressed). Metadata can be corrected in-place because the struct layout didn't change.
+Data blobs with array dimensions baked in cannot.
+
+**Rule:**
+1. Never change a compile-time constant that dimensions a persisted struct without a migration
+   plan that accounts for the blob size change.
+2. The restore loop (`restore_from_nvs()`) must detect `ESP_ERR_NVS_INVALID_LENGTH` and
+   recalibrate `meta.valid_segments` to exclude unloadable ghost slots. The recalibrated
+   meta must be persisted back to NVS so subsequent boots don't repeat futile load attempts.
+3. Preflight should assert `sizeof(SegmentSnapshot)` hasn't changed when `NUM_SENSORS` is
+   expected to remain constant. Any prompt that touches sensor count constants must include
+   an explicit "verify `sizeof(SegmentSnapshot)` is unchanged" acceptance criterion.
+4. Data in incompatible blobs is unrecoverable without a dedicated cross-schema converter.
+   Users should be advised to CSV-export before any firmware update that might change
+   persistence-related constants.
+
+Related: BUG-048, BUG-046, BUG-045, LESSON-OPS-060
+
+---
+
+
+---
+
 ### LESSON-OPS-068: Use lwip_*() prefixed functions, not BSD socket aliases, in ESPHome C++ code (2026-03-22)
 
 **Context:** ESPHome defines `namespace esphome::socket` which collides with lwIP's BSD-compatible inline wrappers (`socket()`, `connect()`, `close()` etc.). This is not visible when reading lwIP documentation because the aliases work fine in standalone ESP-IDF projects — the collision only appears inside the ESPHome build environment.
@@ -1107,11 +1141,6 @@ Codified as Critical Rule 43.
 
 ---
 
-### LESSON-OPS-102
-
-
-
----
 
 ### LESSON-OPS-104: Always use `std::string`, never Arduino `String` or bare `string`, in ESP-IDF code (2026-04-01)
 
