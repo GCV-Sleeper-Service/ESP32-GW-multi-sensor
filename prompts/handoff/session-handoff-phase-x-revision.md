@@ -2,7 +2,7 @@
 
 _Date: 2026-04-04_
 _Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
-_Continuation from: Phase X plan drafting session_
+_Continuation from: Phase X plan drafting session_ - https://claude.ai/chat/fc8e22e6-8911-4d59-a5b3-471c57b1fae8
 
 ---
 
@@ -24,7 +24,7 @@ Clone https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 Read these files before doing anything else:
 
 1. **The Phase X plan draft** — `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` (1,224 lines). This is the primary deliverable to revise.
-2. **The Phase X plan draft's revision notes** — `Docs/phase-x-revision-notes.md` — IMPORTANT: these notes need to be incorporated into the plan above and updated accordingly.
+2. **The Phase X plan draft's revision notes** — `Docs/phase-x-revision-notes.md` — IMPORTANT: these notes need to be incorporated into the plan above and the plan updated accordingly.
 3. `dashboard/dashboard.js` — verify the module boundary line ranges in the plan match the actual code.
 4. `dashboard/dashboard.html` — verify CSS section boundaries and HTML section boundaries match the plan's component mapping.
 5. `scripts/render_sensor_config.py` — verify generator coupling description (§2.5 and §3.5) is accurate. Specifically check that the `SENSOR_MANIFEST:DEFAULT_SENSOR_META` markers are at the lines stated and that the generator writes into `dashboard.js` via the `JS_PATH` variable.
