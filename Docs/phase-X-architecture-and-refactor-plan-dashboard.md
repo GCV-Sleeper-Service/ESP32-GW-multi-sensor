@@ -1,9 +1,9 @@
 # Phase X — Dashboard Architecture and Refactor Plan
 
 _Unified implementation plan — reconciles Draft A (GP) and Draft B (PR) with codebase-verified corrections._
-_Date: 2026-04-04_
+_Date: 2026-04-04 (revised 2026-04-05)_
 _Phase: Phase X — Post-Phase D dashboard architecture refactor_
-_Version range: `v7.6.5.0`–`v7.6.5.8`_
+_Version range: `v7.6.4.0`–`v7.6.5.8` (v7.6.4.0 is a documentation pre-step)_
 _Status: Planning — not yet implemented_
 _Prerequisite: Phase D Complete (v7.6.0.5 on `main`, 402/0 tests green)_
 _Repository: `GCV-Sleeper-Service/ESP32-GW-multi-sensor`_
@@ -60,6 +60,8 @@ All POST fetch calls must be moved intact. No refactoring of request constructio
 **Decision: `render_sensor_config.py` continues to write into the assembled `dashboard.js`, not into individual modules.**
 
 The generator's `DEFAULT_SENSOR_META` block (lines 196–202 in current `dashboard.js`) is only 6 lines. Moving the marker into a source module would require updating the generator's `JS_PATH` and adding a rebuild-after-generate step. Instead: the generator writes into `dashboard.js` (the assembled output) as it does today, and preflight verifies sync. This means the canonical pipeline is: modules → bundle → generator → minify → header. The generator operates on the bundle, not the sources.
+
+**Note:** The markers physically live in `02-sensor-defs.js` during editing (not `04-manifest.js` — the function names suggest manifest but the markers sit at lines 196–202 which fall in the sensor definitions section). After bundling, they land in `dashboard.js` where the generator can find them.
 
 After Level 2, the pipeline becomes: modules → bundle (writes `dashboard.js`) → generator (updates `dashboard.js` markers) → template injection (produces `dashboard.html`) → minify → header.
 
@@ -234,27 +236,27 @@ The generator also writes into `sensor_history_multi.h` (header block and entity
 ```
 dashboard/
   src/
-    00-app-shell.js           ~110 lines — App namespace, plugin shell, error logger
-    01-config-transport.js    ~120 lines — host/transport detection, config wiring
-    02-state.js               ~100 lines — App.State IIFE, shared globals
-    03-helpers.js             ~200 lines — esc*, cToF, formatBytes, dlog, pad2, formatMetricValue, METRIC_FORMATTERS
-    04-manifest.js            ~200 lines — loadSensorManifest, loadManifestV2, autoPromoteV1ToV2, applySensorMeta, makeSensorConfig, DEFAULT_SENSOR_META (with generator markers)
-    05-history.js             ~260 lines — fetchDeviceHistory, loadHistory, parseCompactHistory, fetchSensorHistoryRows, history store helpers
-    06-status-storage.js      ~160 lines — loadStatusSnapshot, applyStatusSnapshot, loadStorageStats, applyStorageStats
-    07-ui-events.js           ~130 lines — bindEvents, toggle, toggleTheme, setHistoryRange, applyHistoryRange, debug toggle
-    08-staleness-derived.js   ~230 lines — checkStaleness, updateRSSI, updateDewPoint, calcDewPoint, calcComfortEstimate, updateComfortLevel
-    09-minmax.js              ~130 lines — updateMinMax, setMinMaxPeriod
-    10-custom-range.js        ~300 lines — CustomRange IIFE (calendar modal)
-    11-cards.js               ~330 lines — CARD_RENDERERS, buildEnvironmentalCard, buildNetworkCard, buildSystemCard, buildDeviceCards, buildSensorCards (compat alias), buildExportButtons
-    12-charts.js              ~340 lines — FREEZING_LINE_PLUGIN, tempChartOpts, humChartOpts, telemetryChartOpts, initCharts, updateChartsTheme, recolorChartForTheme, setAxisColorsForTheme
-    13-transport.js           ~200 lines — connectSSE, handleState, pollEntity, pollAll, startPolling, delay
-    14-live-devices.js        ~160 lines — updateBattery, updateDeviceInfo, updateTelemetry, pushTelemetry, updateNetworkCards, updateSystemCards, pollV2Live
-    15-management.js          ~180 lines — requestManagementCredentials, postManagementAction, rebootESP, deleteHistoryData
-    16-suspend-resume.js      ~110 lines — suspendDashboardNetworkActivity, resumeDashboardNetworkActivity, isImportActive, stopPolling, stopStorageRefresh, stopStatusRefresh
-    17-import.js              ~400 lines — importHistoryData, processImportFile, parseImportCsv, detectImportColumns, buildImportSegments, executeImport, importFetchJsonWithRetry
-    18-export.js              ~160 lines — exportSensorCSV, exportAllCSV, buildSingleSensorCsv, buildMergedSensorCsv, resetHistoryVisuals, triggerCsvDownload
-    19-aggregator.js          ~500 lines — detectAggregatorMode, renderGatewaySelector, renderAllGatewaysSummary, renderGatewayDevices, _populateGatewayDeviceLive, renderSettingsPanel, _handleTestSatellite, _handleAddSatellite, _handleRemoveSatellite, _refreshSettingsPanel, initAggregatorDashboard, pollAggregatorLive
-    20-boot.js                ~80 lines — updateBoardInfo, onSensorColorPicked, updateBadge, App.Boot.start, DOMContentLoaded
+    00-app-shell.js           ~71  lines — App namespace, App.Features IIFE, logNonFatal
+    01-config-state.js        ~119 lines — FILE_FALLBACK_HOST, IS_FILE_MODE, ESP_HOST, TRANSPORT, App.Config, MAX_POINTS, HISTORY vars, SENSORS, DASHBOARD_MODE, App.State IIFE
+    02-sensor-defs.js         ~178 lines — SENSOR_COLORS, DEFAULT_SENSOR_META (generator markers), export column helpers, sensorSlug, csvEscape, METRIC_FORMATTERS, formatMetricValue, triggerCsvDownload
+    03-history-fetch.js       ~216 lines — parseHistoryMetricLines, buildNormalizedSensorRows, fetchDeviceHistory, fetchSensorHistoryRows, fetchAllSensorHistoryRowsSequentially, buildSingleSensorCsv, buildMergedSensorCsv, currentExportDateTag
+    04-manifest.js            ~151 lines — makeSensorConfig, makeNetworkSensorConfig, applySensorMeta, normalizeManifestSensors, loadSensorManifest, loadManifestV2, autoPromoteV1ToV2
+    05-status-snapshot.js     ~65  lines — TELEMETRY_IDS, POLL_SHARED, POLL_DEVICE, formatUptimeSeconds, applyStatusSnapshot, loadStatusSnapshot
+    06-ui-helpers.js          ~248 lines — esc*, cToF, pad2, formatUtcForExport, formatBytes, formatEpochLocal, getEffectiveTimeRange, filterPointsForRange, ensureHistoryStore, setHistoryRange, applyHistoryRange, isNoDataState, parseVal, dlog, toggle, toggleTheme, bindEvents
+    07-staleness-derived.js   ~121 lines — calcDewPoint, checkStaleness, updateRSSI, updateDewPoint, calcComfortEstimate, updateComfortLevel, setMinMaxPeriod
+    08-custom-range.js        ~329 lines — CustomRange IIFE (calendar modal)
+    09-export.js              ~64  lines — exportSensorCSV, exportAllCSV, resetHistoryVisuals
+    10-storage-stats.js       ~100 lines — applyStorageStats, loadStorageStats, importState vars, polling interval vars
+    11-suspend-resume.js      ~86  lines — isImportActive, stopPolling, stopStorageRefresh, stopStatusRefresh, suspendDashboardNetworkActivity, resumeDashboardNetworkActivity, isTransientImportError
+    12-management.js          ~168 lines — importFetchJsonWithRetry, requestManagementCredentials, postManagementAction, rebootESP, deleteHistoryData
+    13-import.js              ~426 lines — importHistoryData, processImportFile, parseImportCsv, estimateImportDuration, detectSensorIdFromImportFileName, detectImportColumns, buildImportSegments, safeJsonResponse, executeImport
+    14-cards.js               ~270 lines — updateBadge, onSensorColorPicked, CARD_RENDERERS, buildEnvironmentalCard, buildNetworkCard, buildSystemCard, buildDeviceCards, buildSensorCards (compat alias), buildExportButtons
+    15-minmax.js              ~52  lines — updateMinMax
+    16-charts.js              ~200 lines — FREEZING_LINE_PLUGIN, chart axis vars, recolorChartForTheme, refreshChartsAfterVisualChange, updateChartsTheme, tempChartOpts, humChartOpts, telemetryChartOpts, initCharts
+    17-live-updates.js        ~156 lines — updateBattery, updateDeviceInfo, updateTelemetry, pushTelemetry, parseCompactHistory, loadHistory
+    18-transport.js            ~276 lines — handleState, connectSSE, pollEntity, pollAll, startPolling, updateNetworkCards, _updateSystemCardDOM, updateSystemCards, updateUsageBar, pollV2Live, App module exports block
+    19-aggregator.js           ~508 lines — detectAggregatorMode, renderGatewaySelector, renderAllGatewaysSummary, renderGatewayDevices, _populateGatewayDeviceLive, renderSettingsPanel, _handleTestSatellite, _handleAddSatellite, _handleRemoveSatellite, _refreshSettingsPanel, initAggregatorDashboard, pollAggregatorLive
+    20-boot.js                ~134 lines — updateBoardInfo, App.Boot.start, DOMContentLoaded
   dashboard.js              ← GENERATED by bundle-dashboard.sh; committed; generator markers live here
   dashboard.html            ← still manually maintained at Level 1
   dashboard.h               ← committed gzip C header (unchanged)
@@ -264,9 +266,17 @@ scripts/
   generate-header.sh        ← unchanged
 ```
 
-**Module count:** 21 source files. Target: each ≤400 lines, most ≤250 lines.
+**Module count:** 21 source files. Largest: `19-aggregator.js` (~508 lines), `13-import.js` (~426 lines). Smallest: `15-minmax.js` (~52 lines), `09-export.js` (~64 lines). Most modules ≤250 lines.
 
-**Generator interaction:** `render_sensor_config.py` still writes into the assembled `dashboard.js` at the `SENSOR_MANIFEST:DEFAULT_SENSOR_META` markers. The markers live in `04-manifest.js` during editing but land in `dashboard.js` after bundling.
+**Critical: module order = file order.** Each module is a contiguous slice of the original `dashboard.js`. The concatenation order (00→20) exactly reproduces the original file. Modules cannot be reordered or have functions moved between them without breaking the identity gate. The function list for each module reflects where those functions actually sit in the current 3,955-line monolith — not where they would logically belong in an ideal architecture.
+
+**Why some groupings may seem unexpected:**
+- `buildSingleSensorCsv` and `buildMergedSensorCsv` are in `03-history-fetch.js` (not `09-export.js`) because they physically sit at lines 529–587, between `fetchSensorHistoryRows` and `currentExportDateTag`.
+- `triggerCsvDownload` is in `02-sensor-defs.js` (not `09-export.js`) because it sits at line 363, in the helpers section.
+- `requestManagementCredentials` is in `12-management.js` (after `11-suspend-resume.js`) because it physically follows the suspend/resume block in the file.
+- `updateMinMax` is a standalone module (`15-minmax.js`) because it physically sits between `buildExportButtons` (end of cards) and `FREEZING_LINE_PLUGIN` (start of charts) — it cannot be merged in either direction without breaking the identity gate at Level 1. At Level 3, it will be absorbed into the sensor-cards component.
+
+**Generator interaction:** `render_sensor_config.py` still writes into the assembled `dashboard.js` at the `SENSOR_MANIFEST:DEFAULT_SENSOR_META` markers. The markers live in `02-sensor-defs.js` during editing but land in `dashboard.js` after bundling.
 
 **Pipeline at Level 1:**
 ```
@@ -333,17 +343,16 @@ dashboard/
     device-info/
       index.js              ~130 lines — device info, GPIO, board info
       styles.css            — top-grid, device-info, gpio CSS
-      template.html         — top-grid HTML
+      template.html         — top-grid HTML (includes existing C3 board SVG)
   core/
     app-shell.js            — App namespace, plugin shell, error logger
-    config.js               — transport detection, config wiring
-    state.js                — App.State, shared globals
-    helpers.js              — pure utility functions
-    manifest.js             — manifest loading, sensor config (with generator markers)
-    history.js              — history fetch, parse, store
-    status-storage.js       — status snapshot, storage stats loading
-    staleness-derived.js    — derived values, staleness checks
-    minmax.js               — min/max tracking
+    config.js               — transport detection, config wiring, App.State
+    sensor-defs.js          — sensor definitions, generator markers, helpers, METRIC_FORMATTERS
+    history.js              — history fetch, parse, CSV builders
+    manifest.js             — manifest loading, sensor config
+    status-snapshot.js      — status/telemetry snapshot loading
+    ui-helpers.js           — esc*, format*, toggle, bindEvents, history range
+    staleness-derived.js    — derived values, staleness checks, min/max period
     suspend-resume.js       — network suspend/resume
     boot.js                 — App.Boot.start orchestrator
     base.css                — :root, theme tokens, global resets, responsive breakpoints
@@ -357,6 +366,8 @@ scripts/
   minify-dashboard.sh       ← unchanged
   generate-header.sh        ← unchanged
 ```
+
+**Future enhancement (not a Phase X deliverable):** Board-specific SVG images can be added under `components/device-info/boards/` as they are created (e.g., `esp32-c3-supermini.svg`, `esp32-s3-devkitc1.svg`, `esp32-wroom-32d.svg`). The component's `index.js` selects the correct SVG at runtime based on the board identifier from `/api/status`. During `v7.6.5.5` (HTML template extraction), the existing C3 SVG is extracted from `dashboard.tmpl.html` into `components/device-info/template.html` as part of the normal template extraction — no new SVG creation required.
 
 **Pipeline at Level 3:**
 ```
@@ -403,6 +414,57 @@ These rules apply to **every** Phase X step without exception.
 
 ## 6. Versioned Implementation Steps
 
+### `v7.6.4.0` — Documentation restructuring (pre-step)
+
+**Level:** Pre-step — Documentation only
+**Goal:** Split the 3,069-line `Docs/bugs-and-lessons-learned.md` and the 1,593-line `Docs/writing-prompts-for-coding-agents-guide.md` into domain-scoped files so that Phase X coding agent prompts reference only the relevant domain file (~3K–4K tokens instead of ~15K–23K tokens).
+
+#### Scope
+
+- Split `Docs/bugs-and-lessons-learned.md` into domain-scoped files under `Docs/lessons/`.
+- Split `Docs/writing-prompts-for-coding-agents-guide.md` into `Docs/writing-guide/` files.
+- Original files become redirect stubs.
+- Update `prompts/prompt-index-and-workflow.md` to reference new file paths.
+- **No code changes, no test changes, no build pipeline changes.**
+
+#### Documentation split targets
+
+**Bugs and lessons (`Docs/bugs-and-lessons-learned.md` → `Docs/lessons/`):**
+
+| File | Content scope | Est. lines |
+|---|---|---|
+| `Docs/lessons/index.md` | Cross-reference: which file covers which domain; how to find a lesson by number | ~100 |
+| `Docs/lessons/dashboard.md` | Dashboard-specific: LESSON-OPS-043, -050, -052, -055, -065, -099, -111; BUG-039, -054, -056, -080, -081 | ~600 |
+| `Docs/lessons/firmware.md` | Firmware/ESP-IDF/NVS: LESSON-OPS-056, -068, -069, -070, -072, -074, -100, -101, -102, -103, -104, -105, -106, -107, -108, -109; BUG-057, -061, -062, -064, -075, -076, -077, -078, -079 | ~800 |
+| `Docs/lessons/build-pipeline.md` | Build, generators, regeneration: LESSON-OPS-066, -067, -071, -077, -090, -091, -097, -098 | ~400 |
+| `Docs/lessons/testing.md` | Playwright, CI, fixtures, mocks: LESSON-OPS-057, -063, -080, -083, -112, -113, -114; BUG-051 | ~500 |
+| `Docs/lessons/operations.md` | Device testing, flashing, USB, deployment: LESSON-OPS-051, -058, -069, -073 | ~300 |
+
+**Writing guide (`Docs/writing-prompts-for-coding-agents-guide.md` → `Docs/writing-guide/`):**
+
+| File | Content | Est. lines |
+|---|---|---|
+| `Docs/writing-guide/methodology.md` | §1–3: Core prompt anatomy, required sections, how to structure a prompt | ~600 |
+| `Docs/writing-guide/gap-catalog.md` | §4: All 17 gap categories with examples — reference material | ~900 |
+| `Docs/writing-guide/checklists/dashboard.md` | Dashboard-specific prompt patterns: async safety, module-scoped prompts, POST body requirements | ~100+ |
+| `Docs/writing-guide/checklists/firmware.md` | Firmware-specific prompt patterns: deferred task pattern, NVS namespace isolation, Arduino-ism detection, `canHandle()` registration | ~100+ |
+
+#### Acceptance criteria
+
+- [ ] `Docs/lessons/` directory exists with all domain files
+- [ ] Every LESSON-OPS and BUG entry from the original file appears in exactly one domain file
+- [ ] `Docs/lessons/index.md` cross-references all entries with file locations
+- [ ] Original `Docs/bugs-and-lessons-learned.md` contains redirect notice
+- [ ] `Docs/writing-guide/` directory exists with methodology + gap catalog + checklists
+- [ ] `prompts/prompt-index-and-workflow.md` updated to reference new file paths
+- [ ] No code changes, no test changes
+
+#### Risk: **Very Low** — pure documentation; no code, no tests, no pipeline
+#### Estimated effort: 1 session
+#### Context window: ~20K tokens (read both large docs once to split)
+
+---
+
 ### `v7.6.5.0` — Module split: extract src/ modules from monolith
 
 **Level:** Level 1 — Module Split
@@ -442,24 +504,24 @@ cd "$ROOT"
 
 MODULES=(
   00-app-shell
-  01-config-transport
-  02-state
-  03-helpers
+  01-config-state
+  02-sensor-defs
+  03-history-fetch
   04-manifest
-  05-history
-  06-status-storage
-  07-ui-events
-  08-staleness-derived
-  09-minmax
-  10-custom-range
-  11-cards
-  12-charts
-  13-transport
-  14-live-devices
-  15-management
-  16-suspend-resume
-  17-import
-  18-export
+  05-status-snapshot
+  06-ui-helpers
+  07-staleness-derived
+  08-custom-range
+  09-export
+  10-storage-stats
+  11-suspend-resume
+  12-management
+  13-import
+  14-cards
+  15-minmax
+  16-charts
+  17-live-updates
+  18-transport
   19-aggregator
   20-boot
 )
@@ -741,22 +803,21 @@ This diff must exit 0 before proceeding to v7.6.5.3.
 | Source | Destination |
 |---|---|
 | `src/00-app-shell.js` | `core/app-shell.js` |
-| `src/01-config-transport.js` | `core/config.js` |
-| `src/02-state.js` | `core/state.js` |
-| `src/03-helpers.js` | `core/helpers.js` |
+| `src/01-config-state.js` | `core/config.js` |
+| `src/02-sensor-defs.js` | `core/sensor-defs.js` |
+| `src/03-history-fetch.js` | `core/history.js` |
 | `src/04-manifest.js` | `core/manifest.js` |
-| `src/05-history.js` | `core/history.js` |
-| `src/06-status-storage.js` | `core/status-storage.js` |
-| `src/07-ui-events.js` | `core/ui-events.js` |
-| `src/08-staleness-derived.js` | `core/staleness-derived.js` |
-| `src/09-minmax.js` | `core/minmax.js` |
-| `src/10-custom-range.js` | `components/custom-range/index.js` |
-| `src/11-cards.js` | `components/sensor-cards/index.js` |
-| `src/12-charts.js` | `components/charts/index.js` |
-| `src/13-transport.js` + `src/14-live-devices.js` | `components/live-view/index.js` (concatenated) |
-| `src/15-management.js` | `components/auth-modal/index.js` |
-| `src/16-suspend-resume.js` | `core/suspend-resume.js` |
-| `src/17-import.js` + `src/18-export.js` | `components/settings-panel/index.js` (concatenated) |
+| `src/05-status-snapshot.js` | `core/status-snapshot.js` |
+| `src/06-ui-helpers.js` | `core/ui-helpers.js` |
+| `src/07-staleness-derived.js` | `core/staleness-derived.js` |
+| `src/08-custom-range.js` | `components/custom-range/index.js` |
+| `src/09-export.js` + `src/10-storage-stats.js` | `components/settings-panel/index.js` (concatenated with 13-import) |
+| `src/11-suspend-resume.js` | `core/suspend-resume.js` |
+| `src/12-management.js` | `components/auth-modal/index.js` |
+| `src/13-import.js` | concatenated into `components/settings-panel/index.js` |
+| `src/14-cards.js` + `src/15-minmax.js` | `components/sensor-cards/index.js` (concatenated) |
+| `src/16-charts.js` | `components/charts/index.js` |
+| `src/17-live-updates.js` + `src/18-transport.js` | `components/live-view/index.js` (concatenated) |
 | `src/19-aggregator.js` | `components/gateway-panel/index.js` |
 | `src/20-boot.js` | `core/boot.js` |
 
@@ -913,7 +974,7 @@ Pass 2: Inject dashboard.js at {{JS_PLACEHOLDER}}.
 
 ---
 
-### `v7.6.5.8` — Phase X closure: documentation, critical rules, preflight guards
+### `v7.6.5.8` — Phase X closure: critical rules, preflight guards, results
 
 **Level:** Closure
 **Goal:** Update all documentation to reflect the new architecture. Add Phase-X-specific preflight guards. Retire superseded critical rules. Phase X complete.
@@ -921,21 +982,16 @@ Pass 2: Inject dashboard.js at {{JS_PLACEHOLDER}}.
 #### Scope
 
 - Add component/core file existence checks to `preflight.sh`.
-- Update `Docs/writing-prompts-for-coding-agents-guide.md` with Phase X patterns.
+- Update `Docs/writing-guide/checklists/dashboard.md` with Phase X patterns (module-scoped prompts, bundle pipeline).
 - Update `prompts/prompt-index-and-workflow.md`:
   - Phase X steps marked complete.
   - Critical Rule 6 marked as structurally resolved (by Level 2).
   - Critical Rule 37 updated with new pipeline steps.
   - New critical rule: "Edit source modules in `dashboard/src/` or `dashboard/components/` — never edit `dashboard.js` or `dashboard.html` directly."
-- Split `Docs/bugs-and-lessons-learned.md` into domain-scoped files (see §8).
 - Update `README.md` with dashboard architecture overview.
 - Produce Phase X results document.
 
-#### Documentation restructuring (see §8 for detail)
-
-| Current file | Split into |
-|---|---|
-| `Docs/bugs-and-lessons-learned.md` (3,069 lines) | `Docs/lessons/dashboard.md`, `Docs/lessons/firmware.md`, `Docs/lessons/build-pipeline.md`, `Docs/lessons/testing.md`, `Docs/lessons/index.md` (cross-reference) |
+**Note:** Documentation restructuring (the `Docs/lessons/` and `Docs/writing-guide/` splits) was completed in `v7.6.4.0`. This step only adds Phase-X-specific lessons to the already-split domain files.
 
 #### Critical rules impact
 
@@ -950,7 +1006,6 @@ Pass 2: Inject dashboard.js at {{JS_PLACEHOLDER}}.
 
 - [ ] All preflight component existence checks pass
 - [ ] Documentation reflects new architecture
-- [ ] `Docs/lessons/` directory exists with domain-scoped files
 - [ ] Critical rules table updated in `prompts/prompt-index-and-workflow.md`
 - [ ] All Playwright tests pass across all four fixture sets
 - [ ] Phase X results document produced
@@ -1010,33 +1065,26 @@ dashboard/core/base.css + dashboard/components/*/styles.css
 
 ## 8. Documentation Refactoring
 
+**This work is performed in `v7.6.4.0` (pre-step), not at Phase X closure.**
+
 ### Problem
 
 `Docs/bugs-and-lessons-learned.md` is 3,069 lines covering dashboard bugs, firmware bugs, build pipeline issues, testing lessons, and operational procedures. A coding agent working on a dashboard module doesn't need to read firmware lessons. A coding agent working on firmware doesn't need dashboard CSS lessons.
 
+`Docs/writing-prompts-for-coding-agents-guide.md` is 1,593 lines. The gap catalog (§4, ~900 lines) is reference material rarely needed in full during prompt authoring.
+
 ### Solution
 
-Split into domain-scoped files under `Docs/lessons/`:
-
-| File | Content | Est. lines |
-|---|---|---|
-| `Docs/lessons/index.md` | Cross-reference: which file covers which topics; critical rules summary | ~100 |
-| `Docs/lessons/dashboard.md` | Dashboard-specific bugs, LESSON-OPS-043, -050, -052, -055, -065, -099, -111 | ~600 |
-| `Docs/lessons/firmware.md` | Firmware bugs, LESSON-OPS-056, -068, -070, -072, -074, -100, -101, -102, -103, -104, -105, -106, -107 | ~800 |
-| `Docs/lessons/build-pipeline.md` | Build/generator bugs, LESSON-OPS-066, -067, -071, -077, -090, -091 | ~400 |
-| `Docs/lessons/testing.md` | Playwright/CI bugs, LESSON-OPS-057, -063, -080, -083, -112, -113, -114 | ~500 |
-| `Docs/lessons/operations.md` | Device testing, flashing, USB, deployment — LESSON-OPS-051, -058, -069, -073 | ~300 |
-
-`Docs/bugs-and-lessons-learned.md` is retained as a redirect: "This file has been split. See `Docs/lessons/index.md`."
+Split into domain-scoped files under `Docs/lessons/` and `Docs/writing-guide/` as part of `v7.6.4.0`. See §6 `v7.6.4.0` for the full file list and acceptance criteria.
 
 ### Prompt impact
 
-Future implementation prompts reference only the relevant domain file in their Required Reading section:
+After `v7.6.4.0`, every Phase X implementation prompt references only the relevant domain file:
 - Dashboard feature prompt → `Docs/lessons/dashboard.md`
 - Firmware handler prompt → `Docs/lessons/firmware.md`
 - Test infrastructure prompt → `Docs/lessons/testing.md`
 
-This immediately reduces the documentation token burden from ~15K to ~3K–4K per prompt.
+This immediately reduces the documentation token burden from ~15K–23K to ~3K–6K per prompt.
 
 ---
 
@@ -1055,12 +1103,12 @@ This immediately reduces the documentation token burden from ~15K to ~3K–4K pe
 
 | Task type | Files needed | Est. tokens |
 |---|---|---|
-| Fix export bug | `src/18-export.js` (~160 ln) + `src/03-helpers.js` | ~5K |
-| New sensor card type | `src/11-cards.js` (~330 ln) | ~5K |
-| Transport change | `src/13-transport.js` + `src/02-state.js` | ~5K |
-| Custom range bug | `src/10-custom-range.js` (~300 ln) | ~4K |
-| Charts theme fix | `src/12-charts.js` (~340 ln) | ~5K |
-| Settings panel feature | `src/19-aggregator.js` (~500 ln) | ~7K |
+| Fix export bug | `src/09-export.js` (~64 ln) + `src/02-sensor-defs.js` | ~4K |
+| New sensor card type | `src/14-cards.js` (~270 ln) | ~5K |
+| Transport change | `src/18-transport.js` + `src/01-config-state.js` | ~6K |
+| Custom range bug | `src/08-custom-range.js` (~329 ln) | ~5K |
+| Charts theme fix | `src/16-charts.js` (~200 ln) | ~4K |
+| Settings panel feature | `src/19-aggregator.js` (~508 ln) | ~8K |
 
 Mirror requirement still exists at Level 1 but is mitigated — edit module, rebundle, CI catches sync.
 
@@ -1100,6 +1148,7 @@ Same per-module sizes as Level 1. **No `dashboard.html` to read or mirror.** JS 
 
 ### Sequence
 
+0. **Documentation pre-step** (`v7.6.4.0`): Immediate token reduction for all subsequent prompts. Zero risk.
 1. **Level 1 first** (`v7.6.5.0`–`v7.6.5.1`): Immediate context reduction. Lowest risk.
 2. **Level 2 second** (`v7.6.5.2`–`v7.6.5.3`): Eliminates LESSON-OPS-043 permanently. Highest-value single change.
 3. **Level 3 third** (`v7.6.5.4`–`v7.6.5.6`): Scales to Phase 7/E. Highest effort.
@@ -1109,6 +1158,7 @@ Same per-module sizes as Level 1. **No `dashboard.html` to read or mirror.** JS 
 
 | Gate | Condition |
 |---|---|
+| Pre-step → Level 1 | v7.6.4.0 merged, no code changes, doc files verified |
 | Level 1 → Level 2 | v7.6.5.1 merged, CI green, preflight passes, bundle identity confirmed |
 | Level 2 → Level 3 | v7.6.5.3 merged, bit-for-bit gate passed, device testing confirmed, LESSON-OPS-043 marked resolved |
 | Level 3 → Test/docs | v7.6.5.6 merged, three-pass assembly stable, visual regression clean |
@@ -1147,6 +1197,7 @@ If the project needs to start Phase 7 urgently:
 | Phase | Version Range | Description |
 |---|---|---|
 | Phase D | v7.6.0.0–v7.6.0.5 | Runtime Satellite Management |
+| **Phase X** | **v7.6.4.0** | **Documentation Restructuring (pre-step)** |
 | **Phase X** | **v7.6.5.0–v7.6.5.8** | **Dashboard Architecture Refactor** |
 | Phase Y | v7.6.6.0–v7.6.6.x | Firmware Architecture Refactor (planned after Phase X) |
 | Phase 7 | v7.7.0.0–v7.7.2.x | Per-Device Persistence Engine |
@@ -1201,13 +1252,40 @@ Phase Y planning will be done after Phase X completion, using Phase X patterns a
 
 ---
 
-## 15. Reconciliation Notes
+## 15. Implementation Prompts
+
+Implementation prompts for each Phase X step are stored in `prompts/phaseX/`:
+
+```
+prompts/phaseX/v7.6.4.0-implementation-instructions-for-coding-agent.md
+prompts/phaseX/v7.6.5.0-implementation-instructions-for-coding-agent.md
+prompts/phaseX/v7.6.5.1-implementation-instructions-for-coding-agent.md
+...
+prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md
+```
+
+Each prompt follows the established anatomy from `Docs/writing-guide/methodology.md`:
+
+1. Header with version and prerequisite
+2. Required Reading with specific callouts (referencing domain-scoped docs from `v7.6.4.0`)
+3. Current status
+4. Pre-condition checks (CI-exact fixture set commands)
+5. Exact scope with file lists
+6. Do-NOT list
+7. Critical rules table
+8. Documentation updates
+9. Validation and regeneration pipeline
+10. Mandatory deliverables (session log, compliance table, validation evidence)
+
+---
+
+## 16. Reconciliation Notes
 
 This plan reconciles Draft A (GP) and Draft B (PR) as follows:
 
 | Decision | Draft A position | Draft B position | This plan |
 |---|---|---|---|
-| Step count | 6 steps (v7.6.5.0–5) | 8 steps (v7.6.5.0–7) | **9 steps** (v7.6.5.0–8): adds test split + doc restructuring |
+| Step count | 6 steps (v7.6.5.0–5) | 8 steps (v7.6.5.0–7) | **10 steps** (v7.6.4.0 + v7.6.5.0–8): doc pre-step + 9 code/closure steps |
 | `dashboard.html` committed? | Yes (reviewable) | No (gitignored) | **Yes** — committed, marked as generated, preflight-enforced |
 | CSS mapping detail | Detailed selector-family table | Minimal | **Detailed** — from Draft A, mapped to component targets |
 | Module names | `src/00-app-shell.js` etc. | `modules/util.js` etc. | **Numbered names** (`src/00-app-shell.js`) for explicit ordering; renamed at Level 3 |
