@@ -1,0 +1,271 @@
+# Writing Effective Prompts for Coding Agents — Methodology
+
+_Extracted from: Writing Effective Prompts for Coding Agents — A Practitioner's Guide_
+_Based on real prompt failures and revisions from the ESP32-GW Multi-Sensor Gateway project_
+
+---
+
+## Table of Contents
+
+1. [Why This Document Exists](#1-why-this-document-exists)
+2. [The Core Problem](#2-the-core-problem)
+3. [Anatomy of a Good Coding Agent Prompt](#3-anatomy-of-a-good-coding-agent-prompt)
+
+---
+
+## 1. Why This Document Exists
+
+During Phase 4 (v7.5.4.x) and Phase 5 (v7.5.5.x) of the ESP32-GW Multi-Sensor Gateway project, implementation prompts were written to guide AI coding agents through each development step. These prompts went through three iterations:
+
+1. **Original prompts** — high-level scope and acceptance criteria, written from the implementation plan
+2. **First expanded prompts** — added more context, code examples, and explicit file lists
+3. **Revised prompts** — fixed after a comprehensive code audit revealed critical gaps that would have caused silent failures
+
+The gap between the second and third iteration is where the most instructive lessons live. The expanded prompts *looked* comprehensive — they had required reading lists, code examples, do-not lists, review checklists, and device testing sections. But they missed things that could only be caught by reading the actual implementation code line by line and tracing the data flow end to end.
+
+Phase 6 (v7.5.6.x) added a second layer of lessons. The Phase 6 prompts were written with the Phase 4/5 lessons already incorporated, and the structural quality was good — zero scope violations, correct data flow tracing in most steps, strong CI-exact pre-conditions. The new failure mode Phase 6 exposed was **the quality of code and specifications within the instructions**: prompt-authored code blocks that contained bugs, mock specifications that omitted validation branches, and reference code patterns that carried latent defects. See `gap-catalog.md` Gaps 14-18 for these lessons.
+
+This document captures both layers as a reusable methodology.
+
+---
+
+## 2. The Core Problem
+
+A coding agent operates without institutional memory. It does not know:
+
+- What a function actually does versus what its name implies
+- Which data paths exist versus which data paths the architecture plan *says* should exist
+- What assumptions are baked into helper functions written months ago
+- Which variables are named differently from what documentation references
+- What silent coupling exists between components that the architecture treats as independent
+
+A prompt is the agent's entire understanding of the task. Every gap in the prompt is a potential silent failure — code that compiles, passes lint, maybe even passes some tests, but does the wrong thing at runtime.
+
+The goal of a good prompt is not to be long. It is to be *complete at the boundaries that matter*.
+
+There is a second dimension that is equally important and frequently overlooked: the agent is also operating without knowledge of the CI/test environment, the sequence of prior prompts, or the patterns in adjacent code that it will encounter while implementing the task. Every gap in these areas is also a potential silent failure — tests that pass locally but break in CI, or correct code that gets overwritten by pattern-matching on wrong neighboring examples.
+
+---
+
+## 3. Anatomy of a Good Coding Agent Prompt
+
+A well-structured prompt has these sections, in order:
+
+### 3.1 Repository and Setup
+Clone URL. Nothing else. Keep it short.
+
+### 3.2 Required Reading — With Specific Callouts
+Not just file names — specific functions, structs, or patterns the agent must understand before touching code. Generic "read the whole file" is insufficient for large files. Call out the exact lines or functions that matter and explain *why* they matter.
+
+**Bad:**
+```
+5. dashboard/dashboard.js — understand CARD_RENDERERS, handleState(), buildDeviceCards()
+```
+
+**Good:**
+```
+5. dashboard/dashboard.js — Read carefully and understand these specific functions:
+   - makeSensorConfig(meta, idx) — builds ThermoPro-specific entity IDs
+     (text_sensor-{id}_temperature, etc.). THIS FUNCTION IS THERMOPRO-SHAPED
+     and will produce meaningless IDs for network devices.
+   - handleState(d) — THERMOPRO-ONLY: matches against s.tempId, s.humId, etc.
+     No path exists for network device metric updates.
+   - normalizeManifestSensors() — currently filters to category === 'environmental'
+     only (line ~589). Network devices are excluded from SENSORS.
+```
+
+The difference: the first version tells the agent what to read. The second tells the agent what traps are in the code. The agent will read the function either way — but without the callout, it may not realize that `makeSensorConfig()` generates IDs that only make sense for ThermoPro devices.
+
+### 3.3 Current Status — Including What Was Verified
+Not just "previous step merged." Include what was device-tested and confirmed working. This prevents the agent from re-solving already-solved problems or making assumptions about what the previous step did.
+
+### 3.4 Pre-condition Checks
+
+Two categories of pre-conditions are required in every prompt.
+
+#### 3.4a State Validation
+Concrete commands to verify the branch is clean and the test baseline passes before any changes. This catches stale branches, failing tests, or missing infrastructure that the prompt assumes is in place.
+
+#### 3.4b CI-Exact Validation (mandatory for any step that touches tests or fixtures)
+
+The test suite is often run differently in CI than in local development. The pre-condition block **must** include the exact commands CI runs — with the same environment variables, the same `--project` flags, and the same `--grep` patterns. A bare local test run is not sufficient.
+
+If the repo has a fixture-set matrix, every matrix cell must be represented.
+
+**Bad** (allows silent CI failures):
+```bash
+npx playwright test --project=chromium
+```
+
+**Good** (matches CI exactly):
+```bash
+FIXTURE_SET=3sensor npx playwright test --project=chromium
+FIXTURE_SET=3sensor npx playwright test --project=firefox
+FIXTURE_SET=1sensor npx playwright test tests/browser/sensor-count.spec.js --project=chromium
+FIXTURE_SET=mixed npx playwright test --project=chromium --grep "18\. Mixed"
+bash scripts/preflight.sh
+```
+
+**The rule:** if running the exact CI command locally would have revealed the problem before the PR was opened, the pre-condition block must include that exact command.
+
+### 3.5 Exact Scope — With Data Flow Tracing
+This is the heart of the prompt. The scope must trace the complete data path from source to screen (or from input to output), not just describe the UI or API endpoint.
+
+For a dashboard feature, the data flow is:
+```
+Data source → Transport → State handler → DOM update → User sees value
+```
+
+Every link in that chain needs explicit guidance. If one link is missing, the feature is broken even if every other link is perfect.
+
+### 3.6 Do NOT (Explicit Scope Boundaries)
+What the agent must not touch. This prevents scope creep and protects unrelated subsystems.
+
+This section must use **named files and functions**, not just descriptions. An agent cannot argue that modifying `generate-fixtures.js` was within scope when the prompt names it explicitly as prohibited.
+
+**Bad:** "Do not implement CI changes in this step."
+
+**Good:** "Do NOT modify `tests/fixtures/generate-fixtures.js` or any fixture variant directory — that is v7.5.4.3's scope. If you notice fixture gaps, document them in a comment in the PR body but do not implement them."
+
+### 3.7 Critical Rules (Non-Negotiable Constraints)
+Project-wide invariants that apply to every step. These come from bugs and lessons learned. They are the institutional knowledge the agent doesn't have.
+
+### 3.8 Documentation Updates
+Which docs to update and what to write. Without this, documentation drifts from code.
+
+### 3.9 Review Checklist
+A verification list the agent runs before creating a PR. Each item should be a concrete, testable assertion — not a subjective judgment.
+
+### 3.10 Device Testing (for Human)
+Step-by-step verification the human performs after merge. Includes expected outputs for each command. Any deviation from expected output is a signal.
+
+### 3.11 Test Group Implementation Guardrails (required in every prompt that adds new test groups)
+
+Any prompt that instructs the agent to write new Playwright test groups **must** contain a dedicated guardrails section. This is not optional and is not satisfied by a mention elsewhere in the prompt. Without this section, the agent will pattern-match on neighboring test code and produce tests that look correct but validate the wrong thing.
+
+The section must contain four elements:
+
+**Element 1 — The exact readiness helper signature, with an explicit anti-pattern callout naming the wrong pattern and why it is wrong.**
+
+State the correct signature AND name the incorrect signature the agent is likely to reach for from nearby code, with a specific explanation of why it does not apply here.
+
+Example:
+```
+All loadDashboard() calls in this group use:
+    await loadDashboard(page, { expectedSensorCount: 3 })
+
+DO NOT use { timeout: 30000 }. That pattern appears in Group 13 for Firefox SSE
+teardown (BUG-049) and must not be copied to new groups. It does not validate that
+cards have rendered — it only prevents a Playwright timeout. Using it here would
+allow tests to proceed before cards exist, producing intermittent false passes.
+```
+
+**Element 2 — Count assertion format with the vacuous-pass warning.**
+
+Specify hardcoded integer literals AND explicitly prohibit dynamic reads, with the reason:
+
+```
+All count assertions must use hardcoded integer literals:
+    await expect(cards).toHaveCount(3)   ✅
+    await expect(cards).toHaveCount(window._manifest.sensors.length)   ❌
+
+Dynamic reads are prohibited because they pass vacuously when the manifest is
+broken. If the manifest returns 0 sensors, toHaveCount(0) passes — the test
+reports green while the feature is completely broken. Hardcoded integers fail
+loudly in exactly that scenario, which is the correct behaviour.
+
+The fixture contract for this group is: 3 total cards, 2 environmental, 1 network.
+Assert those exact integers.
+```
+
+**Element 3 — Group number derivation instruction.**
+
+Never hardcode the group number. Instruct the agent to derive it from the source file:
+
+```
+Determine the current last group number by reading dashboard.spec.js and finding
+the highest numbered test.describe() heading (format: "N. Description").
+Your new group is N+1. Do not rely on this prompt's description of how many
+groups currently exist — read the file and count.
+```
+
+**Element 4 — Pre-commit verification checklist specific to the new group.**
+
+Not the general PR checklist — a checklist the agent runs against the tests it just wrote:
+
+```
+Before committing, verify:
+[ ] All loadDashboard() calls in this group use { expectedSensorCount: N }
+    — not { timeout: T }, not bare loadDashboard(page)
+[ ] All count assertions are integer literals — zero window._manifest reads for counts
+[ ] No code was copied from Group 13 that includes timeout: 30000 or test.setTimeout(90000)
+[ ] Group number is N+1 of the actual last group in the file (verified by reading the file)
+[ ] If a new FIXTURE_SET variant was introduced: FIXTURE_SET=<variant> npx playwright test
+    (full suite, no --grep) was run and all failures have skip guards with reason strings
+```
+
+### 3.12 Mock Contract Fidelity (required in every prompt that adds mock endpoints)
+
+When a prompt asks the agent to create or extend a mock endpoint in the test server, the prompt must include a **contract-lock section**. Without this, mock endpoints default to stub-level implementations that hide the very bugs the test layer should detect.
+
+A contract-lock section has five mandatory elements:
+
+1. **Name the firmware function the mock must mirror.** The agent must read the real handler before writing the mock.
+2. **Enumerate all positive and negative validation branches.** Every `if` that returns an error in the firmware must have a corresponding branch in the mock.
+3. **Specify exact success and failure response shapes.** JSON key names, HTTP status codes, and error message format.
+4. **Require at least one test per branch.** A mock branch without a test is invisible.
+5. **Explicitly prohibit stub-level mocking.** State that "device exists → 200" is not acceptable when the firmware also validates metric keys and parameter values.
+
+**Bad:**
+```
+Add a mock ingest route that returns 200 for valid devices.
+```
+
+**Good:**
+```
+### Contract-Lock: Mock `/api/ingest` Route
+
+Read `handle_api_ingest_()` in `dashboard/sensor_history_multi.h` first.
+Mirror all validation branches:
+
+| Condition | HTTP Status | Response |
+|---|---|---|
+| Device found, metric found, val valid | 200 | `{"ok":true}` |
+| Device not found | 404 | `{"ok":false,"message":"Unknown device: {id}","status":404}` |
+| Metric not found for device | 404 | `{"ok":false,"message":"Unknown metric: {key}","status":404}` |
+| Missing or non-finite val | 400 | `{"ok":false,"message":"Missing or invalid val","status":400}` |
+
+Write one test per row. Do NOT reduce this mock to a "device exists → 200" stub.
+```
+
+**Why this matters:** Phase 6.4 showed that a stub-level mock made the test suite green while removing the contract checks the test layer was supposed to defend. Two fix commits were needed after the initial implementation because the prompt only specified happy-path and unknown-device branches.
+
+### 3.13 Prompt-Provided Code Quality Gates (required when a prompt contains code blocks)
+
+If a prompt contains copy-ready code, that code is an upstream artifact in the implementation pipeline. Agents reproduce prompt code faithfully — including bugs. The prompt author must review embedded code with the same discipline as repository code.
+
+**Minimum quality checks before prompt publication:**
+
+**JavaScript:**
+- `escHtml()` applied to every config-derived or manifest-derived string inserted into HTML
+- Null/undefined guards use explicit checks (`!== undefined && !== null`), never truthy checks on values that could legitimately be `0` or `""`
+- `isFinite()` guard on any numeric value before conversion to CSS (width, percentage, etc.)
+- No mixed guard styles within a single function body
+
+**Python:**
+- All imports at module top level (not inside functions), even in prompt-provided snippets
+- `with` context managers for network resources (`urlopen`), file handles, and subprocesses
+- Unsupported-platform stub functions return the documented safe default (`0.0`), not a non-zero placeholder
+- Docstrings match actual behavior
+
+**Shell (bash):**
+- `LC_ALL=C` before any command whose output varies by locale (`top`, `df`, `free`, `date`, `ps`)
+- Command-derived numeric values sanitized before URL interpolation (strip non-numeric characters)
+- Log messages match true behavior ("Attempted push" if failures are suppressed, not "Pushed successfully")
+- Full script in one unbroken code fence
+
+**General:**
+- When copying a pattern from existing code, audit the reference code for latent bugs first. Existing code is not automatically correct.
+- Comments and docstrings must match the actual implementation behavior, not describe an idealized version.
+
+**Why this matters:** Phase 6 showed that prompt-authored code was the primary defect source across four of five steps. The agents didn't invent bugs — they copied them from the prompt.

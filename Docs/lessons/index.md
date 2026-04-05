@@ -1,0 +1,184 @@
+# Bugs Fixed & Lessons Learned
+
+_Last updated: 2026-04-05 — v7.6.4.0 documentation restructuring._
+
+This file tracks significant bugs, root causes, fixes, and operational lessons.
+It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
+
+Entries within each domain file are in reverse chronological order (most recent first).
+This index is sorted by entry number.
+
+_Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
+
+## Entry Index
+
+This index lists every BUG and LESSON-OPS entry and its domain file location.
+
+| Entry | Domain File |
+|-------|-------------|
+| BUG-009 | dashboard.md |
+| BUG-010 | firmware.md |
+| BUG-011 | dashboard.md |
+| BUG-012 | dashboard.md |
+| BUG-013 | dashboard.md |
+| BUG-014 | dashboard.md |
+| BUG-015 | dashboard.md |
+| BUG-016 | firmware.md |
+| BUG-017 | firmware.md |
+| BUG-018 | dashboard.md |
+| BUG-019 | operations.md |
+| BUG-020 | dashboard.md |
+| BUG-021 | testing.md |
+| BUG-022 | dashboard.md |
+| BUG-023 | firmware.md |
+| BUG-024 | dashboard.md |
+| BUG-025 | dashboard.md |
+| BUG-026 | testing.md |
+| BUG-027 | testing.md |
+| BUG-028 | build-pipeline.md |
+| BUG-029 | dashboard.md |
+| BUG-030 | dashboard.md |
+| BUG-031 | testing.md |
+| BUG-032 | dashboard.md |
+| BUG-033 | dashboard.md |
+| BUG-034 | dashboard.md |
+| BUG-035 | build-pipeline.md |
+| BUG-036 | build-pipeline.md |
+| BUG-037 | dashboard.md |
+| BUG-038 | dashboard.md |
+| BUG-039 | dashboard.md |
+| BUG-040 | build-pipeline.md |
+| BUG-041 | build-pipeline.md |
+| BUG-042 | build-pipeline.md |
+| BUG-044 | firmware.md |
+| BUG-045 | dashboard.md |
+| BUG-046 | dashboard.md |
+| BUG-048 | dashboard.md |
+| BUG-049 | dashboard.md |
+| BUG-050 | testing.md |
+| BUG-051 | testing.md |
+| BUG-052 | dashboard.md |
+| BUG-053 | testing.md |
+| BUG-054 | dashboard.md |
+| BUG-055 | build-pipeline.md |
+| BUG-056 | dashboard.md |
+| BUG-057 | firmware.md |
+| BUG-058 | firmware.md |
+| BUG-059 | firmware.md |
+| BUG-060 | firmware.md |
+| BUG-061 | firmware.md |
+| BUG-062 | firmware.md |
+| BUG-063 | dashboard.md |
+| BUG-064 | firmware.md |
+| BUG-065 | dashboard.md |
+| BUG-066 | dashboard.md |
+| BUG-067 | dashboard.md |
+| BUG-068 | dashboard.md |
+| BUG-069 | dashboard.md |
+| BUG-070 | firmware.md |
+| BUG-071 | dashboard.md |
+| BUG-074 | dashboard.md |
+| BUG-075 | firmware.md |
+| BUG-076 | firmware.md |
+| BUG-077 | firmware.md |
+| BUG-078 | firmware.md |
+| BUG-079 | firmware.md |
+| BUG-080 | dashboard.md |
+| BUG-081 | dashboard.md |
+| LESSON-OPS-001 | build-pipeline.md |
+| LESSON-OPS-002 | build-pipeline.md |
+| LESSON-OPS-003 | testing.md |
+| LESSON-OPS-004 | testing.md |
+| LESSON-OPS-005 | firmware.md |
+| LESSON-OPS-006 | testing.md |
+| LESSON-OPS-007 | firmware.md |
+| LESSON-OPS-008 | firmware.md |
+| LESSON-OPS-009 | dashboard.md |
+| LESSON-OPS-010 | operations.md |
+| LESSON-OPS-011 | firmware.md |
+| LESSON-OPS-012 | firmware.md |
+| LESSON-OPS-013 | firmware.md |
+| LESSON-OPS-014 | dashboard.md |
+| LESSON-OPS-015 | firmware.md |
+| LESSON-OPS-016 | firmware.md |
+| LESSON-OPS-017 | firmware.md |
+| LESSON-OPS-018 | dashboard.md |
+| LESSON-OPS-019 | dashboard.md |
+| LESSON-OPS-020 | firmware.md |
+| LESSON-OPS-021 | testing.md |
+| LESSON-OPS-022 | dashboard.md |
+| LESSON-OPS-023 | firmware.md |
+| LESSON-OPS-024 | testing.md |
+| LESSON-OPS-025 | testing.md |
+| LESSON-OPS-026 | firmware.md |
+| LESSON-OPS-027 | firmware.md |
+| LESSON-OPS-028 | dashboard.md |
+| LESSON-OPS-029 | dashboard.md |
+| LESSON-OPS-030 | build-pipeline.md |
+| LESSON-OPS-031 | dashboard.md |
+| LESSON-OPS-032 | firmware.md |
+| LESSON-OPS-033 | dashboard.md |
+| LESSON-OPS-034 | testing.md |
+| LESSON-OPS-035 | testing.md |
+| LESSON-OPS-036 | firmware.md |
+| LESSON-OPS-037 | dashboard.md |
+| LESSON-OPS-038 | firmware.md |
+| LESSON-OPS-039 | firmware.md |
+| LESSON-OPS-040 | build-pipeline.md |
+| LESSON-OPS-041 | build-pipeline.md |
+| LESSON-OPS-042 | dashboard.md |
+| LESSON-OPS-043 | dashboard.md |
+| LESSON-OPS-044 | dashboard.md |
+| LESSON-OPS-045 | build-pipeline.md |
+| LESSON-OPS-046 | build-pipeline.md |
+| LESSON-OPS-047 | build-pipeline.md |
+| LESSON-OPS-048 | build-pipeline.md |
+| LESSON-OPS-049 | build-pipeline.md |
+| LESSON-OPS-050 | dashboard.md |
+| LESSON-OPS-051 | operations.md |
+| LESSON-OPS-052 | dashboard.md |
+| LESSON-OPS-053 | firmware.md |
+| LESSON-OPS-054 | dashboard.md |
+| LESSON-OPS-055 | dashboard.md |
+| LESSON-OPS-056 | firmware.md |
+| LESSON-OPS-057 | testing.md |
+| LESSON-OPS-058 | operations.md |
+| LESSON-OPS-059 | firmware.md |
+| LESSON-OPS-060 | firmware.md |
+| LESSON-OPS-061 | firmware.md |
+| LESSON-OPS-062 | dashboard.md |
+| LESSON-OPS-063 | testing.md |
+| LESSON-OPS-064 | testing.md |
+| LESSON-OPS-065 | dashboard.md |
+| LESSON-OPS-066 | build-pipeline.md |
+| LESSON-OPS-068 | firmware.md |
+| LESSON-OPS-069 | firmware.md |
+| LESSON-OPS-070 | firmware.md |
+| LESSON-OPS-071 | build-pipeline.md |
+| LESSON-OPS-072 | firmware.md |
+| LESSON-OPS-073 | firmware.md |
+| LESSON-OPS-074 | firmware.md |
+| LESSON-OPS-076 | firmware.md |
+| LESSON-OPS-077 | build-pipeline.md |
+| LESSON-OPS-078 | dashboard.md |
+| LESSON-OPS-079 | testing.md |
+| LESSON-OPS-085 | firmware.md |
+| LESSON-OPS-097 | build-pipeline.md |
+| LESSON-OPS-098 | build-pipeline.md |
+| LESSON-OPS-099 | dashboard.md |
+| LESSON-OPS-100 | firmware.md |
+| LESSON-OPS-101 | firmware.md |
+| LESSON-OPS-102 | firmware.md |
+| LESSON-OPS-103 | firmware.md |
+| LESSON-OPS-104 | firmware.md |
+| LESSON-OPS-105 | firmware.md |
+| LESSON-OPS-106 | firmware.md |
+| LESSON-OPS-107 | firmware.md |
+| LESSON-OPS-108 | firmware.md |
+| LESSON-OPS-109 | firmware.md |
+| LESSON-OPS-110 | firmware.md |
+| LESSON-OPS-111 | dashboard.md |
+| LESSON-OPS-112 | testing.md |
+| LESSON-OPS-113 | testing.md |
+| LESSON-OPS-114 | testing.md |
+| LESSON-OPS-115 | build-pipeline.md |

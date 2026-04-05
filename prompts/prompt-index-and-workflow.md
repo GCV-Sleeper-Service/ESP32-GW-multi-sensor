@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-04 — Phase D complete (v7.6.0.5); Critical Rules 43–44 confirmed; Phase D results and summary produced_
+_Last updated: 2026-04-05 — Phase D complete (v7.6.0.5); Phase X documentation restructuring (v7.6.4.0) complete; Related Documents updated to reference domain-scoped files_
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -28,8 +28,8 @@ Your job as the human operator is to:
 | Phase 6 Implementation Plan | `Docs/phase6-implementation-plan.md` | Step-level scope for Phase 6 |
 | Phase D Implementation Plan | `Docs/phase-d-implementation-plan.md` | Step-level scope for Phase D |
 | Phase 7 Implementation Plan | `Docs/v7.7-implementation-plan.md` | Step-level scope for Phase 7 |
-| Bugs & Lessons Learned | `Docs/bugs-and-lessons-learned.md` | Project guardrails and failure history |
-| **Prompt Writing Guide** | `Docs/writing-prompts-for-coding-agents-guide.md` | How to create and audit prompts |
+| Bugs & Lessons Learned | `Docs/lessons/index.md` | Project guardrails and failure history (split by domain at v7.6.4.0) |
+| **Prompt Writing Guide** | `Docs/writing-guide/methodology.md` | How to create and audit prompts (split into methodology + gap catalog at v7.6.4.0) |
 | Architecture Forward-Looking Notes | `Docs/architecture-forward-looking-notes.md` | Post-Phase-6 architectural decisions and risks |
 | **Phase D Results and Summary** | `prompts/handoff/phaseD-results.md` | Phase D delivery record, lessons, API contracts |
 | Phase X Architecture Plan | `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` | Dashboard refactor design and step details |
@@ -254,7 +254,7 @@ All steps shipped. No prompts needed.
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
-| v7.6.4.0 | Documentation restructuring | `prompts/phaseX/v7.6.4.0-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.4.0 | Documentation restructuring | `prompts/phaseX/v7.6.4.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-05 |
 | v7.6.5.0 | Module split (21 modules) | `prompts/phaseX/v7.6.5.0-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.1 | CI + preflight wiring | `prompts/phaseX/v7.6.5.1-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.2 | Template creation | `prompts/phaseX/v7.6.5.2-implementation-instructions-for-coding-agent.md` | Pending |
@@ -417,6 +417,15 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-04-05 — v7.6.4.0 Complete: Documentation Restructuring
+
+| Change | Why |
+|--------|-----|
+| **Bugs & Lessons Learned split into `Docs/lessons/`** | 3,069-line monolith split into 6 domain files (index, dashboard, firmware, build-pipeline, testing, operations); 69 bugs + 97 lessons distributed by domain |
+| **Writing Guide split into `Docs/writing-guide/`** | 1,674-line guide split into methodology, gap catalog, and domain-specific checklists (dashboard, firmware) |
+| **Related Documents table updated** | `bugs-and-lessons-learned.md` → `Docs/lessons/index.md`; `writing-prompts-for-coding-agents-guide.md` → `Docs/writing-guide/methodology.md` |
+| **v7.6.4.0 marked complete** | Phase X pre-step complete — documentation-only change, no code/test/pipeline changes |
 
 ### 2026-04-05 — Phase X Prompts Produced
 
