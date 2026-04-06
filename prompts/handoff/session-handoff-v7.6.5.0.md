@@ -163,11 +163,11 @@ Use stable core questions from `prompts/phaseX/pr-audit-question-template.md`  p
 
 ### 2. Session Handoff for v7.6.5.1
 
-**File:** `prompts/handoff/session-handoff-v7.6.5.1.md` is already produced,  if this or previous steps reveals something unexpected (identity gate fails, a module boundary needs adjustment), provide a patch for this and future step handoff files if necessary.  
+**File:** `prompts/handoff/session-handoff-v7.6.5.1.md` is already produced, update any stale references if the split changed anything unexpected. Provide a patch for  future step handoff files if necessary.  
 
 ### 3. Check Agent's prompt for v7.6.5.1
 
-**File:** `prompts/phaseX/v7.6.5.1-implementation-instructions-for-coding-agent.md` is already produced, provide a patch for this and future step prompts files if necessary.  
+**File:** `prompts/phaseX/v7.6.5.1-implementation-instructions-for-coding-agent.md` is already produced, update any stale references if the split changed anything unexpected.  
 
 ---
 

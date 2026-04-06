@@ -166,8 +166,9 @@ Use stable core questions from `prompts/phaseX/pr-audit-question-template.md`  p
 ### 2. Inspect Next Step Artifacts
 
 **Review and update if necessary:**
-- `prompts/handoff/session-handoff-v7.6.5.6.md` — verify the CSS partition table still matches the delivered `dashboard.tmpl.html` state. If template extraction changed which CSS selectors remain in the shell vs. which moved to components, update the handoff accordingly.
-- `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` — verify CSS selector families and their component targets still match. The CSS extraction step depends on the HTML template structure being stable — if v7.6.5.5 changed the template structure in any way the prompt didn't anticipate, update the CSS mapping.
+- `prompts/handoff/session-handoff-v7.6.5.6.md` — verify the CSS partition table still matches the delivered `dashboard.tmpl.html` state. Update if the template extraction changed which CSS selectors remain in the shell vs. components, or if the `<style>` block line numbers shifted
+	
+- `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` — verify CSS selector families and their component targets still match. The CSS extraction step depends on the HTML template structure being stable — if v7.6.5.5 changed the template structure in any way the prompt didn't anticipate, update the CSS mapping. Update if the template extraction changed which CSS selectors remain in the shell vs. components, or if the `<style>` block line numbers shifted
 
 ---
 

@@ -178,7 +178,7 @@ The Phase X plan recommends Phase Y before Phase 7 (so Phase 7's firmware change
 ### 3. Inspect Next Phase Artifacts
 
 **Review and update if necessary:**
-- If proceeding to **Phase 7**: review `prompts/phase7/v7.7.0.0-implementation-instructions-for-coding-agent.md` and `prompts/handoff/session-handoff-v7.7.0.0.md` (if they exist). Update Required Reading sections to reference the new domain-scoped docs (`Docs/lessons/firmware.md` instead of `Docs/bugs-and-lessons-learned.md`). Update any `dashboard.js` or `dashboard.html` references to use the module/component paths instead.
+- If proceeding to **Phase 7**: review `prompts/phase7/v7.7.0.0-implementation-instructions-for-coding-agent.md` and `prompts/handoff/session-handoff-v7.7.0.0.md` (if they exist). Update Required Reading sections to reference the new domain-scoped docs (`Docs/lessons/firmware.md` instead of `Docs/bugs-and-lessons-learned.md`, ). Update any `dashboard.js` or `dashboard.html` references to use the module/component paths instead. 
 - If proceeding to **Phase Y**: a planning session is needed first. Use `Docs/phase-X-context-for-phase-Y.md` as the starting point.
 
 ---

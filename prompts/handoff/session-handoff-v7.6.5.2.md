@@ -169,3 +169,8 @@ v7.6.5.3 makes the generated HTML canonical. Before proceeding, confirm:
 ---
 
 _End of session handoff document._
+al.
+
+---
+
+_End of session handoff document._

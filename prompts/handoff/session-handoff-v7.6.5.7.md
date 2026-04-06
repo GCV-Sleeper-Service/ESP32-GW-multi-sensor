@@ -154,8 +154,8 @@ Use stable core + Test/Closure supplement:
 ### 2. Inspect Next Step Artifacts
 
 **Review and update if necessary:**
-- `prompts/handoff/session-handoff-v7.6.5.8.md` — verify the closure step's scope still matches reality. If the test split revealed any issues or required unexpected changes, update the handoff.
-- `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` — verify the preflight component-existence check list matches the delivered file structure. Update any stale file paths or component names. Verify the proposed new critical rules (47–48) still make sense given the delivered architecture.
+- `prompts/handoff/session-handoff-v7.6.5.8.md` — verify the closure step's scope still matches reality. If the test split revealed any issues or required unexpected changes, update the handoff. Update if the test file structure or component names differ from what those assume (especially the preflight component-existence check list in v7.6.5.8)
+- `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` — verify the preflight component-existence check list matches the delivered file structure. Update any stale file paths or component names. Verify the proposed new critical rules (47–48) still make sense given the delivered architecture. Update if the test file structure or component names differ from what those assume (especially the preflight component-existence check list in v7.6.5.8)
 
 ---
 

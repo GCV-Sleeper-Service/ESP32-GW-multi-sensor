@@ -191,11 +191,11 @@ Level 3 adds component-level ownership (self-contained directories, CSS extracti
 
 ### 4. Session Handoff for v7.6.5.4
 
-**File:** `prompts/handoff/session-handoff-v7.6.5.4.md` is already produced,  if this or previous steps reveals something unexpected, provide a patch for this and future step handoff files if necessary.  
+**File:** `prompts/handoff/session-handoff-v7.6.5.4.md` is already produced, update if the pipeline or build script contract changed from what those assume. Provide a patch for future step handoff files if necessary.  
 
 ### 5. Check Agent's prompt for v7.6.5.4
 
-**File:** `prompts/phaseX/v7.6.5.4-implementation-instructions-for-coding-agent.md` is already produced, provide a patch for this and future step prompts files if necessary.  
+**File:** `prompts/phaseX/v7.6.5.4-implementation-instructions-for-coding-agent.md` is already produced, update if the pipeline or build script contract changed from what those assume.  
 
 ---
 

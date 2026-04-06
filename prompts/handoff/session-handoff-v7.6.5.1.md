@@ -135,11 +135,12 @@ After v7.6.5.1 merges, verify the Level 1 → Level 2 gate condition: CI green, 
 
 ### 3. Session Handoff for v7.6.5.2
 
-**File:** `prompts/handoff/session-handoff-v7.6.5.2.md` is already produced,  if this or previous steps reveals something unexpected, provide a patch for this and future step handoff files if necessary.  
+**File:** `prompts/handoff/session-handoff-v7.6.5.2.md` update if CI workflow positioning differs from what the next prompt assumes. Provide a patch for future step handoff files if necessary.  
 
 ### 4. Check Agent's prompt for v7.6.5.2
 
-**File:** `prompts/phaseX/v7.6.5.2-implementation-instructions-for-coding-agent.md` is already produced, provide a patch for this and future step prompts files if necessary.  
+**File:** `prompts/phaseX/v7.6.5.2-implementation-instructions-for-coding-agent.md` is already produced, update if CI workflow positioning differs from what the next prompt assumes.  
+
 
 ---
 

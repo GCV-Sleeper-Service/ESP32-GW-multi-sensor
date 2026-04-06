@@ -157,8 +157,8 @@ Use stable core questions from `prompts/phaseX/pr-audit-question-template.md`  p
 ### 2. Inspect Next Step Artifacts
 
 **Review and update if necessary:**
-- `prompts/handoff/session-handoff-v7.6.5.5.md` — verify assumptions still hold after this step's delivery. If the component directory structure differs from what was planned, update the handoff.
-- `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` — verify file paths, component names, and template extraction targets still match the delivered directory structure. Update any stale references.
+- `prompts/handoff/session-handoff-v7.6.5.5.md` — verify assumptions still hold after this step's delivery. update if the directory structure differs from what those assume (e.g., device-info component may or may not have an index.js depending on whether device-info JS was split from core) verify file paths, component names, and template extraction targets still match the delivered directory structure.
+- `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` — update if the directory structure differs from what those assume (e.g., device-info component may or may not have an index.js depending on whether device-info JS was split from core) verify file paths, component names, and template extraction targets still match the delivered directory structure. 
 
 ---
 

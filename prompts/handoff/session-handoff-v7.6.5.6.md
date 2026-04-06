@@ -184,8 +184,8 @@ After v7.6.5.6 merges, verify the Level 3 → Test/Closure gate:
 ### 3. Inspect Next Step Artifacts
 
 **Review and update if necessary:**
-- `prompts/handoff/session-handoff-v7.6.5.7.md` — verify test group assignments still make sense given the delivered component structure. If any component boundary changed during CSS extraction, the test grouping may need adjustment.
-- `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` — verify test file names, group numbers, and the proposed test file structure table still align with the delivered component model. Update if component names or boundaries shifted.
+- `prompts/handoff/session-handoff-v7.6.5.7.md` — verify test group assignments still make sense given the delivered component structure. If any component boundary changed during CSS extraction, the test grouping may need adjustment. Update if the component structure changed in a way that affects test group assignments.
+- `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` — verify test file names, group numbers, and the proposed test file structure table still align with the delivered component model. Update if the component structure changed in a way that affects test group assignments.
 
 ---
 
