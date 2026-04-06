@@ -2,6 +2,37 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.5.1] — 2026-04-06 — Phase X Level 1: Wire Bundle into CI and Preflight
+
+### Changes
+
+- **CI integration:** Added `Verify dashboard bundle sync` step to `.github/workflows/browser-tests.yml` before Playwright tests
+- **Preflight check:** Added `dashboard_js_bundle_sync()` function to `scripts/preflight.sh` — runs `bundle-dashboard.sh --check` and reports pass/fail
+- **Documentation updates:**
+  - Updated LESSON-OPS-091 in `Docs/lessons/build-pipeline.md` — pipeline now includes bundle step as Step 1
+  - Updated `Docs/aggregator-setup.md` Section 7.1 and fixture regeneration section — canonical pipeline now six steps
+
+### Canonical Regeneration Pipeline (updated)
+
+```bash
+bash scripts/bundle-dashboard.sh --write          # Step 1 (new)
+python3 scripts/render_sensor_config.py --write   # Step 2
+node tests/fixtures/generate-fixtures.js          # Step 3
+bash scripts/minify-dashboard.sh                  # Step 4
+bash scripts/generate-header.sh                   # Step 5
+python3 scripts/render_sensor_config.py --check   # Step 6
+```
+
+Running the bundler first avoids wiping generator markers; the generator runs once immediately after bundling.
+
+### Acceptance Criteria
+
+- [x] CI workflow includes bundle check before Playwright
+- [x] `dashboard_js_bundle_sync` preflight check passes on clean tree
+- [x] Editing a module without rebundling → preflight FAIL (verified with negative test)
+
+---
+
 ## [v7.6.5.0] — 2026-04-06 — Phase X Level 1: Split dashboard.js into 21 Source Modules
 
 ### Structural Changes

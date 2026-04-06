@@ -458,6 +458,17 @@ if [[ "$FAIL_COUNT" -gt 0 ]]; then
   exit 1
 fi
 
+dashboard_js_bundle_sync() {
+  echo "Checking dashboard.js bundle sync..."
+  if bash scripts/bundle-dashboard.sh --check; then
+    pass "dashboard.js matches source modules"
+  else
+    fail "dashboard.js is out of sync with source modules — run: bash scripts/bundle-dashboard.sh --write"
+  fi
+}
+
+dashboard_js_bundle_sync
+
 if command -v node >/dev/null 2>&1; then
   if [[ -d node_modules/@playwright/test ]]; then
     npx playwright test tests/browser/manifest.spec.js --project=chromium >/dev/null

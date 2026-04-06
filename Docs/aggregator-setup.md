@@ -110,24 +110,29 @@ Copy `config/aggregator.example.json` to `config/aggregator.json`, then configur
 **⚠️ ALWAYS run the complete pipeline before compiling firmware.** The pipeline generates all derived artifacts from the config files. Missing any step can produce stale or mismatched firmware.
 
 ```bash
-# Step 1: Generate C++ headers, YAML, and test fixtures from config
+# Step 1: Bundle dashboard source modules into dashboard.js
+bash scripts/bundle-dashboard.sh --write
+
+# Step 2: Generate C++ headers, YAML, and test fixtures from config
 python3 scripts/render_sensor_config.py --write
 
-# Step 2: Regenerate test fixture files
+# Step 3: Regenerate test fixture files
 node tests/fixtures/generate-fixtures.js
 
-# Step 3: Minify dashboard HTML (produces dashboard.min.html)
+# Step 4: Minify dashboard HTML (produces dashboard.min.html)
 bash scripts/minify-dashboard.sh
 
-# Step 4: Generate gzip-compressed dashboard header (uses .min.html if present)
+# Step 5: Generate gzip-compressed dashboard header (uses .min.html if present)
 bash scripts/generate-header.sh
 
-# Step 5: Verify all generated files are in sync
+# Step 6: Verify all generated files are in sync
 python3 scripts/render_sensor_config.py --check
 
-# Step 6: Run preflight checks
+# Step 7: Run preflight checks
 bash scripts/preflight.sh
 ```
+
+**Why `bundle-dashboard.sh` matters:** At v7.6.5.0, the dashboard JS was split into 21 source modules under `dashboard/src/`. The bundle step concatenates them into `dashboard/dashboard.js`. This must run before the generator injects version markers, otherwise the generator would wipe the markers. Running the bundler first ensures source module changes are reflected in the assembled output.
 
 **Why `minify-dashboard.sh` matters:** `generate-header.sh` auto-detects `dashboard.min.html` and uses it if present. Without the minification step, the firmware embeds the unminified HTML — larger flash footprint and slower page load. If `dashboard.min.html` already exists from a previous run but `dashboard.html` has been modified since (e.g. version bump), the stale minified copy gets embedded. Always re-run the minification step.
 
@@ -318,6 +323,7 @@ Every version bump must run the full regeneration pipeline and verify (Critical 
 
 ```bash
 bash scripts/bump-version.sh <version>
+bash scripts/bundle-dashboard.sh --write
 python3 scripts/render_sensor_config.py --write
 node tests/fixtures/generate-fixtures.js
 bash scripts/minify-dashboard.sh

@@ -48,6 +48,9 @@ jobs:
       - name: Generate fixture variants
         run: node tests/fixtures/generate-fixtures.js
 
+      - name: Verify dashboard bundle sync
+        run: bash scripts/bundle-dashboard.sh --check
+
       # Cache Playwright browser binaries between runs.
       # Key includes the Playwright version from package-lock.json — cache
       # invalidates automatically when the dependency is upgraded.
