@@ -127,32 +127,47 @@ SHA_AFTER=$(sha256sum dashboard/dashboard.js | cut -d' ' -f1)
 
 > **⚠️ This is the highest-context step (~35K tokens). The coding agent must read the full monolith once to split.**
 
+> **⚠️ IMPORTANT: Do NOT open PR immediately after reading this document — ask human if PR
+> for this session has been opened yet and if yes, ask to provide PR number to work on.**
+> **⚠️ IMPORTANT: Do NOT use this chat session to invoke the coding agent directly.**
+> **⚠️ IMPORTANT: If something is not clear when reading instructions, stop and ask for
+> clarification.**
+
 1. Read the coding agent prompt and this handoff completely
-2. Open a new coding-agent session and paste the prompt
+2. Ask human if PR for v7.6.5.1. If PR has not been open, **open a NEW coding agent session outside of this chat** and paste the prompt
 3. The agent:
    a. Records SHA-256 of current `dashboard.js`
    b. Creates `dashboard/src/` with 21 module files (contiguous slices)
    c. Creates `scripts/bundle-dashboard.sh`
    d. Runs bundle → verifies SHA-256 identity
    e. Runs full pipeline and Playwright
-4. Review the PR — verify module boundaries, identity gate, no behavior changes
+4. Review the PR — verify module boundaries, identity gate, no behavior changes, check automatically posted reviews and additional external reviews that might be posted
 5. Merge, tag `v7.6.5.0`
-6. Produce consolidated audit and session handoff for v7.6.5.1
-
+6. Produce consolidated audit and lessons file (see Post-PR Closure section below)
+7. Check and update session handoff for v7.6.5.1 if necessary (see Post-PR Closure section below)
+8. Check and update agent's prompt for v7.6.5.1 if necessary (see Post-PR Closure section below)
 ---
 
 ## Post-PR Closure Deliverables for v7.6.5.0
 
 ### 1. Consolidated Audit
 
-Use stable core questions plus Level 1 supplement:
+**File:** `prompts/phaseX/v7.6.5.0-PR<NN>-consolidated-audit-and-lessons.md`
+**Use template file:** `prompts/phaseX/pr-audit-question-template.md`
+**Format:** Same structure as `prompts/phaseX/v7.6.4.0-PR131-consolidated-audit-and-lessons.md`
+
+Use stable core questions from `prompts/phaseX/pr-audit-question-template.md`  plus Level-Specific Supplements for Level 1:
 - Did the identity gate pass (SHA-256 before = after)?
 - Were all modules contiguous file slices with no function reordering?
 - Did the agent introduce any behavioral changes?
 
 ### 2. Session Handoff for v7.6.5.1
 
-Brief — v7.6.5.1 is a small CI/preflight wiring step.
+**File:** `prompts/handoff/session-handoff-v7.6.5.1.md` is already produced,  if this or previous steps reveals something unexpected (identity gate fails, a module boundary needs adjustment), provide a patch for this and future step handoff files if necessary.  
+
+### 3. Check Agent's prompt for v7.6.5.1
+
+**File:** `prompts/phaseX/v7.6.5.1-implementation-instructions-for-coding-agent.md` is already produced, provide a patch for this and future step prompts files if necessary.  
 
 ---
 
