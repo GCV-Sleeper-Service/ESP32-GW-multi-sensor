@@ -1,7 +1,8 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-06 — Phase X Level 1 complete (v7.6.5.1 CI + preflight wiring); v7.6.5.0 module split complete; Phase X documentation restructuring (v7.6.4.0) complete; Related Documents updated to reference domain-scoped files__Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
+_Last updated: 2026-04-06 — Phase X Level 2 complete (v7.6.5.2 template creation + build-dashboard.sh); Level 1 complete (v7.6.5.1 CI + preflight wiring, v7.6.5.0 module split); Phase X documentation restructuring (v7.6.4.0) complete; Related Documents updated to reference domain-scoped files_
+reference domain-scoped files__Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
 
@@ -256,13 +257,22 @@ All steps shipped. No prompts needed.
 | v7.6.4.0 | Documentation restructuring | `prompts/phaseX/v7.6.4.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-05 |
 | v7.6.5.0 | Module split (21 modules) | `prompts/phaseX/v7.6.5.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
 | v7.6.5.1 | CI + preflight wiring | `prompts/phaseX/v7.6.5.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
-| v7.6.5.2 | Template creation | `prompts/phaseX/v7.6.5.2-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.2 | Template creation | `prompts/phaseX/v7.6.5.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
 | v7.6.5.3 | Retire manual mirror | `prompts/phaseX/v7.6.5.3-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.4 | Component directories | `prompts/phaseX/v7.6.5.4-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.5 | HTML template extraction | `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.6 | CSS extraction | `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | Pending |
+
+**v7.6.5.2 delivery summary (PR #134):**
+- `dashboard/dashboard.tmpl.html` created — copy of `dashboard.html` with `<script>…</script>` block replaced by `{{JS_PLACEHOLDER}}`
+- `scripts/build-dashboard.sh` added — Python binary exact-substitution, `--write` and `--check` modes, strict CLI validation
+- `preflight.sh` updated — `dashboard_tmpl_has_placeholder` (exactly-one check) and `dashboard_html_sync` checks added
+- `bump-version.sh` updated — redundant `sed` on `dashboard.html` removed; `build-dashboard.sh --write` added to pipeline
+- Bit-for-bit gate passed — idempotency confirmed pre- and post-version bump
+- All 224 Playwright tests pass (46 skipped, 0 failed) across all four fixture sets
+- Consolidated audit: `prompts/phaseX/v7.6.5.2-PR134-consolidated-audit-and-lessons.md`
 
 **v7.6.5.0 delivery summary (PR #132):**
 - 21 source modules extracted from 3,955-line `dashboard.js` monolith into `dashboard/src/`
@@ -359,7 +369,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 34 | Shell scripts with locale-sensitive commands must use `LC_ALL=C` | Phase 6.3 audit finding |
 | 35 | Python network/file resources must use context managers (`with`) in long-running modes | Phase 6.3 audit finding |
 | 36 | Device testing firmware commands must reference the GENERATED YAML for the target board — never use the committed C3 template (`esp32-c3-multi-sensor.yaml`) for non-C3 boards. Generated YAMLs are gitignored and only exist after `render_sensor_config.py --write`. | LESSON-OPS-090 |
-| 37 | Regeneration pipeline must include `bundle-dashboard.sh --write` as Step 1 and `minify-dashboard.sh` before `generate-header.sh`. Full canonical pipeline: `bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `generate-fixtures.js` → `minify-dashboard.sh` → `generate-header.sh` → `render_sensor_config.py --check` | LESSON-OPS-091 (updated v7.6.5.1) |
+| 37 | Regeneration pipeline must include `bundle-dashboard.sh --write` as Step 1 and `minify-dashboard.sh` before `generate-header.sh`. Full canonical pipeline: `bundle-dashboard.sh --write` → | 37 | Regeneration pipeline must include `bundle-dashboard.sh --write` as Step 1, `build-dashboard.sh --write` as Step 3, and `minify-dashboard.sh` before `generate-header.sh`. Full canonical pipeline: `bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `build-dashboard.sh --write` → `minify-dashboard.sh` → `generate-header.sh` → `render_sensor_config.py --check` | LESSON-OPS-091 (updated v7.6.5.2) |
 | 38 | All dashboard `fetch()` POST calls must use `Content-Type: application/x-www-form-urlencoded` with `body: \'a=1\'`. ESPHome does not consume JSON POST bodies. | BUG-076 / LESSON-OPS-099 |
 | 39 | All `curl` POST commands must use `-d \'a=1\'`. Never use `-H "Content-Type: application/json"`, never use `-d \'\'`, never use bare `-X POST` without a body. | BUG-076 / LESSON-OPS-099 |
 | 40 | Any HTTP handler performing NVS operations must use the deferred task pattern (`xTaskCreate`, 8192+ byte stack). Never perform NVS work synchronously in an HTTP handler. | BUG-075 / LESSON-OPS-100/101 |
@@ -425,6 +435,18 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-04-06 — v7.6.5.2 Complete: Phase X Level 2 Template Creation
+
+| Change | Why |
+|--------|-----|
+| **v7.6.5.2 marked complete** | PR #134 merged — `dashboard/dashboard.tmpl.html` created; `scripts/build-dashboard.sh` created; bit-for-bit idempotency gate passed pre- and post-bump; all 224 tests pass |
+| **`preflight.sh` updated** | `dashboard_tmpl_has_placeholder()` (exactly-one `{{JS_PLACEHOLDER}}` check) and `dashboard_html_sync()` (calls `build-dashboard.sh --check`) added in correct order before exit block |
+| **`bump-version.sh` cleaned** | Redundant `sed` that directly edited `dashboard.html` removed; `build-dashboard.sh --write` inserted after `render_sensor_config.py --write` so version propagates through the full pipeline |
+| **Critical Rule 37 wording updated** | `build-dashboard.sh --write` added as Step 3 of the canonical 6-step regeneration pipeline |
+| **v7.6.5.2 consolidated audit produced** | `prompts/phaseX/v7.6.5.2-PR134-consolidated-audit-and-lessons.md` |
+| **Level 2 gate check: ready for v7.6.5.3** | `build-dashboard.sh --check` passes; template injection exact; pipeline produces clean output; v7.6.5.3 may proceed |
+| **Document header `_Last updated_` refreshed** | Reflects current session date and v7.6.5.2 closure state |
 
 ### 2026-04-06 — v7.6.5.1 Complete: Phase X Level 1 CI + Preflight Wiring
 
