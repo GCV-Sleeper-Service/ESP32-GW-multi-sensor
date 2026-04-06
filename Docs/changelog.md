@@ -2,6 +2,45 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.5.3] — 2026-04-06 — Phase X Level 2: Generated HTML Canonical; Retire Manual Mirror
+
+### Changes
+
+- **Build script:** Modified `scripts/build-dashboard.sh` — prepends `<!-- GENERATED — Do not edit. Source: dashboard/src/*.js + dashboard.tmpl.html -->` header to every generated `dashboard.html`
+- **CI:** Added `build-dashboard.sh --check` step to `.github/workflows/browser-tests.yml` — runs after bundle sync check, before Playwright, on the `3sensor` matrix leg
+- **Bump-version:** `scripts/bump-version.sh` no longer uses `sed` to directly edit `dashboard.html`; version update flows entirely through the pipeline (`bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `build-dashboard.sh --write`)
+- **Docs:** Added LESSON-OPS-043 resolution note to `Docs/lessons/dashboard.md` — structurally resolved at v7.6.5.3
+- **Artifact:** `dashboard/dashboard.html` regenerated with `<!-- GENERATED -->` header
+
+### Canonical Regeneration Pipeline (final Level 2 form)
+
+```bash
+python3 scripts/render_sensor_config.py --write   # Step 1
+node tests/fixtures/generate-fixtures.js          # Step 2
+bash scripts/bundle-dashboard.sh --write          # Step 3
+python3 scripts/render_sensor_config.py --write   # Step 4 (re-inject markers)
+bash scripts/build-dashboard.sh --write           # Step 5 (template + JS → dashboard.html)
+bash scripts/minify-dashboard.sh                  # Step 6
+bash scripts/generate-header.sh                   # Step 7
+python3 scripts/render_sensor_config.py --check   # Step 8
+```
+
+### Acceptance Criteria
+
+- [x] `head -1 dashboard/dashboard.html` shows `<!-- GENERATED — Do not edit. Source: dashboard/src/*.js + dashboard.tmpl.html -->`
+- [x] `grep "sed.*dashboard\.html" scripts/bump-version.sh` returns nothing
+- [x] `build-dashboard.sh --check` passes on clean tree
+- [x] `preflight.sh` passes (including `dashboard_html_sync`)
+- [x] LESSON-OPS-043 marked structurally resolved in `Docs/lessons/dashboard.md`
+
+### What This Step Permanently Eliminates
+
+`dashboard.html` is now a generated artifact. The manual mirror requirement (every JS edit
+must be duplicated in `dashboard.html`) is structurally impossible — `dashboard.html` is
+always regenerated from the template and `dashboard.js`. LESSON-OPS-043 is resolved.
+
+---
+
 ## [v7.6.5.2] — 2026-04-06 — Phase X Level 2: Create dashboard.tmpl.html and build-dashboard.sh
 
 ### Changes

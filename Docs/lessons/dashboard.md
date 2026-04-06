@@ -931,6 +931,10 @@ Edit order must always be:
 
 Editing `dashboard.js` alone is not sufficient. The script block inside `dashboard.html` must also be updated, and both the minified intermediate and the embedded header must be regenerated. A preflight rule should verify that `dashboard.h` reflects the current state of `dashboard.html`.
 
+**Structurally resolved at v7.6.5.3.** `dashboard.html` is now a generated artifact
+produced by `build-dashboard.sh`. There is no manual mirror to maintain. The failure
+class described in this lesson can no longer occur.
+
 ---
 
 

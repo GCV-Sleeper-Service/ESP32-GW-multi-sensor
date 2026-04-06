@@ -52,6 +52,10 @@ jobs:
         if: matrix.fixture_set == '3sensor'
         run: bash scripts/bundle-dashboard.sh --check
 
+      - name: Verify dashboard HTML matches build
+        if: matrix.fixture_set == '3sensor'
+        run: bash scripts/build-dashboard.sh --check
+
       # Cache Playwright browser binaries between runs.
       # Key includes the Playwright version from package-lock.json — cache
       # invalidates automatically when the dependency is upgraded.
