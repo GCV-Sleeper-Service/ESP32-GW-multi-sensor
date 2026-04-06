@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-05 — Phase D complete (v7.6.0.5); Phase X documentation restructuring (v7.6.4.0) complete; Related Documents updated to reference domain-scoped files_
+_Last updated: 2026-04-06 — Phase X Level 1 complete (v7.6.5.0 module split); Phase X documentation restructuring (v7.6.4.0) complete; Related Documents updated to reference domain-scoped files_
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -255,7 +255,7 @@ All steps shipped. No prompts needed.
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
 | v7.6.4.0 | Documentation restructuring | `prompts/phaseX/v7.6.4.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-05 |
-| v7.6.5.0 | Module split (21 modules) | `prompts/phaseX/v7.6.5.0-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.0 | Module split (21 modules) | `prompts/phaseX/v7.6.5.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
 | v7.6.5.1 | CI + preflight wiring | `prompts/phaseX/v7.6.5.1-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.2 | Template creation | `prompts/phaseX/v7.6.5.2-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.3 | Retire manual mirror | `prompts/phaseX/v7.6.5.3-implementation-instructions-for-coding-agent.md` | Pending |
@@ -265,6 +265,14 @@ All steps shipped. No prompts needed.
 | v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | Pending |
 
+**v7.6.5.0 delivery summary (PR #132):**
+- 21 source modules extracted from 3,955-line `dashboard.js` monolith into `dashboard/src/`
+- `scripts/bundle-dashboard.sh` added with `--write` and `--check` modes
+- Identity gate passed: SHA-256 before split = SHA-256 after bundle
+- `dashboard.html` unchanged (Level 1 constraint)
+- All 402 Playwright tests pass across all fixture sets
+- Post-review fixes: bundler strict arg validation; HTML/header revert; preflight version sourced from HTML
+- Consolidated audit: `prompts/phaseX/v7.6.5.0-PR132-consolidated-audit-and-lessons.md`
 
 ### Phase 7 — Per-Device Persistence Engine - After Phase Y (Phase Y Not Scoped Yet)
 
@@ -417,6 +425,17 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-04-06 — v7.6.5.0 Complete: Phase X Level 1 Module Split
+
+| Change | Why |
+|--------|-----|
+| **v7.6.5.0 marked complete** | PR #132 merged — 21 source modules extracted from `dashboard.js` monolith into `dashboard/src/`; identity gate (SHA-256) confirmed; all 402 tests pass |
+| **`scripts/bundle-dashboard.sh` added** | Concatenates modules in dependency order; `--write` and `--check` modes; strict arg validation (post-review fix) |
+| **`dashboard.html` unchanged** | Level 1 constraint; HTML/header revert applied as post-review fix; preflight now reads version from frozen HTML |
+| **v7.6.5.1 prompt and handoff patched** | Bundle-first pipeline order corrected in both files to prevent generator markers being wiped |
+| **v7.6.5.0 delivery summary added to Step Index** | Quick-reference for operator |
+| **Document header `_Last updated_` refreshed** | Reflects current session date and v7.6.5.0 closure state |
 
 ### 2026-04-05 — v7.6.4.0 Complete: Documentation Restructuring
 

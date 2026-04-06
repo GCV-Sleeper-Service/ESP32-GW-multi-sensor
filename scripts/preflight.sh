@@ -6,6 +6,12 @@ cd "$ROOT"
 
 VER_RAW="$(tr -d '[:space:]' < VERSION)"
 VER_TAG="v${VER_RAW#v}"
+HTML_VER="$(grep -oP "App\.version\s*=\s*'\K[^']+" dashboard/dashboard.html | head -1 || true)"
+if [[ -z "$HTML_VER" ]]; then
+  DASH_TAG="$VER_TAG"
+else
+  DASH_TAG="v${HTML_VER#v}"
+fi
 
 pass() { echo "$1: PASS"; }
 fail() { echo "$1: FAIL"; exit 1; }
@@ -53,7 +59,7 @@ check_contains "version_file_present" VERSION "${VER_RAW}"
 check_contains "dashboard_js_version_matches" dashboard/dashboard.js "App.version = '${VER_TAG}'"
 # dashboard.h is now gzip-compressed binary data; version appears in the header comment
 # as "Dashboard version: App.version = 'vX.Y.Z.W'"
-check_contains_regex "dashboard_h_version_matches" dashboard/dashboard.h "Dashboard version:.*${VER_TAG}"
+check_contains_regex "dashboard_h_version_matches" dashboard/dashboard.h "Dashboard version:.*${DASH_TAG}"
 # BUG-043: verify dashboard.h uses gzip format (not raw string literal)
 check_contains "dashboard_h_gzip_format" dashboard/dashboard.h "DASHBOARD_HTML_GZ"
 check_not_contains "dashboard_h_no_raw_literal" dashboard/dashboard.h "R\"DASH64("

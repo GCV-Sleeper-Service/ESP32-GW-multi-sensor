@@ -2,6 +2,31 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.5.0] — 2026-04-06 — Phase X Level 1: Split dashboard.js into 21 Source Modules
+
+### Structural Changes
+
+- **Phase X Level 1 complete:** Split the 3,955-line `dashboard/dashboard.js` monolith into 21 ordered source modules under `dashboard/src/`
+- **Introduced `scripts/bundle-dashboard.sh`:** Concatenates modules in dependency order → `dashboard/dashboard.js`. Supports `--write` and `--check` modes.
+- **Identity gate confirmed:** Bundled output is byte-identical to the pre-split monolith (SHA-256 verified before and after split)
+- No functional changes to dashboard behavior; `dashboard.html` is unchanged
+- **Bundler CLI hardening:** `bundle-dashboard.sh` now rejects unknown flags with usage and non-zero exit
+- **Preflight alignment:** Header version check now validates `dashboard/dashboard.h` against the HTML-sourced `App.version`
+
+### Module list (`dashboard/src/`)
+
+`00-app-shell.js`, `01-config-state.js`, `02-sensor-defs.js`, `03-history-fetch.js`, `04-manifest.js`,
+`05-status-snapshot.js`, `06-ui-helpers.js`, `07-staleness-derived.js`, `08-custom-range.js`,
+`09-export.js`, `10-storage-stats.js`, `11-suspend-resume.js`, `12-management.js`, `13-import.js`,
+`14-cards.js`, `15-minmax.js`, `16-charts.js`, `17-live-updates.js`, `18-transport.js`,
+`19-aggregator.js`, `20-boot.js`
+
+### Documentation
+
+- Added `Docs/session-log-2026-04-06-v7.6.5.0.md`
+
+---
+
 ## [v7.6.0.5] — 2026-04-04 (PR #129) — Phase D Closure: Playwright Tests + Stateful Mock Server
 
 ### New Features
