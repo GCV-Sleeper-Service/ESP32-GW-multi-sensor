@@ -51,16 +51,15 @@ _Status: v7.6.5.0 COMPLETE. 21 source modules under `dashboard/src/`, `bundle-da
 The canonical pipeline after this step:
 
 ```
-1. python3 scripts/render_sensor_config.py --write
-2. node tests/fixtures/generate-fixtures.js
-3. bash scripts/bundle-dashboard.sh --write          ← NEW
-4. python3 scripts/render_sensor_config.py --write   ← re-inject markers after bundle
-5. bash scripts/minify-dashboard.sh
-6. bash scripts/generate-header.sh
-7. python3 scripts/render_sensor_config.py --check
+1. bash scripts/bundle-dashboard.sh --write          ← NEW, run first
+2. python3 scripts/render_sensor_config.py --write   ← inject version + markers after bundle
+3. node tests/fixtures/generate-fixtures.js
+4. bash scripts/minify-dashboard.sh
+5. bash scripts/generate-header.sh
+6. python3 scripts/render_sensor_config.py --check
 ```
 
-Step 4 re-runs the generator because `bundle-dashboard.sh` overwrites `dashboard.js`, erasing the generator's marker content.
+Running the bundler first avoids wiping generator markers; the generator runs once immediately after bundling.
 
 ### Acceptance criteria
 
