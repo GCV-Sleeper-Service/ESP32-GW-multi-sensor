@@ -10,6 +10,8 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 - **Introduced `scripts/bundle-dashboard.sh`:** Concatenates modules in dependency order → `dashboard/dashboard.js`. Supports `--write` and `--check` modes.
 - **Identity gate confirmed:** Bundled output is byte-identical to the pre-split monolith (SHA-256 verified before and after split)
 - No functional changes to dashboard behavior; `dashboard.html` is unchanged
+- **Bundler CLI hardening:** `bundle-dashboard.sh` now rejects unknown flags with usage and non-zero exit
+- **Preflight alignment:** Header version check now validates `dashboard/dashboard.h` against the HTML-sourced `App.version`
 
 ### Module list (`dashboard/src/`)
 

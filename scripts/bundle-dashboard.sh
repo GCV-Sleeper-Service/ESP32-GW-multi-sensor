@@ -39,7 +39,22 @@ for mod in "${MODULES[@]}"; do
   cat "$SRC" >> "$TMP"
 done
 
+usage() {
+  echo "Usage: $(basename "$0") [--write|--check]"
+  exit 1
+}
+
+if [[ "$#" -gt 1 ]]; then
+  usage
+fi
+
 MODE="${1:---write}"
+case "$MODE" in
+  --write|--check) ;;
+  -h|--help) usage ;;
+  *) usage ;;
+esac
+
 if [[ "$MODE" == "--check" ]]; then
   if diff -q "$TMP" "$OUT" >/dev/null 2>&1; then
     echo "OK: dashboard.js matches source modules"

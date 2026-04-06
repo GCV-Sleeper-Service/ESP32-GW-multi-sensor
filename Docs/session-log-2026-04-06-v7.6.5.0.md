@@ -10,6 +10,8 @@ _Prerequisite: v7.6.4.0 merged (documentation restructuring)_
 
 Completed Phase X Level 1: split the 3,955-line `dashboard/dashboard.js` monolith into 21 ordered source modules under `dashboard/src/`. Introduced `scripts/bundle-dashboard.sh`. Identity gate confirmed: bundled output byte-identical to pre-split monolith.
 
+Post-review fixes: reverted `dashboard/dashboard.html` + generated header to keep Level 1 HTML unchanged; tightened `bundle-dashboard.sh` to reject unknown flags.
+
 ---
 
 ## Pre-split Verification
@@ -49,6 +51,9 @@ wc -l dashboard/dashboard.js → 3955
     - `render_sensor_config.py --check` → PASS ✅
 16. **Preflight:** `bash scripts/preflight.sh` → all checks PASS ✅
 17. **Playwright tests** — all four fixture sets, all 402 tests pass ✅
+18. **Review fix:** Reverted `dashboard/dashboard.html` and regenerated `dashboard/dashboard.h` to keep HTML unchanged at Level 1.
+19. **Review fix:** Hardened `scripts/bundle-dashboard.sh` CLI parsing (unknown flags now error with usage).
+20. **Review fix:** Updated `scripts/preflight.sh` to validate `dashboard/dashboard.h` against the HTML-sourced version tag.
 
 ---
 
@@ -96,9 +101,10 @@ IDENTITY GATE PASSED
 - **Added:** `dashboard/src/00-app-shell.js` through `dashboard/src/20-boot.js` (21 files)
 - **Added:** `scripts/bundle-dashboard.sh`
 - **Modified:** `dashboard/dashboard.js` (version bump + generator re-injection)
-- **Modified:** `dashboard/dashboard.h` (regenerated)
+- **Modified:** `dashboard/dashboard.h` (regenerated; reverted to unchanged HTML content)
 - **Modified:** `dashboard/sensor_history_multi.h` (version bump)
-- **Modified:** `dashboard/dashboard.html` (version bump)
+- **Modified:** `dashboard/dashboard.html` (reverted; unchanged for Level 1)
+- **Modified:** `scripts/preflight.sh` (dashboard header version now sourced from HTML)
 - **Modified:** `tests/fixtures/manifest.json` (version bump)
 - **Modified:** `tests/fixtures/api-status.json` (version bump)
 - **Modified:** `src/gateway_manifest.h` (version bump)
@@ -117,7 +123,7 @@ IDENTITY GATE PASSED
 |---|---|
 | Do NOT reorder any functions | ✅ All modules are contiguous sed slices |
 | Do NOT add header comments/separators/blank lines | ✅ Plain cat concatenation |
-| Do NOT change `dashboard.html` behavior | ✅ Only version bump in HTML |
+| Do NOT change `dashboard.html` behavior | ✅ HTML and header reverted to pre-PR content |
 | Do NOT change test files | ✅ No test file changes |
 | Do NOT change `render_sensor_config.py` | ✅ Unchanged (only version updated by bump script) |
 | Identity gate passes | ✅ SHA-256 before = SHA-256 after bundle |
