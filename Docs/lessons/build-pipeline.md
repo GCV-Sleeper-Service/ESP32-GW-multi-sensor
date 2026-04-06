@@ -457,18 +457,20 @@ Additionally, at v7.6.5.0, the dashboard JS was split into 21 source modules und
 
 **Updated at v7.6.5.3:** `bash scripts/build-dashboard.sh --write` added as Step 5 (after re-injecting markers, before minification). `dashboard.html` is now a generated artifact produced by this step. The canonical pipeline is now eight steps:
 
-**Rule:** The canonical regeneration pipeline is eight steps in this exact order:
+**Rule:** The canonical regeneration pipeline (full manual regeneration) is eight steps in this exact order:
 
-1. `python3 scripts/render_sensor_config.py --write`
-2. `node tests/fixtures/generate-fixtures.js`
-3. `bash scripts/bundle-dashboard.sh --write`
-4. `python3 scripts/render_sensor_config.py --write`   ← re-inject markers after bundle
-5. `bash scripts/build-dashboard.sh --write`             ← template + JS → dashboard.html
-6. `bash scripts/minify-dashboard.sh`
-7. `bash scripts/generate-header.sh`
-8. `python3 scripts/render_sensor_config.py --check`
+1. `bash scripts/bundle-dashboard.sh --write`          — bundle BEFORE render to avoid wiping markers
+2. `python3 scripts/render_sensor_config.py --write`   — inject version markers
+3. `node tests/fixtures/generate-fixtures.js`          — generate fixture variants
+4. `python3 scripts/render_sensor_config.py --write`   — re-inject markers after fixture generation
+5. `bash scripts/build-dashboard.sh --write`           — template + JS → dashboard.html
+6. `bash scripts/minify-dashboard.sh`                  — minify dashboard.html
+7. `bash scripts/generate-header.sh`                   — generate dashboard.h
+8. `python3 scripts/render_sensor_config.py --check`   — verify all artifacts in sync
 
 Any prompt or documentation that references "the regeneration pipeline" must include all eight steps. Omitting the bundle step risks source module drift. Omitting `build-dashboard.sh` produces a `dashboard.html` without the `<!-- GENERATED -->` header and without current JS content. Omitting the minification step risks stale embedded dashboard content.
+
+**Note:** `scripts/bump-version.sh` runs a subset (Steps 1, 2, 5, 6, 7, 8) because it does not regenerate test fixtures.
 
 **Critical Rule 37 updated.**
 

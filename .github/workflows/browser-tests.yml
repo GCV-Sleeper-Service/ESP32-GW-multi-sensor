@@ -11,6 +11,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'scripts/preflight.sh'
+      - 'scripts/build-dashboard.sh'
+      - 'scripts/bundle-dashboard.sh'
   pull_request:
     branches: [main]
     paths:
@@ -20,6 +22,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'scripts/preflight.sh'
+      - 'scripts/build-dashboard.sh'
+      - 'scripts/bundle-dashboard.sh'
 
 jobs:
   browser-tests:

@@ -128,7 +128,7 @@ the coding agent (requires physical hardware).
 | 4 | Add `dashboard_html_matches_build` to preflight.sh | ✅ Pre-existing | `dashboard_html_sync` added in v7.6.5.2 serves same purpose |
 | 5 | Add LESSON-OPS-043 resolution note | ✅ Done | |
 | 6 | Version bump to 7.6.5.3 | ✅ Done | `bash scripts/bump-version.sh 7.6.5.3` |
-| 7 | Full pipeline: render → fixtures → bundle → render → build-html → minify → header → check | ✅ Done | Executed by bump-version.sh |
+| 7 | Full pipeline: bundle → render → build-html → minify → header → check (subset) | ✅ Done | Executed by bump-version.sh (subset: no fixture generation) |
 | 8 | Verify: `grep "sed.*dashboard\.html"` returns nothing | ✅ PASS | |
 | 9 | Verify: `head -1 dashboard/dashboard.html` shows GENERATED comment | ✅ PASS | |
 | 10 | Changelog entry | ✅ Done | |
@@ -139,7 +139,7 @@ the coding agent (requires physical hardware).
 | — | Do NOT modify dashboard/src/*.js | ✅ Compliant | |
 | — | Do NOT modify dashboard.tmpl.html | ✅ Compliant | |
 | — | Do NOT delete sed for dashboard.js | ✅ Compliant | Only dashboard.html sed removed |
-| — | Do NOT modify test files | ✅ Compliant | |
+| — | Do NOT modify test files | ⚠️ Clarified | Fixture version files in tests/fixtures/ updated by bump-version.sh; no test logic changed |
 
 ---
 
