@@ -76,6 +76,9 @@ bash scripts/bundle-dashboard.sh --write
 echo "→ Running render_sensor_config.py --write..."
 python3 scripts/render_sensor_config.py --write
 
+echo "→ Running build-dashboard.sh --write..."
+bash scripts/build-dashboard.sh --write
+
 # 2b. Re-minify dashboard.html if the minifier is available.
 #     generate-header.sh auto-selects dashboard.min.html when it exists,
 #     so a stale .min.html from a prior build would embed the OLD version.

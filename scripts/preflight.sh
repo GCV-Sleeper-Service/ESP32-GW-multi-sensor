@@ -465,6 +465,17 @@ dashboard_js_bundle_sync() {
 
 dashboard_js_bundle_sync
 
+dashboard_tmpl_has_placeholder() {
+  echo "Checking dashboard.tmpl.html has JS placeholder..."
+  if grep -q '{{JS_PLACEHOLDER}}' dashboard/dashboard.tmpl.html; then
+    pass "dashboard.tmpl.html contains {{JS_PLACEHOLDER}}"
+  else
+    fail "dashboard.tmpl.html missing {{JS_PLACEHOLDER}}"
+  fi
+}
+
+dashboard_tmpl_has_placeholder
+
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   echo "✗ Preflight failed with $FAIL_COUNT error(s)"
   exit 1
