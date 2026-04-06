@@ -288,4 +288,18 @@ v7.6.5.1 PR scope is complete after addressing review feedback. All acceptance c
 
 ---
 
+## Post-Review Residual Fix Addendum (commit after 89c019b)
+
+Three documentation/structural defects identified in automated reviews were not addressed in commit 89c019b and are fixed in this addendum commit:
+
+| # | Defect | Fix |
+|---|--------|-----|
+| R1 | `dashboard_js_bundle_sync` placed after final FAIL_COUNT exit block in `scripts/preflight.sh` | Moved to before the final exit block so structural ordering matches all other checks |
+| R2 | `bash scripts/preflight.sh` listed as Step 7 inside the six-step canonical pipeline in `Docs/aggregator-setup.md` | Moved to a separate post-pipeline verification paragraph; canonical pipeline remains six steps |
+| R3 | Marker-ordering explanation reversed in `Docs/aggregator-setup.md` and `Docs/lessons/build-pipeline.md` | Corrected to state the bundler would wipe generator markers if order were reversed |
+
+All fixes are documentation/structural only. No functional behaviour changes. Preflight passes. Negative test confirmed.
+
+---
+
 _End of session log._

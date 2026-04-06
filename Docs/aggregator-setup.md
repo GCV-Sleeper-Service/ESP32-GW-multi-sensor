@@ -127,12 +127,15 @@ bash scripts/generate-header.sh
 
 # Step 6: Verify all generated files are in sync
 python3 scripts/render_sensor_config.py --check
+```
 
-# Step 7: Run preflight checks
+After the six-step regeneration pipeline, run preflight to verify the full tree is consistent:
+
+```bash
 bash scripts/preflight.sh
 ```
 
-**Why `bundle-dashboard.sh` matters:** At v7.6.5.0, the dashboard JS was split into 21 source modules under `dashboard/src/`. The bundle step concatenates them into `dashboard/dashboard.js`. This must run before the generator injects version markers, otherwise the generator would wipe the markers. Running the bundler first ensures source module changes are reflected in the assembled output.
+**Why `bundle-dashboard.sh` matters:** At v7.6.5.0, the dashboard JS was split into 21 source modules under `dashboard/src/`. The bundle step concatenates them into `dashboard/dashboard.js`. This must run before the generator injects version markers, otherwise the bundler would overwrite `dashboard/dashboard.js` and wipe the markers the generator had just injected. Running the bundler first ensures source module changes are reflected in the assembled output.
 
 **Why `minify-dashboard.sh` matters:** `generate-header.sh` auto-detects `dashboard.min.html` and uses it if present. Without the minification step, the firmware embeds the unminified HTML — larger flash footprint and slower page load. If `dashboard.min.html` already exists from a previous run but `dashboard.html` has been modified since (e.g. version bump), the stale minified copy gets embedded. Always re-run the minification step.
 

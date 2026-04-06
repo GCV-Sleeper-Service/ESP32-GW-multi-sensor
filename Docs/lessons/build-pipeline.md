@@ -451,7 +451,7 @@ Any significant dashboard or data-path modification should re-check:
 
 **Root cause:** `generate-header.sh` auto-detects `dashboard.min.html` and uses it if present, falling back to unminified `dashboard.html` otherwise. This "silent fallback" masked the missing step — the build succeeds either way, but produces a larger firmware payload without minification. More dangerously, if a stale `dashboard.min.html` exists from a previous run, the header embeds the outdated minified copy instead of the current source.
 
-Additionally, at v7.6.5.0, the dashboard JS was split into 21 source modules under `dashboard/src/`. The bundle step must run before the generator injects version markers, otherwise the generator would wipe the markers inserted by the bundler.
+Additionally, at v7.6.5.0, the dashboard JS was split into 21 source modules under `dashboard/src/`. The bundle step must run before the generator injects version markers, otherwise the bundler would overwrite `dashboard/dashboard.js` and wipe the markers the generator had just injected.
 
 **Fix:** Added `bash scripts/bundle-dashboard.sh --write` as Step 1 and `bash scripts/minify-dashboard.sh` as Step 4 in the regeneration pipeline (after fixture generation, before header generation) in `Docs/aggregator-setup.md` Sections 7.1 and 15, and in all Phase D prompt device testing sections. Updated at v7.6.5.1 to include the bundle step.
 

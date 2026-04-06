@@ -453,11 +453,6 @@ for csv in partitions/*.csv; do
   fi
 done
 
-if [[ "$FAIL_COUNT" -gt 0 ]]; then
-  echo "✗ Preflight failed with $FAIL_COUNT error(s)"
-  exit 1
-fi
-
 dashboard_js_bundle_sync() {
   echo "Checking dashboard.js bundle sync..."
   if bash scripts/bundle-dashboard.sh --check; then
@@ -469,6 +464,11 @@ dashboard_js_bundle_sync() {
 }
 
 dashboard_js_bundle_sync
+
+if [[ "$FAIL_COUNT" -gt 0 ]]; then
+  echo "✗ Preflight failed with $FAIL_COUNT error(s)"
+  exit 1
+fi
 
 if command -v node >/dev/null 2>&1; then
   if [[ -d node_modules/@playwright/test ]]; then
