@@ -445,23 +445,26 @@ Any significant dashboard or data-path modification should re-check:
 
 ---
 
-## LESSON-OPS-091 — Regeneration pipeline must include dashboard minification before header generation (v7.6.0.0)
+## LESSON-OPS-091 — Regeneration pipeline must include dashboard bundle and minification before header generation (v7.6.0.0, updated v7.6.5.1)
 
-**Context:** The regeneration pipeline documented in prompts and `Docs/aggregator-setup.md` listed four steps: `render_sensor_config.py --write`, `generate-fixtures.js`, `generate-header.sh`, and `render_sensor_config.py --check`. The `minify-dashboard.sh` step was absent from all references.
+**Context:** The regeneration pipeline documented in prompts and `Docs/aggregator-setup.md` originally listed four steps: `render_sensor_config.py --write`, `generate-fixtures.js`, `generate-header.sh`, and `render_sensor_config.py --check`. The `minify-dashboard.sh` step and the `bundle-dashboard.sh` step were absent from all references.
 
 **Root cause:** `generate-header.sh` auto-detects `dashboard.min.html` and uses it if present, falling back to unminified `dashboard.html` otherwise. This "silent fallback" masked the missing step — the build succeeds either way, but produces a larger firmware payload without minification. More dangerously, if a stale `dashboard.min.html` exists from a previous run, the header embeds the outdated minified copy instead of the current source.
 
-**Fix:** Added `bash scripts/minify-dashboard.sh` as Step 3 in the regeneration pipeline (after fixture generation, before header generation) in `Docs/aggregator-setup.md` Sections 7.1 and 15, and in all Phase D prompt device testing sections.
+Additionally, at v7.6.5.0, the dashboard JS was split into 21 source modules under `dashboard/src/`. The bundle step must run before the generator injects version markers, otherwise the bundler would overwrite `dashboard/dashboard.js` and wipe the markers the generator had just injected.
 
-**Rule:** The canonical regeneration pipeline is five steps in this exact order:
+**Fix:** Added `bash scripts/bundle-dashboard.sh --write` as Step 1 and `bash scripts/minify-dashboard.sh` as Step 4 in the regeneration pipeline (after fixture generation, before header generation) in `Docs/aggregator-setup.md` Sections 7.1 and 15, and in all Phase D prompt device testing sections. Updated at v7.6.5.1 to include the bundle step.
 
-1. `python3 scripts/render_sensor_config.py --write`
-2. `node tests/fixtures/generate-fixtures.js`
-3. `bash scripts/minify-dashboard.sh`
-4. `bash scripts/generate-header.sh`
-5. `python3 scripts/render_sensor_config.py --check`
+**Rule:** The canonical regeneration pipeline is six steps in this exact order:
 
-Any prompt or documentation that references "the regeneration pipeline" must include all five steps. Omitting the minification step risks stale embedded dashboard content.
+1. `bash scripts/bundle-dashboard.sh --write`
+2. `python3 scripts/render_sensor_config.py --write`
+3. `node tests/fixtures/generate-fixtures.js`
+4. `bash scripts/minify-dashboard.sh`
+5. `bash scripts/generate-header.sh`
+6. `python3 scripts/render_sensor_config.py --check`
+
+Any prompt or documentation that references "the regeneration pipeline" must include all six steps. Omitting the bundle step risks source module drift. Omitting the minification step risks stale embedded dashboard content.
 
 **Critical Rule 37 added.**
 
