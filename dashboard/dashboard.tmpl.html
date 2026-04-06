@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <!--
-  dashboard.html
-  Source-editable dashboard file for the ESP32-C3 Multi-Sensor Gateway.
+  dashboard.tmpl.html
+  Editable dashboard template for the ESP32-C3 Multi-Sensor Gateway.
   Version is set in App.version inside the script block.
 
   Notes:
-    This standalone HTML is kept as the editable source version of the UI.
-    The ESP-hosted copy is gzip-compressed into dashboard.h and served by
-    sensor_history_multi.h through /dashboard, /dashboard.html, and
-    /dashboard-download. If you edit this file, regenerate the matching header
-    via scripts/generate-header.sh.
+    This file is the editable template source for the UI.
+    Generated outputs include dashboard.html and the gzip-compressed dashboard.h
+    served by sensor_history_multi.h through /dashboard, /dashboard.html, and
+    /dashboard-download. If you edit this template, regenerate the matching
+    dashboard.html and dashboard.h via build-dashboard.sh.
 -->
 <html lang="en">
 <head>
