@@ -63,9 +63,6 @@ sed -i "s/^VERSION = \"[0-9.]*\"/VERSION = \"${NEW_VER}\"/" scripts/render_senso
 echo "→ Updating tests/fixtures/generate-fixtures.js..."
 sed -i "s/const VERSION = 'v[0-9.]*'/const VERSION = 'v${NEW_VER}'/" tests/fixtures/generate-fixtures.js
 
-echo "→ Updating dashboard/dashboard.html..."
-sed -i "s/App\.version = 'v[0-9.]*'/App.version = 'v${NEW_VER}'/" dashboard/dashboard.html
-
 echo "→ Updating dashboard/src/00-app-shell.js..."
 sed -i "s/App\.version = 'v[0-9.]*'/App.version = 'v${NEW_VER}'/" dashboard/src/00-app-shell.js
 
@@ -75,6 +72,9 @@ bash scripts/bundle-dashboard.sh --write
 
 echo "→ Running render_sensor_config.py --write..."
 python3 scripts/render_sensor_config.py --write
+
+echo "→ Running build-dashboard.sh --write..."
+bash scripts/build-dashboard.sh --write
 
 # 2b. Re-minify dashboard.html if the minifier is available.
 #     generate-header.sh auto-selects dashboard.min.html when it exists,

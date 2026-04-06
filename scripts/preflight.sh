@@ -465,6 +465,32 @@ dashboard_js_bundle_sync() {
 
 dashboard_js_bundle_sync
 
+dashboard_tmpl_has_placeholder() {
+  echo "Checking dashboard.tmpl.html has exactly one JS placeholder..."
+  PLACEHOLDER_COUNT=$(grep -o '{{JS_PLACEHOLDER}}' dashboard/dashboard.tmpl.html 2>/dev/null | wc -l | tr -d '[:space:]')
+  if [[ "$PLACEHOLDER_COUNT" == "1" ]]; then
+    pass "dashboard.tmpl.html contains exactly one {{JS_PLACEHOLDER}}"
+  elif [[ "$PLACEHOLDER_COUNT" == "0" ]]; then
+    fail "dashboard.tmpl.html missing {{JS_PLACEHOLDER}}"
+  else
+    fail "dashboard.tmpl.html contains {{JS_PLACEHOLDER}} $PLACEHOLDER_COUNT times (must be exactly 1)"
+  fi
+}
+
+dashboard_tmpl_has_placeholder
+
+dashboard_html_sync() {
+  echo "Checking dashboard.html is in sync with template and JS..."
+  if bash scripts/build-dashboard.sh --check; then
+    pass "dashboard_html_sync"
+  else
+    echo "dashboard_html_sync: run bash scripts/build-dashboard.sh --write"
+    fail "dashboard_html_sync"
+  fi
+}
+
+dashboard_html_sync
+
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   echo "✗ Preflight failed with $FAIL_COUNT error(s)"
   exit 1

@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <!--
-  dashboard.html
-  Source-editable dashboard file for the ESP32-C3 Multi-Sensor Gateway.
+  dashboard.tmpl.html
+  Editable dashboard template for the ESP32-C3 Multi-Sensor Gateway.
   Version is set in App.version inside the script block.
 
   Notes:
-    This standalone HTML is kept as the editable source version of the UI.
-    The ESP-hosted copy is gzip-compressed into dashboard.h and served by
-    sensor_history_multi.h through /dashboard, /dashboard.html, and
-    /dashboard-download. If you edit this file, regenerate the matching header
-    via scripts/generate-header.sh.
+    This file is the editable template source for the UI.
+    Generated outputs include dashboard.html and the gzip-compressed dashboard.h
+    served by sensor_history_multi.h through /dashboard, /dashboard.html, and
+    /dashboard-download. If you edit this template, regenerate the matching
+    dashboard.html and dashboard.h via build-dashboard.sh.
 -->
 <html lang="en">
 <head>
@@ -975,7 +975,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.6.0.4';
+App.version = 'v7.6.5.2';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -1129,11 +1129,13 @@ var DASHBOARD_MODE = 'satellite'; // 'satellite' | 'aggregator'
 // ── Sensor definitions ──────────────────────────────────────────
 var SENSOR_COLORS = ['#fbbf24', '#f87171', '#34d399', '#60a5fa'];
 
+// <<< SENSOR_MANIFEST:DEFAULT_SENSOR_META_BEGIN >>>
 var DEFAULT_SENSOR_META = [
   { id: 'office', name: 'Office' },
   { id: 'first_floor', name: 'First Floor' },
-  { id: 'outside', name: 'Outside' }
+  { id: 'outside', name: 'Outside' },
 ];
+// <<< SENSOR_MANIFEST:DEFAULT_SENSOR_META_END >>>
 
 var GATEWAY_EXPORT_HOSTNAME_FALLBACK = 'esp32-c3-multi';
 var EXPORT_SHARED_COLUMNS = ['gateway_host', 'gateway_ip', 'timestamp', 'datetime_utc'];
@@ -1363,7 +1365,7 @@ function buildNormalizedSensorRows(tempText, humText) {
 // fetchDeviceHistory — manifest-driven history URL resolution (v7.5.2.3)
 // Derives history URLs from manifest measurements[].history_url when available.
 // Falls back to legacy /history/{id}/temp and /history/{id}/hum when manifest data is absent.
-// Returns Promise<Array<{key, raw}>> where raw is the CSV text.
+// Returns Promise<Array<{key, raw}>> where raw is the raw CSV text.
 function fetchDeviceHistory(sensor, manifest) {
   var historyMeasurements = [];
 
@@ -1620,7 +1622,7 @@ function loadSensorManifest() {
           dlog('Manifest unavailable, using built-in (' + DEFAULT_SENSOR_META.length + ' sensors): api=' + apiErr.message + '; legacy=' + legacyErr.message, 'err');
         });
     });
-}
+};
 
 // ── v7.5.2.0: manifest v2 loader with three-tier fallback ──────────────────
 async function loadManifestV2() {
@@ -1675,14 +1677,6 @@ function autoPromoteV1ToV2(sensorsArray) {
   };
 }
 
-// Device info + telemetry mapping
-var DEVICE_INFO_MAP = {
-  'text_sensor-chip': {el:'di-chip'}, 'text_sensor-features': {el:'di-features'},
-  'text_sensor-cores': {el:'di-cores'}, 'text_sensor-revision': {el:'di-revision'},
-  'text_sensor-cpu_frequency': {el:'di-cpu'}, 'text_sensor-framework': {el:'di-framework'},
-  'text_sensor-esphome_version': {el:'di-esphome'}, 'text_sensor-ip_address': {el:'di-ip'},
-  'text_sensor-mac_address': {el:'di-mac'}, 'text_sensor-reset_reason': {el:'di-reset'}
-};
 var TELEMETRY_IDS = { heap:'sensor-free_heap', uptime:'sensor-uptime', wifi:'sensor-wifi_signal' };
 
 var POLL_SHARED = ['/text_sensor/Current%20Time', '/sensor/WiFi%20Signal'];
@@ -4895,6 +4889,7 @@ document.addEventListener('DOMContentLoaded', function() {
   try { App.Features.emit('onBoot'); } catch(e) { logNonFatal('boot hook emit', e); }
   App.Boot.start();
 });
+
 </script>
 </body>
 </html>

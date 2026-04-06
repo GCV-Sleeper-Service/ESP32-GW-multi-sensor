@@ -2,7 +2,36 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
-## [v7.6.5.1] — TBD — Phase X Level 1: Wire Bundle into CI and Preflight
+## [v7.6.5.2] — 2026-04-06 — Phase X Level 2: Create dashboard.tmpl.html and build-dashboard.sh
+
+### Changes
+
+- **Template:** Created `dashboard/dashboard.tmpl.html` — copy of `dashboard.html` with the entire `<script>...</script>` block replaced by `<script>\n{{JS_PLACEHOLDER}}\n</script>`
+- **Build script:** Created `scripts/build-dashboard.sh` — Python-based exact text substitution; injects `dashboard.js` into the template to produce `dashboard.html`; supports `--write` and `--check` modes
+- **Preflight check:** Added `dashboard_tmpl_has_placeholder()` function to `scripts/preflight.sh` — verifies `dashboard/dashboard.tmpl.html` contains `{{JS_PLACEHOLDER}}`
+- **Bump-version pipeline:** Updated `scripts/bump-version.sh` to run `build-dashboard.sh --write` after `render_sensor_config.py --write`, completing the Level 2 pipeline
+- **Bit-for-bit gate:** Proved idempotency — running `bundle → render → build` twice in succession produces byte-for-byte identical output (`diff` exits 0)
+
+### Canonical Regeneration Pipeline (updated — Level 2 form)
+
+```bash
+bash scripts/bundle-dashboard.sh --write          # Step 1
+python3 scripts/render_sensor_config.py --write   # Step 2
+bash scripts/build-dashboard.sh --write           # Step 3 (new)
+bash scripts/minify-dashboard.sh                  # Step 4
+bash scripts/generate-header.sh                   # Step 5
+python3 scripts/render_sensor_config.py --check   # Step 6
+```
+
+### Acceptance Criteria
+
+- [x] `dashboard.tmpl.html` exists with exactly one `{{JS_PLACEHOLDER}}`
+- [x] `build-dashboard.sh` produces byte-for-byte identical output (idempotency gate passes)
+- [x] `build-dashboard.sh --check` passes
+- [x] All 224 tests pass across all four fixture sets (224 passed, 46 skipped, 0 failed)
+- [x] Preflight passes (including new `dashboard_tmpl_has_placeholder` check)
+
+
 
 ### Changes
 
