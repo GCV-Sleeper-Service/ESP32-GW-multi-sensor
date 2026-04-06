@@ -461,9 +461,10 @@ fi
 dashboard_js_bundle_sync() {
   echo "Checking dashboard.js bundle sync..."
   if bash scripts/bundle-dashboard.sh --check; then
-    pass "dashboard.js matches source modules"
+    pass "dashboard_js_bundle_sync"
   else
-    fail "dashboard.js is out of sync with source modules — run: bash scripts/bundle-dashboard.sh --write"
+    echo "dashboard_js_bundle_sync: run bash scripts/bundle-dashboard.sh --write"
+    fail "dashboard_js_bundle_sync"
   fi
 }
 

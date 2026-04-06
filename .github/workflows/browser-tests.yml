@@ -49,6 +49,7 @@ jobs:
         run: node tests/fixtures/generate-fixtures.js
 
       - name: Verify dashboard bundle sync
+        if: matrix.fixture_set == '3sensor'
         run: bash scripts/bundle-dashboard.sh --check
 
       # Cache Playwright browser binaries between runs.

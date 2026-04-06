@@ -2,12 +2,13 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
-## [v7.6.5.1] — 2026-04-06 — Phase X Level 1: Wire Bundle into CI and Preflight
+## [v7.6.5.1] — TBD — Phase X Level 1: Wire Bundle into CI and Preflight
 
 ### Changes
 
-- **CI integration:** Added `Verify dashboard bundle sync` step to `.github/workflows/browser-tests.yml` before Playwright tests
-- **Preflight check:** Added `dashboard_js_bundle_sync()` function to `scripts/preflight.sh` — runs `bundle-dashboard.sh --check` and reports pass/fail
+- **CI integration:** Added `Verify dashboard bundle sync` step to `.github/workflows/browser-tests.yml` before Playwright tests (runs only once in 3sensor matrix job to avoid redundancy)
+- **Preflight check:** Added `dashboard_js_bundle_sync()` function to `scripts/preflight.sh` — runs `bundle-dashboard.sh --check` and reports pass/fail with stable check ID
+- **Version bump workflow fix:** Updated `scripts/bump-version.sh` to update source module version (`dashboard/src/00-app-shell.js`) and run bundler before generator to maintain bundle sync
 - **Documentation updates:**
   - Updated LESSON-OPS-091 in `Docs/lessons/build-pipeline.md` — pipeline now includes bundle step as Step 1
   - Updated `Docs/aggregator-setup.md` Section 7.1 and fixture regeneration section — canonical pipeline now six steps
