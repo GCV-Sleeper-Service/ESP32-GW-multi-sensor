@@ -1,0 +1,60 @@
+    .auth-modal.hidden { display:none; }
+    .auth-modal {
+      position:fixed; inset:0; z-index:1000;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(3,7,18,.72);
+      padding:18px;
+    }
+    .auth-dialog {
+      width:min(440px,100%);
+      background:var(--bg-card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      box-shadow:0 18px 48px rgba(0,0,0,.42);
+      padding:18px;
+    }
+    .auth-dialog h3 {
+      margin:0 0 8px 0; font-size:.95rem; color:var(--text-main);
+    }
+    .auth-dialog p {
+      margin:0 0 14px 0; color:var(--text-muted); font-size:.72rem; line-height:1.55;
+    }
+    .auth-field { margin-bottom:12px; }
+    .auth-field label {
+      display:block; margin-bottom:6px; font-size:.72rem; color:var(--text-main);
+    }
+    .auth-note {
+      display:block; margin-top:5px; font-size:.62rem; color:var(--text-muted);
+    }
+    .auth-input-wrap {
+      display:flex; align-items:center; gap:8px;
+      border:1px solid var(--border); border-radius:10px;
+      background:rgba(15,23,42,.42); padding:0 10px;
+    }
+    .auth-input {
+      width:100%; border:none; outline:none; background:transparent;
+      color:var(--text-main); font-family:'JetBrains Mono',monospace;
+      font-size:.78rem; padding:10px 0;
+    }
+    .auth-toggle {
+      border:none; background:none; cursor:pointer; padding:0;
+      color:var(--text-muted); font-size:1rem; line-height:1;
+      min-width:24px;
+    }
+    .auth-toggle:hover { color:var(--accent-blue); }
+    .auth-error {
+      min-height:1.1em; margin:4px 0 10px 0; color:#f87171; font-size:.68rem;
+    }
+    .auth-actions {
+      display:flex; justify-content:flex-end; gap:10px; margin-top:6px;
+    }
+    .auth-btn {
+      font-family:'JetBrains Mono',monospace; font-size:.72rem; cursor:pointer;
+      border-radius:8px; padding:8px 12px; border:1px solid var(--border);
+      background:rgba(30,41,59,.55); color:var(--text-main);
+    }
+    .auth-btn.primary {
+      background:rgba(59,130,246,.14); color:#93c5fd; border-color:rgba(59,130,246,.35);
+    }
+
+
