@@ -1,4 +1,18 @@
+/**
+ * tests/browser/manifest.spec.js
+ * Manifest boot flow, manifest v2 loader, and manifest v2 fallback chain tests.
+ *
+ * Groups from dashboard.spec.js added at v7.6.5.7:
+ *    9. Manifest v2 loader
+ *   10. Manifest v2 fallback chain
+ *
+ * Original manifest boot flow group preserved from pre-split.
+ */
+
+'use strict';
+
 const { test, expect } = require('@playwright/test');
+const { loadDashboard: loadDashboardHelper } = require('./test-helpers');
 
 // Stub external CDN resources (Chart.js, Google Fonts) so page.goto resolves
 // in offline / sandboxed CI environments.  The dashboard wraps initCharts()
@@ -111,5 +125,86 @@ test.describe('manifest boot flow', () => {
     await waitForDashboardReady(page, 3);
     const sensors = await page.evaluate(() => App.State.getSensors().map(s => s.id));
     expect(sensors).toEqual(['office', 'first_floor', 'outside']);
+  });
+});
+
+// ── 9. Manifest v2 loader ─────────────────────────────────────────
+
+test.describe('9. Manifest v2 loader', () => {
+  test('window._manifest is set after boot', async ({ page }) => {
+    await loadDashboardHelper(page);
+    await page.waitForFunction(() => typeof window._manifest !== 'undefined' && window._manifest !== null, { timeout: 10000 });
+    const manifest = await page.evaluate(() => window._manifest);
+    expect(manifest).not.toBeNull();
+    expect(manifest.ok).toBe(true);
+  });
+
+  test('window._manifest has correct schema_version', async ({ page }) => {
+    await loadDashboardHelper(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.schema_version === 2, { timeout: 10000 });
+    const schemaVersion = await page.evaluate(() => window._manifest.schema_version);
+    expect(schemaVersion).toBe(2);
+  });
+
+  test('window._manifest contains sensors array', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'aggregator',
+      'Aggregator manifest has sensors:[] (0 local sensors); window._manifest.sensors is empty and does not match DEFAULT_SENSOR_META fallback. Aggregator manifest verified via Group 19 integration tests.');
+    await loadDashboardHelper(page);
+    await page.waitForFunction(() => window._manifest && Array.isArray(window._manifest.sensors), { timeout: 10000 });
+    // Compare against the active fixture — fixture-agnostic so all FIXTURE_SET variants pass
+    const result = await page.evaluate(async () => {
+      const resp = await fetch('/api/manifest');
+      const m = await resp.json();
+      return {
+        expected: m.sensors.map(function(s) { return s.id; }),
+        actual: window._manifest.sensors.map(function(s) { return s.id; }),
+      };
+    });
+    expect(result.actual.length).toBeGreaterThan(0);
+    expect(result.actual.length).toBe(result.expected.length);
+    for (const id of result.expected) {
+      expect(result.actual).toContain(id);
+    }
+  });
+
+  test('window._manifest contains gateway block', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'aggregator',
+      'Aggregator manifest gateway.role is "aggregator" (not "satellite") and hardware is "ESP32-S3"; satellite-specific gateway block assertions do not apply.');
+    await loadDashboardHelper(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.gateway, { timeout: 10000 });
+    const gateway = await page.evaluate(() => window._manifest.gateway);
+    expect(gateway.role).toBe('satellite');
+    expect(gateway.api_version).toBe('v2');
+  });
+
+  test('window._manifest contains metrics array', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'aggregator',
+      'Aggregator manifest has metrics:[] (no local env sensors); metrics assertions (temp/hum) do not apply to pure aggregator.');
+    await loadDashboardHelper(page);
+    await page.waitForFunction(() => window._manifest && Array.isArray(window._manifest.metrics), { timeout: 10000 });
+    const metricKeys = await page.evaluate(() => window._manifest.metrics.map(m => m.key));
+    expect(metricKeys).toEqual(expect.arrayContaining(['temp', 'hum']));
+  });
+});
+
+// ── 10. Manifest v2 fallback chain ───────────────────────────────
+
+test.describe('10. Manifest v2 fallback chain', () => {
+  test('dashboard loads and window._manifest is auto-promoted when /api/manifest returns 404', async ({ page }) => {
+    await page.route('**/api/manifest', async route => {
+      await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false }) });
+    });
+    await loadDashboardHelper(page);
+    await page.waitForFunction(() => window._manifest && window._manifest.schema_version === 2, { timeout: 10000 });
+    const source = await page.evaluate(() => window._manifest.source);
+    expect(source).toBe('auto-promoted');
+    const sensors = await page.evaluate(() => App.State.getSensors().map(s => s.id));
+    expect(sensors.length).toBeGreaterThan(0);
+  });
+
+  test('loadManifestV2 and autoPromoteV1ToV2 are accessible on window', async ({ page }) => {
+    await loadDashboardHelper(page);
+    const hasFns = await page.evaluate(() => typeof loadManifestV2 === 'function' && typeof autoPromoteV1ToV2 === 'function');
+    expect(hasFns).toBe(true);
   });
 });
