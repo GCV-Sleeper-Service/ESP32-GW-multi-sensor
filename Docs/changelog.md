@@ -60,11 +60,19 @@ python3 scripts/render_sensor_config.py --check   # Step 8 — verify all artifa
 
 **Identity gate status:** ✅ **PASS** — Byte order preserved. The only difference between pre-restructure and post-restructure bundles is the version number change (`v7.6.5.3` → `v7.6.5.4`). Version-normalized SHA256 comparison confirms content-identical output.
 
+### Plan Correction: import-panel as separate component
+
+The architecture plan (§6 v7.6.5.4) specified concatenating `09-export.js + 10-storage-stats.js + 13-import.js` into `settings-panel/index.js` with a 17-entry FILES array. This is physically impossible without breaking byte order: modules 11 (suspend-resume) and 12 (management) sit between 10 and 13 in the original `dashboard.js`. Concatenating 09+10+13 at array position 9 would place 13's bytes before 11 and 12.
+
+Resolution: `13-import.js` remains a separate component at `components/import-panel/index.js` (array position 12, preserving original byte position). The FILES array has 18 entries instead of 17. The identity gate passes. This is a plan correction, not a spec deviation — the plan's concatenation instruction conflicted with the plan's own identity gate requirement, and the identity gate takes precedence.
+
+`import-panel` is a JS-only component (no HTML template, no CSS). The import button HTML lives inside the ESP Management card, which belongs to `settings-panel`'s template. This does not affect v7.6.5.5 (HTML extraction) or v7.6.5.6 (CSS extraction) — those steps work with 8 template-bearing components, and `import-panel` is not one of them.
+
 ### Acceptance Criteria
 
 - [x] All files moved to `dashboard/core/` and `dashboard/components/*/` directories
 - [x] `dashboard/src/` fully removed
-- [x] `bundle-dashboard.sh --check` passes with new 17-entry paths
+- [x] `bundle-dashboard.sh --check` passes with new 18-entry paths
 - [x] `build-dashboard.sh --check` passes
 - [x] `preflight.sh` passes (including `dashboard_js_bundle_sync` and `dashboard_html_sync`)
 - [x] `bump-version.sh 7.6.5.4` succeeds (path updated from `src/00-app-shell.js` → `core/app-shell.js`)
