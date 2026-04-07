@@ -1,42 +1,38 @@
 #!/usr/bin/env bash
-# Concatenates dashboard/src/*.js in dependency order → dashboard/dashboard.js
+# Concatenates dashboard/core/*.js + dashboard/components/*/index.js in dependency order → dashboard/dashboard.js
 # Usage: bundle-dashboard.sh [--write|--check]
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-MODULES=(
-  00-app-shell
-  01-config-state
-  02-sensor-defs
-  03-history-fetch
-  04-manifest
-  05-status-snapshot
-  06-ui-helpers
-  07-staleness-derived
-  08-custom-range
-  09-export
-  10-storage-stats
-  11-suspend-resume
-  12-management
-  13-import
-  14-cards
-  15-minmax
-  16-charts
-  17-live-updates
-  18-transport
-  19-aggregator
-  20-boot
+FILES=(
+  dashboard/core/app-shell.js            # was 00-app-shell
+  dashboard/core/config.js               # was 01-config-state
+  dashboard/core/sensor-defs.js          # was 02-sensor-defs
+  dashboard/core/history.js              # was 03-history-fetch
+  dashboard/core/manifest.js             # was 04-manifest
+  dashboard/core/status-snapshot.js      # was 05-status-snapshot
+  dashboard/core/ui-helpers.js           # was 06-ui-helpers
+  dashboard/core/staleness-derived.js    # was 07-staleness-derived
+  dashboard/components/custom-range/index.js    # was 08-custom-range
+  dashboard/components/settings-panel/index.js  # was 09+10 (export+storage)
+  dashboard/core/suspend-resume.js       # was 11-suspend-resume
+  dashboard/components/auth-modal/index.js      # was 12-management
+  dashboard/components/import-panel/index.js    # was 13-import
+  dashboard/components/sensor-cards/index.js    # was 14+15 (cards+minmax)
+  dashboard/components/charts/index.js          # was 16-charts
+  dashboard/components/live-view/index.js       # was 17+18 (live-updates+transport)
+  dashboard/components/gateway-panel/index.js   # was 19-aggregator
+  dashboard/core/boot.js                        # was 20-boot
 )
 
 OUT="dashboard/dashboard.js"
 TMP=$(mktemp)
 trap 'rm -f "$TMP"' EXIT
 
-for mod in "${MODULES[@]}"; do
-  SRC="dashboard/src/${mod}.js"
-  [[ -f "$SRC" ]] || { echo "MISSING: $SRC"; exit 1; }
-  cat "$SRC" >> "$TMP"
+for src in "${FILES[@]}"; do
+  [[ -f "$src" ]] || { echo "MISSING: $src"; exit 1; }
+  cat "$src" >> "$TMP"
 done
 
 usage() {
@@ -87,5 +83,5 @@ if [[ "$MODE" == "--check" ]]; then
   fi
 else
   cp "$TMP" "$OUT"
-  echo "Bundled ${#MODULES[@]} modules → $OUT ($(wc -c < "$OUT") bytes)"
+  echo "Bundled ${#FILES[@]} modules → $OUT ($(wc -c < "$OUT") bytes)"
 fi

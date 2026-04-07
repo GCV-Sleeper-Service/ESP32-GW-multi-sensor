@@ -2,7 +2,86 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
-## [v7.6.5.3] — 2026-04-06 — Phase X Level 2: Generated HTML Canonical; Retire Manual Mirror
+## [v7.6.5.4] — 2026-04-07 — Phase X Level 3: Component Directory Scaffolding
+
+### Changes
+
+- **Directory structure:** Created `dashboard/core/` and `dashboard/components/` with 9 component subdirectories (`sensor-cards/`, `charts/`, `custom-range/`, `auth-modal/`, `settings-panel/`, `import-panel/`, `gateway-panel/`, `live-view/`, `device-info/`)
+- **File moves (14 total: 10 core moves + 4 component moves):**
+  - `src/00-app-shell.js` → `core/app-shell.js`
+  - `src/01-config-state.js` → `core/config.js`
+  - `src/02-sensor-defs.js` → `core/sensor-defs.js`
+  - `src/03-history-fetch.js` → `core/history.js`
+  - `src/04-manifest.js` → `core/manifest.js`
+  - `src/05-status-snapshot.js` → `core/status-snapshot.js`
+  - `src/06-ui-helpers.js` → `core/ui-helpers.js`
+  - `src/07-staleness-derived.js` → `core/staleness-derived.js`
+  - `src/08-custom-range.js` → `components/custom-range/index.js`
+  - `src/11-suspend-resume.js` → `core/suspend-resume.js`
+  - `src/12-management.js` → `components/auth-modal/index.js`
+  - `src/16-charts.js` → `components/charts/index.js`
+  - `src/19-aggregator.js` → `components/gateway-panel/index.js`
+  - `src/20-boot.js` → `core/boot.js`
+- **File concatenations (3 groups, plain `cat`, no separators):**
+  - `src/09-export.js` + `src/10-storage-stats.js` → `components/settings-panel/index.js`
+  - `src/14-cards.js` + `src/15-minmax.js` → `components/sensor-cards/index.js`
+  - `src/17-live-updates.js` + `src/18-transport.js` → `components/live-view/index.js`
+- **Individual component moves (1:1 mapping to preserve byte order):**
+  - `src/13-import.js` → `components/import-panel/index.js`
+- **Bundle script:** Updated `scripts/bundle-dashboard.sh` — replaced 21-entry `MODULES`/`src/` array with 18-entry `FILES` array using `dashboard/core/` and `dashboard/components/*/index.js` paths; updated loop variable from `mod` to `src`
+- **Bump-version script:** Updated `scripts/bump-version.sh` — updated `App.version` sed target from `dashboard/src/00-app-shell.js` to `dashboard/core/app-shell.js`
+- **Build script:** Updated `scripts/build-dashboard.sh` — updated `<!-- GENERATED -->` header to reflect new source path (`dashboard/core/*.js + dashboard/components/*/index.js`)
+- **Source removal:** Removed `dashboard/src/` directory (21 files, ~174 KB)
+- **Artifacts:** `dashboard/dashboard.js`, `dashboard/dashboard.html`, `dashboard/dashboard.min.html`, `dashboard/dashboard.h` all regenerated via full 8-step pipeline
+
+### Canonical Regeneration Pipeline (unchanged — 8 steps, now reads from component dirs)
+
+```bash
+bash scripts/bundle-dashboard.sh --write          # Step 1 — bundle from core/ + components/
+python3 scripts/render_sensor_config.py --write   # Step 2 — inject version markers
+node tests/fixtures/generate-fixtures.js          # Step 3 — generate fixture variants
+python3 scripts/render_sensor_config.py --write   # Step 4 — re-inject markers after fixture generation
+bash scripts/build-dashboard.sh --write           # Step 5 — template + JS → dashboard.html
+bash scripts/minify-dashboard.sh                  # Step 6 — minify dashboard.html
+bash scripts/generate-header.sh                   # Step 7 — generate dashboard.h
+python3 scripts/render_sensor_config.py --check   # Step 8 — verify all artifacts in sync
+```
+
+### Identity Gate Results
+
+| Metric | Value |
+|--------|-------|
+| SHA-256 before file moves (original src/ bundle) | `f689e6d4e0a0307d6e2ba49ee10b6d9a56c1e479b062b11eaa79358dba24eb11` |
+| SHA-256 after component bundle + render (current) | `343afd2162d57b90fee127238920489c1f026c0be391f47d406fa149285c30b1` |
+| Version-normalized SHA (v7.6.5.X substitution) | `40c2af24ad3e46c6dea5e32ff82ee883a9815f6fb9765b9babcca2f1d783b617` (MATCH) |
+| `bundle-dashboard.sh --check` | PASS |
+| `build-dashboard.sh --check` | PASS |
+| `preflight.sh` | PASS (all checks) |
+
+**Identity gate status:** ✅ **PASS** — Byte order preserved. The only difference between pre-restructure and post-restructure bundles is the version number change (`v7.6.5.3` → `v7.6.5.4`). Version-normalized SHA256 comparison confirms content-identical output.
+
+### Plan Correction: import-panel as separate component
+
+The architecture plan (§6 v7.6.5.4) specified concatenating `09-export.js + 10-storage-stats.js + 13-import.js` into `settings-panel/index.js` with a 17-entry FILES array. This is physically impossible without breaking byte order: modules 11 (suspend-resume) and 12 (management) sit between 10 and 13 in the original `dashboard.js`. Concatenating 09+10+13 at array position 9 would place 13's bytes before 11 and 12.
+
+Resolution: `13-import.js` remains a separate component at `components/import-panel/index.js` (array position 12, preserving original byte position). The FILES array has 18 entries instead of 17. The identity gate passes. This is a plan correction, not a spec deviation — the plan's concatenation instruction conflicted with the plan's own identity gate requirement, and the identity gate takes precedence.
+
+`import-panel` is a JS-only component (no HTML template, no CSS). The import button HTML lives inside the ESP Management card, which belongs to `settings-panel`'s template. This does not affect v7.6.5.5 (HTML extraction) or v7.6.5.6 (CSS extraction) — those steps work with 8 template-bearing components, and `import-panel` is not one of them.
+
+### Acceptance Criteria
+
+- [x] All files moved to `dashboard/core/` and `dashboard/components/*/` directories
+- [x] `dashboard/src/` fully removed
+- [x] `bundle-dashboard.sh --check` passes with new 18-entry paths
+- [x] `build-dashboard.sh --check` passes
+- [x] `preflight.sh` passes (including `dashboard_js_bundle_sync` and `dashboard_html_sync`)
+- [x] `bump-version.sh 7.6.5.4` succeeds (path updated from `src/00-app-shell.js` → `core/app-shell.js`)
+- [x] Full 8-step regeneration pipeline completes without error
+- [x] All Playwright tests pass across all four fixture sets
+
+---
+
+
 
 ### Changes
 

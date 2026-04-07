@@ -12,7 +12,7 @@
 #   scripts/render_sensor_config.py      (VERSION constant)
 #   tests/fixtures/generate-fixtures.js  (VERSION constant)
 #   dashboard/dashboard.html                (App.version — newly added in v7.5.3.0)
-#   dashboard/src/00-app-shell.js        (App.version in source module — added in v7.6.5.1)
+#   dashboard/core/app-shell.js          (App.version in source module — moved from src/ in v7.6.5.4)
 #
 # Generated files updated by render_sensor_config.py --write:
 #   dashboard/dashboard.js               (App.version)
@@ -63,8 +63,8 @@ sed -i "s/^VERSION = \"[0-9.]*\"/VERSION = \"${NEW_VER}\"/" scripts/render_senso
 echo "→ Updating tests/fixtures/generate-fixtures.js..."
 sed -i "s/const VERSION = 'v[0-9.]*'/const VERSION = 'v${NEW_VER}'/" tests/fixtures/generate-fixtures.js
 
-echo "→ Updating dashboard/src/00-app-shell.js..."
-sed -i "s/App\.version = 'v[0-9.]*'/App.version = 'v${NEW_VER}'/" dashboard/src/00-app-shell.js
+echo "→ Updating dashboard/core/app-shell.js..."
+sed -i "s/App\.version = 'v[0-9.]*'/App.version = 'v${NEW_VER}'/" dashboard/core/app-shell.js
 
 # 2. Regenerate all generated artifacts from canonical sources
 echo "→ Running bundle-dashboard.sh --write..."
