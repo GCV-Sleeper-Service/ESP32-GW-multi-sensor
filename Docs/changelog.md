@@ -6,8 +6,8 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ### Changes
 
-- **Directory structure:** Created `dashboard/core/` and `dashboard/components/` with 8 component subdirectories (`sensor-cards/`, `charts/`, `custom-range/`, `auth-modal/`, `settings-panel/`, `gateway-panel/`, `live-view/`, `device-info/`)
-- **File moves (10 simple moves):**
+- **Directory structure:** Created `dashboard/core/` and `dashboard/components/` with 9 component subdirectories (`sensor-cards/`, `charts/`, `custom-range/`, `auth-modal/`, `settings-panel/`, `import-panel/`, `gateway-panel/`, `live-view/`, `device-info/`)
+- **File moves (14 total: 10 core moves + 4 component moves):**
   - `src/00-app-shell.js` → `core/app-shell.js`
   - `src/01-config-state.js` → `core/config.js`
   - `src/02-sensor-defs.js` → `core/sensor-defs.js`
@@ -23,10 +23,12 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
   - `src/19-aggregator.js` → `components/gateway-panel/index.js`
   - `src/20-boot.js` → `core/boot.js`
 - **File concatenations (3 groups, plain `cat`, no separators):**
-  - `src/09-export.js` + `src/10-storage-stats.js` + `src/13-import.js` → `components/settings-panel/index.js`
+  - `src/09-export.js` + `src/10-storage-stats.js` → `components/settings-panel/index.js`
   - `src/14-cards.js` + `src/15-minmax.js` → `components/sensor-cards/index.js`
   - `src/17-live-updates.js` + `src/18-transport.js` → `components/live-view/index.js`
-- **Bundle script:** Updated `scripts/bundle-dashboard.sh` — replaced 21-entry `MODULES`/`src/` array with 17-entry `FILES` array using `dashboard/core/` and `dashboard/components/*/index.js` paths; updated loop variable from `mod` to `src`
+- **Individual component moves (1:1 mapping to preserve byte order):**
+  - `src/13-import.js` → `components/import-panel/index.js`
+- **Bundle script:** Updated `scripts/bundle-dashboard.sh` — replaced 21-entry `MODULES`/`src/` array with 18-entry `FILES` array using `dashboard/core/` and `dashboard/components/*/index.js` paths; updated loop variable from `mod` to `src`
 - **Bump-version script:** Updated `scripts/bump-version.sh` — updated `App.version` sed target from `dashboard/src/00-app-shell.js` to `dashboard/core/app-shell.js`
 - **Build script:** Updated `scripts/build-dashboard.sh` — updated `<!-- GENERATED -->` header to reflect new source path (`dashboard/core/*.js + dashboard/components/*/index.js`)
 - **Source removal:** Removed `dashboard/src/` directory (21 files, ~174 KB)
@@ -50,12 +52,13 @@ python3 scripts/render_sensor_config.py --check   # Step 8 — verify all artifa
 | Metric | Value |
 |--------|-------|
 | SHA-256 before file moves (original src/ bundle) | `f689e6d4e0a0307d6e2ba49ee10b6d9a56c1e479b062b11eaa79358dba24eb11` |
-| SHA-256 after component bundle + render | `b257c171b99de45893f71c97d5daab2aa5ccbceffbd8140102acc32c3d95222f` |
-| `bundle-dashboard.sh --check` | PASS (functional identity: same code, markers stripped) |
+| SHA-256 after component bundle + render (current) | `343afd2162d57b90fee127238920489c1f026c0be391f47d406fa149285c30b1` |
+| Version-normalized SHA (v7.6.5.X substitution) | `40c2af24ad3e46c6dea5e32ff82ee883a9815f6fb9765b9babcca2f1d783b617` (MATCH) |
+| `bundle-dashboard.sh --check` | PASS |
 | `build-dashboard.sh --check` | PASS |
 | `preflight.sh` | PASS (all checks) |
 
-**Note on SHA difference:** The component grouping places `09-export` + `10-storage-stats` + `13-import` together in `settings-panel/index.js`. In the original 21-module order, `11-suspend-resume` and `12-management` appeared between `10-storage-stats` and `13-import`. The new bundle reads `settings-panel/index.js` as a single entry (09+10+13), shifting the positions of `11-suspend-resume` and `12-management` to follow. All JavaScript functions involved are declarations (hoisted); runtime behaviour is unchanged. `bundle-dashboard.sh --check` confirms functional identity.
+**Identity gate status:** ✅ **PASS** — Byte order preserved. The only difference between pre-restructure and post-restructure bundles is the version number change (`v7.6.5.3` → `v7.6.5.4`). Version-normalized SHA256 comparison confirms content-identical output.
 
 ### Acceptance Criteria
 

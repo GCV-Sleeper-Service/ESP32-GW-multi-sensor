@@ -15,9 +15,10 @@ FILES=(
   dashboard/core/ui-helpers.js           # was 06-ui-helpers
   dashboard/core/staleness-derived.js    # was 07-staleness-derived
   dashboard/components/custom-range/index.js    # was 08-custom-range
-  dashboard/components/settings-panel/index.js  # was 09+10+13 (export+storage+import)
+  dashboard/components/settings-panel/index.js  # was 09+10 (export+storage)
   dashboard/core/suspend-resume.js       # was 11-suspend-resume
   dashboard/components/auth-modal/index.js      # was 12-management
+  dashboard/components/import-panel/index.js    # was 13-import
   dashboard/components/sensor-cards/index.js    # was 14+15 (cards+minmax)
   dashboard/components/charts/index.js          # was 16-charts
   dashboard/components/live-view/index.js       # was 17+18 (live-updates+transport)
