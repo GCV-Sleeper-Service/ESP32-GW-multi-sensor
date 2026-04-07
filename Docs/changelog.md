@@ -20,7 +20,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 - **Build script:** Updated `scripts/build-dashboard.sh` for two-pass assembly:
   - Pass 1: resolves all `{{COMPONENT:name}}` markers → inlines `components/<name>/template.html`
   - Pass 2: injects `dashboard.js` at `{{JS_PLACEHOLDER}}` → produces `dashboard/dashboard.html`
-- **Artifacts:** `dashboard.html`, `dashboard.h` regenerated via full pipeline; output byte-identical to v7.6.5.4
+- **Artifacts:** `dashboard.html`, `dashboard.h` regenerated via full pipeline; output structurally identical to v7.6.5.4 (version strings updated)
 
 ### Diff Gate
 
@@ -28,7 +28,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 bash scripts/build-dashboard.sh --write && diff dashboard/dashboard.html dashboard/dashboard.html.baseline
 ```
 
-**Result:** Empty diff — exit 0. Two-pass output is byte-identical to v7.6.5.4 baseline.
+**Result:** Version-string churn only. HTML structure byte-identical to v7.6.5.4 baseline aside from version bump.
 
 ### Component Template Files
 
@@ -46,14 +46,13 @@ bash scripts/build-dashboard.sh --write && diff dashboard/dashboard.html dashboa
 ### Canonical Regeneration Pipeline (two-pass build)
 
 ```bash
-python3 scripts/render_sensor_config.py --write   # Step 1 — inject version markers
-node tests/fixtures/generate-fixtures.js           # Step 2 — generate fixture variants
-bash scripts/bundle-dashboard.sh --write           # Step 3 — bundle from core/ + components/
-python3 scripts/render_sensor_config.py --write    # Step 4 — re-inject markers
-bash scripts/build-dashboard.sh --write            # Step 5 — two-pass: components + JS → dashboard.html
-bash scripts/minify-dashboard.sh                   # Step 6 — minify
-bash scripts/generate-header.sh                    # Step 7 — generate dashboard.h
-python3 scripts/render_sensor_config.py --check    # Step 8 — verify all artifacts in sync
+bash scripts/bundle-dashboard.sh --write           # Step 1 — bundle from core/ + components/
+python3 scripts/render_sensor_config.py --write    # Step 2 — inject version markers after bundling
+node tests/fixtures/generate-fixtures.js           # Step 3 — generate fixture variants
+bash scripts/build-dashboard.sh --write            # Step 4 — two-pass: components + JS → dashboard.html
+bash scripts/minify-dashboard.sh                   # Step 5 — minify
+bash scripts/generate-header.sh                    # Step 6 — generate dashboard.h
+python3 scripts/render_sensor_config.py --check    # Step 7 — verify all artifacts in sync
 ```
 
 ### Acceptance Criteria

@@ -36,20 +36,28 @@ python3 - "$ROOT/dashboard/dashboard.tmpl.html" "$ROOT/dashboard/dashboard.js" "
 import sys, os, re
 tmpl = open(sys.argv[1], 'rb').read()
 js = open(sys.argv[2], 'rb').read()
-components_dir = os.path.join(os.path.dirname(sys.argv[1]), 'components')
+components_dir = os.path.realpath(os.path.join(os.path.dirname(sys.argv[1]), 'components'))
+component_name_re = re.compile(r'^[a-z0-9-]+$')
 
 # Pass 1: resolve {{COMPONENT:name}} markers
 assembled = tmpl
 for m in re.finditer(rb'\{\{COMPONENT:([^}]+)\}\}', tmpl):
     name = m.group(1)
+    name_str = name.decode('utf-8')
     marker_with_nl = b'{{COMPONENT:' + name + b'}}\n'
-    comp_path = os.path.join(components_dir, name.decode(), 'template.html')
+    if not component_name_re.fullmatch(name_str):
+        print(f"ERROR: invalid component name: {name_str}", file=sys.stderr)
+        sys.exit(1)
+    comp_path = os.path.realpath(os.path.join(components_dir, name_str, 'template.html'))
+    if os.path.commonpath([components_dir, comp_path]) != components_dir:
+        print(f"ERROR: component path escapes components directory: {name_str}", file=sys.stderr)
+        sys.exit(1)
     if not os.path.exists(comp_path):
         print(f"ERROR: component template not found: {comp_path}", file=sys.stderr)
         sys.exit(1)
     if assembled.count(marker_with_nl) != 1:
         print(
-            f"ERROR: marker {{{{COMPONENT:{name.decode()}}}}} must appear exactly once"
+            f"ERROR: marker {{{{COMPONENT:{name_str}}}}} must appear exactly once"
             f" (found {assembled.count(marker_with_nl)})",
             file=sys.stderr,
         )
@@ -66,7 +74,7 @@ if placeholder_count != 1:
         file=sys.stderr,
     )
     sys.exit(1)
-header = '<!-- GENERATED \u2014 Do not edit. Source: dashboard/dashboard.tmpl.html + dashboard/dashboard.js (bundled from dashboard/core/*.js + dashboard/components/*/index.js) -->\n'.encode('utf-8')
+header = '<!-- GENERATED \u2014 Do not edit. Source: dashboard/dashboard.tmpl.html + dashboard/components/*/template.html + dashboard/dashboard.js (bundled from dashboard/core/*.js + dashboard/components/*/index.js) -->\n'.encode('utf-8')
 out = header + assembled.replace(placeholder, js, 1)
 out_path = os.path.join(os.path.dirname(sys.argv[1]), 'dashboard.html')
 mode = sys.argv[3]
