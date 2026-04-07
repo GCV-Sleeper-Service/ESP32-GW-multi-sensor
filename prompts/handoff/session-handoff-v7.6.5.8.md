@@ -51,6 +51,7 @@ scripts/
   build-dashboard.sh        ← three-pass: CSS → templates → JS → dashboard.html
   minify-dashboard.sh       ← dashboard.html → dashboard.min.html
   generate-header.sh        ← dashboard.min.html → dashboard.h
+  provision.sh              ← board config switching (aggregator/WROOM/satellite)
 tests/
   browser/
     boot-structure.spec.js
@@ -90,9 +91,11 @@ Documentation, preflight guards, critical rules, and the Phase X results documen
 2. **Update `prompts/prompt-index-and-workflow.md`:**
    - All 10 Phase X steps → `✅ Complete`
    - Critical Rule 6 → "Structurally resolved by Phase X v7.6.5.3"
-   - Critical Rule 37 → updated with full three-pass pipeline
+   - Critical Rule 37 → updated with full pipeline (bundle-first order) + `provision.sh` device-switching note
    - New Critical Rule 47 → "Source modules in `dashboard/core/` and `dashboard/components/*/`. Never edit `dashboard.js` or `dashboard.html` directly."
    - New Critical Rule 48 → "After any module edit, run the full pipeline."
+   - **New Critical Rule 49 → "`scripts/provision.sh` is the mandatory entry point for switching between aggregator, WROOM satellite, and C3 satellite configs. Always run `bash scripts/provision.sh satellite` before pushing."**
+   - **New board provisioning reference table added.**
 3. **Update `Docs/writing-guide/checklists/dashboard.md`** — add Phase X prompt patterns (module-scoped prompts, bundle pipeline, component ownership).
 4. **Update `Docs/lessons/dashboard.md`** — add Phase X lessons (identity gate, contiguous-slice splitting, three-pass pipeline).
 5. **Update `README.md`** — add Dashboard Architecture section.
@@ -102,10 +105,11 @@ Documentation, preflight guards, critical rules, and the Phase X results documen
 
 - [ ] All preflight component existence checks pass
 - [ ] Documentation reflects new architecture
-- [ ] Critical rules table updated (Rule 6 resolved, Rule 37 updated, Rules 47–48 added)
+- [ ] Critical rules table updated (Rule 6 resolved, Rule 37 updated, Rules 47–49 added)
 - [ ] All 402 tests pass
 - [ ] Phase X results document produced
 - [ ] README updated
+- [ ] `provision.sh` referenced in Critical Rule 49 and pipeline documentation
 
 ---
 
@@ -113,13 +117,15 @@ Documentation, preflight guards, critical rules, and the Phase X results documen
 
 - [ ] Read the coding agent prompt completely
 - [ ] Read this handoff completely
+- [ ] Verify current board state: `bash scripts/provision.sh status`
 - [ ] Verify preflight component checks work (pass on clean tree, fail if a file is removed)
 - [ ] Verify all Phase X steps marked complete in prompt-index
-- [ ] Verify critical rules accurately reflect the delivered architecture
+- [ ] Verify critical rules accurately reflect the delivered architecture (including Rule 49)
 - [ ] Verify Phase X results document is accurate and complete
 - [ ] Verify README architecture section matches reality
 - [ ] Run CI-exact Playwright across all fixture sets
 - [ ] Preflight passes
+- [ ] Confirm `bash scripts/provision.sh satellite` run before push
 
 ---
 
@@ -131,6 +137,30 @@ Documentation, preflight guards, critical rules, and the Phase X results documen
 | 5 | CI-exact `FIXTURE_SET=` runs | Final verification |
 | 20 | Session log mandatory | Closure evidence |
 | 21 | Instruction Compliance Output | PR deliverable |
+| 49 | `provision.sh satellite` before every push | CI safety |
+
+---
+
+## Board Provisioning (provision.sh)
+
+`scripts/provision.sh` manages config switching between aggregator/WROOM/C3-satellite without breaking CI.
+
+```bash
+bash scripts/provision.sh status       # show current board config + CI-safe flag
+bash scripts/provision.sh satellite    # ← default, CI-safe — REQUIRED before every push
+bash scripts/provision.sh aggregator   # S3 aggregator (agg-s3-16m-1) — local device testing only
+bash scripts/provision.sh wroom        # WROOM satellite (sat-esp32-4m-190) — local device testing only
+```
+
+| Command | Board | CI-safe |
+|---|---|---|
+| `bash scripts/provision.sh satellite` | C3 SuperMini (default) | ✅ YES |
+| `bash scripts/provision.sh aggregator` | ESP32-S3 agg-s3-16m-1 | ❌ NO |
+| `bash scripts/provision.sh wroom` | WROOM sat-esp32-4m-190 | ❌ NO |
+| `bash scripts/provision.sh status` | (inspect only) | n/a |
+
+**Rule:** Never push with aggregator or wroom active. Always run `provision.sh satellite` before pushing.
+The script internally runs `render_sensor_config.py --write` on every switch — then run the remaining pipeline steps after.
 
 ---
 
@@ -143,12 +173,13 @@ Documentation, preflight guards, critical rules, and the Phase X results documen
 > clarification.**
 
 1. Read the coding agent prompt and this handoff completely
-2. Ask human if PR for this step is open. If PR has not been open, **open a NEW coding agent session outside of this chat** and paste the prompt
-3. Agent updates documentation, preflight, prompt-index, README
-4. Agent produces Phase X results document
-5. Review the PR — verify accuracy of all documentation changes
-6. Merge, tag `v7.6.5.8`
-7. **Phase X is COMPLETE**
+2. Run `bash scripts/provision.sh status` — confirm satellite/CI-safe state
+3. Ask human if PR for this step is open. If PR has not been opened, **open a NEW coding agent session outside of this chat** and paste the prompt
+4. Agent updates documentation, preflight, prompt-index, README (including Rule 49 + provisioning table)
+5. Agent produces Phase X results document
+6. Review the PR — verify accuracy of all documentation changes and that `provision.sh` is correctly documented
+7. Merge, tag `v7.6.5.8`
+8. **Phase X is COMPLETE**
 
 ---
 
@@ -161,10 +192,11 @@ Documentation, preflight guards, critical rules, and the Phase X results documen
 **Format:** Same structure as `prompts/phaseX/v7.6.4.0-PR131-consolidated-audit-and-lessons.md`
 
 Use stable core + Test/Closure supplement:
-- Are all new critical rules traceable to a specific Phase X step?
+- Are all new critical rules (47–49) traceable to a specific Phase X step?
 - Does the Phase X results document accurately reflect what was delivered?
 - Are all 10 Phase X steps marked complete?
 - Does the README architecture section match reality?
+- Is `provision.sh` correctly documented in Critical Rule 49 and the pipeline sections?
 
 ### 2. Next Phase Determination
 
@@ -178,14 +210,14 @@ The Phase X plan recommends Phase Y before Phase 7 (so Phase 7's firmware change
 ### 3. Inspect Next Phase Artifacts
 
 **Review and update if necessary:**
-- If proceeding to **Phase 7**: review `prompts/phase7/v7.7.0.0-implementation-instructions-for-coding-agent.md` and `prompts/handoff/session-handoff-v7.7.0.0.md` (if they exist). Update Required Reading sections to reference the new domain-scoped docs (`Docs/lessons/firmware.md` instead of `Docs/bugs-and-lessons-learned.md`, ). Update any `dashboard.js` or `dashboard.html` references to use the module/component paths instead. 
-- If proceeding to **Phase Y**: a planning session is needed first. Use `Docs/phase-X-context-for-phase-Y.md` as the starting point.
+- If proceeding to **Phase 7**: review `prompts/phase7/v7.7.0.0-implementation-instructions-for-coding-agent.md` and `prompts/handoff/session-handoff-v7.7.0.0.md` (if they exist). Update Required Reading sections to reference the new domain-scoped docs (`Docs/lessons/firmware.md` instead of `Docs/bugs-and-lessons-learned.md`). Update any `dashboard.js` or `dashboard.html` references to use the module/component paths instead. Add `provision.sh` status check to pre-condition steps.
+- If proceeding to **Phase Y**: a planning session is needed first. Use `Docs/phase-X-context-for-phase-Y.md` as the starting point. Include `provision.sh` satellite guard in any pipeline documentation written for Phase Y.
 
 ---
 
 ## Device Testing
 
-**Not applicable.** Closure step — no runtime changes.
+**Not applicable.** Closure step — no runtime changes. If any incidental device testing is done, use `bash scripts/provision.sh <target>` to switch config and remember to run `bash scripts/provision.sh satellite` before pushing.
 
 ---
 
@@ -198,9 +230,10 @@ The Phase X plan recommends Phase Y before Phase 7 (so Phase 7's firmware change
 | Tests | 402/0 unchanged throughout |
 | Context reduction | ~55K–70K tokens → ~8K–15K tokens per task (6x–8x) |
 | Mirror problem | LESSON-OPS-043 structurally resolved at v7.6.5.3 |
-| New critical rules | 47–48 |
+| New critical rules | 47–49 |
 | Identity gate | Confirmed at every structural step |
 | Device testing | Confirmed at Level 2 transition (v7.6.5.3) |
+| Board provisioning | provision.sh satellite guard re-established as Critical Rule 49 |
 
 ---
 
