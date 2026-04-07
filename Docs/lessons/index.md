@@ -196,3 +196,4 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-115 | build-pipeline.md |
 | LESSON-OPS-116 | build-pipeline.md |
 | LESSON-OPS-117 | build-pipeline.md |
+| LESSON-OPS-118 | build-pipeline.md |
