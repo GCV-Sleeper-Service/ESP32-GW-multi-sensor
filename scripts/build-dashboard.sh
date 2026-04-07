@@ -53,6 +53,20 @@ CSS_FILES = [
     os.path.join(components_dir, 'custom-range',    'styles.css'),
     os.path.join(components_dir, 'gateway-panel',   'styles.css'),
 ]
+# Validate CSS file existence and readability
+missing_css_files = []
+for f in CSS_FILES:
+    if not os.path.exists(f):
+        missing_css_files.append(f)
+    elif not os.path.isfile(f):
+        print(f"ERROR: CSS path is not a file: {f}", file=sys.stderr)
+        sys.exit(1)
+if missing_css_files:
+    print("ERROR: missing CSS file(s):", file=sys.stderr)
+    for f in missing_css_files:
+        print(f"  {f}", file=sys.stderr)
+    sys.exit(1)
+
 css_placeholder = b'{{CSS_PLACEHOLDER}}'
 css_placeholder_count = tmpl.count(css_placeholder)
 if css_placeholder_count != 1:
@@ -65,7 +79,20 @@ css_bytes = b''.join(open(f, 'rb').read() for f in CSS_FILES)
 # Strip one trailing newline so replacement produces exact inline CSS (no extra blank line)
 if css_bytes.endswith(b'\n'):
     css_bytes = css_bytes[:-1]
-assembled = re.sub(rb'\{\{CSS_PLACEHOLDER\}\}\r?\n', css_bytes + b'\n', tmpl, count=1)
+# Use re.subn with lambda replacement to avoid backreference interpretation and preserve newline style
+assembled, css_replacements = re.subn(
+    rb'\{\{CSS_PLACEHOLDER\}\}(\r?\n)',
+    lambda m: css_bytes + m.group(1),
+    tmpl,
+    count=1,
+)
+if css_replacements != 1:
+    print(
+        "ERROR: failed to replace {{CSS_PLACEHOLDER}} exactly once; "
+        "ensure the placeholder is followed immediately by a newline",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 # Pass 1: resolve {{COMPONENT:name}} markers (tolerates LF and CRLF)
 for m in re.finditer(rb'\{\{COMPONENT:([^}]+)\}\}', assembled):
