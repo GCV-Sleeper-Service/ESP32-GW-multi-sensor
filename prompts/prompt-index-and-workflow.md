@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-07 — Phase X Level 3 in progress: v7.6.5.5 HTML template extraction complete (PR #146); two-pass build, CRLF-tolerant, path-confined; accepted exceptions documented; v7.6.5.6 is next_
+_Last updated: 2026-04-07 — Phase X Level 3 in progress: v7.6.5.6 CSS extraction complete (PR #147); three-pass build (CSS → components → JS), 9 CSS files created, global @media in core/base.css; v7.6.5.7 test spec split next._
 _reference domain-scoped files__Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -261,9 +261,35 @@ All steps shipped. No prompts needed.
 | v7.6.5.3 | Retire manual mirror | `prompts/phaseX/v7.6.5.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
 | v7.6.5.4 | Component directories | `prompts/phaseX/v7.6.5.4-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
 | v7.6.5.5 | HTML template extraction | `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
-| v7.6.5.6 | CSS extraction | `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` | ⬅ Next |
-| v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.6 | CSS extraction | `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
+| v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | ⬅ Next |
 | v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | Pending |
+
+**v7.6.5.6 delivery summary (PR #147):**
+- Extracted CSS from `dashboard.tmpl.html` `<style>` block (491 lines, 35,088 bytes) into 9 per-component CSS files:
+  `core/base.css` (102 lines, 7,613 bytes — includes global @media breakpoints),
+  `device-info/styles.css` (38 lines), `settings-panel/styles.css` (8 lines),
+  `live-view/styles.css` (4 lines), `sensor-cards/styles.css` (106 lines),
+  `charts/styles.css` (24 lines), `auth-modal/styles.css` (60 lines),
+  `custom-range/styles.css` (109 lines), `gateway-panel/styles.css` (40 lines)
+- `import-panel` correctly excluded (JS-only, no CSS)
+- `dashboard.tmpl.html` updated: `<style>` content replaced with `{{CSS_PLACEHOLDER}}`
+- `scripts/build-dashboard.sh` updated for three-pass assembly:
+  Pass 0: concatenate `core/base.css` + 8 `components/*/styles.css` → replace `{{CSS_PLACEHOLDER}}` (explicit cascade order, no glob);
+  Pass 1: `{{COMPONENT:name}}` markers → component templates;
+  Pass 2: `{{JS_PLACEHOLDER}}` → bundled JS
+- All three passes use `re.subn` with lambda replacement (backreference-safe) and CRLF-tolerant patterns
+- CSS file existence validated before concatenation with targeted error messages
+- Shell-resident CSS (`.about-bar`, `.export-*`) correctly in `core/base.css`
+- Global `@media` breakpoints (1200px, 1024px, 640px) correctly in `core/base.css` (initially misplaced in `gateway-panel/styles.css`, fixed in commit 14490d9)
+- Accepted exceptions documented in session log and changelog:
+  Output-identity gate: normalized semantic equivalence (CSS interleaving makes byte-identical output impossible);
+  JS version bump despite Do-NOT list (prompt self-contradiction);
+  Global @media relocated after initial error
+- Diff gate: normalized semantic equivalence ✅ (~186 lines of CSS positional reordering; all 35,088 bytes preserved)
+- Preflight passes; build produces 239,626 bytes
+- **Consolidated audit:** `prompts/phaseX/v7.6.5.6-PR147-consolidated-audit-and-lessons.md`
+- Device testing: not applicable (CSS extraction only; no runtime change)
 
 **v7.6.5.5 delivery summary (PR #146):**
 - Extracted 8 component `template.html` files from `dashboard/dashboard.tmpl.html`:
@@ -432,8 +458,11 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 48 | CI `browser-tests.yml` path filters must include ALL scripts that can change checked artifacts (`scripts/bundle-dashboard.sh`, `scripts/build-dashboard.sh`, `scripts/render_sensor_config.py`, `scripts/minify-dashboard.sh`, `scripts/generate-header.sh`). Omitting a script allows script-only changes to bypass CI. | v7.6.5.3 PR #135 review finding |
 | 49 | Always use `bash scripts/provision.sh <target>` to switch board configs (aggregator / satellite / wroom). Never copy `.bak` files or edit `gateway.json` by hand. Run `bash scripts/provision.sh satellite` + `bash scripts/preflight.sh` BEFORE every `git push`. `scripts/provision.sh` must never be removed from the repo. | LESSON-OPS-116 / v7.6.5.3 |
 | 50 | When planning file concatenations for non-contiguous modules, verify that all source modules in the group are physically adjacent in the bundle output. Modules can only be safely concatenated if contiguous. If intervening modules exist, keep them as separate components — the identity gate will catch violations but the plan should catch them first. | LESSON-OPS-118 / v7.6.5.4 |
-| 51 | `build-dashboard.sh` component marker resolution must use `re.sub(rb'...?', ...)` — never `bytes.replace()` with hardcoded ``. CRLF-checked repos silently produce un-assembled output with the literal approach. | v7.6.5.5 PR #146 review finding |
+| 51 | `build-dashboard.sh` marker resolution must use `re.subn` with **lambda replacement** and CRLF-tolerant `\r?\n` patterns — never `bytes.replace()` with hardcoded `\n`, never `re.sub()` with raw bytes as replacement (backreference risk). | BUG-076 / LESSON-OPS-099; updated v7.6.5.6 (Gemini HIGH finding) |
 | 52 | Build tool dependencies used via shell scripts must be wired as `devDependencies` with `npx` invocation in scripts — never as global-only requirements. Global-only tooling causes silent CI mismatches on fresh installs. | v7.6.5.5 PR #146 CODEX/GPT review finding |
+v7.6.5.6 PR #147 |
+| 54 | When an acceptance criterion is contradicted by another requirement, the agent MUST stop and escalate to the operator — never self-waive. Document the contradiction in session log § Accepted Exceptions after operator confirms the waiver. | v7.6.5.6 PR #147 — agent self-waived output-identity gate |
+| 55 | CSS partition rule is "by selector target" — which component does this rule style? Global `@media` rules targeting selectors from multiple components belong in `core/base.css` regardless of source proximity in the original file. | v7.6.5.6 PR #147 — global @media initially misplaced |
 ---
 
 ## Prompt File Naming Convention
@@ -489,6 +518,17 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-04-07 — v7.6.5.6 Complete: Phase X Level 3 CSS Extraction
+
+| Change | Why |
+|--------|-----|
+| **v7.6.5.6 marked complete** | PR #147 merged (commits: 22fe76c, e951572, 50562c9, 5dea1ac, 14490d9) — 9 CSS files extracted from monolithic `<style>` block; three-pass assembly (CSS → components → JS); `re.subn` + lambda for all passes; global @media breakpoints correctly placed in `core/base.css` |
+| **Three-pass assembly contract established** | `build-dashboard.sh` now runs Pass 0 (CSS injection), Pass 1 (component markers), Pass 2 (JS injection); all passes use `re.subn` + lambda with CRLF-tolerant patterns |
+| **Normalized semantic equivalence gate established** | Byte-identical output is impossible when source CSS is interleaved across component boundaries; future extraction steps use sorted byte comparison + specificity analysis as evidence |
+| **Critical Rules 53–55 added** | Lambda replacement for `re.sub` (53); escalate contradictory criteria (54); CSS partition by selector target not proximity (55) |
+| **Rule 51 updated** | Now mandates lambda replacement (not just CRLF tolerance) |
+| **v7.6.5.7 marked ⬅ Next** | Test spec split — next step in Level Test/Closure |
 
 ### 2026-04-07 — v7.6.5.5 Complete: Phase X Level 3 HTML Template Extraction
 

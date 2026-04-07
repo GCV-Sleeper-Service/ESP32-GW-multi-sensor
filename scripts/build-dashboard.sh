@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Two-pass assembly: resolves {{COMPONENT:name}} markers then injects dashboard.js
+# Three-pass assembly: injects CSS, resolves component markers, injects dashboard.js
+# Pass 0: concatenate core/base.css + components/*/styles.css → replace {{CSS_PLACEHOLDER}}
 # Pass 1: {{COMPONENT:name}} → dashboard/components/<name>/template.html
 # Pass 2: {{JS_PLACEHOLDER}} → dashboard/dashboard.js → dashboard/dashboard.html
 # Usage: build-dashboard.sh [--write|--check]
@@ -36,12 +37,67 @@ python3 - "$ROOT/dashboard/dashboard.tmpl.html" "$ROOT/dashboard/dashboard.js" "
 import sys, os, re
 tmpl = open(sys.argv[1], 'rb').read()
 js = open(sys.argv[2], 'rb').read()
-components_dir = os.path.realpath(os.path.join(os.path.dirname(sys.argv[1]), 'components'))
+dashboard_dir = os.path.dirname(sys.argv[1])
+components_dir = os.path.realpath(os.path.join(dashboard_dir, 'components'))
 component_name_re = re.compile(r'^[a-z0-9-]+$')
 
+# Pass 0: concatenate CSS files → replace {{CSS_PLACEHOLDER}}
+CSS_FILES = [
+    os.path.join(dashboard_dir, 'core', 'base.css'),
+    os.path.join(components_dir, 'device-info',    'styles.css'),
+    os.path.join(components_dir, 'settings-panel', 'styles.css'),
+    os.path.join(components_dir, 'live-view',       'styles.css'),
+    os.path.join(components_dir, 'sensor-cards',    'styles.css'),
+    os.path.join(components_dir, 'charts',          'styles.css'),
+    os.path.join(components_dir, 'auth-modal',      'styles.css'),
+    os.path.join(components_dir, 'custom-range',    'styles.css'),
+    os.path.join(components_dir, 'gateway-panel',   'styles.css'),
+]
+# Validate CSS file existence and readability
+missing_css_files = []
+for f in CSS_FILES:
+    if not os.path.exists(f):
+        missing_css_files.append(f)
+    elif not os.path.isfile(f):
+        print(f"ERROR: CSS path is not a file: {f}", file=sys.stderr)
+        sys.exit(1)
+if missing_css_files:
+    print("ERROR: missing CSS file(s):", file=sys.stderr)
+    for f in missing_css_files:
+        print(f"  {f}", file=sys.stderr)
+    sys.exit(1)
+
+css_placeholder = b'{{CSS_PLACEHOLDER}}'
+css_placeholder_count = tmpl.count(css_placeholder)
+if css_placeholder_count != 1:
+    print(
+        f"ERROR: template must contain exactly one {{{{CSS_PLACEHOLDER}}}} (found {css_placeholder_count})",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+css_bytes = b''.join(open(f, 'rb').read() for f in CSS_FILES)
+# Strip one trailing newline (CRLF-safe) so replacement produces exact inline CSS (no extra blank line)
+if css_bytes.endswith(b'\r\n'):
+    css_bytes = css_bytes[:-2]
+elif css_bytes.endswith(b'\n'):
+    css_bytes = css_bytes[:-1]
+# Use re.subn with lambda replacement to avoid backreference interpretation and preserve newline style
+assembled, css_replacements = re.subn(
+    rb'\{\{CSS_PLACEHOLDER\}\}(\r?\n)',
+    lambda m: css_bytes + m.group(1),
+    tmpl,
+    count=1,
+)
+if css_replacements != 1:
+    print(
+        "ERROR: failed to replace {{CSS_PLACEHOLDER}} exactly once; "
+        "ensure the placeholder is followed immediately by a newline",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 # Pass 1: resolve {{COMPONENT:name}} markers (tolerates LF and CRLF)
-assembled = tmpl
-for m in re.finditer(rb'\{\{COMPONENT:([^}]+)\}\}', tmpl):
+for m in re.finditer(rb'\{\{COMPONENT:([^}]+)\}\}', assembled):
     name = m.group(1)
     name_str = name.decode('utf-8')
     if not component_name_re.fullmatch(name_str):

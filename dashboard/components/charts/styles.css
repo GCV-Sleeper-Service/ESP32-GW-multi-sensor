@@ -1,0 +1,24 @@
+    /* Charts */
+    .charts-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+    .chart-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:14px 14px 10px; }
+    .chart-title { font-family:'JetBrains Mono',monospace; font-size:.78rem; font-weight:600; letter-spacing:.5px; color:var(--text-secondary); margin-bottom:3px; text-transform:uppercase; }
+    .chart-subtitle { font-family:'JetBrains Mono',monospace; font-size:.62rem; color:var(--text-muted); margin-bottom:8px; }
+    .chart-wrapper { position:relative; height:250px; }
+    .no-data { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-family:'JetBrains Mono',monospace; font-size:.82rem; pointer-events:none; }
+    .no-data.hidden { display:none; }
+    .section-divider { border:none; border-top:1px solid var(--border); margin:20px 0; }
+    .history-badge { display:inline-block; font-family:'JetBrains Mono',monospace; font-size:.6rem; color:var(--accent-green); background:rgba(52,211,153,.1); border:1px solid rgba(52,211,153,.3); border-radius:4px; padding:2px 8px; }
+    .history-badge.empty { color:var(--text-muted); background:transparent; border-color:var(--border); }
+    .refresh-btn { font-family:'JetBrains Mono',monospace; font-size:.65rem; background:rgba(52,211,153,.1); color:var(--accent-green); border:1px solid rgba(52,211,153,.3); border-radius:4px; padding:3px 10px; cursor:pointer; transition:all .2s; }
+    .refresh-btn:hover { background:rgba(52,211,153,.2); border-color:rgba(52,211,153,.5); }
+    .history-range-row { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-bottom:12px; }
+    .history-range-label { font-family:'JetBrains Mono',monospace; font-size:.62rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; }
+    .history-range-toggle { display:inline-flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+    .history-range-toggle button { font-family:'JetBrains Mono',monospace; font-size:.66rem; padding:5px 12px; border:none; border-right:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all .15s; }
+    .history-range-toggle button:last-child { border-right:none; }
+    .history-range-toggle button.active { background:rgba(96,165,250,.14); color:#60a5fa; }
+    .history-range-toggle button:hover:not(.active) { background:rgba(255,255,255,.04); color:var(--text-secondary); }
+
+
+    .chart-hint { font-size:.70rem; font-style:italic; color:var(--text-muted); margin-top:2px; }
+    .section-hint { font-size:.72rem; color:var(--text-muted); margin:6px 0 10px 0; font-style:italic; }

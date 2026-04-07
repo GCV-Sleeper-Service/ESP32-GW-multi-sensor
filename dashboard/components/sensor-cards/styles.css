@@ -1,0 +1,106 @@
+    /* ═══════════════════════════════════════════════════════════ */
+    /* Sensor cards */
+    /* ═══════════════════════════════════════════════════════════ */
+    .sensor-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }
+    .sensor-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:14px; }
+    .sensor-card:hover { border-color:#505050; }
+    .sensor-card-header { font-family:'JetBrains Mono',monospace; font-size:.82rem; font-weight:600; color:var(--text-secondary); margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; }
+    .sensor-color-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .sensor-photo-thumb { width:40px; height:40px; border-radius:4px; object-fit:cover; margin-left:auto; }
+    .sensor-readings { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .sensor-reading { background:rgba(255,255,255,.02); border-radius:8px; padding:8px 10px; }
+    .reading-label { font-size:.58rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:2px; font-family:'JetBrains Mono',monospace; }
+    .reading-value { font-family:'JetBrains Mono',monospace; font-size:.92rem; font-weight:600; }
+    .reading-value.waiting { color:var(--text-muted)!important; font-size:.82rem; }
+    .reading-time { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--text-muted); margin-top:1px; }
+
+    /* Min/max section in sensor card */
+    .sensor-minmax { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; margin-top:8px; }
+    .minmax-col { background:rgba(255,255,255,.02); border-radius:8px; padding:8px 10px; }
+    .minmax-col-title { font-size:.58rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:4px; font-family:'JetBrains Mono',monospace; }
+    .minmax-line { font-family:'JetBrains Mono',monospace; font-size:.78rem; line-height:1.6; }
+    .minmax-line .lo { color:#60a5fa; }
+    .minmax-line .hi { color:#f87171; }
+    .minmax-line .ts { font-size:.58rem; color:var(--text-muted); }
+
+    /* Battery */
+    .sensor-batt-row { display:flex; align-items:center; gap:10px; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,.04); }
+    .batt-bar-bg { flex:1; height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+    .batt-bar-fill { height:100%; border-radius:4px; transition:width .5s; background:var(--accent-green); }
+    .batt-pct { font-family:'JetBrains Mono',monospace; font-size:.78rem; font-weight:600; color:var(--accent-green); min-width:38px; text-align:right; }
+    .batt-pct.low { color:#f87171; } .batt-pct.mid { color:#fbbf24; } /* low ≤30%, mid ≤55% */
+    .batt-pct.waiting { color:var(--text-muted)!important; }
+    .batt-label { font-size:.58rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; }
+
+    /* Network card (v7.5.4.2) */
+    .network-card { border-left:3px solid var(--accent-network, #4FC3F7); }
+    .network-card .sensor-card-header { border-bottom-color:var(--accent-network, #4FC3F7); }
+    .system-card { border-left:3px solid var(--accent-system, #66BB6A); }
+    .system-card .sensor-card-header { border-bottom-color:var(--accent-system, #66BB6A); }
+    .system-usage-row { display:flex; align-items:center; gap:8px; }
+    .system-bar-bg { flex:1; height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+    .system-bar-fill { height:100%; border-radius:4px; transition:width .5s, background .3s; }
+    .system-bar-fill.bar-ok { background:#4caf50; }
+    .system-bar-fill.bar-warning { background:#ff9800; }
+    .system-bar-fill.bar-danger { background:#f44336; }
+
+    /* Min/max period toggle */
+    .minmax-toggle { display:inline-flex; gap:0; margin-left:8px; vertical-align:middle; }
+    .minmax-toggle button { font-family:'JetBrains Mono',monospace; font-size:.52rem; padding:1px 6px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all .15s; line-height:1.5; }
+    .minmax-toggle button:first-child { border-radius:3px 0 0 3px; }
+    .minmax-toggle button:last-child { border-radius:0 3px 3px 0; border-left:none; }
+    .minmax-toggle button.active { background:rgba(52,211,153,.15); color:var(--accent-green); border-color:rgba(52,211,153,.4); }
+    .minmax-toggle button:hover:not(.active) { border-color:#666; color:var(--text-secondary); }
+    /* RSSI signal row */
+    .sensor-rssi-row { display:flex; align-items:center; gap:10px; margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,.04); }
+    .rssi-label { font-size:.58rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; }
+    .rssi-bars { display:flex; align-items:flex-end; gap:2px; height:14px; }
+    .rssi-bar { width:4px; border-radius:1px; background:var(--border); transition:background .3s; }
+    .rssi-bar.b1 { height:4px; } .rssi-bar.b2 { height:7px; } .rssi-bar.b3 { height:10px; } .rssi-bar.b4 { height:14px; }
+    .rssi-bar.on-strong { background:#34d399; } .rssi-bar.on-med { background:#fbbf24; } .rssi-bar.on-weak { background:#f87171; }
+    .rssi-dbm { font-family:'JetBrains Mono',monospace; font-size:.72rem; font-weight:600; min-width:55px; text-align:right; }
+    .rssi-dbm.strong { color:#34d399; } .rssi-dbm.med { color:#fbbf24; } .rssi-dbm.weak { color:#f87171; }
+    .rssi-dbm.waiting { color:var(--text-muted)!important; }
+
+    /* Dew point row */
+    .sensor-dewpoint-row { display:flex; align-items:center; gap:10px; margin-top:4px; padding:6px 10px; background:rgba(255,255,255,.02); border-radius:8px; }
+    .dewpoint-label { font-size:.58rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; min-width:70px; }
+    .dewpoint-value { font-family:'JetBrains Mono',monospace; font-size:.82rem; font-weight:600; color:#a78bfa; }
+    .dewpoint-value.waiting { color:var(--text-muted)!important; font-size:.78rem; }
+    .sensor-env-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px; }
+    .sensor-env-item { display:flex; align-items:center; gap:10px; padding:6px 10px; background:rgba(255,255,255,.02); border-radius:8px; min-height:36px; }
+
+    /* Comfort estimate proxy */
+    .sensor-comfort-row { display:flex; align-items:center; gap:10px; margin-top:4px; padding:6px 10px; background:rgba(255,255,255,.02); border-radius:8px; }
+    .comfort-label { font-size:.58rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; min-width:70px; }
+    .comfort-chip { font-family:'JetBrains Mono',monospace; font-size:.76rem; font-weight:700; border-radius:999px; padding:4px 10px; border:1px solid var(--border); color:var(--text-secondary); }
+    .comfort-chip.waiting { color:var(--text-muted)!important; }
+    .comfort-chip.good { color:#34d399; border-color:rgba(52,211,153,.35); background:rgba(52,211,153,.10); }
+    .comfort-chip.neutral { color:#60a5fa; border-color:rgba(96,165,250,.35); background:rgba(96,165,250,.10); }
+    .comfort-chip.warn { color:#fbbf24; border-color:rgba(251,191,36,.35); background:rgba(251,191,36,.10); }
+    .comfort-chip.bad { color:#f87171; border-color:rgba(248,113,113,.35); background:rgba(248,113,113,.10); }
+    /* Direct styling of the native color picker (Chromium-safe; no synthetic click) */
+.sensor-color-picker {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  outline: none;
+}
+.sensor-color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.sensor-color-picker::-webkit-color-swatch { border: 1px solid var(--border); border-radius: 50%; }
+.sensor-color-picker::-moz-color-swatch { border: 1px solid var(--border); border-radius: 50%; }
+    .comfort-chip.cold { color:#60a5fa; border-color:rgba(96,165,250,.35); background:rgba(96,165,250,.10); }
+    .comfort-chip.hot { color:#f87171; border-color:rgba(248,113,113,.35); background:rgba(248,113,113,.10); }
+
+    /* Staleness indicator */
+    .reading-time.stale-warn { color:#fbbf24!important; }
+    .reading-time.stale-crit { color:#f87171!important; }
+

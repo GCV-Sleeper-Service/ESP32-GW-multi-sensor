@@ -1,0 +1,38 @@
+    /* Top area: gateway column + GPIO */
+    .top-grid { display:grid; grid-template-columns:minmax(0,1.22fr) minmax(0,1fr); gap:14px; margin-bottom:16px; align-items:stretch; }
+    .gateway-column { display:grid; grid-template-rows:auto auto; gap:14px; min-width:0; height:100%; }
+    .gateway-mini-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; }
+    .device-info-card { padding:14px 16px 12px; min-width:0; }
+    .device-info-inner { display:flex; gap:16px; align-items:flex-start; }
+    .device-photo-wrap { flex-shrink:0; }
+    .device-info-details { flex:1; min-width:0; }
+    .device-info-grid { display:grid; grid-template-columns:repeat(2,minmax(180px,1fr)); gap:1px 16px; }
+    .device-info-row { display:flex; gap:8px; align-items:baseline; font-family:'JetBrains Mono',monospace; font-size:.77rem; line-height:1.62; }
+    .device-info-label { color:var(--text-muted); white-space:nowrap; min-width:88px; }
+    .device-info-value { color:var(--text-secondary); word-break:break-word; }
+    .device-info-value.loading { color:var(--text-muted); font-style:italic; }
+
+    .gateway-tool-card { padding:0; overflow:hidden; }
+    .gateway-tool-card .collapse-hdr { margin:0; padding:11px 12px 7px; }
+    .gateway-tool-card .collapse-body { padding:0 12px 12px; }
+    .compact-grid { display:grid; grid-template-columns:1fr; gap:8px; }
+    .compact-btn, .compact-link { display:flex; align-items:center; justify-content:center; min-height:40px; padding:8px 10px; border-radius:8px; font-family:'JetBrains Mono',monospace; font-size:.68rem; text-align:center; text-decoration:none; transition:all .15s; }
+    .compact-btn { background:rgba(255,255,255,.04); color:var(--text-secondary); border:1px solid rgba(255,255,255,.08); cursor:pointer; }
+    .compact-btn:hover { border-color:rgba(255,255,255,.18); color:var(--text-primary); }
+    .compact-btn.warn { background:rgba(251,191,36,.10); color:#fbbf24; border-color:rgba(251,191,36,.30); }
+    .compact-btn.warn:hover { background:rgba(251,191,36,.16); }
+    .compact-btn.danger { background:rgba(248,113,113,.10); color:#f87171; border-color:rgba(248,113,113,.30); }
+    .compact-btn.danger:hover { background:rgba(248,113,113,.16); }
+    .compact-link { border:1px solid rgba(96,165,250,.24); background:rgba(96,165,250,.08); color:#60a5fa; }
+    .compact-link:hover { background:rgba(96,165,250,.14); border-color:rgba(96,165,250,.36); }
+    .gateway-tool-card .mini-status { margin-top:8px; padding-top:6px; font-family:'JetBrains Mono',monospace; font-size:.62rem; color:var(--text-muted); line-height:1.45; }
+
+    .gpio-card { padding:16px; height:100%; }
+    .gpio-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 22px; font-family:'JetBrains Mono',monospace; font-size:.72rem; }
+    .gpio-col-title { color:var(--accent-green); font-weight:600; margin-bottom:4px; font-size:.72rem; }
+    .gpio-row { display:flex; justify-content:space-between; align-items:center; padding:2px 0; border-bottom:1px solid rgba(255,255,255,.03); }
+    .gpio-pin { color:#fbbf24; font-weight:600; min-width:64px; font-size:.78rem; }
+    .gpio-func { color:var(--text-muted); font-size:.68rem; text-align:right; padding-left:10px; }
+    .gpio-note { color:#60a5fa; font-size:.64rem; }
+

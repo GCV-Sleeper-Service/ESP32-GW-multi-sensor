@@ -1,0 +1,8 @@
+    .storage-card { padding:0; overflow:hidden; margin-bottom:16px; }
+    .storage-card .collapse-hdr { margin:0; padding:12px 14px 8px; }
+    .storage-card .collapse-body { padding:0 14px 14px; }
+    .storage-grid-wide { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px 16px; }
+    .storage-item { padding:7px 0; border-bottom:1px solid rgba(255,255,255,.04); min-width:0; }
+    .storage-item-label { display:block; font-family:'JetBrains Mono',monospace; font-size:.60rem; text-transform:uppercase; letter-spacing:.9px; color:var(--text-muted); margin-bottom:3px; }
+    .storage-item-value { display:block; font-family:'JetBrains Mono',monospace; font-size:.69rem; line-height:1.45; color:var(--text-secondary); word-break:break-word; }
+

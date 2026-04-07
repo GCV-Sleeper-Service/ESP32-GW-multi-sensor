@@ -1,0 +1,4 @@
+    /* Telemetry */
+    .telemetry-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:16px; }
+    .telemetry-chart-wrapper { position:relative; height:200px; }
+

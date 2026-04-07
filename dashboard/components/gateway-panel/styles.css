@@ -1,0 +1,40 @@
+    /* ── Aggregator mode UI (v7.5.5.3) ─────────────────────────────── */
+    .gw-selector { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; overflow-x:auto; padding:4px 0; }
+    .gw-tab { font-family:'JetBrains Mono',monospace; font-size:.72rem; padding:5px 14px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all .15s; white-space:nowrap; }
+    .gw-tab:hover { border-color:#666; color:var(--text-secondary); }
+    .gw-tab.active { background:rgba(96,165,250,.14); color:#60a5fa; border-color:rgba(96,165,250,.4); }
+    .gw-tab.gw-offline { border-color:rgba(248,113,113,.4); color:#f87171; }
+    .gw-tab.gw-online { border-color:rgba(52,211,153,.3); }
+    .gw-settings-tab { margin-left:auto; }
+    .gw-summary-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:10px; }
+    .gw-summary-card.gw-stale { opacity:.65; border-color:rgba(248,113,113,.35); }
+    .gw-summary-header { font-family:'JetBrains Mono',monospace; font-size:.82rem; font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .gw-summary-id { color:var(--text-muted); font-weight:400; font-size:.72rem; }
+    .gw-summary-details { font-family:'JetBrains Mono',monospace; font-size:.72rem; color:var(--text-secondary); display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; }
+    .gw-detail-label { color:var(--text-muted); }
+    .gw-status-online { color:#34d399; }
+    .gw-status-offline { color:#f87171; }
+    .gw-stale-overlay { grid-column:1/-1; color:#f87171; font-style:italic; }
+    .settings-panel { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:18px; }
+    .settings-title { font-family:'JetBrains Mono',monospace; font-size:.9rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; }
+    .settings-subtitle { font-family:'JetBrains Mono',monospace; font-size:.72rem; color:var(--text-muted); margin-bottom:16px; }
+    .settings-satellite-card { background:rgba(255,255,255,.02); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:10px; }
+    .settings-sat-header { font-family:'JetBrains Mono',monospace; font-size:.82rem; font-weight:600; color:var(--text-secondary); margin-bottom:8px; }
+    .settings-sat-id { color:var(--text-muted); font-weight:400; }
+    .settings-sat-details { font-family:'JetBrains Mono',monospace; font-size:.72rem; color:var(--text-secondary); display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; }
+    .settings-sat-details code { color:#60a5fa; }
+    .settings-add-form { margin-bottom:16px; padding:12px; border:1px solid var(--border-color,#ccc); border-radius:8px; }
+    .settings-add-row { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+    .settings-input { flex:1; min-width:180px; padding:6px 10px; border:1px solid var(--border-color,#ccc); border-radius:4px; font-size:14px; color-scheme:light dark; }
+    .settings-input-name { flex:0.6; min-width:120px; }
+    .settings-add-actions { display:flex; gap:8px; }
+    .settings-btn { padding:6px 16px; border:1px solid var(--border-color,#ccc); border-radius:4px; cursor:pointer; font-size:14px; color-scheme:light dark; }
+    .settings-btn-test { background:var(--btn-secondary-bg,#e0e0e0); }
+    .settings-btn-add { background:var(--btn-primary-bg,#4CAF50); color:white; }
+    .settings-btn-remove { background:var(--btn-danger-bg,#f44336); color:white; margin-top:8px; font-size:12px; padding:4px 12px; }
+    .settings-status { margin-top:8px; font-size:13px; min-height:20px; }
+    .settings-warning { color:var(--warning-color,#ff9800); font-size:13px; }
+    .settings-empty { color:var(--text-muted,#999); font-style:italic; }
+    :root.light .gw-tab { background:transparent; color:var(--text-muted); }
+    :root.light .gw-tab.active { background:rgba(37,99,235,.1); color:#2563eb; border-color:rgba(37,99,235,.4); }
+    :root.light .settings-satellite-card { background:rgba(0,0,0,.02); }
