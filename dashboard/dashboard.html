@@ -103,7 +103,27 @@
     .export-btn:disabled { opacity:.4; cursor:not-allowed; }
     .export-status { font-family:'JetBrains Mono',monospace; font-size:.62rem; color:var(--text-muted); }
 
-    
+    /* Global responsive breakpoints */
+    @media (max-width:1200px) {
+      .top-grid { grid-template-columns:1fr; }
+      .gateway-mini-grid { grid-template-columns:1fr 1fr; }
+      .storage-grid-wide { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    }
+    @media (max-width:1024px) {
+      .charts-row { grid-template-columns:1fr; }
+      .device-info-grid { grid-template-columns:1fr; }
+      .sensor-grid { grid-template-columns:1fr 1fr; }
+      .storage-grid-wide { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
+    @media (max-width:640px) {
+      body { padding:14px; } h1 { font-size:1.15rem; }
+      .chart-wrapper { height:220px; }
+      .sensor-grid { grid-template-columns:1fr; }
+      .sensor-readings { grid-template-columns:1fr 1fr; }
+      .gateway-mini-grid, .compact-grid, .storage-grid-wide { grid-template-columns:1fr; }
+      .footer { gap:8px; flex-direction:column; align-items:flex-start; }
+    }
+
     /* Top area: gateway column + GPIO */
     .top-grid { display:grid; grid-template-columns:minmax(0,1.22fr) minmax(0,1fr); gap:14px; margin-bottom:16px; align-items:stretch; }
     .gateway-column { display:grid; grid-template-rows:auto auto; gap:14px; min-width:0; height:100%; }
@@ -452,26 +472,6 @@
     }
     /* ── End Custom Date Range Modal ────────────────────────────────────── */
 
-
-    @media (max-width:1200px) {
-      .top-grid { grid-template-columns:1fr; }
-      .gateway-mini-grid { grid-template-columns:1fr 1fr; }
-      .storage-grid-wide { grid-template-columns:repeat(3,minmax(0,1fr)); }
-    }
-    @media (max-width:1024px) {
-      .charts-row { grid-template-columns:1fr; }
-      .device-info-grid { grid-template-columns:1fr; }
-      .sensor-grid { grid-template-columns:1fr 1fr; }
-      .storage-grid-wide { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    }
-    @media (max-width:640px) {
-      body { padding:14px; } h1 { font-size:1.15rem; }
-      .chart-wrapper { height:220px; }
-      .sensor-grid { grid-template-columns:1fr; }
-      .sensor-readings { grid-template-columns:1fr 1fr; }
-      .gateway-mini-grid, .compact-grid, .storage-grid-wide { grid-template-columns:1fr; }
-      .footer { gap:8px; flex-direction:column; align-items:flex-start; }
-    }
 
     /* ── Aggregator mode UI (v7.5.5.3) ─────────────────────────────── */
     .gw-selector { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; overflow-x:auto; padding:4px 0; }
