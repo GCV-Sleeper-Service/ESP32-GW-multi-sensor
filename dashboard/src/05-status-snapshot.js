@@ -1,3 +1,11 @@
+// Device info + telemetry mapping
+var DEVICE_INFO_MAP = {
+  'text_sensor-chip': {el:'di-chip'}, 'text_sensor-features': {el:'di-features'},
+  'text_sensor-cores': {el:'di-cores'}, 'text_sensor-revision': {el:'di-revision'},
+  'text_sensor-cpu_frequency': {el:'di-cpu'}, 'text_sensor-framework': {el:'di-framework'},
+  'text_sensor-esphome_version': {el:'di-esphome'}, 'text_sensor-ip_address': {el:'di-ip'},
+  'text_sensor-mac_address': {el:'di-mac'}, 'text_sensor-reset_reason': {el:'di-reset'}
+};
 var TELEMETRY_IDS = { heap:'sensor-free_heap', uptime:'sensor-uptime', wifi:'sensor-wifi_signal' };
 
 var POLL_SHARED = ['/text_sensor/Current%20Time', '/sensor/WiFi%20Signal'];

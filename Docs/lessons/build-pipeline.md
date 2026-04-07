@@ -564,5 +564,53 @@ For multi-board builds, generated YAMLs inherit `sdkconfig_options` from `firmwa
 
 ---
 
+### LESSON-OPS-116: `provision.sh` is the mandatory entry point for all local board config switching (v7.6.5.3)
+
+**Context:** From Phase X onward the project supports three hardware targets: C3 SuperMini satellite (default/CI-safe), ESP32-S3 aggregator (`agg-s3-16m-1`), and WROOM satellite (`sat-esp32-4m-190`). Each target requires a different `config/gateway.json`, `config/aggregator.json`, and sensor config set. Manually copying or editing these files creates inconsistent states that silently break CI.
+
+**Failure class:** Operator switches board configs by hand (copying `.bak` files or editing `gateway.json` directly), forgets to run `render_sensor_config.py --write` after the switch, and pushes with aggregator config active. CI fails with fixture or preflight errors unrelated to the config switch. Alternatively, the operator runs the regeneration pipeline without switching config first, producing firmware for the wrong board.
+
+**Fix:** `scripts/provision.sh` is the single mandatory entry point. It validates backup files, copies the correct config set, runs `render_sensor_config.py --write` automatically, emits the full 8-step regeneration pipeline as next-step guidance, and warns when the current config is not CI-safe.
+
+**Local device testing workflow (Phase X and beyond):**
+
+```bash
+# 1. Check or switch config
+bash scripts/provision.sh status
+bash scripts/provision.sh aggregator   # or: satellite / wroom
+
+# 2. Run the full 8-step regeneration pipeline
+bash scripts/bundle-dashboard.sh --write
+python3 scripts/render_sensor_config.py --write
+node tests/fixtures/generate-fixtures.js
+python3 scripts/render_sensor_config.py --write
+bash scripts/build-dashboard.sh --write
+bash scripts/minify-dashboard.sh
+bash scripts/generate-header.sh
+python3 scripts/render_sensor_config.py --check
+bash scripts/preflight.sh
+
+# 3. Flash
+esphome clean firmware/esp32-s3-devkitc1-n16r8-gw.yaml   # aggregator example
+esphome run   firmware/esp32-s3-devkitc1-n16r8-gw.yaml
+
+# 4. BEFORE pushing — mandatory return to CI-safe state
+bash scripts/provision.sh satellite
+bash scripts/preflight.sh
+```
+
+**Note on double-render:** `provision.sh` internally calls `render_sensor_config.py --write` on every switch. The 8-step pipeline then calls it again as Step 2. This is intentional — the bundle step (Step 1) overwrites `dashboard.js`, erasing the marker injection from the provision switch. Step 2 re-injects.
+
+**Critical Rule 49.**
+
+---
+
+### LESSON-OPS-117: `bundle-dashboard.sh --check` must strip SENSOR_MANIFEST marker blocks before diffing (v7.6.5.3)
+
+**Context:** `render_sensor_config.py --write` legitimately post-modifies `SENSOR_MANIFEST` marker blocks inside `dashboard.js` after bundling. These blocks are injection targets (sensor definitions from the active config), not source code. A naive `diff` between a fresh bundle from `dashboard/src/` and the committed `dashboard.js` will always fail after a full pipeline run because the committed version has been post-modified.
+
+**Fix (commit a30ae4f):** `bundle-dashboard.sh --check` now uses a `strip_manifest_blocks()` function to remove all `// <<< SENSOR_MANIFEST:*_BEGIN >>> ... // <<< SENSOR_MANIFEST:*_END >>>` blocks from both files before diffing. Everything outside those blocks — all actual source code — is still fully validated.
+
+**Implication:** Changes inside SENSOR_MANIFEST blocks will not be caught by the bundle sync check. This is by design — those blocks are managed by `render_sensor_config.py`, not by source modules.
 
 ---

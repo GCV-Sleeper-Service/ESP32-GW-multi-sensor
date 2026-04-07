@@ -11,6 +11,8 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 - **Bump-version:** `scripts/bump-version.sh` no longer uses `sed` to directly edit `dashboard.html`; version update flows entirely through the bump-version subset pipeline (`bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `build-dashboard.sh --write`)
 - **Docs:** Added LESSON-OPS-043 resolution note to `Docs/lessons/dashboard.md` — structurally resolved at v7.6.5.3
 - **Artifact:** `dashboard/dashboard.html` regenerated with `<!-- GENERATED -->` header
+- **Post-merge fixup (a30ae4f):** `scripts/bundle-dashboard.sh` `--check` mode now strips `SENSOR_MANIFEST` marker blocks before diffing — these blocks are injection targets post-modified by `render_sensor_config.py`, not source code (LESSON-OPS-117)
+- **Post-merge fixup (PR #135 squash):** `scripts/provision.sh` restored and extended — mandatory entry point for all board config switching (LESSON-OPS-116, Critical Rule 49)
 
 ### Canonical Regeneration Pipeline (full manual regeneration — 8 steps)
 

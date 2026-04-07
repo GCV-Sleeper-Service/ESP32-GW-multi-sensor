@@ -85,6 +85,7 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | BUG-079 | firmware.md |
 | BUG-080 | dashboard.md |
 | BUG-081 | dashboard.md |
+| BUG-082 | dashboard.md |
 | LESSON-OPS-001 | build-pipeline.md |
 | LESSON-OPS-002 | build-pipeline.md |
 | LESSON-OPS-003 | testing.md |
@@ -163,6 +164,17 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-078 | dashboard.md |
 | LESSON-OPS-079 | testing.md |
 | LESSON-OPS-085 | firmware.md |
+| LESSON-OPS-086 | build-pipeline.md |
+| LESSON-OPS-087 | build-pipeline.md |
+| LESSON-OPS-088 | build-pipeline.md |
+| LESSON-OPS-089 | build-pipeline.md |
+| LESSON-OPS-090 | build-pipeline.md |
+| LESSON-OPS-091 | build-pipeline.md |
+| LESSON-OPS-092 | build-pipeline.md |
+| LESSON-OPS-093 | build-pipeline.md |
+| LESSON-OPS-094 | build-pipeline.md |
+| LESSON-OPS-095 | build-pipeline.md |
+| LESSON-OPS-096 | build-pipeline.md |
 | LESSON-OPS-097 | build-pipeline.md |
 | LESSON-OPS-098 | build-pipeline.md |
 | LESSON-OPS-099 | dashboard.md |
@@ -182,3 +194,5 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-113 | testing.md |
 | LESSON-OPS-114 | testing.md |
 | LESSON-OPS-115 | build-pipeline.md |
+| LESSON-OPS-116 | build-pipeline.md |
+| LESSON-OPS-117 | build-pipeline.md |

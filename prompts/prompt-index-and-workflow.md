@@ -393,7 +393,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 46 | Mock server response shapes must be verified against the live firmware `httpd_resp_sendstr()` call — not the prompt description, not an audit table, not a prior session summary. The firmware contract is the single source of truth. | LESSON-OPS-112 |
 | 47 | `dashboard.html` is a GENERATED artifact from v7.6.5.3 onward — it must always open with `<!-- GENERATED — Do not edit. … -->`. Never hand-edit `dashboard.html`. All changes go into `dashboard/dashboard.tmpl.html` (structure) or `dashboard/src/*.js` modules (logic). | LESSON-OPS-043 resolution / v7.6.5.3 |
 | 48 | CI `browser-tests.yml` path filters must include ALL scripts that can change checked artifacts (`scripts/bundle-dashboard.sh`, `scripts/build-dashboard.sh`, `scripts/render_sensor_config.py`, `scripts/minify-dashboard.sh`, `scripts/generate-header.sh`). Omitting a script allows script-only changes to bypass CI. | v7.6.5.3 PR #135 review finding |
-| 49 | Always use `bash scripts/provision.sh <target>` to switch board configs (aggregator / satellite / wroom). Never copy `.bak` files or edit `gateway.json` by hand. Run `bash scripts/provision.sh satellite` + `bash scripts/preflight.sh` BEFORE every `git push`. `scripts/provision.sh` must never be removed from the repo. | LESSON-OPS-049 / v7.6.5.8 |
+| 49 | Always use `bash scripts/provision.sh <target>` to switch board configs (aggregator / satellite / wroom). Never copy `.bak` files or edit `gateway.json` by hand. Run `bash scripts/provision.sh satellite` + `bash scripts/preflight.sh` BEFORE every `git push`. `scripts/provision.sh` must never be removed from the repo. | LESSON-OPS-116 / v7.6.5.3 |
 ---
 
 ## Prompt File Naming Convention
