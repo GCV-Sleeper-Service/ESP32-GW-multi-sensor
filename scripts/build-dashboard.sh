@@ -42,7 +42,8 @@ if placeholder_count != 1:
         file=sys.stderr,
     )
     sys.exit(1)
-out = tmpl.replace(placeholder, js, 1)
+header = '<!-- GENERATED \u2014 Do not edit. Source: dashboard/dashboard.tmpl.html + dashboard/dashboard.js (bundled from dashboard/src/*.js) -->\n'.encode('utf-8')
+out = header + tmpl.replace(placeholder, js, 1)
 out_path = os.path.join(os.path.dirname(sys.argv[1]), 'dashboard.html')
 mode = sys.argv[3]
 if mode == '--check':

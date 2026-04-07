@@ -11,6 +11,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'scripts/preflight.sh'
+      - 'scripts/build-dashboard.sh'
+      - 'scripts/bundle-dashboard.sh'
   pull_request:
     branches: [main]
     paths:
@@ -20,6 +22,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'scripts/preflight.sh'
+      - 'scripts/build-dashboard.sh'
+      - 'scripts/bundle-dashboard.sh'
 
 jobs:
   browser-tests:
@@ -51,6 +55,10 @@ jobs:
       - name: Verify dashboard bundle sync
         if: matrix.fixture_set == '3sensor'
         run: bash scripts/bundle-dashboard.sh --check
+
+      - name: Verify dashboard HTML matches build
+        if: matrix.fixture_set == '3sensor'
+        run: bash scripts/build-dashboard.sh --check
 
       # Cache Playwright browser binaries between runs.
       # Key includes the Playwright version from package-lock.json — cache
