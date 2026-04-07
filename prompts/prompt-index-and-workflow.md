@@ -1,8 +1,8 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-06 — Phase X Level 2 complete (v7.6.5.3 retire manual mirror + CI build gate; v7.6.5.2 template creation + build-dashboard.sh); Level 1 complete (v7.6.5.1 CI + preflight wiring, v7.6.5.0 module split); Phase X documentation restructuring (v7.6.4.0) complete; Related Documents updated to reference domain-scoped files_
-reference domain-scoped files__Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
+_Last updated: 2026-04-07 — Phase X Level 3 in progress: v7.6.5.4 component directory scaffolding complete (PR #145); identity gate PASS; import-panel plan correction (LESSON-OPS-118); v7.6.5.5 is next_
+_reference domain-scoped files__Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
 
@@ -259,11 +259,26 @@ All steps shipped. No prompts needed.
 | v7.6.5.1 | CI + preflight wiring | `prompts/phaseX/v7.6.5.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
 | v7.6.5.2 | Template creation | `prompts/phaseX/v7.6.5.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
 | v7.6.5.3 | Retire manual mirror | `prompts/phaseX/v7.6.5.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
-| v7.6.5.4 | Component directories | `prompts/phaseX/v7.6.5.4-implementation-instructions-for-coding-agent.md` | Pending |
-| v7.6.5.5 | HTML template extraction | `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.4 | Component directories | `prompts/phaseX/v7.6.5.4-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
+| v7.6.5.5 | HTML template extraction | `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` | ⬅ Next |
 | v7.6.5.6 | CSS extraction | `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | Pending |
+
+**v7.6.5.4 delivery summary (PR #145):**
+- Created `dashboard/core/` (8 files) and `dashboard/components/` (9 subdirectories with `index.js`)
+- 14 individual file moves + 3 concatenations (`09+10 → settings-panel`, `14+15 → sensor-cards`, `17+18 → live-view`)
+- **Plan correction:** `src/13-import.js` moved to `components/import-panel/index.js` as a separate component — concatenation into `settings-panel` was physically impossible without breaking byte order (modules 11 and 12 sit between 10 and 13); FILES array is 18 entries (not 17 as planned)
+- `import-panel` is JS-only — no HTML template, no CSS; excluded from v7.6.5.5 (HTML extraction) and v7.6.5.6 (CSS extraction)
+- `scripts/bundle-dashboard.sh` updated — 21-entry `MODULES`/`src/` array replaced with 18-entry `FILES` array using `dashboard/core/` and `dashboard/components/*/index.js` paths
+- `scripts/bump-version.sh` updated — `App.version` sed target updated to `dashboard/core/app-shell.js`
+- `scripts/build-dashboard.sh` updated — `<!-- GENERATED -->` header source path updated
+- `dashboard/src/` fully removed
+- Identity gate: PASS (version-normalized SHA256 match confirmed)
+- All Playwright tests pass; preflight passes
+- Documentation fixup commit (post-merge): `Docs/changelog.md` corrected (17-entry → 18-entry, plan correction section added)
+- Consolidated audit: `prompts/phaseX/v7.6.5.4-PR145-consolidated-audit-and-lessons.md`
+- Device testing: not applicable (pure file moves, identity gate substitutes)
 
 **v7.6.5.3 delivery summary (PR #135):**
 - `scripts/build-dashboard.sh` modified — `<!-- GENERATED -->` header prepended to all `--write` output
@@ -394,6 +409,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 47 | `dashboard.html` is a GENERATED artifact from v7.6.5.3 onward — it must always open with `<!-- GENERATED — Do not edit. … -->`. Never hand-edit `dashboard.html`. All changes go into `dashboard/dashboard.tmpl.html` (structure) or `dashboard/src/*.js` modules (logic). | LESSON-OPS-043 resolution / v7.6.5.3 |
 | 48 | CI `browser-tests.yml` path filters must include ALL scripts that can change checked artifacts (`scripts/bundle-dashboard.sh`, `scripts/build-dashboard.sh`, `scripts/render_sensor_config.py`, `scripts/minify-dashboard.sh`, `scripts/generate-header.sh`). Omitting a script allows script-only changes to bypass CI. | v7.6.5.3 PR #135 review finding |
 | 49 | Always use `bash scripts/provision.sh <target>` to switch board configs (aggregator / satellite / wroom). Never copy `.bak` files or edit `gateway.json` by hand. Run `bash scripts/provision.sh satellite` + `bash scripts/preflight.sh` BEFORE every `git push`. `scripts/provision.sh` must never be removed from the repo. | LESSON-OPS-116 / v7.6.5.3 |
+| 50 | When planning file concatenations for non-contiguous modules, verify that all source modules in the group are physically adjacent in the bundle output. Modules can only be safely concatenated if contiguous. If intervening modules exist, keep them as separate components — the identity gate will catch violations but the plan should catch them first. | LESSON-OPS-118 / v7.6.5.4 |
 ---
 
 ## Prompt File Naming Convention
@@ -449,6 +465,20 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-04-07 — v7.6.5.4 Complete: Phase X Level 3 Component Directory Scaffolding
+
+| Change | Why |
+|--------|-----|
+| **v7.6.5.4 marked complete** | PR #145 merged — `dashboard/core/` and `dashboard/components/` created; 14 file moves + 3 concatenations; `dashboard/src/` removed; identity gate PASS |
+| **Plan correction: import-panel as separate component** | `src/13-import.js` could not be concatenated into `settings-panel` without breaking byte order (modules 11 and 12 are physically between 10 and 13); `import-panel/index.js` created as a 9th component; FILES array is 18 entries (not 17); classified as plan correction, not agent error |
+| **`bundle-dashboard.sh` FILES array updated** | 21-entry `MODULES`/`src/` array replaced with 18-entry `FILES` array using `dashboard/core/` and `dashboard/components/*/index.js` paths; loop variable `mod` → `src` |
+| **`bump-version.sh` path updated** | `App.version` sed target changed from `dashboard/src/00-app-shell.js` to `dashboard/core/app-shell.js` |
+| **`build-dashboard.sh` header updated** | `<!-- GENERATED -->` source path updated to reflect new component directory structure |
+| **Post-merge documentation fixup** | `Docs/changelog.md` corrected: "17-entry" → "18-entry", plan correction section added; `prompts/phaseX/v7.6.5.4-PR145-consolidated-audit-and-lessons.md` created |
+| **Critical Rule 50 added** | LESSON-OPS-118: non-contiguous module concatenation breaks byte order — verify physical adjacency before specifying concatenations in architecture plans |
+| **v7.6.5.5 is next** | HTML template extraction for 8 template-bearing components (import-panel excluded — JS-only) |
+| **Document header `_Last updated_` refreshed** | Reflects 2026-04-07 and v7.6.5.4 closure state |
 
 ### 2026-04-06 — v7.6.5.3 Complete: Phase X Level 2 Retire Manual Mirror + CI Build Gate
 
