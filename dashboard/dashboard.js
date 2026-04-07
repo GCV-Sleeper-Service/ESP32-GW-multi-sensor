@@ -39,7 +39,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.6.5.3';
+App.version = 'v7.6.5.4';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -1682,262 +1682,6 @@ var storageStatsIntervalId = null;
 var statusSnapshotIntervalId = null;
 var historyBootstrapTimerId = null;
 
-function isImportActive() {
-  return !!importState.active;
-}
-
-function stopPolling() {
-  if (pollingLiveIntervalId) {
-    clearInterval(pollingLiveIntervalId);
-    pollingLiveIntervalId = null;
-  }
-  if (pollingDeviceIntervalId) {
-    clearInterval(pollingDeviceIntervalId);
-    pollingDeviceIntervalId = null;
-  }
-}
-
-function stopStorageRefresh() {
-  if (storageStatsIntervalId) {
-    clearInterval(storageStatsIntervalId);
-    storageStatsIntervalId = null;
-  }
-}
-
-function stopStatusRefresh() {
-  if (statusSnapshotIntervalId) {
-    clearInterval(statusSnapshotIntervalId);
-    statusSnapshotIntervalId = null;
-  }
-}
-
-function suspendDashboardNetworkActivity(statusEl) {
-  importState.active = true;
-  importState.startedAt = Date.now();
-  stopPolling();
-  stopStorageRefresh();
-  stopStatusRefresh();
-  if (historyBootstrapTimerId) {
-    clearTimeout(historyBootstrapTimerId);
-    historyBootstrapTimerId = null;
-  }
-  if (evtSource) {
-    // BUG-049: Null out all callbacks BEFORE calling close(). Firefox's Gecko
-    // engine keeps the SSE TCP socket alive if callbacks are still attached,
-    // causing browserContext.close() to hang during Playwright teardown.
-    evtSource.onopen = null;
-    evtSource.onerror = null;
-    evtSource.onmessage = null;
-    try { evtSource.close(); } catch (_e) {}
-    evtSource = null;
-  }
-  if (statusEl) statusEl.textContent = 'Pausing dashboard refresh during import...';
-}
-
-function resumeDashboardNetworkActivity() {
-  importState.active = false;
-  if (TRANSPORT === 'sse') {
-    try { connectSSE(); } catch (e) { logNonFatal('resume SSE after import', e); }
-  } else {
-    try { startPolling(); } catch (e2) { logNonFatal('resume polling after import', e2); }
-  }
-  // BUG-037 Fix 8: storage stats interval 120s (matching boot sequence)
-  if (!storageStatsIntervalId) {
-    storageStatsIntervalId = setInterval(function() {
-      if (isImportActive()) return;
-      loadStorageStats().catch(function(){});
-    }, 120000);
-  }
-  // BUG-037 Fix 5: status interval only in polling mode (matching boot sequence)
-  if (!statusSnapshotIntervalId && TRANSPORT !== 'sse') {
-    statusSnapshotIntervalId = setInterval(function() {
-      if (isImportActive()) return;
-      loadStatusSnapshot().catch(function(){});
-    }, 30000);
-  }
-}
-
-function isTransientImportError(err) {
-  var msg = (err && err.message ? err.message : String(err || '')).toLowerCase();
-  if (!msg) return false;
-  return /http\s+(502|503|504|520|522|524)\b/.test(msg) ||
-    msg.indexOf('failed to fetch') >= 0 ||
-    msg.indexOf('networkerror') >= 0 ||
-    msg.indexOf('load failed') >= 0 ||
-    msg.indexOf('bad gateway') >= 0 ||
-    msg.indexOf('connection reset') >= 0;
-}
-
-function importFetchJsonWithRetry(url, options, label, statusEl, attempt) {
-  var tryNum = Number(attempt || 1);
-  return fetch(url, options)
-    .then(safeJsonResponse)
-    .catch(function(err) {
-      if (!isTransientImportError(err) || tryNum >= 3) throw err;
-      var waitMs = 500 * Math.pow(2, tryNum - 1);
-      if (statusEl) {
-        statusEl.textContent = 'Transient tunnel/origin error during ' + label +
-          '; retrying in ' + waitMs + ' ms (attempt ' + (tryNum + 1) + '/3)...';
-      }
-      return delay(waitMs).then(function() {
-        return importFetchJsonWithRetry(url, options, label, statusEl, tryNum + 1);
-      });
-    });
-}
-
-function requestManagementCredentials(actionLabel) {
-  return new Promise(function(resolve, reject) {
-    var modal = document.getElementById('authModal');
-    var title = document.getElementById('authTitle');
-    var subtitle = document.getElementById('authSubtitle');
-    var userInput = document.getElementById('authUsername');
-    var passInput = document.getElementById('authPassword');
-    var toggleBtn = document.getElementById('authToggle');
-    var errorEl = document.getElementById('authError');
-    var cancelBtn = document.getElementById('authCancel');
-    var submitBtn = document.getElementById('authSubmit');
-    if (!modal || !title || !subtitle || !userInput || !passInput || !toggleBtn || !errorEl || !cancelBtn || !submitBtn) {
-      reject(new Error('Authentication dialog is unavailable'));
-      return;
-    }
-
-    title.textContent = 'Management authentication required';
-    subtitle.textContent = 'Authentication required for ' + actionLabel + '. Enter the case-sensitive management credentials to continue.';
-    userInput.value = '';
-    passInput.value = '';
-    passInput.type = 'password';
-    toggleBtn.setAttribute('aria-label', 'Show password');
-    toggleBtn.setAttribute('title', 'Show password');
-    errorEl.textContent = '';
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden', 'false');
-
-    var settled = false;
-    function cleanup() {
-      toggleBtn.removeEventListener('click', onToggle);
-      cancelBtn.removeEventListener('click', onCancel);
-      submitBtn.removeEventListener('click', onSubmit);
-      userInput.removeEventListener('keydown', onKeyDown);
-      passInput.removeEventListener('keydown', onKeyDown);
-      modal.removeEventListener('click', onBackdropClick);
-      document.removeEventListener('keydown', onEscape, true);
-      modal.classList.add('hidden');
-      modal.setAttribute('aria-hidden', 'true');
-    }
-    function finish(value, isError) {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      if (isError) reject(value);
-      else resolve(value);
-    }
-    function onToggle() {
-      var show = passInput.type === 'password';
-      passInput.type = show ? 'text' : 'password';
-      toggleBtn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-      toggleBtn.setAttribute('title', show ? 'Hide password' : 'Show password');
-      passInput.focus();
-      try { passInput.setSelectionRange(passInput.value.length, passInput.value.length); } catch (e) {}
-    }
-    function validateAndSubmit() {
-      var username = String(userInput.value || '').trim();
-      var password = String(passInput.value || '');
-      if (!username) {
-        errorEl.textContent = 'Management username is required.';
-        userInput.focus();
-        return;
-      }
-      if (!password) {
-        errorEl.textContent = 'Management password is required.';
-        passInput.focus();
-        return;
-      }
-      finish({ username: username, password: password }, false);
-    }
-    function onCancel() { finish(null, false); }
-    function onSubmit() { validateAndSubmit(); }
-    function onKeyDown(ev) {
-      if (ev.key === 'Enter') {
-        ev.preventDefault();
-        validateAndSubmit();
-      }
-    }
-    function onEscape(ev) {
-      if (ev.key === 'Escape') {
-        ev.preventDefault();
-        finish(null, false);
-      }
-    }
-    function onBackdropClick(ev) {
-      if (ev.target === modal) finish(null, false);
-    }
-
-    toggleBtn.addEventListener('click', onToggle);
-    cancelBtn.addEventListener('click', onCancel);
-    submitBtn.addEventListener('click', onSubmit);
-    userInput.addEventListener('keydown', onKeyDown);
-    passInput.addEventListener('keydown', onKeyDown);
-    modal.addEventListener('click', onBackdropClick);
-    document.addEventListener('keydown', onEscape, true);
-    window.setTimeout(function() { userInput.focus(); userInput.select(); }, 0);
-  });
-}
-
-function postManagementAction(path, busyText, actionLabel) {
-  var statusEl = document.getElementById('mgmt-status');
-  return requestManagementCredentials(actionLabel)
-    .then(function(creds) {
-      if (!creds) {
-        if (statusEl) statusEl.textContent = 'Action cancelled';
-        throw new Error('Authentication cancelled');
-      }
-      if (statusEl) statusEl.textContent = busyText;
-      return fetch(ESP_HOST + path, {
-          method: 'POST',
-          cache: 'no-store',
-          headers: {
-            'Authorization': 'Basic ' + btoa(creds.username + ':' + creds.password),
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: 'a=1'
-        });
-    })
-    .then(function(r) {
-      return r.json().catch(function(){ return {ok:false, message:'Invalid JSON response'}; }).then(function(data) {
-        if (!r.ok || !data.ok) {
-          var msg = data.message || ('HTTP ' + r.status);
-          throw new Error(msg);
-        }
-        return data;
-      });
-    })
-    .then(function(data) {
-      if (statusEl) statusEl.textContent = data.message || 'Done';
-      return data;
-    })
-    .catch(function(err) {
-      if (statusEl) statusEl.textContent = err.message === 'Authentication cancelled' ? 'Action cancelled' : 'Action failed: ' + err.message;
-      throw err;
-    });
-}
-
-function rebootESP() {
-  if (!confirm('Reboot this ESP32 gateway now? The dashboard connection will drop briefly.')) return;
-  postManagementAction('/api/reboot', 'Scheduling reboot...', 'gateway reboot').catch(function(){});
-}
-
-function deleteHistoryData() {
-  if (!confirm('Delete persisted sensor history from the dedicated history partition and clear RAM history on the ESP?')) return;
-  postManagementAction('/api/delete-data', 'Deleting history...', 'history deletion').then(function() {
-    resetHistoryVisuals();
-    loadStorageStats().catch(function(){});
-  }).catch(function(){});
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// Import v1 — CSV import into NVS history
-// ═══════════════════════════════════════════════════════════════════
-
 function importHistoryData() {
   var statusEl = document.getElementById('mgmt-status');
   var fileInput = document.getElementById('importFileInput');
@@ -2363,6 +2107,262 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
     }
   });
 }
+
+function isImportActive() {
+  return !!importState.active;
+}
+
+function stopPolling() {
+  if (pollingLiveIntervalId) {
+    clearInterval(pollingLiveIntervalId);
+    pollingLiveIntervalId = null;
+  }
+  if (pollingDeviceIntervalId) {
+    clearInterval(pollingDeviceIntervalId);
+    pollingDeviceIntervalId = null;
+  }
+}
+
+function stopStorageRefresh() {
+  if (storageStatsIntervalId) {
+    clearInterval(storageStatsIntervalId);
+    storageStatsIntervalId = null;
+  }
+}
+
+function stopStatusRefresh() {
+  if (statusSnapshotIntervalId) {
+    clearInterval(statusSnapshotIntervalId);
+    statusSnapshotIntervalId = null;
+  }
+}
+
+function suspendDashboardNetworkActivity(statusEl) {
+  importState.active = true;
+  importState.startedAt = Date.now();
+  stopPolling();
+  stopStorageRefresh();
+  stopStatusRefresh();
+  if (historyBootstrapTimerId) {
+    clearTimeout(historyBootstrapTimerId);
+    historyBootstrapTimerId = null;
+  }
+  if (evtSource) {
+    // BUG-049: Null out all callbacks BEFORE calling close(). Firefox's Gecko
+    // engine keeps the SSE TCP socket alive if callbacks are still attached,
+    // causing browserContext.close() to hang during Playwright teardown.
+    evtSource.onopen = null;
+    evtSource.onerror = null;
+    evtSource.onmessage = null;
+    try { evtSource.close(); } catch (_e) {}
+    evtSource = null;
+  }
+  if (statusEl) statusEl.textContent = 'Pausing dashboard refresh during import...';
+}
+
+function resumeDashboardNetworkActivity() {
+  importState.active = false;
+  if (TRANSPORT === 'sse') {
+    try { connectSSE(); } catch (e) { logNonFatal('resume SSE after import', e); }
+  } else {
+    try { startPolling(); } catch (e2) { logNonFatal('resume polling after import', e2); }
+  }
+  // BUG-037 Fix 8: storage stats interval 120s (matching boot sequence)
+  if (!storageStatsIntervalId) {
+    storageStatsIntervalId = setInterval(function() {
+      if (isImportActive()) return;
+      loadStorageStats().catch(function(){});
+    }, 120000);
+  }
+  // BUG-037 Fix 5: status interval only in polling mode (matching boot sequence)
+  if (!statusSnapshotIntervalId && TRANSPORT !== 'sse') {
+    statusSnapshotIntervalId = setInterval(function() {
+      if (isImportActive()) return;
+      loadStatusSnapshot().catch(function(){});
+    }, 30000);
+  }
+}
+
+function isTransientImportError(err) {
+  var msg = (err && err.message ? err.message : String(err || '')).toLowerCase();
+  if (!msg) return false;
+  return /http\s+(502|503|504|520|522|524)\b/.test(msg) ||
+    msg.indexOf('failed to fetch') >= 0 ||
+    msg.indexOf('networkerror') >= 0 ||
+    msg.indexOf('load failed') >= 0 ||
+    msg.indexOf('bad gateway') >= 0 ||
+    msg.indexOf('connection reset') >= 0;
+}
+
+function importFetchJsonWithRetry(url, options, label, statusEl, attempt) {
+  var tryNum = Number(attempt || 1);
+  return fetch(url, options)
+    .then(safeJsonResponse)
+    .catch(function(err) {
+      if (!isTransientImportError(err) || tryNum >= 3) throw err;
+      var waitMs = 500 * Math.pow(2, tryNum - 1);
+      if (statusEl) {
+        statusEl.textContent = 'Transient tunnel/origin error during ' + label +
+          '; retrying in ' + waitMs + ' ms (attempt ' + (tryNum + 1) + '/3)...';
+      }
+      return delay(waitMs).then(function() {
+        return importFetchJsonWithRetry(url, options, label, statusEl, tryNum + 1);
+      });
+    });
+}
+
+function requestManagementCredentials(actionLabel) {
+  return new Promise(function(resolve, reject) {
+    var modal = document.getElementById('authModal');
+    var title = document.getElementById('authTitle');
+    var subtitle = document.getElementById('authSubtitle');
+    var userInput = document.getElementById('authUsername');
+    var passInput = document.getElementById('authPassword');
+    var toggleBtn = document.getElementById('authToggle');
+    var errorEl = document.getElementById('authError');
+    var cancelBtn = document.getElementById('authCancel');
+    var submitBtn = document.getElementById('authSubmit');
+    if (!modal || !title || !subtitle || !userInput || !passInput || !toggleBtn || !errorEl || !cancelBtn || !submitBtn) {
+      reject(new Error('Authentication dialog is unavailable'));
+      return;
+    }
+
+    title.textContent = 'Management authentication required';
+    subtitle.textContent = 'Authentication required for ' + actionLabel + '. Enter the case-sensitive management credentials to continue.';
+    userInput.value = '';
+    passInput.value = '';
+    passInput.type = 'password';
+    toggleBtn.setAttribute('aria-label', 'Show password');
+    toggleBtn.setAttribute('title', 'Show password');
+    errorEl.textContent = '';
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+
+    var settled = false;
+    function cleanup() {
+      toggleBtn.removeEventListener('click', onToggle);
+      cancelBtn.removeEventListener('click', onCancel);
+      submitBtn.removeEventListener('click', onSubmit);
+      userInput.removeEventListener('keydown', onKeyDown);
+      passInput.removeEventListener('keydown', onKeyDown);
+      modal.removeEventListener('click', onBackdropClick);
+      document.removeEventListener('keydown', onEscape, true);
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+    function finish(value, isError) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (isError) reject(value);
+      else resolve(value);
+    }
+    function onToggle() {
+      var show = passInput.type === 'password';
+      passInput.type = show ? 'text' : 'password';
+      toggleBtn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      toggleBtn.setAttribute('title', show ? 'Hide password' : 'Show password');
+      passInput.focus();
+      try { passInput.setSelectionRange(passInput.value.length, passInput.value.length); } catch (e) {}
+    }
+    function validateAndSubmit() {
+      var username = String(userInput.value || '').trim();
+      var password = String(passInput.value || '');
+      if (!username) {
+        errorEl.textContent = 'Management username is required.';
+        userInput.focus();
+        return;
+      }
+      if (!password) {
+        errorEl.textContent = 'Management password is required.';
+        passInput.focus();
+        return;
+      }
+      finish({ username: username, password: password }, false);
+    }
+    function onCancel() { finish(null, false); }
+    function onSubmit() { validateAndSubmit(); }
+    function onKeyDown(ev) {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        validateAndSubmit();
+      }
+    }
+    function onEscape(ev) {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        finish(null, false);
+      }
+    }
+    function onBackdropClick(ev) {
+      if (ev.target === modal) finish(null, false);
+    }
+
+    toggleBtn.addEventListener('click', onToggle);
+    cancelBtn.addEventListener('click', onCancel);
+    submitBtn.addEventListener('click', onSubmit);
+    userInput.addEventListener('keydown', onKeyDown);
+    passInput.addEventListener('keydown', onKeyDown);
+    modal.addEventListener('click', onBackdropClick);
+    document.addEventListener('keydown', onEscape, true);
+    window.setTimeout(function() { userInput.focus(); userInput.select(); }, 0);
+  });
+}
+
+function postManagementAction(path, busyText, actionLabel) {
+  var statusEl = document.getElementById('mgmt-status');
+  return requestManagementCredentials(actionLabel)
+    .then(function(creds) {
+      if (!creds) {
+        if (statusEl) statusEl.textContent = 'Action cancelled';
+        throw new Error('Authentication cancelled');
+      }
+      if (statusEl) statusEl.textContent = busyText;
+      return fetch(ESP_HOST + path, {
+          method: 'POST',
+          cache: 'no-store',
+          headers: {
+            'Authorization': 'Basic ' + btoa(creds.username + ':' + creds.password),
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: 'a=1'
+        });
+    })
+    .then(function(r) {
+      return r.json().catch(function(){ return {ok:false, message:'Invalid JSON response'}; }).then(function(data) {
+        if (!r.ok || !data.ok) {
+          var msg = data.message || ('HTTP ' + r.status);
+          throw new Error(msg);
+        }
+        return data;
+      });
+    })
+    .then(function(data) {
+      if (statusEl) statusEl.textContent = data.message || 'Done';
+      return data;
+    })
+    .catch(function(err) {
+      if (statusEl) statusEl.textContent = err.message === 'Authentication cancelled' ? 'Action cancelled' : 'Action failed: ' + err.message;
+      throw err;
+    });
+}
+
+function rebootESP() {
+  if (!confirm('Reboot this ESP32 gateway now? The dashboard connection will drop briefly.')) return;
+  postManagementAction('/api/reboot', 'Scheduling reboot...', 'gateway reboot').catch(function(){});
+}
+
+function deleteHistoryData() {
+  if (!confirm('Delete persisted sensor history from the dedicated history partition and clear RAM history on the ESP?')) return;
+  postManagementAction('/api/delete-data', 'Deleting history...', 'history deletion').then(function() {
+    resetHistoryVisuals();
+    loadStorageStats().catch(function(){});
+  }).catch(function(){});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Import v1 — CSV import into NVS history
+// ═══════════════════════════════════════════════════════════════════
 
 function updateBadge() {
   var badge = document.getElementById('histBadge'), total = historyPoints + liveAvgPoints;
