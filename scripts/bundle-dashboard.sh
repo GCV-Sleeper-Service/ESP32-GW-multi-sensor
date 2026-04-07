@@ -55,12 +55,34 @@ case "$MODE" in
   *) usage ;;
 esac
 
+# Strip all SENSOR_MANIFEST marker blocks (begin..end inclusive) from a file.
+# render_sensor_config.py legitimately post-modifies these blocks after bundling,
+# so the --check diff must ignore them to avoid false failures.
+strip_manifest_blocks() {
+  python3 - "$1" <<'PYEOF'
+import re, sys
+text = open(sys.argv[1]).read()
+text = re.sub(
+    r'// <<< SENSOR_MANIFEST:[A-Z_]+_BEGIN >>>.*?// <<< SENSOR_MANIFEST:[A-Z_]+_END >>>',
+    '',
+    text,
+    flags=re.S
+)
+print(text, end='')
+PYEOF
+}
+
 if [[ "$MODE" == "--check" ]]; then
-  if diff -q "$TMP" "$OUT" >/dev/null 2>&1; then
+  TMP_STRIPPED=$(mktemp)
+  OUT_STRIPPED=$(mktemp)
+  trap 'rm -f "$TMP" "$TMP_STRIPPED" "$OUT_STRIPPED"' EXIT
+  strip_manifest_blocks "$TMP" > "$TMP_STRIPPED"
+  strip_manifest_blocks "$OUT" > "$OUT_STRIPPED"
+  if diff -q "$TMP_STRIPPED" "$OUT_STRIPPED" >/dev/null 2>&1; then
     echo "OK: dashboard.js matches source modules"
   else
     echo "FAIL: dashboard.js is out of sync with source modules"
-    diff "$TMP" "$OUT" | head -20
+    diff "$TMP_STRIPPED" "$OUT_STRIPPED" | head -20
     exit 1
   fi
 else
