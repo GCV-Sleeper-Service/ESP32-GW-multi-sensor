@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-06 — Phase X Level 2 complete (v7.6.5.2 template creation + build-dashboard.sh); Level 1 complete (v7.6.5.1 CI + preflight wiring, v7.6.5.0 module split); Phase X documentation restructuring (v7.6.4.0) complete; Related Documents updated to reference domain-scoped files_
+_Last updated: 2026-04-06 — Phase X Level 2 complete (v7.6.5.3 retire manual mirror + CI build gate; v7.6.5.2 template creation + build-dashboard.sh); Level 1 complete (v7.6.5.1 CI + preflight wiring, v7.6.5.0 module split); Phase X documentation restructuring (v7.6.4.0) complete; Related Documents updated to reference domain-scoped files_
 reference domain-scoped files__Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -258,12 +258,24 @@ All steps shipped. No prompts needed.
 | v7.6.5.0 | Module split (21 modules) | `prompts/phaseX/v7.6.5.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
 | v7.6.5.1 | CI + preflight wiring | `prompts/phaseX/v7.6.5.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
 | v7.6.5.2 | Template creation | `prompts/phaseX/v7.6.5.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
-| v7.6.5.3 | Retire manual mirror | `prompts/phaseX/v7.6.5.3-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.3 | Retire manual mirror | `prompts/phaseX/v7.6.5.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
 | v7.6.5.4 | Component directories | `prompts/phaseX/v7.6.5.4-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.5 | HTML template extraction | `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.6 | CSS extraction | `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | Pending |
+
+**v7.6.5.3 delivery summary (PR #135):**
+- `scripts/build-dashboard.sh` modified — `<!-- GENERATED -->` header prepended to all `--write` output
+- `<!-- GENERATED -->` header text: `GENERATED — Do not edit. Source: dashboard/dashboard.tmpl.html + dashboard/dashboard.js (bundled from dashboard/src/*.js)`
+- `.github/workflows/browser-tests.yml` updated — `build-dashboard.sh --check` step added (after bundle sync check, before Playwright); `scripts/build-dashboard.sh` and `scripts/bundle-dashboard.sh` added to `push.paths` and `pull_request.paths`
+- LESSON-OPS-043 marked structurally resolved in `Docs/lessons/dashboard.md` — manual mirror problem class can no longer occur
+- Two pre-existing conditions handled correctly: `bump-version.sh` sed removal (done in v7.6.5.2) and `dashboard_html_sync()` preflight check (already present from v7.6.5.2) — no duplicates added
+- Pipeline ordering inconsistency across docs resolved: canonical 8-step (full manual) and 6-step (bump-version subset) sequences documented and aligned
+- All 7 Playwright fixture sets pass
+- Review feedback addressed in commit 6dabe6d: CI path filters, pipeline ordering, session log compliance table corrections, GENERATED header text
+- Consolidated audit: `prompts/phaseX/v7.6.5.3-PR135-consolidated-audit-and-lessons.md`
+- Device testing: ⏳ **Pending operator execution post-merge** — S3 aggregator at 192.168.120.191, verify page load / SSE / charts / management actions
 
 **v7.6.5.2 delivery summary (PR #134):**
 - `dashboard/dashboard.tmpl.html` created — copy of `dashboard.html` with `<script>…</script>` block replaced by `{{JS_PLACEHOLDER}}`
@@ -369,7 +381,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 34 | Shell scripts with locale-sensitive commands must use `LC_ALL=C` | Phase 6.3 audit finding |
 | 35 | Python network/file resources must use context managers (`with`) in long-running modes | Phase 6.3 audit finding |
 | 36 | Device testing firmware commands must reference the GENERATED YAML for the target board — never use the committed C3 template (`esp32-c3-multi-sensor.yaml`) for non-C3 boards. Generated YAMLs are gitignored and only exist after `render_sensor_config.py --write`. | LESSON-OPS-090 |
-| 37 | Regeneration pipeline must include `bundle-dashboard.sh --write` as Step 1 and `minify-dashboard.sh` before `generate-header.sh`. Full canonical pipeline: `bundle-dashboard.sh --write` → | 37 | Regeneration pipeline must include `bundle-dashboard.sh --write` as Step 1, `build-dashboard.sh --write` as Step 3, and `minify-dashboard.sh` before `generate-header.sh`. Full canonical pipeline: `bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `build-dashboard.sh --write` → `minify-dashboard.sh` → `generate-header.sh` → `render_sensor_config.py --check` | LESSON-OPS-091 (updated v7.6.5.2) |
+| 37 | Regeneration pipeline — two variants:<br>**Full manual (8 steps):** `bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `node generate-fixtures.js` → `render_sensor_config.py --write` → `build-dashboard.sh --write` → `minify-dashboard.sh` → `generate-header.sh` → `render_sensor_config.py --check`<br>**Bump-version subset (6 steps, no fixture generation):** `bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `build-dashboard.sh --write` → `minify-dashboard.sh` → `generate-header.sh` → `preflight.sh`<br>Bundle MUST run first in both variants. | LESSON-OPS-091 (updated v7.6.5.3) |
 | 38 | All dashboard `fetch()` POST calls must use `Content-Type: application/x-www-form-urlencoded` with `body: \'a=1\'`. ESPHome does not consume JSON POST bodies. | BUG-076 / LESSON-OPS-099 |
 | 39 | All `curl` POST commands must use `-d \'a=1\'`. Never use `-H "Content-Type: application/json"`, never use `-d \'\'`, never use bare `-X POST` without a body. | BUG-076 / LESSON-OPS-099 |
 | 40 | Any HTTP handler performing NVS operations must use the deferred task pattern (`xTaskCreate`, 8192+ byte stack). Never perform NVS work synchronously in an HTTP handler. | BUG-075 / LESSON-OPS-100/101 |
@@ -379,7 +391,9 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 44 | Never use Arduino `String` (capital S) or bare `string` in ESP-IDF code. Always use `std::string`. The coding agent\'s CI does not perform ESP-IDF compilation — Arduino-isms pass CI but break the real build. Treat `String` in agent-generated code as a PR review red flag. | BUG-077 / LESSON-OPS-104 |
 | 45 | DOM references captured before an async auth flow (`requestManagementCredentials()`) become stale if `pollAggregatorLive()` fires during the wait and rebuilds `innerHTML`. Always re-query stable `id` nodes AFTER async boundaries. Suppress poll-driven rerenders while any action flag is true or while a management input has focus. | BUG-080/081 / LESSON-OPS-111 |
 | 46 | Mock server response shapes must be verified against the live firmware `httpd_resp_sendstr()` call — not the prompt description, not an audit table, not a prior session summary. The firmware contract is the single source of truth. | LESSON-OPS-112 |
-
+| 47 | `dashboard.html` is a GENERATED artifact from v7.6.5.3 onward — it must always open with `<!-- GENERATED — Do not edit. … -->`. Never hand-edit `dashboard.html`. All changes go into `dashboard/dashboard.tmpl.html` (structure) or `dashboard/src/*.js` modules (logic). | LESSON-OPS-043 resolution / v7.6.5.3 |
+| 48 | CI `browser-tests.yml` path filters must include ALL scripts that can change checked artifacts (`scripts/bundle-dashboard.sh`, `scripts/build-dashboard.sh`, `scripts/render_sensor_config.py`, `scripts/minify-dashboard.sh`, `scripts/generate-header.sh`). Omitting a script allows script-only changes to bypass CI. | v7.6.5.3 PR #135 review finding |
+| 49 | Always use `bash scripts/provision.sh <target>` to switch board configs (aggregator / satellite / wroom). Never copy `.bak` files or edit `gateway.json` by hand. Run `bash scripts/provision.sh satellite` + `bash scripts/preflight.sh` BEFORE every `git push`. `scripts/provision.sh` must never be removed from the repo. | LESSON-OPS-049 / v7.6.5.8 |
 ---
 
 ## Prompt File Naming Convention
@@ -435,6 +449,21 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-04-06 — v7.6.5.3 Complete: Phase X Level 2 Retire Manual Mirror + CI Build Gate
+
+| Change | Why |
+|--------|-----|
+| **v7.6.5.3 marked complete** | PR #135 merged — `<!-- GENERATED -->` header added to `build-dashboard.sh` output; CI `build-dashboard.sh --check` step added to `browser-tests.yml`; LESSON-OPS-043 marked structurally resolved |
+| **`scripts/build-dashboard.sh` updated** | `<!-- GENERATED — Do not edit. Source: dashboard/dashboard.tmpl.html + dashboard/dashboard.js (bundled from dashboard/src/*.js) -->` header prepended to every `--write` output; header included in `--check` comparison so generated file always opens with the comment |
+| **`.github/workflows/browser-tests.yml` updated** | `build-dashboard.sh --check` added after bundle sync check and before Playwright (3sensor leg); `scripts/build-dashboard.sh` and `scripts/bundle-dashboard.sh` added to `push.paths` and `pull_request.paths` |
+| **LESSON-OPS-043 marked structurally resolved** | Resolution note added to `Docs/lessons/dashboard.md` — manual mirror of `dashboard.js` → `dashboard.html` can no longer occur; `dashboard.html` is now a fully generated artifact |
+| **Pipeline ordering inconsistency resolved** | Canonical 8-step (full manual) and 6-step (bump-version subset) sequences aligned across `Docs/changelog.md`, `Docs/lessons/build-pipeline.md`, session log, and this document |
+| **Critical Rule 37 updated** | Two-variant pipeline (8-step manual / 6-step bump-version subset) documented; bundle-first invariant stated explicitly for both variants |
+| **Critical Rules 47–48 added** | Rule 47: `dashboard.html` is a generated artifact — never hand-edit. Rule 48: CI path filters must include all scripts that can change checked artifacts |
+| **v7.6.5.3 consolidated audit produced** | `prompts/phaseX/v7.6.5.3-PR135-consolidated-audit-and-lessons.md` |
+| **Level 2 → Level 3 gate check: conditionally ready** | CI green (all 7 fixture sets); bit-for-bit gate passed (v7.6.5.2 pre-condition); device testing pending operator post-merge execution |
+| **Document header `_Last updated_` refreshed** | Reflects v7.6.5.3 closure state |
 
 ### 2026-04-06 — v7.6.5.2 Complete: Phase X Level 2 Template Creation
 
