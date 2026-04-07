@@ -76,8 +76,10 @@ if css_placeholder_count != 1:
     )
     sys.exit(1)
 css_bytes = b''.join(open(f, 'rb').read() for f in CSS_FILES)
-# Strip one trailing newline so replacement produces exact inline CSS (no extra blank line)
-if css_bytes.endswith(b'\n'):
+# Strip one trailing newline (CRLF-safe) so replacement produces exact inline CSS (no extra blank line)
+if css_bytes.endswith(b'\r\n'):
+    css_bytes = css_bytes[:-2]
+elif css_bytes.endswith(b'\n'):
     css_bytes = css_bytes[:-1]
 # Use re.subn with lambda replacement to avoid backreference interpretation and preserve newline style
 assembled, css_replacements = re.subn(
