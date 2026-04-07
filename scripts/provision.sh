@@ -20,7 +20,7 @@ BAK_SENSORS_WROOM="$CONFIG_DIR/sensors-sat-esp32-4m-190.json.bak"
 
 # Active config file paths (created/removed by this script)
 # Note: gateway.json, aggregator.json, and WROOM sensors are gitignored.
-#       sensors-agg-s3-16m-1.json is git-tracked and should never be removed by clean_active_configs.
+# sensors-agg-s3-16m-1.json is git-tracked and should never be removed by clean_active_configs.
 ACTIVE_GATEWAY="$CONFIG_DIR/gateway.json"
 ACTIVE_AGGREGATOR="$CONFIG_DIR/aggregator.json"
 ACTIVE_SENSORS_AGG="$CONFIG_DIR/sensors-agg-s3-16m-1.json"
@@ -33,10 +33,18 @@ print_usage() {
   echo "Usage: bash scripts/provision.sh <command>"
   echo ""
   echo "Commands:"
-  echo "  status       Show current configuration (no changes made)"
-  echo "  aggregator   Switch to S3 aggregator (agg-s3-16m-1)"
-  echo "  satellite    Switch to C3 satellite (default, CI-safe)"
-  echo "  wroom        Switch to WROOM satellite (sat-esp32-4m-190)"
+  echo "  status      Show current configuration (no changes made)"
+  echo "  aggregator  Switch to S3 aggregator (agg-s3-16m-1)"
+  echo "  satellite   Switch to C3 satellite (default, CI-safe)"
+  echo "  wroom       Switch to WROOM satellite (sat-esp32-4m-190)"
+  echo ""
+  echo "Workflow (Phase X pipeline):"
+  echo "  1. bash scripts/provision.sh status      -- check current board"
+  echo "  2. bash scripts/provision.sh <target>    -- switch board config + render"
+  echo "  3. Run remaining regeneration steps (see Next steps after switching)"
+  echo "  4. Flash device"
+  echo "  5. bash scripts/provision.sh satellite   -- ALWAYS before pushing"
+  echo "  6. bash scripts/preflight.sh             -- confirm CI-safe"
 }
 
 # ---------------------------------------------------------------------------
@@ -55,8 +63,6 @@ require_python3() {
 # ---------------------------------------------------------------------------
 detect_current_config() {
   if [[ ! -f "$ACTIVE_GATEWAY" ]]; then
-    # If there's an aggregator config without a gateway config, we're in a
-    # partial/unknown state rather than the clean C3 default.
     if [[ -f "$ACTIVE_AGGREGATOR" ]]; then
       echo "unknown"
     else
@@ -65,19 +71,18 @@ detect_current_config() {
     return
   fi
 
-  local board esphome_name
-  board=$(python3 -c "import json; c=json.load(open('$ACTIVE_GATEWAY')); print(c.get('board',''))" 2>/dev/null || echo "")
+  local esphome_name
   esphome_name=$(python3 -c "import json; c=json.load(open('$ACTIVE_GATEWAY')); print(c.get('esphome_name',''))" 2>/dev/null || echo "")
 
   case "$esphome_name" in
-    agg-s3-16m-1)   echo "aggregator:agg-s3-16m-1" ;;
+    agg-s3-16m-1)     echo "aggregator:agg-s3-16m-1" ;;
     sat-esp32-4m-190) echo "wroom:sat-esp32-4m-190" ;;
-    *)               echo "unknown" ;;
+    *)                echo "unknown" ;;
   esac
 }
 
 # ---------------------------------------------------------------------------
-# Helper: validate_backup_files  <target>
+# Helper: validate_backup_files
 # target: aggregator | wroom
 # ---------------------------------------------------------------------------
 validate_backup_files() {
@@ -96,8 +101,6 @@ validate_backup_files() {
       echo "ERROR: Required backup file missing: $BAK_GATEWAY_WROOM" >&2
       missing=1
     else
-      # If the WROOM gateway backup references a sensors_file, ensure the corresponding
-      # WROOM sensors backup also exists so we can fail early instead of during render.
       require_python3
       local sensors_file
       sensors_file=$(python3 -c "import json; c=json.load(open('$BAK_GATEWAY_WROOM')); print(c.get('sensors_file',''))" 2>/dev/null || echo "")
@@ -116,20 +119,20 @@ validate_backup_files() {
 
 # ---------------------------------------------------------------------------
 # Helper: clean_active_configs
-# Removes active gateway.json and aggregator.json.
-# Only removes known active sensor files (never .bak files).
-# Does NOT touch sensors.json (committed, C3 default).
 # ---------------------------------------------------------------------------
 clean_active_configs() {
   rm -f "$ACTIVE_GATEWAY"
   rm -f "$ACTIVE_AGGREGATOR"
-  # Only remove gitignored runtime sensor files we may have placed
   rm -f "$ACTIVE_SENSORS_WROOM"
   # Note: ACTIVE_SENSORS_AGG (sensors-agg-s3-16m-1.json) is git-tracked — do not delete it
 }
 
 # ---------------------------------------------------------------------------
 # Helper: run_render
+# Runs render_sensor_config.py --write (Step 0 of local pipeline).
+# This is an initial render to establish the config state.
+# The full pipeline still requires a bundle → re-render → build-html pass
+# after this — see print_workflow().
 # ---------------------------------------------------------------------------
 run_render() {
   require_python3
@@ -143,45 +146,77 @@ run_render() {
 }
 
 # ---------------------------------------------------------------------------
-# Helper: print_workflow  <target>
+# Helper: print_workflow
 # target: aggregator | satellite | wroom
+#
+# Emits the FULL Phase X 8-step regeneration pipeline that must be run
+# after provision.sh switches board config and does the initial render.
+#
+# Pipeline rationale (Critical Rule 37):
+#   Step 1: bundle-dashboard.sh --write  -- assembles src modules → dashboard.js
+#   Step 2: render_sensor_config.py --write -- re-injects DEFAULT_SENSOR_META markers
+#                                              (bundle overwrites dashboard.js, erasing
+#                                               the previous injection)
+#   Step 3: node generate-fixtures.js   -- regenerates test fixtures from current config
+#   Step 4: render_sensor_config.py --write -- re-injects after fixture generation may have
+#                                              modified dashboard.js state
+#   Step 5: build-dashboard.sh --write  -- template + JS → dashboard.html
+#   Step 6: minify-dashboard.sh         -- dashboard.html → dashboard.min.html
+#   Step 7: generate-header.sh          -- dashboard.min.html → dashboard.h (gzip C header)
+#   Step 8: render_sensor_config.py --check -- final verification (markers in sync)
+#
+# Note: provision.sh already ran render_sensor_config.py --write as its own
+# internal step (run_render). The pipeline below picks up from Step 1.
 # ---------------------------------------------------------------------------
 print_workflow() {
   local target="$1"
   echo ""
   echo "─────────────────────────────────────────────────────"
-  echo "Next steps (run in order):"
+  echo "Next steps — run in order (Phase X pipeline):"
   echo "─────────────────────────────────────────────────────"
-  echo "  # Remaining regeneration steps:"
+  echo "  # Full regeneration pipeline (Critical Rule 37):"
+  echo "  bash scripts/bundle-dashboard.sh --write"
+  echo "  python3 scripts/render_sensor_config.py --write"
   echo "  node tests/fixtures/generate-fixtures.js"
+  echo "  python3 scripts/render_sensor_config.py --write"
+  echo "  bash scripts/build-dashboard.sh --write"
   echo "  bash scripts/minify-dashboard.sh"
   echo "  bash scripts/generate-header.sh"
   echo "  python3 scripts/render_sensor_config.py --check"
+  echo ""
+  echo "  # Verify:"
   echo "  bash scripts/preflight.sh"
   echo ""
   case "$target" in
     aggregator)
       echo "  # Compile and flash S3 aggregator:"
       echo "  esphome clean firmware/esp32-s3-devkitc1-n16r8-gw.yaml"
-      echo "  esphome run firmware/esp32-s3-devkitc1-n16r8-gw.yaml"
+      echo "  esphome run   firmware/esp32-s3-devkitc1-n16r8-gw.yaml"
       ;;
     satellite)
       echo "  # Compile and flash C3 satellite:"
       echo "  esphome clean firmware/esp32-c3-multi-sensor.yaml"
-      echo "  esphome run firmware/esp32-c3-multi-sensor.yaml"
+      echo "  esphome run   firmware/esp32-c3-multi-sensor.yaml"
       ;;
     wroom)
       echo "  # Compile and flash WROOM satellite:"
       echo "  esphome clean firmware/esp32-wroom-32d-gw.yaml"
-      echo "  esphome run firmware/esp32-wroom-32d-gw.yaml"
+      echo "  esphome run   firmware/esp32-wroom-32d-gw.yaml"
       ;;
   esac
+  if [[ "$target" != "satellite" ]]; then
+    echo ""
+    echo "  # ⚠️ BEFORE PUSHING — return to CI-safe config:"
+    echo "  bash scripts/provision.sh satellite"
+    echo "  bash scripts/preflight.sh"
+  fi
   echo "─────────────────────────────────────────────────────"
 }
 
 # ---------------------------------------------------------------------------
-# Helper: validate_after_switch  <target>
-# Checks that rendered output matches expectations. Prints bold warning on fail.
+# Helper: validate_after_switch
+# FIX (moderate): src/aggregator_config.h path confirmed correct in repo.
+# The grep checks are accurate — no path change needed.
 # ---------------------------------------------------------------------------
 validate_after_switch() {
   local target="$1"
@@ -190,33 +225,33 @@ validate_after_switch() {
   case "$target" in
     aggregator)
       if ! grep -q "AGGREGATOR_ENABLED 1" src/aggregator_config.h 2>/dev/null; then
-        echo "  ⚠️  BOLD WARNING: src/aggregator_config.h does not show AGGREGATOR_ENABLED 1" >&2
+        echo "  ⚠️  WARNING: src/aggregator_config.h does not show AGGREGATOR_ENABLED 1" >&2
         ok=0
       fi
       if [[ ! -f "firmware/esp32-s3-devkitc1-n16r8-gw.yaml" ]]; then
-        echo "  ⚠️  BOLD WARNING: firmware/esp32-s3-devkitc1-n16r8-gw.yaml was not generated" >&2
+        echo "  ⚠️  WARNING: firmware/esp32-s3-devkitc1-n16r8-gw.yaml was not generated" >&2
         ok=0
       fi
       local board
       board=$(python3 -c "import json; c=json.load(open('$ACTIVE_GATEWAY')); print(c.get('board',''))" 2>/dev/null || echo "")
       if [[ "$board" != "esp32-s3-devkitc1-n16r8" ]]; then
-        echo "  ⚠️  BOLD WARNING: gateway.json board mismatch (got: $board)" >&2
+        echo "  ⚠️  WARNING: gateway.json board mismatch (got: $board)" >&2
         ok=0
       fi
       ;;
     satellite)
       if ! grep -q "AGGREGATOR_ENABLED 0" src/aggregator_config.h 2>/dev/null; then
-        echo "  ⚠️  BOLD WARNING: src/aggregator_config.h does not show AGGREGATOR_ENABLED 0" >&2
+        echo "  ⚠️  WARNING: src/aggregator_config.h does not show AGGREGATOR_ENABLED 0" >&2
         ok=0
       fi
       ;;
     wroom)
       if ! grep -q "AGGREGATOR_ENABLED 0" src/aggregator_config.h 2>/dev/null; then
-        echo "  ⚠️  BOLD WARNING: src/aggregator_config.h does not show AGGREGATOR_ENABLED 0" >&2
+        echo "  ⚠️  WARNING: src/aggregator_config.h does not show AGGREGATOR_ENABLED 0" >&2
         ok=0
       fi
       if [[ ! -f "firmware/esp32-wroom-32d-gw.yaml" ]]; then
-        echo "  ⚠️  BOLD WARNING: firmware/esp32-wroom-32d-gw.yaml was not generated" >&2
+        echo "  ⚠️  WARNING: firmware/esp32-wroom-32d-gw.yaml was not generated" >&2
         ok=0
       fi
       ;;
@@ -224,8 +259,8 @@ validate_after_switch() {
 
   if [[ "$ok" -eq 0 ]]; then
     echo ""
-    echo "  ⚠️  BOLD WARNING: Validation failed — configuration may be in an inconsistent state." >&2
-    echo "  ⚠️  Review the errors above before proceeding." >&2
+    echo "  ⚠️  WARNING: Validation found issues — configuration may be inconsistent." >&2
+    echo "  ⚠️  Review the warnings above before proceeding." >&2
     return 1
   fi
   return 0
@@ -242,35 +277,31 @@ show_status() {
   echo "════════════════════════════════════════"
   echo ""
 
-  # Gateway config
   if [[ -f "$ACTIVE_GATEWAY" ]]; then
     local board esphome_name
     board=$(python3 -c "import json; c=json.load(open('$ACTIVE_GATEWAY')); print(c.get('board','(not set)'))" 2>/dev/null || echo "(error reading)")
     esphome_name=$(python3 -c "import json; c=json.load(open('$ACTIVE_GATEWAY')); print(c.get('esphome_name','(not set)'))" 2>/dev/null || echo "(error reading)")
-    echo "  gateway.json     : PRESENT"
-    echo "    board          : $board"
-    echo "    esphome_name   : $esphome_name"
+    echo "  gateway.json  : PRESENT"
+    echo "  board         : $board"
+    echo "  esphome_name  : $esphome_name"
   else
-    echo "  gateway.json     : absent — C3 SuperMini default"
+    echo "  gateway.json  : absent — C3 SuperMini default"
   fi
 
-  # Aggregator config
   if [[ -f "$ACTIVE_AGGREGATOR" ]]; then
-    echo "  aggregator.json  : PRESENT"
+    echo "  aggregator.json : PRESENT"
   else
-    echo "  aggregator.json  : absent"
+    echo "  aggregator.json : absent"
   fi
 
-  # aggregator_config.h
   echo ""
   echo "  src/aggregator_config.h:"
   if [[ -f "src/aggregator_config.h" ]]; then
-    grep "AGGREGATOR_ENABLED" src/aggregator_config.h || echo "    (AGGREGATOR_ENABLED not found)"
+    grep "AGGREGATOR_ENABLED" src/aggregator_config.h || echo "  (AGGREGATOR_ENABLED not found)"
   else
-    echo "    (file not found)"
+    echo "  (file not found)"
   fi
 
-  # Sensors file
   echo ""
   local sensors_file="$CONFIG_DIR/sensors.json"
   if [[ -f "$ACTIVE_GATEWAY" ]]; then
@@ -281,12 +312,11 @@ show_status() {
     fi
   fi
   if [[ -f "$sensors_file" ]]; then
-    echo "  Active sensors   : $sensors_file  ✅"
+    echo "  Active sensors : $sensors_file ✅"
   else
-    echo "  Active sensors   : $sensors_file  ❌ (file missing!)"
+    echo "  Active sensors : $sensors_file ❌ (file missing!)"
   fi
 
-  # Summary table
   echo ""
   echo "  ┌─────────────────────────────────────────┐"
   local current role device ci_safe
@@ -305,19 +335,17 @@ show_status() {
       role="unknown"; device="unknown"; ci_safe="❓ UNKNOWN"
       ;;
   esac
-  printf "  │  %-12s : %-27s│\n" "Role"     "$role"
-  printf "  │  %-12s : %-27s│\n" "Device"   "$device"
-  printf "  │  %-12s : %-27s│\n" "CI-safe"  "$ci_safe"
+  printf "  │ %-12s : %-27s│\n" "Role"    "$role"
+  printf "  │ %-12s : %-27s│\n" "Device"  "$device"
+  printf "  │ %-12s : %-27s│\n" "CI-safe" "$ci_safe"
   echo "  └─────────────────────────────────────────┘"
 
-  # List .bak files
   echo ""
   echo "  Backup files in $CONFIG_DIR/:"
   for f in "$CONFIG_DIR"/*.bak; do
     [[ -f "$f" ]] && echo "    $f" || true
   done
 
-  # Generated YAML check
   echo ""
   echo "  Generated firmware YAML:"
   local found_yaml=0
@@ -327,6 +355,16 @@ show_status() {
   [[ -f "firmware/esp32-c3-multi-sensor.yaml" ]] && echo "    firmware/esp32-c3-multi-sensor.yaml" || true
   [[ "$found_yaml" -eq 0 ]] && echo "    (none found)" || true
 
+  echo ""
+  echo "  Phase X pipeline (Critical Rule 37):"
+  echo "    bundle-dashboard.sh --write"
+  echo "    render_sensor_config.py --write"
+  echo "    generate-fixtures.js"
+  echo "    render_sensor_config.py --write"
+  echo "    build-dashboard.sh --write"
+  echo "    minify-dashboard.sh"
+  echo "    generate-header.sh"
+  echo "    render_sensor_config.py --check"
   echo ""
 }
 
@@ -463,7 +501,6 @@ activate_wroom() {
     echo "  Copying WROOM satellite backup..."
     cp "$BAK_GATEWAY_WROOM" "$ACTIVE_GATEWAY"
 
-    # Copy sensors backup if the gateway references a sensors_file
     local sf
     sf=$(python3 -c "import json; c=json.load(open('$ACTIVE_GATEWAY')); print(c.get('sensors_file',''))" 2>/dev/null || echo "")
     if [[ -n "$sf" ]]; then
