@@ -30,16 +30,16 @@ if [[ ! -f "$INPUT" ]]; then
 fi
 
 # Verify html-minifier-terser is available
-if ! command -v html-minifier-terser &>/dev/null; then
-  echo "ERROR: html-minifier-terser not found."
-  echo "Install with: npm install -g html-minifier-terser"
+if ! command -v npx &>/dev/null; then
+  echo "ERROR: npx not found."
+  echo "Install Node.js and npm first."
   exit 1
 fi
 
 ORIG=$(wc -c < "$INPUT")
 
 # html-minifier-terser reads from a file positional arg and writes to --output
-html-minifier-terser \
+npx html-minifier-terser \
   --collapse-whitespace \
   --remove-comments \
   --remove-optional-tags \

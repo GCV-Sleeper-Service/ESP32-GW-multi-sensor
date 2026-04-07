@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Injects dashboard.js into dashboard.tmpl.html → dashboard.html
+# Two-pass assembly: resolves {{COMPONENT:name}} markers then injects dashboard.js
+# Pass 1: {{COMPONENT:name}} → dashboard/components/<name>/template.html
+# Pass 2: {{JS_PLACEHOLDER}} → dashboard/dashboard.js → dashboard/dashboard.html
 # Usage: build-dashboard.sh [--write|--check]
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,19 +33,51 @@ case "$#" in
 esac
 
 python3 - "$ROOT/dashboard/dashboard.tmpl.html" "$ROOT/dashboard/dashboard.js" "$MODE" << 'PYEOF'
-import sys, os
+import sys, os, re
 tmpl = open(sys.argv[1], 'rb').read()
 js = open(sys.argv[2], 'rb').read()
+components_dir = os.path.realpath(os.path.join(os.path.dirname(sys.argv[1]), 'components'))
+component_name_re = re.compile(r'^[a-z0-9-]+$')
+
+# Pass 1: resolve {{COMPONENT:name}} markers (tolerates LF and CRLF)
+assembled = tmpl
+for m in re.finditer(rb'\{\{COMPONENT:([^}]+)\}\}', tmpl):
+    name = m.group(1)
+    name_str = name.decode('utf-8')
+    if not component_name_re.fullmatch(name_str):
+        print(f"ERROR: invalid component name: {name_str}", file=sys.stderr)
+        sys.exit(1)
+    comp_path = os.path.realpath(os.path.join(components_dir, name_str, 'template.html'))
+    if os.path.commonpath([components_dir, comp_path]) != components_dir:
+        print(f"ERROR: component path escapes components directory: {name_str}", file=sys.stderr)
+        sys.exit(1)
+    if not os.path.exists(comp_path):
+        print(f"ERROR: component template not found: {comp_path}", file=sys.stderr)
+        sys.exit(1)
+    # Match marker + optional CR + required LF (tolerates CRLF and LF)
+    marker_pattern = rb'\{\{COMPONENT:' + name + rb'\}\}\r?\n'
+    occurrences = len(re.findall(marker_pattern, assembled))
+    if occurrences != 1:
+        print(
+            f"ERROR: marker {{{{COMPONENT:{name_str}}}}} must appear exactly once"
+            f" (found {occurrences})",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    comp_content = open(comp_path, 'rb').read()
+    assembled = re.sub(marker_pattern, comp_content, assembled, count=1)
+
+# Pass 2: inject JS at {{JS_PLACEHOLDER}}
 placeholder = b'{{JS_PLACEHOLDER}}'
-placeholder_count = tmpl.count(placeholder)
+placeholder_count = assembled.count(placeholder)
 if placeholder_count != 1:
     print(
         f"ERROR: template must contain exactly one {{{{JS_PLACEHOLDER}}}} (found {placeholder_count})",
         file=sys.stderr,
     )
     sys.exit(1)
-header = '<!-- GENERATED \u2014 Do not edit. Source: dashboard/dashboard.tmpl.html + dashboard/dashboard.js (bundled from dashboard/core/*.js + dashboard/components/*/index.js) -->\n'.encode('utf-8')
-out = header + tmpl.replace(placeholder, js, 1)
+header = '<!-- GENERATED \u2014 Do not edit. Source: dashboard/dashboard.tmpl.html + dashboard/components/*/template.html + dashboard/dashboard.js (bundled from dashboard/core/*.js + dashboard/components/*/index.js) -->\n'.encode('utf-8')
+out = header + assembled.replace(placeholder, js, 1)
 out_path = os.path.join(os.path.dirname(sys.argv[1]), 'dashboard.html')
 mode = sys.argv[3]
 if mode == '--check':

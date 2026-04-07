@@ -1,0 +1,55 @@
+  <div class="cr-modal hidden" id="customRangeModal" role="dialog" aria-hidden="true" aria-labelledby="crTitle">
+    <div class="cr-container">
+      <div class="cr-header">
+        <span id="crTitle">Custom Date Range</span>
+        <button id="customRangeClose" class="cr-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="cr-body">
+        <div class="cr-presets">
+          <button class="cr-preset-btn" data-cr-preset="today">Today</button>
+          <button class="cr-preset-btn" data-cr-preset="yesterday">Yesterday</button>
+          <button class="cr-preset-btn" data-cr-preset="24h">Last 24h</button>
+          <button class="cr-preset-btn" data-cr-preset="7d">Last 7 days</button>
+          <button class="cr-preset-btn" data-cr-preset="30d">Last 30 days</button>
+          <button class="cr-preset-btn" data-cr-preset="45d">Last 45 days</button>
+        </div>
+        <div class="cr-calendar-panel">
+          <div class="cr-cal-nav">
+            <button id="crPrev">&#8249;</button>
+            <span id="crCalHeader"></span>
+            <button id="crNext">&#8250;</button>
+          </div>
+          <div class="cr-pick-hint" id="crPickHint">Click a start date</div>
+          <div class="cr-cal-grid" id="crCalGrid"></div>
+          <div class="cr-time-row">
+            <span>From</span>
+            <input type="date" id="crStartDate">
+            <select id="crStartHour">
+              <option>12</option><option>1</option><option>2</option><option>3</option>
+              <option>4</option><option>5</option><option>6</option><option>7</option>
+              <option>8</option><option>9</option><option>10</option><option>11</option>
+            </select>
+            <select id="crStartAmpm"><option>AM</option><option>PM</option></select>
+          </div>
+          <div class="cr-time-row">
+            <span>To&nbsp;&nbsp;</span>
+            <input type="date" id="crEndDate">
+            <select id="crEndHour">
+              <option>12</option><option>1</option><option>2</option><option>3</option>
+              <option>4</option><option>5</option><option>6</option><option>7</option>
+              <option>8</option><option>9</option><option>10</option><option>11</option>
+            </select>
+            <select id="crEndAmpm"><option>AM</option><option>PM</option></select>
+          </div>
+          <div class="cr-error" id="crError"></div>
+        </div>
+      </div>
+      <div class="cr-footer">
+        <span class="cr-avail" id="customRangeAvail"></span>
+        <div class="cr-footer-btns">
+          <button class="cr-btn" id="customRangeCancel">Cancel</button>
+          <button class="cr-btn primary" id="customRangeApply">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>

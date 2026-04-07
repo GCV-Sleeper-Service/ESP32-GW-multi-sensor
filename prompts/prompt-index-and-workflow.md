@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-07 — Phase X Level 3 in progress: v7.6.5.4 component directory scaffolding complete (PR #145); identity gate PASS; import-panel plan correction (LESSON-OPS-118); v7.6.5.5 is next_
+_Last updated: 2026-04-07 — Phase X Level 3 in progress: v7.6.5.5 HTML template extraction complete (PR #146); two-pass build, CRLF-tolerant, path-confined; accepted exceptions documented; v7.6.5.6 is next_
 _reference domain-scoped files__Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -260,10 +260,32 @@ All steps shipped. No prompts needed.
 | v7.6.5.2 | Template creation | `prompts/phaseX/v7.6.5.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
 | v7.6.5.3 | Retire manual mirror | `prompts/phaseX/v7.6.5.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
 | v7.6.5.4 | Component directories | `prompts/phaseX/v7.6.5.4-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
-| v7.6.5.5 | HTML template extraction | `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` | ⬅ Next |
-| v7.6.5.6 | CSS extraction | `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.5 | HTML template extraction | `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
+| v7.6.5.6 | CSS extraction | `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` | ⬅ Next |
 | v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | Pending |
+
+**v7.6.5.5 delivery summary (PR #146):**
+- Extracted 8 component `template.html` files from `dashboard/dashboard.tmpl.html`:
+  `auth-modal` (1427 B), `custom-range` (2755 B), `device-info` (15522 B),
+  `settings-panel` (2560 B), `live-view` (634 B), `gateway-panel` (438 B),
+  `sensor-cards` (454 B), `charts` (3062 B)
+- `dashboard.tmpl.html` reduced from 66356 B → 39711 B (8 markers replace extracted sections)
+- `scripts/build-dashboard.sh` updated for two-pass assembly:
+  Pass 1: `{{COMPONENT:name}}` markers → component templates (CRLF-tolerant `re.sub`);
+  Pass 2: `{{JS_PLACEHOLDER}}` → bundled JS
+- Security: component name validated against `^[a-z0-9-]+$`; realpath + commonpath confinement
+- `html-minifier-terser` moved to `devDependencies`; `minify-dashboard.sh` updated to use `npx`
+- Generated header updated: lists `dashboard/components/*/template.html` as build inputs
+- Accepted exceptions documented in session log and changelog:
+  `device-info`: `#c3DescriptionBlock` (`.about-bar`) stays in shell — non-contiguous with `.top-grid`
+  `settings-panel`: `#exportSection` (`.export-section`) stays in shell — non-contiguous with `.storage-card`
+  `import-panel`: JS-only component, no `template.html`, no marker — deferred to v7.6.5.6
+- Normalized diff evidence produced: only GENERATED header line differs between edf8d0d → f83330a
+- Diff gate: two-pass output byte-identical to v7.6.5.4 baseline (except version churn)
+- All 402 tests pass; preflight passes
+- **Consolidated audit:** `prompts/phaseX/v7.6.5.5-PR146-consolidated-audit-and-lessons.md` 
+- Device testing: not applicable (identity gate substitutes; no runtime change)
 
 **v7.6.5.4 delivery summary (PR #145):**
 - Created `dashboard/core/` (8 files) and `dashboard/components/` (9 subdirectories with `index.js`)
@@ -410,6 +432,8 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 48 | CI `browser-tests.yml` path filters must include ALL scripts that can change checked artifacts (`scripts/bundle-dashboard.sh`, `scripts/build-dashboard.sh`, `scripts/render_sensor_config.py`, `scripts/minify-dashboard.sh`, `scripts/generate-header.sh`). Omitting a script allows script-only changes to bypass CI. | v7.6.5.3 PR #135 review finding |
 | 49 | Always use `bash scripts/provision.sh <target>` to switch board configs (aggregator / satellite / wroom). Never copy `.bak` files or edit `gateway.json` by hand. Run `bash scripts/provision.sh satellite` + `bash scripts/preflight.sh` BEFORE every `git push`. `scripts/provision.sh` must never be removed from the repo. | LESSON-OPS-116 / v7.6.5.3 |
 | 50 | When planning file concatenations for non-contiguous modules, verify that all source modules in the group are physically adjacent in the bundle output. Modules can only be safely concatenated if contiguous. If intervening modules exist, keep them as separate components — the identity gate will catch violations but the plan should catch them first. | LESSON-OPS-118 / v7.6.5.4 |
+| 51 | `build-dashboard.sh` component marker resolution must use `re.sub(rb'...?', ...)` — never `bytes.replace()` with hardcoded ``. CRLF-checked repos silently produce un-assembled output with the literal approach. | v7.6.5.5 PR #146 review finding |
+| 52 | Build tool dependencies used via shell scripts must be wired as `devDependencies` with `npx` invocation in scripts — never as global-only requirements. Global-only tooling causes silent CI mismatches on fresh installs. | v7.6.5.5 PR #146 CODEX/GPT review finding |
 ---
 
 ## Prompt File Naming Convention
@@ -465,6 +489,19 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-04-07 — v7.6.5.5 Complete: Phase X Level 3 HTML Template Extraction
+
+| Change | Why |
+|--------|-----|
+| **v7.6.5.5 marked complete** | PR #146 merged (commits: 710ba31, edf8d0d, f83330a, c1ae068) — 8 `template.html` files extracted; two-pass assembly; CRLF-tolerant `re.sub` marker replacement; path-confined component resolution; accepted exceptions documented |
+| **Two-pass assembly contract established** | `build-dashboard.sh` now runs Pass 1 (component markers) then Pass 2 (JS injection); both passes use realpath + commonpath confinement and regex name validation; CRLF-tolerant |
+| **Accepted exceptions pattern established** | Non-contiguous DOM targets (`#c3DescriptionBlock`, `#exportSection`) kept in shell and explicitly documented in session log § Accepted Exceptions + changelog entry; `import-panel` JS-only exception also documented |
+| **Normalized diff evidence pattern established** | Version-normalized diff (`sed + diff`) run between baseline and PR head to prove structural identity when version bump is part of the same PR; output recorded in session log |
+| **Critical Rules 51–52 added** | Rule 51: CRLF-tolerant `re.sub` for marker replacement (not `bytes.replace`). Rule 52: `devDependencies` + `npx` for build tool deps. |
+| **Consolidated audit MISSING** | `v7.6.5.5-PR146-consolidated-audit-and-lessons.md` was not produced during agent execution — **must be created post-merge as a manual operator task** (see Post-PR Closure section in handoff) |
+| **v7.6.5.6 is next** | CSS extraction — review `prompts/handoff/session-handoff-v7.6.5.6.md` and `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` before starting; verify CSS selector families still match delivered `dashboard.tmpl.html` structure |
+| **Document header `_Last updated_` refreshed** | Reflects v7.6.5.5 closure state |
 
 ### 2026-04-07 — v7.6.5.4 Complete: Phase X Level 3 Component Directory Scaffolding
 

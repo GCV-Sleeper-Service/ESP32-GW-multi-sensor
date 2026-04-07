@@ -12,6 +12,7 @@
     "fixtures": "node tests/fixtures/generate-fixtures.js"
   },
   "devDependencies": {
-    "@playwright/test": "^1.56.0"
+    "@playwright/test": "^1.56.0",
+    "html-minifier-terser": "^7.2.0"
   }
 }

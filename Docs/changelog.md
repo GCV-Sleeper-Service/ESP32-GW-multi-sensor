@@ -2,6 +2,72 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.5.5] — 2026-04-07 — Phase X Level 3: Component HTML Template Extraction
+
+### Changes
+
+- **Component templates:** Extracted HTML sections from `dashboard/dashboard.tmpl.html` into 8 per-component `template.html` files:
+  - `dashboard/components/auth-modal/template.html` (26 lines) — `#authModal` div
+  - `dashboard/components/custom-range/template.html` (55 lines) — `#customRangeModal` div
+  - `dashboard/components/device-info/template.html` (167 lines) — `.top-grid` div (board SVG, device-info, management, GPIO)
+  - `dashboard/components/settings-panel/template.html` (23 lines) — `.storage-card` div
+  - `dashboard/components/live-view/template.html` (11 lines) — `.telemetry-card` div
+  - `dashboard/components/gateway-panel/template.html` (8 lines) — `#hdr-gateways` + `#body-gateways`
+  - `dashboard/components/sensor-cards/template.html` (8 lines) — readings collapse-hdr + `#body-readings`
+  - `dashboard/components/charts/template.html` (54 lines) — realtime + divider + averages sections
+- **New component directory:** Created `dashboard/components/device-info/` (previously missing; no `index.js` — device-info JS lives in `core/`)
+- **Template markers:** Replaced extracted sections in `dashboard/dashboard.tmpl.html` with `{{COMPONENT:name}}` markers (one per component, on its own line)
+- **Build script:** Updated `scripts/build-dashboard.sh` for two-pass assembly:
+  - Pass 1: resolves all `{{COMPONENT:name}}` markers → inlines `components/<name>/template.html`
+  - Pass 2: injects `dashboard.js` at `{{JS_PLACEHOLDER}}` → produces `dashboard/dashboard.html`
+- **Artifacts:** `dashboard.html`, `dashboard.h` regenerated via full pipeline; output structurally identical to v7.6.5.4 (version strings updated)
+- **Known exceptions:** Two prompt-listed DOM identifiers remain in shell template (non-contiguous with extracted blocks): `#c3DescriptionBlock` (device-info about-bar) and `#exportSection` (settings-panel export UI). `import-panel/` directory exists but has no `template.html` (deferred to v7.6.5.6). See session log §Accepted Exceptions for rationale.
+
+### Diff Gate
+
+```
+bash scripts/build-dashboard.sh --write && diff dashboard/dashboard.html dashboard/dashboard.html.baseline
+```
+
+**Result:** Version-string churn only. HTML structure byte-identical to v7.6.5.4 baseline aside from version bump.
+
+### Component Template Files
+
+| Component | File | Lines | Primary DOM identifier |
+|-----------|------|-------|------------------------|
+| `auth-modal` | `components/auth-modal/template.html` | 26 | `#authModal` |
+| `custom-range` | `components/custom-range/template.html` | 55 | `#customRangeModal` |
+| `device-info` | `components/device-info/template.html` | 167 | `.top-grid` |
+| `settings-panel` | `components/settings-panel/template.html` | 23 | `.storage-card` |
+| `live-view` | `components/live-view/template.html` | 11 | `.telemetry-card` |
+| `gateway-panel` | `components/gateway-panel/template.html` | 8 | `#hdr-gateways` |
+| `sensor-cards` | `components/sensor-cards/template.html` | 8 | `#sensorGrid` |
+| `charts` | `components/charts/template.html` | 54 | `.charts-row` / `#hdr-realtime` |
+
+### Canonical Regeneration Pipeline (two-pass build)
+
+```bash
+bash scripts/bundle-dashboard.sh --write           # Step 1 — bundle from core/ + components/
+python3 scripts/render_sensor_config.py --write    # Step 2 — inject version markers after bundling
+node tests/fixtures/generate-fixtures.js           # Step 3 — generate fixture variants
+bash scripts/build-dashboard.sh --write            # Step 4 — two-pass: components + JS → dashboard.html
+bash scripts/minify-dashboard.sh                   # Step 5 — minify
+bash scripts/generate-header.sh                    # Step 6 — generate dashboard.h
+python3 scripts/render_sensor_config.py --check    # Step 7 — verify all artifacts in sync
+```
+
+### Acceptance Criteria
+
+- [x] All 8 component `template.html` files exist
+- [x] `device-info/` directory created
+- [x] Diff gate passes (two-pass output byte-identical to v7.6.5.4)
+- [x] `build-dashboard.sh --check` passes
+- [x] `bundle-dashboard.sh --check` passes
+- [x] `preflight.sh` passes (all checks)
+- [x] All Playwright tests pass: 3sensor (99/99 chromium, 99/99 firefox), mixed (7/7), system (8/8), aggregator (11/12 — 1 skipped)
+
+---
+
 ## [v7.6.5.4] — 2026-04-07 — Phase X Level 3: Component Directory Scaffolding
 
 ### Changes

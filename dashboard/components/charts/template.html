@@ -1,0 +1,54 @@
+  <div class="collapse-hdr" data-toggle-target="realtime" id="hdr-realtime">
+    <span class="collapse-icon" id="icon-realtime">&minus;</span>
+    Real-Time Charts
+  </div>
+  <div class="collapse-body" id="body-realtime">
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Temperature &mdash; Real Time</div>
+        <div class="chart-subtitle">every BLE broadcast &middot; left &deg;C &middot; right &deg;F</div>
+        <div class="chart-hint">Tip: click a sensor name in the legend to show/hide its line.</div>
+        <div class="chart-wrapper"><canvas id="tempChart"></canvas><div class="no-data" id="tempNoData">waiting for sensor data...</div></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Humidity &mdash; Real Time</div>
+        <div class="chart-subtitle">every BLE broadcast</div>
+        <div class="chart-wrapper"><canvas id="humChart"></canvas><div class="no-data" id="humNoData">waiting for sensor data...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider" id="divider-charts">
+
+  <!-- 15-minute average charts -->
+  <div class="collapse-hdr" data-toggle-target="averages" id="hdr-averages">
+    <span class="collapse-icon" id="icon-averages">&minus;</span>
+    15 Minute Averages (Available Retained History)
+    <span class="history-badge empty" id="histBadge">loading...</span>
+    <button class="refresh-btn" data-action="refresh-history" title="Reload merged NVS + RAM history from ESP32">&#x21BB; Refresh</button>
+  </div>
+  <div class="collapse-body" id="body-averages">
+    <div class="history-range-row">
+      <span class="history-range-label">Visible range</span>
+      <div class="history-range-toggle">
+        <button class="active" id="histRange-24" data-history-range="24">24h</button>
+        <button id="histRange-168" data-history-range="168">7d</button>
+        <button id="histRange-720" data-history-range="720">30d</button>
+        <button id="histRange-1080" data-history-range="1080">45d</button>
+        <button id="histRange-custom" data-history-range="custom">Custom</button>
+      </div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Temperature &mdash; 15m avg</div>
+        <div class="chart-subtitle">wall-clock aligned &middot; left &deg;C &middot; right &deg;F &middot; 24h RAM + hourly flash segments</div>
+        <div class="chart-hint">Tip: click a sensor name in the legend to show/hide its line.</div>
+        <div class="chart-wrapper"><canvas id="tempAvgChart"></canvas><div class="no-data" id="tempAvgNoData">waiting for first average...</div></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Humidity &mdash; 15m avg</div>
+        <div class="chart-subtitle">wall-clock aligned &middot; 24h RAM + hourly flash segments</div>
+        <div class="chart-wrapper"><canvas id="humAvgChart"></canvas><div class="no-data" id="humAvgNoData">waiting for first average...</div></div>
+      </div>
+    </div>
+  </div>

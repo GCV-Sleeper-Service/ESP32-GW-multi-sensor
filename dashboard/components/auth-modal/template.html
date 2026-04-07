@@ -1,0 +1,26 @@
+  <div class="auth-modal hidden" id="authModal" aria-hidden="true">
+    <div class="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <h3 id="authTitle">Management authentication required</h3>
+      <p id="authSubtitle">Enter the case-sensitive management credentials to continue.</p>
+      <div class="auth-field">
+        <label for="authUsername">Enter management username</label>
+        <div class="auth-input-wrap">
+          <input class="auth-input" id="authUsername" type="text" autocomplete="username" spellcheck="false" />
+        </div>
+        <span class="auth-note">Case-sensitive</span>
+      </div>
+      <div class="auth-field">
+        <label for="authPassword">Enter management password</label>
+        <div class="auth-input-wrap">
+          <input class="auth-input" id="authPassword" type="password" autocomplete="current-password" spellcheck="false" />
+          <button class="auth-toggle" id="authToggle" type="button" title="Show or hide password" aria-label="Show or hide password">&#128065;</button>
+        </div>
+        <span class="auth-note">Case-sensitive</span>
+      </div>
+      <div class="auth-error" id="authError"></div>
+      <div class="auth-actions">
+        <button class="auth-btn" id="authCancel" type="button">Cancel</button>
+        <button class="auth-btn primary" id="authSubmit" type="button">Continue</button>
+      </div>
+    </div>
+  </div>
