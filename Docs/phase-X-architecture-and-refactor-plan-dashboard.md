@@ -329,13 +329,15 @@ dashboard/
       styles.css            — auth modal CSS
       template.html         — auth dialog HTML
     settings-panel/
-      index.js              ~400 lines — management actions, import engine, export, storage stats
+      index.js              ~128 lines — export, storage stats display
       styles.css            — storage/management CSS
       template.html         — management/storage/export HTML
     gateway-panel/
       index.js              ~500 lines — aggregator detection, selector, summary, settings, satellite mgmt
       styles.css            — gateway/settings CSS
       template.html         — gateway panel HTML
+    import-panel/
+      index.js              ~426 lines — JS-only; importHistoryData, processImportFile, parseImportCsv (no template.html, no styles.css — import button HTML is in settings-panel)
     live-view/
       index.js              ~360 lines — SSE, polling, handleState, telemetry, live device updates
       styles.css            — telemetry CSS
@@ -811,17 +813,19 @@ This diff must exit 0 before proceeding to v7.6.5.3.
 | `src/06-ui-helpers.js` | `core/ui-helpers.js` |
 | `src/07-staleness-derived.js` | `core/staleness-derived.js` |
 | `src/08-custom-range.js` | `components/custom-range/index.js` |
-| `src/09-export.js` + `src/10-storage-stats.js` | `components/settings-panel/index.js` (concatenated with 13-import) |
+| `src/09-export.js` + `src/10-storage-stats.js` | `components/settings-panel/index.js` (concatenated; 13-import kept separate) |
 | `src/11-suspend-resume.js` | `core/suspend-resume.js` |
 | `src/12-management.js` | `components/auth-modal/index.js` |
-| `src/13-import.js` | concatenated into `components/settings-panel/index.js` |
+| `src/13-import.js` | `components/import-panel/index.js` (separate — byte order constraint, see note) |
 | `src/14-cards.js` + `src/15-minmax.js` | `components/sensor-cards/index.js` (concatenated) |
 | `src/16-charts.js` | `components/charts/index.js` |
 | `src/17-live-updates.js` + `src/18-transport.js` | `components/live-view/index.js` (concatenated) |
 | `src/19-aggregator.js` | `components/gateway-panel/index.js` |
 | `src/20-boot.js` | `core/boot.js` |
 
-**Note:** Some modules are concatenated during the move (transport + live-devices → live-view, import + export → settings-panel). This is because the Level 3 component boundaries group related functionality more coarsely than the Level 1 modules. The concatenation is mechanical — no code changes.
+**Note:** Some modules are concatenated during the move (transport + live-devices → live-view, export + storage → settings-panel). This is because the Level 3 component boundaries group related functionality more coarsely than the Level 1 modules. The concatenation is mechanical — no code changes.
+
+**Correction (applied at v7.6.5.4):** The original plan specified concatenating `09-export.js + 10-storage-stats.js + 13-import.js` into `settings-panel/index.js`. This is physically impossible without breaking byte order — modules 11 (suspend-resume) and 12 (management) sit between 10 and 13 in the original bundle. Concatenating 09+10+13 at array position 9 would move 13's bytes ahead of 11 and 12, failing the identity gate. Resolution: `13-import.js` is a separate component at `components/import-panel/index.js`. See LESSON-OPS-118.
 
 #### Acceptance criteria
 
@@ -1189,6 +1193,8 @@ If the project needs to start Phase 7 urgently:
 | POST semantics (LESSON-OPS-099) changed during code move | 1+ | Migration rule 8; POST code moved intact; Group 21 tests verify |
 | `render_sensor_config.py` writes into wrong file after restructure | 1 | Generator continues targeting assembled `dashboard.js`; path unchanged |
 | Phase 7 starts before Level 3 is stable | 3 | Gate conditions enforce stability before proceeding; optional early-stop at Level 2 |
+
+Additional entry: **LESSON-OPS-118:** Non-contiguous module concatenation breaks byte order. Only physically adjacent modules can be concatenated without violating the identity gate.
 
 ---
 
