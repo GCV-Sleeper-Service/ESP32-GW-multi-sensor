@@ -21,6 +21,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
   - Pass 1: resolves all `{{COMPONENT:name}}` markers → inlines `components/<name>/template.html`
   - Pass 2: injects `dashboard.js` at `{{JS_PLACEHOLDER}}` → produces `dashboard/dashboard.html`
 - **Artifacts:** `dashboard.html`, `dashboard.h` regenerated via full pipeline; output structurally identical to v7.6.5.4 (version strings updated)
+- **Known exceptions:** Two prompt-listed DOM identifiers remain in shell template (non-contiguous with extracted blocks): `#c3DescriptionBlock` (device-info about-bar) and `#exportSection` (settings-panel export UI). `import-panel/` directory exists but has no `template.html` (deferred to v7.6.5.6). See session log §Accepted Exceptions for rationale.
 
 ### Diff Gate
 

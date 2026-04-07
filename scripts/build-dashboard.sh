@@ -39,12 +39,11 @@ js = open(sys.argv[2], 'rb').read()
 components_dir = os.path.realpath(os.path.join(os.path.dirname(sys.argv[1]), 'components'))
 component_name_re = re.compile(r'^[a-z0-9-]+$')
 
-# Pass 1: resolve {{COMPONENT:name}} markers
+# Pass 1: resolve {{COMPONENT:name}} markers (tolerates LF and CRLF)
 assembled = tmpl
 for m in re.finditer(rb'\{\{COMPONENT:([^}]+)\}\}', tmpl):
     name = m.group(1)
     name_str = name.decode('utf-8')
-    marker_with_nl = b'{{COMPONENT:' + name + b'}}\n'
     if not component_name_re.fullmatch(name_str):
         print(f"ERROR: invalid component name: {name_str}", file=sys.stderr)
         sys.exit(1)
@@ -55,15 +54,18 @@ for m in re.finditer(rb'\{\{COMPONENT:([^}]+)\}\}', tmpl):
     if not os.path.exists(comp_path):
         print(f"ERROR: component template not found: {comp_path}", file=sys.stderr)
         sys.exit(1)
-    if assembled.count(marker_with_nl) != 1:
+    # Match marker + optional CR + required LF (tolerates CRLF and LF)
+    marker_pattern = rb'\{\{COMPONENT:' + name + rb'\}\}\r?\n'
+    occurrences = len(re.findall(marker_pattern, assembled))
+    if occurrences != 1:
         print(
             f"ERROR: marker {{{{COMPONENT:{name_str}}}}} must appear exactly once"
-            f" (found {assembled.count(marker_with_nl)})",
+            f" (found {occurrences})",
             file=sys.stderr,
         )
         sys.exit(1)
     comp_content = open(comp_path, 'rb').read()
-    assembled = assembled.replace(marker_with_nl, comp_content)
+    assembled = re.sub(marker_pattern, comp_content, assembled, count=1)
 
 # Pass 2: inject JS at {{JS_PLACEHOLDER}}
 placeholder = b'{{JS_PLACEHOLDER}}'

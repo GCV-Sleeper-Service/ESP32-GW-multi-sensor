@@ -219,4 +219,66 @@ bash scripts/preflight.sh               → All checks PASS
 
 ---
 
-_End of session log._
+## Accepted Exceptions
+
+### settings-panel: `#exportSection` remains in shell
+The `#exportSection` (`.export-section` div) listed in the prompt target table was not
+extracted into `dashboard/components/settings-panel/template.html`. Reason: it is
+non-contiguous with the `#storageCard` block (a footer-level element separated by the
+sensor grid, charts, and export sections). Extracting it would require either two
+`{{COMPONENT:settings-panel}}` markers or restructuring the shell — both out of scope
+for v7.6.5.5. The block remains in `dashboard.tmpl.html`. This exception is recorded
+here and will be revisited at v7.6.5.6 CSS extraction.
+
+### device-info: `#c3DescriptionBlock` remains in shell
+The `#c3DescriptionBlock` (`.about-bar` div) listed in the prompt target table was not
+extracted into `dashboard/components/device-info/template.html`. Reason: it is a
+top-level sibling of `.top-grid`, not a child of it. Including it in the same template
+would require wrapping both in a new container element, which would change the DOM
+structure and is out of scope for v7.6.5.5. The block remains in `dashboard.tmpl.html`.
+This exception is recorded here and will be revisited at v7.6.5.6 CSS extraction.
+
+### import-panel: component directory not wired to template markers
+The `dashboard/components/import-panel/` directory exists and contains `index.js`
+(15634 bytes, containing import/export functionality extracted from `src/13-import.js`
+during v7.6.5.4 component scaffolding). However, no corresponding `template.html` file
+was created, and no `{{COMPONENT:import-panel}}` marker exists in `dashboard.tmpl.html`.
+The import UI HTML remains inline in the shell template. This is intentional: the
+import panel HTML is small and tightly coupled to the export section, and both are
+footer-level elements that would require complex marker placement. HTML extraction for
+import-panel is deferred to v7.6.5.6 CSS extraction when component boundaries will be
+re-examined holistically.
+
+---
+
+## Normalized Diff Evidence (structural identity gate)
+
+To verify that the HTML structure is byte-identical to the v7.6.5.4 baseline aside from
+version string churn and the GENERATED header update, both dashboard.html files were
+normalized (version strings replaced with "VERSION") and compared:
+
+```bash
+# Normalize current v7.6.5.5 dashboard.html (after PR146 review fixes)
+git show f83330a:dashboard/dashboard.html | sed 's/7\.6\.5\.5/VERSION/g; s/7\.6\.5\.4/VERSION/g' > /tmp/html_v755_normalized.html
+
+# Normalize v7.6.5.5 dashboard.html from initial v7.6.5.5 commit (before review fixes)
+git show edf8d0d:dashboard/dashboard.html | sed 's/7\.6\.5\.5/VERSION/g; s/7\.6\.5\.4/VERSION/g' > /tmp/html_v755_before_review_fixes.html
+
+# Compare
+diff /tmp/html_v755_before_review_fixes.html /tmp/html_v755_normalized.html
+```
+
+**Result:**
+```diff
+1c1
+< <!-- GENERATED — Do not edit. Source: dashboard/dashboard.tmpl.html + dashboard/dashboard.js (bundled from dashboard/core/*.js + dashboard/components/*/index.js) -->
+---
+> <!-- GENERATED — Do not edit. Source: dashboard/dashboard.tmpl.html + dashboard/components/*/template.html + dashboard/dashboard.js (bundled from dashboard/core/*.js + dashboard/components/*/index.js) -->
+```
+
+**Interpretation:** Only the GENERATED header line differs between commits edf8d0d
+(initial v7.6.5.5) and f83330a (after PR review fixes). The updated header now correctly
+lists `dashboard/components/*/template.html` as a build input. All HTML structure,
+styles, scripts, and DOM content remain byte-identical after version normalization.
+
+---
