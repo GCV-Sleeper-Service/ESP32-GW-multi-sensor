@@ -18,9 +18,6 @@ _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
 
 ---
 
-
----
-
 ### BUG-035: YAML generator produced invalid indentation in ESPHome block scalars (v7.5.0.0)
 
 **Symptom:** `esphome compile firmware/esp32-c3-multi-sensor.yaml` failed immediately after `render_sensor_config.py --write` with `expected <block end>, but found '<scalar>'` near line 135.
@@ -30,13 +27,7 @@ _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
 **Fix:** Routed all YAML marker replacements through `apply_yaml_marker_block()`, which captures the indentation column of the marker line and re-applies it to every inserted line.
 
 **Lesson:** See LESSON-OPS-040.
-
----
-
-
----
-
-### BUG-036: YAML generator reintroduced broken indentation after hotfix — preflight passed but compile failed (v7.5.0.1)
+- **LESSON-OPS-118:** Non-contiguous module concatenation breaks byte order. Only physically adjacent modules can be concatenated without violating the identity gate.### BUG-036: YAML generator reintroduced broken indentation after hotfix — preflight passed but compile failed (v7.5.0.1)
 
 **Symptom:** After the initial YAML indentation fix, running `python3 scripts/render_sensor_config.py --write` again silently reintroduced bad indentation into the YAML. `bash ./scripts/preflight.sh` passed. `esphome compile` failed near the averaging block with `expected <block end>`.
 
@@ -45,9 +36,6 @@ _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
 **Fix:** Switched all YAML marker replacements in `render_sensor_config.py` to `apply_yaml_marker_block()`. Confirmed idempotence by running `--write` twice.
 
 **Lesson:** See LESSON-OPS-041.
-
----
-
 
 ---
 
@@ -63,9 +51,6 @@ _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
 
 ---
 
-
----
-
 ### BUG-041: Fixture generator VERSION bumped independently from canonical VERSION file (v7.5.1.3)
 
 **Symptom:** CI preflight failed with "Generated files are out of sync with config/sensors.json." The diff showed `manifest.json` containing `v7.5.1.3` while the Python generator (using VERSION from `render_sensor_config.py`) expected `v7.5.1.0`.
@@ -78,9 +63,6 @@ _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
 
 ---
 
-
----
-
 ### BUG-042: `dashboard/dashboard.h` version check fails due to minification (post-v7.5.2.0)
 
 **Symptom:** PR #25 added `dashboard_h_version_matches` to `scripts/preflight.sh` and CI failed with `dashboard_h_version_matches: FAIL` even though `dashboard.js` and `dashboard.html` had the correct version string `App.version = 'v7.5.2.0'`.
@@ -90,9 +72,6 @@ _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
 **Fix:** Changed `dashboard_h_version_matches` to use `grep -Eq` with a regex pattern `App\.version[[:space:]]*=[[:space:]]*['\"]${VER_TAG}['\"]` that matches both the unminified source form and the minified generated form. Added `check_contains_regex()` helper to `scripts/preflight.sh` for future regex-based checks.
 
 **Lesson:** See LESSON-OPS-048.
-
----
-
 
 ---
 
@@ -120,16 +99,11 @@ freshly-updated `dashboard.html`.
 
 ---
 
-
----
-
 ## Lessons Learned
 
 ### LESSON-OPS-001: File renames must update internal references
 
 Preflight should catch cross-reference drift, but docs should still be reviewed after any rename.
-
-
 
 ---
 
@@ -139,24 +113,15 @@ Only actual configuration matters.
 
 ---
 
-
----
-
 ### LESSON-OPS-030: Preflight sensor-count checks belong in Node.js, not bash regex (v7.4.4.0)
 
 Counting occurrences of patterns in YAML and C++ using bash `grep -c` and `sed` is fragile. Inline Node.js scripting within the bash preflight is more readable, reliable, and straightforward to extend.
 
 ---
 
-
----
-
 ### LESSON-OPS-040: YAML generator must use indentation-aware insertion for all block scalar sections (v7.5.0.0)
 
 When generating content for YAML files that contain block scalars (lambda bodies, sorting_groups, nested sensor blocks), the generator must preserve the indentation level of the target marker location. Content-correct YAML with wrong indentation is not valid YAML — ESPHome will reject it at parse time, not compile time.
-
----
-
 
 ---
 
@@ -170,9 +135,6 @@ YAML generation that passes content-only sync checks can still produce invalid Y
 
 ---
 
-
----
-
 ### LESSON-OPS-045: Preflight must include a YAML/ESPHome parse gate, not just generated-file sync checks (v7.5.0.1)
 
 The existing preflight catches version drift and generator sync failures. It does not catch structurally invalid YAML that passes the sync check because the generator produced syntactically invalid output. Add a step that runs `esphome config firmware/esp32-c3-multi-sensor.yaml` (or equivalent YAML parse) to block bad YAML from reaching the compile stage.
@@ -180,9 +142,6 @@ The existing preflight catches version drift and generator sync failures. It doe
 Without this gate, a generator bug can produce invalid YAML that passes preflight, passes `--check`, and only fails at `esphome compile`. The gap between "preflight green" and "compile fails" wastes time and creates false confidence.
 
 **Implementation**: v7.5.1.2 — preflight runs `esphome config firmware/esp32-c3-multi-sensor.yaml`
-
----
-
 
 ---
 
@@ -196,9 +155,6 @@ Related: BUG-040
 
 ---
 
-
----
-
 ### LESSON-OPS-047: Version strings in test fixture generators must match the canonical VERSION file (v7.5.1.3)
 
 The fixture generator (`tests/fixtures/generate-fixtures.js`) embeds a VERSION constant that is stamped into generated fixture JSON files. The Python generator (`render_sensor_config.py --check`) independently derives the expected version from the canonical `VERSION` file and its own VERSION constant. If these two sources drift, the `--check` comparison will fail even though the generated fixture files are otherwise valid.
@@ -208,9 +164,6 @@ The fixture generator (`tests/fixtures/generate-fixtures.js`) embeds a VERSION c
 **Enforcement:** Preflight checks `fixture_generator_version_sync` that the VERSION extracted from `generate-fixtures.js` matches the canonical `VERSION` file. If they differ, preflight fails immediately.
 
 Related: BUG-041
-
----
-
 
 ---
 
@@ -237,9 +190,6 @@ Version drift occurs when the developer updates some canonical sources but misse
 - `dashboard/dashboard.h` (embedded App.version — via generate-header.sh)
 
 Related: BUG-042
-
----
-
 
 ---
 
@@ -270,9 +220,6 @@ propagates non-version JS edits from `dashboard.js` → `dashboard.html`. After 
 
 ---
 
-
----
-
 ### LESSON-OPS-066: Build pipelines with intermediate artifacts must re-derive them on version bumps (2026-03-21)
 
 **Date:** 2026-03-21
@@ -290,9 +237,6 @@ Related: BUG-055
 
 ---
 
-
----
-
 ### LESSON-OPS-071: Module-level imports for optional dependencies must be lazy (2026-03-23)
 
 **Context:** `import yaml` at the top of `sensor_manifest_lib.py` crashed the satellite workflow on systems without PyYAML, even though PyYAML was only needed for the `load_board_profile()` function which satellites never call.
@@ -300,9 +244,6 @@ Related: BUG-055
 **Rule:** If a Python module is only needed by one function (e.g., `yaml` for `load_board_profile()`), import it inside that function, not at the top of the file. Top-level imports break all callers of the module, even those that never use the optional dependency. This is especially important in ESPHome containers where pip packages beyond the standard library are not guaranteed.
 
 Related: BUG-060
-
----
-
 
 ---
 
@@ -348,9 +289,6 @@ Related: BUG-062, LESSON-OPS-072
 
 ---
 
-
----
-
 ### LESSON-OPS-115: Aggregator fixture `live` field must be a JSON object, not a JSON string (2026-03-25)
 
 **Context:** The v7.5.5.4 prompt example showed `"live": "{...JSON string...}"` in
@@ -370,9 +308,6 @@ both change together.
 the live field is a string instead of an object.
 
 Related: BUG-071
-
----
-
 
 ---
 
@@ -555,9 +490,6 @@ When a prompt says "Do NOT change file X" but also requires a version bump or re
 
 ---
 
-
----
-
 ### LESSON-OPS-098: `sdkconfig_options` must be updated in board profiles, not only templates (2026-03-30)
 
 For multi-board builds, generated YAMLs inherit `sdkconfig_options` from `firmware/boards/*.yaml`. Updating only a template YAML can appear to fix one local build while leaving other board builds unchanged. Apply socket/stack changes to all relevant board profiles and verify generated outputs before release testing.
@@ -612,5 +544,19 @@ bash scripts/preflight.sh
 **Fix (commit a30ae4f):** `bundle-dashboard.sh --check` now uses a `strip_manifest_blocks()` function to remove all `// <<< SENSOR_MANIFEST:*_BEGIN >>> ... // <<< SENSOR_MANIFEST:*_END >>>` blocks from both files before diffing. Everything outside those blocks — all actual source code — is still fully validated.
 
 **Implication:** Changes inside SENSOR_MANIFEST blocks will not be caught by the bundle sync check. This is by design — those blocks are managed by `render_sensor_config.py`, not by source modules.
+
+---
+
+### LESSON-OPS-118: Non-contiguous modules cannot be concatenated without breaking byte order (v7.6.5.4)
+
+**Context:** The Phase X architecture plan (§6 v7.6.5.4) specified concatenating `src/09-export.js + src/10-storage-stats.js + src/13-import.js` into `components/settings-panel/index.js` with a 17-entry FILES array. The coding agent identified during execution that this is physically impossible: modules 11 (suspend-resume) and 12 (management) sit between 10 and 13 in the original `dashboard.js` byte stream.
+
+**Problem:** If 09+10+13 are concatenated at FILES array position 9, the bundle output becomes `...08, [09,10,13], 11, 12, 14+15...` — placing 13's bytes before 11 and 12. The identity gate (version-normalized SHA comparison) fails because the byte order no longer matches the original.
+
+**Fix:** The agent kept `13-import.js` as a separate component (`components/import-panel/index.js`) at array position 12, preserving the original byte sequence: `...08, [09,10], 11, 12, 13, [14+15]...`. The FILES array has 18 entries instead of 17. The identity gate passes.
+
+**Rule:** Before specifying a module concatenation in the architecture plan, verify that all source modules in the group are physically contiguous in the bundle output. If intervening modules exist between them, they cannot be concatenated without reordering bytes. Either keep non-contiguous modules as separate components or explicitly accept the byte-order change and adjust the identity gate expectation.
+
+**Critical Rule candidate:** Consider adding as a critical rule if future phases involve similar restructuring.
 
 ---
