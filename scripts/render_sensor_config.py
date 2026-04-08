@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_aggregator_config, load_board_profile, load_gateway_config, load_manifest, manifest_v2
 
-VERSION = "7.6.5.6"
+VERSION = "7.6.5.8"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"

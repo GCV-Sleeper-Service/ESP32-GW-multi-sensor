@@ -1,8 +1,8 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-08 — Phase X Test/Closure in progress: v7.6.5.7 test spec split complete (PR #148); 10 domain-scoped spec files + shared helpers; v7.6.5.8 Phase X closure next._
-_reference domain-scoped files__Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
+_Last updated: 2026-04-08 — Phase X COMPLETE: All 10 steps delivered (v7.6.4.0 + v7.6.5.0–v7.6.5.8). Dashboard architecture refactored. Next: Phase Y (firmware refactor) or Phase 7 (persistence engine)._
+_Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
 
@@ -248,7 +248,7 @@ All steps shipped. No prompts needed.
 - v7.6.0.4: full dashboard add/remove/test workflow via browser; verify async safety (no stale panel during poll)
 - v7.6.0.5: Playwright + Phase D closure verification (all 4 fixture sets)
 
-### Phase X — Dashboard Architecture Refactor ⬅ NEXT
+### Phase X — Dashboard Architecture Refactor ✅ COMPLETE
 
 **Phase X plan:** `Docs/phase-X-architecture-and-refactor-plan-dashboard.md`
 
@@ -263,7 +263,34 @@ All steps shipped. No prompts needed.
 | v7.6.5.5 | HTML template extraction | `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
 | v7.6.5.6 | CSS extraction | `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
 | v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-08 |
-| v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | ⬅ Next |
+| v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-08 |
+
+Phase X is COMPLETE.
+
+All 10 steps shipped: v7.6.4.0 (documentation restructuring) + v7.6.5.0–v7.6.5.8 (dashboard architecture refactor), delivered across PRs #131–#149
+402/0 test count maintained throughout — no tests broken at any step; all structural changes were identity-preserving
+Phase X results document produced: prompts/handoff/phaseX-results.md
+Context reduction achieved: 55K–70K tokens → 8K–15K tokens per dashboard task (6x–8x)
+LESSON-OPS-043 structurally resolved: manual mirror problem class eliminated at v7.6.5.3
+11 new Critical Rules (47–57) established from Phase X execution
+Next phase determination: ⚠️ OPERATOR DECISION REQUIRED
+
+Phase Y (v7.6.6.x) — firmware refactor of sensor_history_multi.h using same Phase X methodology. Recommended by Phase X plan before Phase 7 so firmware changes happen on an already-split codebase.
+Phase 7 (v7.7.0.x) — per-device persistence engine. Feature work that benefits from reduced context window.
+The Phase 7 prompt (v7.7.0.0) exists but needs updates (stale doc references, resolved Rule 6 still referenced). These updates should be applied before starting Phase 7 regardless of Phase Y decision.
+
+**v7.6.5.8 delivery summary (PR #149):**
+- Added `dashboard_component_files()` preflight check — validates all 36 expected source files exist
+- Updated Critical Rules: Rule 6 marked structurally resolved, Rule 37 updated with provision.sh,
+  Rules 47–49 simplified for Phase X architecture
+- Added Board Provisioning section with provision.sh command table
+- Produced `prompts/handoff/phaseX-results.md` — comprehensive Phase X delivery record
+- Updated README with Dashboard Architecture section
+- Updated `Docs/lessons/dashboard.md` with LESSON-OPS-117–120 (identity gate, contiguous-slice,
+  three-pass pipeline, CSS partition by selector target)
+- Updated `Docs/writing-guide/checklists/dashboard.md` with Phase X prompt patterns
+- Version bump: 7.6.5.6 → 7.6.5.8 (no functional changes)
+- **Consolidated audit:** `prompts/phaseX/v7.6.5.8-PR149-consolidated-audit-and-lessons.md`
 
 **v7.6.5.7 delivery summary (PR #148):**
 - Split 1,853-line `tests/browser/dashboard.spec.js` monolith into 10 domain-scoped spec files
@@ -372,7 +399,7 @@ All steps shipped. No prompts needed.
 ### Phase 7 — Per-Device Persistence Engine - After Phase Y (Phase Y Not Scoped Yet)
 
 
-**`main` is at v7.6.0.5. Phase 7 starts at v7.7.0.0.**
+**`main` is at v7.6.5.8. Phase 7 starts at v7.7.0.0.**
 
 Before starting Phase 7, read `prompts/handoff/phaseD-results.md` for the active lessons and API contracts that Phase 7 must remain compatible with. Also read `prompts/handoff/session-handoff-v7.7.0.0.md` for the full Phase 7 entry context.
 
@@ -423,7 +450,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 3 | Regenerate all artifacts after source changes | All steps |
 | 4 | Run `bash scripts/preflight.sh` — must pass | All steps |
 | 5 | Run full Playwright suite with CI-exact `FIXTURE_SET=` commands — bare `npx playwright test` is NOT sufficient | All steps (revised 2026-03-21) |
-| 6 | Mirror all `dashboard.js` changes to `dashboard.html` | LESSON-OPS-043 |
+| 6 | ~~Mirror all dashboard.js changes to dashboard.html~~ **Structurally resolved by Phase X v7.6.5.3.** dashboard.html is now generated by build-dashboard.sh. Never edit dashboard.js or dashboard.html directly — edit source modules and run the pipeline. | LESSON-OPS-043 (resolved) |
 | 7 | Never fire concurrent history requests from dashboard JS | LESSON-OPS-052 |
 | 8 | Never use `beginResponseStream` for responses >10KB | LESSON-OPS-056 |
 | 9 | Dashboard.h must be gzip-compressed | LESSON-OPS-055 |
@@ -454,7 +481,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 34 | Shell scripts with locale-sensitive commands must use `LC_ALL=C` | Phase 6.3 audit finding |
 | 35 | Python network/file resources must use context managers (`with`) in long-running modes | Phase 6.3 audit finding |
 | 36 | Device testing firmware commands must reference the GENERATED YAML for the target board — never use the committed C3 template (`esp32-c3-multi-sensor.yaml`) for non-C3 boards. Generated YAMLs are gitignored and only exist after `render_sensor_config.py --write`. | LESSON-OPS-090 |
-| 37 | Regeneration pipeline — two variants:<br>**Full manual (8 steps):** `bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `node generate-fixtures.js` → `render_sensor_config.py --write` → `build-dashboard.sh --write` → `minify-dashboard.sh` → `generate-header.sh` → `render_sensor_config.py --check`<br>**Bump-version subset (6 steps, no fixture generation):** `bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `build-dashboard.sh --write` → `minify-dashboard.sh` → `generate-header.sh` → `preflight.sh`<br>Bundle MUST run first in both variants. | LESSON-OPS-091 (updated v7.6.5.3) |
+| 37 | Full regeneration pipeline (CI/satellite default): `bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `node generate-fixtures.js` → `render_sensor_config.py --write` → `build-dashboard.sh --write` → `minify-dashboard.sh` → `generate-header.sh` → `render_sensor_config.py --check`. For local device testing with non-default hardware, use `bash scripts/provision.sh <aggregator\|wroom>` BEFORE the pipeline, and `bash scripts/provision.sh satellite` after local testing and before pushing to remote. | LESSON-OPS-091 (updated at Phase X v7.6.5.8) |
 | 38 | All dashboard `fetch()` POST calls must use `Content-Type: application/x-www-form-urlencoded` with `body: \'a=1\'`. ESPHome does not consume JSON POST bodies. | BUG-076 / LESSON-OPS-099 |
 | 39 | All `curl` POST commands must use `-d \'a=1\'`. Never use `-H "Content-Type: application/json"`, never use `-d \'\'`, never use bare `-X POST` without a body. | BUG-076 / LESSON-OPS-099 |
 | 40 | Any HTTP handler performing NVS operations must use the deferred task pattern (`xTaskCreate`, 8192+ byte stack). Never perform NVS work synchronously in an HTTP handler. | BUG-075 / LESSON-OPS-100/101 |
@@ -464,17 +491,34 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 44 | Never use Arduino `String` (capital S) or bare `string` in ESP-IDF code. Always use `std::string`. The coding agent\'s CI does not perform ESP-IDF compilation — Arduino-isms pass CI but break the real build. Treat `String` in agent-generated code as a PR review red flag. | BUG-077 / LESSON-OPS-104 |
 | 45 | DOM references captured before an async auth flow (`requestManagementCredentials()`) become stale if `pollAggregatorLive()` fires during the wait and rebuilds `innerHTML`. Always re-query stable `id` nodes AFTER async boundaries. Suppress poll-driven rerenders while any action flag is true or while a management input has focus. | BUG-080/081 / LESSON-OPS-111 |
 | 46 | Mock server response shapes must be verified against the live firmware `httpd_resp_sendstr()` call — not the prompt description, not an audit table, not a prior session summary. The firmware contract is the single source of truth. | LESSON-OPS-112 |
-| 47 | `dashboard.html` is a GENERATED artifact from v7.6.5.3 onward — it must always open with `<!-- GENERATED — Do not edit. … -->`. Never hand-edit `dashboard.html`. All changes go into `dashboard/dashboard.tmpl.html` (structure) or `dashboard/src/*.js` modules (logic). | LESSON-OPS-043 resolution / v7.6.5.3 |
-| 48 | CI `browser-tests.yml` path filters must include ALL scripts that can change checked artifacts (`scripts/bundle-dashboard.sh`, `scripts/build-dashboard.sh`, `scripts/render_sensor_config.py`, `scripts/minify-dashboard.sh`, `scripts/generate-header.sh`). Omitting a script allows script-only changes to bypass CI. | v7.6.5.3 PR #135 review finding |
-| 49 | Always use `bash scripts/provision.sh <target>` to switch board configs (aggregator / satellite / wroom). Never copy `.bak` files or edit `gateway.json` by hand. Run `bash scripts/provision.sh satellite` + `bash scripts/preflight.sh` BEFORE every `git push`. `scripts/provision.sh` must never be removed from the repo. | LESSON-OPS-116 / v7.6.5.3 |
+| 47 | Source modules live in dashboard/core/ and dashboard/components/*/. dashboard.js and dashboard.html are generated — never edit directly. | Phase X v7.6.5.3 |
+| 48 | After any module edit, run the full pipeline: bundle-dashboard.sh --write → render_sensor_config.py --write → build-dashboard.sh --write → minify-dashboard.sh → generate-header.sh | Phase X v7.6.5.0 |
+| 49 | scripts/provision.sh is the mandatory entry point for switching between aggregator, WROOM satellite, and C3 satellite (default/CI-safe) configs. Always run `bash scripts/provision.sh satellite` before pushing to remote — failure to do so will break CI. Run `bash scripts/provision.sh status` to verify current state at any time. | Phase X v7.6.5.8 |
 | 50 | When planning file concatenations for non-contiguous modules, verify that all source modules in the group are physically adjacent in the bundle output. Modules can only be safely concatenated if contiguous. If intervening modules exist, keep them as separate components — the identity gate will catch violations but the plan should catch them first. | LESSON-OPS-118 / v7.6.5.4 |
 | 51 | `build-dashboard.sh` marker resolution must use `re.subn` with **lambda replacement** and CRLF-tolerant `\r?\n` patterns — never `bytes.replace()` with hardcoded `\n`, never `re.sub()` with raw bytes as replacement (backreference risk). | BUG-076 / LESSON-OPS-099; updated v7.6.5.6 (Gemini HIGH finding) |
 | 52 | Build tool dependencies used via shell scripts must be wired as `devDependencies` with `npx` invocation in scripts — never as global-only requirements. Global-only tooling causes silent CI mismatches on fresh installs. | v7.6.5.5 PR #146 CODEX/GPT review finding |
 v7.6.5.6 PR #147 |
+| 53 | When using `re.sub()` / `re.subn()` to inject raw file contents (CSS, JS, HTML) as a replacement, ALWAYS use a lambda function — never pass raw bytes directly. CSS/JS commonly contain backslash sequences that `re.sub` interprets as backreferences. | LESSON-OPS-121 / v7.6.5.6 PR #147 |
 | 54 | When an acceptance criterion is contradicted by another requirement, the agent MUST stop and escalate to the operator — never self-waive. Document the contradiction in session log § Accepted Exceptions after operator confirms the waiver. | v7.6.5.6 PR #147 — agent self-waived output-identity gate |
 | 55 | CSS partition rule is "by selector target" — which component does this rule style? Global `@media` rules targeting selectors from multiple components belong in `core/base.css` regardless of source proximity in the original file. | v7.6.5.6 PR #147 — global @media initially misplaced |
 | 56 | Version bumps (VERSION file, App.version, fixtures, firmware YAML) are out of scope for test-only PRs. Version bumps belong in the step that delivers code changes. | v7.6.5.7 PR #148 — three agents attempted version bumps before revert |
 | 57 | When splitting a monolithic test file into domain-scoped files, any pre-existing spec file that receives new test groups must be audited for duplicate helper functions. Local copies must be replaced with imports from the shared helpers module. | v7.6.5.7 PR #148 — `manifest.spec.js` had divergent local copies |
+
+---
+
+## Board Provisioning for Local Device Testing
+
+Use `scripts/provision.sh` to switch between hardware targets without breaking CI.
+
+| Command | Board | CI-safe |
+|---|---|---|
+| `bash scripts/provision.sh satellite` | C3 SuperMini (default) | ✅ YES |
+| `bash scripts/provision.sh aggregator` | ESP32-S3 agg-s3-16m-1 | ❌ NO |
+| `bash scripts/provision.sh wroom` | WROOM sat-esp32-4m-190 | ❌ NO |
+| `bash scripts/provision.sh status` | (inspect only) | n/a |
+
+**Mandatory rule:** Run `bash scripts/provision.sh satellite` before every `git push`.
+The script runs `render_sensor_config.py --write` automatically on switch. Run the remaining pipeline steps after.
 
 ---
 
@@ -531,6 +575,19 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-04-08 — v7.6.5.8 Complete: Phase X Closure
+
+| Change | Why |
+|--------|-----|
+| **v7.6.5.8 marked complete** | Phase X closure: documentation updates, preflight component checks, prompt index finalization, Phase X results document |
+| **Critical Rule 6 updated** | Marked as "Structurally resolved by Phase X v7.6.5.3" — dashboard.html is now generated, manual mirroring no longer possible |
+| **Critical Rule 37 updated** | Added provision.sh device-switching note and full three-pass pipeline reference |
+| **Critical Rules 47–49 updated** | Simplified to essential guidance: 47 (source modules location), 48 (pipeline after edits), 49 (provision.sh mandatory for board switching) |
+| **Board provisioning table added** | New section after Critical Rules documenting provision.sh commands and CI-safe/unsafe states |
+| **preflight.sh updated** | dashboard_component_files() check added — verifies all expected component/core files exist (36 files total) |
+| **Phase X marked COMPLETE** | All 10 steps (v7.6.4.0 + v7.6.5.0–v7.6.5.8) delivered; dashboard architecture refactor complete |
+| **Document header `_Last updated_` refreshed** | Reflects 2026-04-08 and Phase X completion state |
 
 ### 2026-04-08 — v7.6.5.7 Complete: Test Spec Split
 

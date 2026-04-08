@@ -1157,5 +1157,77 @@ See BUG-080/BUG-081 and the PR #128 follow-up for the full guard pattern.
 
 ---
 
+## Phase X Architecture Lessons (v7.6.5.0–v7.6.5.8)
+
+### LESSON-OPS-117: Identity Gate Pattern
+
+**Context:** Phase X (dashboard architecture refactor) required structural changes to generated artifacts while preserving runtime behavior.
+
+**Problem:** Device testing is expensive (hardware required, manual steps, ~20 minutes per device). Structural-only changes (file moves, extractions, rearrangements) shouldn't require device testing every time.
+
+**Solution:** Identity gates substitute for device testing when changes are purely structural:
+
+- **Level 1 (module split):** SHA-256 hash of `dashboard.js` before = after bundle
+- **Level 2 (template creation):** bit-for-bit idempotency of `build-dashboard.sh` output
+- **Level 3 (component extraction):** normalized diff evidence when byte-identity is impossible
+
+**Rule:** For structural dashboard changes, run the identity gate appropriate to the level. Device testing required only at level transitions (e.g., Level 2 → Level 3).
+
+**Reference:** Phase X architecture plan, v7.6.5.0–v7.6.5.6 implementation.
+
+---
+
+### LESSON-OPS-118: Contiguous-Slice Splitting (Critical Rule 50)
+
+**Context:** v7.6.5.4 component directory scaffolding planned to concatenate 3 module groups.
+
+**Problem:** `src/13-import.js` was planned for concatenation into `settings-panel/index.js` (modules 9+10). However, modules 11 and 12 physically sit between module 10 and module 13 in the bundle output. Concatenating non-contiguous modules breaks byte order and fails the identity gate.
+
+**Solution:** Verify physical adjacency before specifying concatenations in architecture plans. Modules can only be safely concatenated if contiguous in the bundle. If intervening modules exist, keep them as separate components.
+
+**Result:** `import-panel` became the 9th component (JS-only), not a concatenation target. Classified as a plan correction, not an implementation error.
+
+**Rule:** When planning file concatenations, read the bundle output and verify modules are physically adjacent. The identity gate will catch violations, but the plan should catch them first.
+
+**Reference:** v7.6.5.4 PR #145 consolidated audit, Critical Rule 50.
+
+---
+
+### LESSON-OPS-119: Three-Pass Build Pipeline
+
+**Context:** v7.6.5.6 CSS extraction required injecting CSS into `dashboard.tmpl.html` before component template injection.
+
+**Problem:** Single-pass or two-pass assembly couldn't handle all three injection points (CSS, component templates, JS) in the correct order.
+
+**Solution:** Three sequential passes in `build-dashboard.sh`:
+
+- **Pass 0:** CSS concatenation (core/base.css + 8 components/*/styles.css) → replace `{{CSS_PLACEHOLDER}}`
+- **Pass 1:** Component template injection → replace `{{COMPONENT:name}}` markers
+- **Pass 2:** JS bundle injection → replace `{{JS_PLACEHOLDER}}`
+
+All passes use `re.subn` with lambda replacement (backreference-safe) and CRLF-tolerant `\r?\n` patterns.
+
+**Rule:** Dashboard assembly is always a three-pass pipeline. The order is fixed: CSS → templates → JS.
+
+**Reference:** v7.6.5.6 PR #147, `scripts/build-dashboard.sh`.
+
+---
+
+### LESSON-OPS-120: CSS Partition by Selector Target (Critical Rule 55)
+
+**Context:** v7.6.5.6 CSS extraction into per-component `styles.css` files.
+
+**Problem:** Global `@media` breakpoints (targeting selectors from multiple components) were initially placed in `gateway-panel/styles.css` because they were physically adjacent in the original monolith CSS block.
+
+**Correction:** Global `@media` rules belong in `core/base.css` regardless of source proximity.
+
+**Rule:** CSS partition rule is "by selector target" — which component does this rule style? If a CSS rule targets selectors from multiple components, it belongs in `core/base.css`, not in any component-specific `styles.css`.
+
+**Anti-pattern:** Partitioning CSS by physical proximity in the source file rather than by semantic ownership.
+
+**Reference:** v7.6.5.6 PR #147 commit 14490d9, Critical Rule 55.
+
+---
+
 
 ---
