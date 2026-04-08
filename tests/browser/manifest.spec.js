@@ -12,7 +12,11 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { loadDashboard: loadDashboardHelper } = require('./test-helpers');
+const {
+  loadDashboard: loadDashboardHelper,
+  waitForDashboardReady,
+  stopDashboardNetwork
+} = require('./test-helpers');
 
 // Stub external CDN resources (Chart.js, Google Fonts) so page.goto resolves
 // in offline / sandboxed CI environments.  The dashboard wraps initCharts()
@@ -28,35 +32,6 @@ async function stubCdn(page) {
   await page.route('https://fonts.gstatic.com/**', route =>
     route.fulfill({ status: 200, contentType: 'font/woff2', body: '' })
   );
-}
-
-async function waitForDashboardReady(page, expectedSensorCount, timeout = 10000) {
-  await page.waitForFunction((expected) => {
-    if (typeof window._manifest === 'undefined') return false;
-    if (!window.App || !App.State || typeof App.State.getSensors !== 'function') return false;
-    var sensors = App.State.getSensors();
-    if (!Array.isArray(sensors) || sensors.length !== expected) return false;
-    var cards = Array.from(document.querySelectorAll('.sensor-card'));
-    if (cards.length !== expected) return false;
-    return cards.every(function(card) {
-      return !!card.querySelector('.sensor-card-header');
-    });
-  }, expectedSensorCount, { timeout });
-}
-
-async function stopDashboardNetwork(page) {
-  try {
-    await page.evaluate(() => {
-      if (typeof suspendDashboardNetworkActivity === 'function') {
-        suspendDashboardNetworkActivity();
-        return;
-      }
-      if (window.evtSource && typeof window.evtSource.close === 'function') {
-        try { window.evtSource.close(); } catch (_) {}
-        window.evtSource = null;
-      }
-    });
-  } catch (_) { /* page may already be closed */ }
 }
 
 test.afterEach(async ({ page }) => {
@@ -105,7 +80,7 @@ test.describe('manifest boot flow', () => {
       return response.json();
     });
     const expectedSensors = (manifest.sensors || []).map(s => ({ id: s.id, name: s.name }));
-    await waitForDashboardReady(page, expectedSensors.length);
+    await waitForDashboardReady(page, { expectedSensorCount: expectedSensors.length });
     const sensors = await page.evaluate(() => App.State.getSensors().map(s => ({ id: s.id, name: s.name })));
     expect(sensors).toEqual(expectedSensors);
   });
@@ -122,7 +97,7 @@ test.describe('manifest boot flow', () => {
       });
     });
     await page.goto('/dashboard.html');
-    await waitForDashboardReady(page, 3);
+    await waitForDashboardReady(page, { expectedSensorCount: 3 });
     const sensors = await page.evaluate(() => App.State.getSensors().map(s => s.id));
     expect(sensors).toEqual(['office', 'first_floor', 'outside']);
   });

@@ -322,7 +322,7 @@ test.describe('18. Mixed-Category Rendering', () => {
     await expect(tempCanvas).toBeVisible();
   });
 
-  test('/api/v2/live returns data for both device categories', async ({ page, request }) => {
+  test('/api/v2/live returns data for both device categories', async ({ request }) => {
     const response = await request.get('/api/v2/live');
     expect(response.ok()).toBeTruthy();
     const data = await response.json();

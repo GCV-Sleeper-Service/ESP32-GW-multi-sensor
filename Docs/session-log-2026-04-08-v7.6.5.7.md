@@ -149,6 +149,7 @@ Per-file runs under FIXTURE_SET=3sensor:
 | `regression.spec.js` | 15 passed |
 | `satellite-management.spec.js` | 19 skipped (requires aggregator fixture — expected) |
 | `sensor-cards.spec.js` | 20 passed, 7 skipped |
+| `sensor-count.spec.js` | 9 passed (pre-existing, not part of split) |
 | `system-devices.spec.js` | 8 skipped (requires system fixture — expected) |
 | `theme-export.spec.js` | 7 passed |
 
