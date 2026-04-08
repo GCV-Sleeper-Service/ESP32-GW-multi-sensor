@@ -344,3 +344,55 @@ When adding or modifying endpoints, verify behavior across all device categories
 | `/api/status` | per-device fields must be category-appropriate |
 | `/api/v2/live` | verify non-environmental devices have correct metric keys |
 | `/history/{id}/temp` and `/history/{id}/hum` | MUST return 404 for non-environmental devices |
+
+---
+
+## Phase X Architecture Patterns (v7.6.5.0–v7.6.5.8)
+
+### Module-Scoped Prompts
+
+After Phase X, dashboard prompts should reference only the specific source module(s) being modified:
+
+- Reference `dashboard/core/app-shell.js` — not `dashboard.js`
+- Reference `dashboard/components/sensor-cards/index.js` — not "the dashboard"
+- Reference `dashboard/components/charts/styles.css` — not "the CSS"
+
+**Anti-pattern:** Prompts that say "update dashboard.js" when the actual change is in a single module.
+
+### Bundle Pipeline Requirement
+
+Every dashboard prompt must include the full pipeline in its validation section:
+
+```bash
+bash scripts/bundle-dashboard.sh --write
+python3 scripts/render_sensor_config.py --write
+node tests/fixtures/generate-fixtures.js
+python3 scripts/render_sensor_config.py --write
+bash scripts/build-dashboard.sh --write
+bash scripts/minify-dashboard.sh
+bash scripts/generate-header.sh
+python3 scripts/render_sensor_config.py --check
+```
+
+**Never edit `dashboard.js` or `dashboard.html` directly.** These are generated artifacts.
+
+### Component Ownership
+
+Changes to a component should be contained within its directory:
+
+- `dashboard/components/sensor-cards/` — index.js, template.html, styles.css
+- `dashboard/components/charts/` — index.js, template.html, styles.css
+- etc.
+
+**Cross-component changes** (e.g., modifying both `sensor-cards` and `charts`) require explicit justification in the prompt.
+
+### POST Body Requirements
+
+Critical Rule 38 applies to **all** dashboard code with `fetch()` POST calls. This includes:
+- Management endpoints (add satellite, remove satellite, delete data)
+- Import endpoints
+- System control endpoints
+
+ESPHome only consumes `application/x-www-form-urlencoded` POST bodies. JSON bodies are not consumed.
+
+---
