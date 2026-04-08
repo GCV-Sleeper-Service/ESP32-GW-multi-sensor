@@ -64,6 +64,8 @@ tests/
     system-devices.spec.js
     satellite-management.spec.js
     test-helpers.js
+	manifest.spec.js
+    sensor-count.spec.js
 ```
 
 ---

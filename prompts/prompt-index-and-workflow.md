@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-07 — Phase X Level 3 in progress: v7.6.5.6 CSS extraction complete (PR #147); three-pass build (CSS → components → JS), 9 CSS files created, global @media in core/base.css; v7.6.5.7 test spec split next._
+_Last updated: 2026-04-08 — Phase X Test/Closure in progress: v7.6.5.7 test spec split complete (PR #148); 10 domain-scoped spec files + shared helpers; v7.6.5.8 Phase X closure next._
 _reference domain-scoped files__Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -262,8 +262,18 @@ All steps shipped. No prompts needed.
 | v7.6.5.4 | Component directories | `prompts/phaseX/v7.6.5.4-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
 | v7.6.5.5 | HTML template extraction | `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
 | v7.6.5.6 | CSS extraction | `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
-| v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | ⬅ Next |
-| v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-08 |
+| v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | ⬅ Next |
+
+**v7.6.5.7 delivery summary (PR #148):**
+- Split 1,853-line `tests/browser/dashboard.spec.js` monolith into 10 domain-scoped spec files
+  covering all 21 test groups, plus `test-helpers.js` shared helpers
+- `dashboard.spec.js` retained as empty stub (no test cases)
+- CI workflow updated: mixed/aggregator/system matrix steps target new domain-scoped files
+- Test counts unchanged: 99 passed / 45 skipped (3sensor), 7 (mixed), 8 (system), 11+1 skipped (aggregator)
+- No dashboard source, build script, or CSS changes (VERSION remains at 7.6.5.6)
+- Remediation: out-of-scope version bump reverted; `manifest.spec.js` helpers deduplicated;
+  unused `page` fixture removed (CR32); changelog per-file table corrected
 
 **v7.6.5.6 delivery summary (PR #147):**
 - Extracted CSS from `dashboard.tmpl.html` `<style>` block (491 lines, 35,088 bytes) into 9 per-component CSS files:
@@ -463,6 +473,9 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 v7.6.5.6 PR #147 |
 | 54 | When an acceptance criterion is contradicted by another requirement, the agent MUST stop and escalate to the operator — never self-waive. Document the contradiction in session log § Accepted Exceptions after operator confirms the waiver. | v7.6.5.6 PR #147 — agent self-waived output-identity gate |
 | 55 | CSS partition rule is "by selector target" — which component does this rule style? Global `@media` rules targeting selectors from multiple components belong in `core/base.css` regardless of source proximity in the original file. | v7.6.5.6 PR #147 — global @media initially misplaced |
+| 56 | Version bumps (VERSION file, App.version, fixtures, firmware YAML) are out of scope for test-only PRs. Version bumps belong in the step that delivers code changes. | v7.6.5.7 PR #148 — three agents attempted version bumps before revert |
+| 57 | When splitting a monolithic test file into domain-scoped files, any pre-existing spec file that receives new test groups must be audited for duplicate helper functions. Local copies must be replaced with imports from the shared helpers module. | v7.6.5.7 PR #148 — `manifest.spec.js` had divergent local copies |
+
 ---
 
 ## Prompt File Naming Convention
@@ -518,6 +531,16 @@ After each step completes:
 ---
 
 ## Revision History
+
+### 2026-04-08 — v7.6.5.7 Complete: Test Spec Split
+
+| Change | Why |
+|--------|-----|
+| **v7.6.5.7 marked complete** | PR #148 merged — 1,853-line dashboard.spec.js monolith split into 10 domain-scoped spec files + test-helpers.js; all 21 groups mapped; CI workflow updated; 99/45 (3sensor) unchanged |
+| **v7.6.5.8 marked ⬅ Next** | Phase X closure step |
+| **Critical Rules 56–57 added** | Version bump scope (56); helper deduplication audit for split targets (57) |
+| **v7.6.5.7 delivery summary added** | Quick-reference for operator |
+| **Document header `_Last updated_` refreshed** | Reflects current session date and v7.6.5.7 closure state |
 
 ### 2026-04-07 — v7.6.5.6 Complete: Phase X Level 3 CSS Extraction
 
