@@ -2,6 +2,45 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.5.8] — 2026-04-08 — Phase X Closure: Documentation and Preflight Finalization
+
+### Changes
+
+- **Phase X completion:** All 10 Phase X steps (v7.6.4.0 + v7.6.5.0–v7.6.5.8) delivered. Dashboard architecture refactor complete.
+- **Preflight enhancement:** Added `dashboard_component_files()` check to `scripts/preflight.sh` — verifies all 33 expected component/core files exist (10 core modules, 1 core CSS, 1 template, 7 full-triad components, 1 template+CSS component, 1 JS-only component)
+- **Critical Rules updated:**
+  - **Rule 6:** Marked as "Structurally resolved by Phase X v7.6.5.3" — dashboard.html is now generated, manual mirroring no longer possible
+  - **Rule 37:** Full pipeline reference updated with `provision.sh` device-switching note
+  - **Rules 47–49:** Simplified to essential guidance (source modules location, pipeline after edits, provision.sh mandatory for board switching)
+- **Board provisioning table added** to `prompts/prompt-index-and-workflow.md` — documents provision.sh commands and CI-safe/unsafe states
+- **Phase X patterns added** to `Docs/writing-guide/checklists/dashboard.md` — module-scoped prompts, bundle pipeline requirement, component ownership, POST body requirements
+- **Phase X lessons added** to `Docs/lessons/dashboard.md`:
+  - LESSON-OPS-117: Identity Gate Pattern (SHA-256, bit-for-bit, normalized diff)
+  - LESSON-OPS-118: Contiguous-Slice Splitting (Critical Rule 50)
+  - LESSON-OPS-119: Three-Pass Build Pipeline
+  - LESSON-OPS-120: CSS Partition by Selector Target (Critical Rule 55)
+- **README.md updated:** Added "Dashboard Architecture" section documenting three-pass build pipeline and modular source structure
+- **Phase X results document created:** `prompts/handoff/phaseX-results.md` — comprehensive delivery summary, lessons, metrics, validation checklist
+
+### Validation
+
+```
+bash scripts/preflight.sh → all 68 checks PASS (including new dashboard_component_files check) ✅
+FIXTURE_SET=3sensor     npx playwright test --project=chromium → 99 passed, 45 skipped ✅
+FIXTURE_SET=mixed       npx playwright test --grep "Mixed" --project=chromium → 7 passed ✅
+FIXTURE_SET=system      npx playwright test --grep "System" --project=chromium → 8 passed ✅
+FIXTURE_SET=aggregator  npx playwright test --grep "Aggregator" --project=chromium → 11 passed, 1 skipped ✅
+```
+
+**Total test counts unchanged:** 99 passed / 45 skipped (3sensor), 7 passed (mixed), 8 passed (system), 11 passed / 1 skipped (aggregator)
+
+### Notes
+
+- This is a documentation-only and tooling-only release. No dashboard source code, CSS, or firmware changes.
+- Phase X is now **COMPLETE**. All 10 steps delivered.
+- Dashboard context requirements reduced from 55K–70K tokens to 8K–15K tokens (6x–8x improvement).
+- Next phase options: Phase Y (firmware refactor) or Phase 7 (persistence engine).
+
 ## [v7.6.5.7] — 2026-04-07 — Phase X Level 5: Test Spec Split
 
 ### Changes
