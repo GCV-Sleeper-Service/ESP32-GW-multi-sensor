@@ -231,27 +231,30 @@ test.describe('21. Satellite Management', () => {
     await expect(urlInput).toHaveValue('http://192.168.1.141');
   });
 
-  test('PR128-regression: panel remains usable after completed delete', async ({ page }) => {
+    test('PR128-regression: panel remains usable after completed delete', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await waitForAggregatorReady(page);
     await page.locator('.gw-tab[data-gw="settings"]').click();
+
+    // Stub requestManagementCredentials BEFORE any interaction — overwrite the
+    // module-scoped function so _handleRemoveSatellite uses the stub
+    await page.evaluate(() => {
+      requestManagementCredentials = () => Promise.resolve({ username: 'admin', password: 'mock' });
+    });
 
     // First add a new satellite so we have one to delete
     const urlInput = page.locator('#sat-url-input');
     await urlInput.fill('http://192.168.1.199');
 
-    // Set up response listener BEFORE clicking so it is registered before the response arrives
+    // Listen for both the add response AND the subsequent _refreshSettingsPanel gateways fetch
+    const panelRefresh = page.waitForResponse(resp => resp.url().includes('/api/aggregator/gateways') && resp.status() === 200);
     const addResponse = page.waitForResponse(resp => resp.url().includes('/api/aggregator/add-satellite') && resp.request().method() === 'POST' && resp.status() === 200);
 
     await page.locator('#sat-add-btn').click();
 
-    // Wait for add to complete
+    // Wait for add AND panel re-render to complete
     await addResponse;
-
-    // Stub requestManagementCredentials to bypass auth modal
-    await page.evaluate(() => {
-      window.requestManagementCredentials = () => Promise.resolve({ username: 'admin', password: 'mock' });
-    });
+    await panelRefresh;
 
     // Now attempt to delete the satellite we just added
     await page.waitForSelector('.settings-satellite-card', { timeout: 10000 });
@@ -261,8 +264,8 @@ test.describe('21. Satellite Management', () => {
     page.on('dialog', dialog => dialog.accept());
 
     // Set up response listener BEFORE clicking so it is registered before the response arrives
-    const deleteResponse = page.waitForResponse(resp => resp.url().includes('/api/aggregator/satellite/') && resp.request().method() === 'DELETE' && resp.status() === 200);
-
+    const deleteResponse = page.waitForResponse(resp => resp.url().includes('/api/aggregator/satellite/') && resp.request().method() === 'DELETE');
+	
     await removeBtns.last().click();
 
     // Wait for delete API response to complete

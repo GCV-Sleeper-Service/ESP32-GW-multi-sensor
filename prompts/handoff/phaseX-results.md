@@ -277,19 +277,19 @@ Every step required internal review rounds or post-merge documentation fixups, b
 
 ## Validation Before Closing Session
 
-- [ ] `prompts/handoff/phaseX-results.md` created (this document)
-- [ ] `prompts/prompt-index-and-workflow.md` updated (Phase X complete, Critical Rules 6/37/47/48/49, provisioning table)
-- [ ] `scripts/preflight.sh` updated (dashboard_component_files check)
-- [ ] `README.md` updated (Dashboard Architecture section)
-- [ ] `Docs/writing-guide/checklists/dashboard.md` updated (Phase X patterns) — pending
-- [ ] `Docs/lessons/dashboard.md` updated (Phase X lessons) — pending
-- [ ] VERSION bumped to 7.6.5.8 — pending
-- [ ] Full pipeline run — pending
-- [ ] Changelog entry — pending
-- [ ] Full Playwright suite (all 4 fixture sets) — pending
-- [ ] Preflight passes with new component checks — pending
-- [ ] Session log created — pending
-- [ ] Instruction Compliance Output table — pending
+- [X] `prompts/handoff/phaseX-results.md` created (this document)
+- [X] `prompts/prompt-index-and-workflow.md` updated (Phase X complete, Critical Rules 6/37/47/48/49, provisioning table)
+- [X] `scripts/preflight.sh` updated (dashboard_component_files check)
+- [X] `README.md` updated (Dashboard Architecture section)
+- [X] `Docs/writing-guide/checklists/dashboard.md` updated (Phase X patterns) 
+- [X] `Docs/lessons/dashboard.md` updated (Phase X lessons) 
+- [X] VERSION bumped to 7.6.5.8 
+- [X] Full pipeline run 
+- [X] Changelog entry 
+- [X] Full Playwright suite (all 4 fixture sets) 
+- [X] Preflight passes with new component checks 
+- [X] Session log created 
+- [X] Instruction Compliance Output table 
 
 ---
 
