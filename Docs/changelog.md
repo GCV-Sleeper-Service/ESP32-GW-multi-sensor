@@ -46,7 +46,7 @@ Per-file independent runs under FIXTURE_SET=3sensor:
 | `system-devices.spec.js` | 8 skipped (requires system fixture) |
 | `theme-export.spec.js` | 7 passed |
 
- — 2026-04-07 — Phase X Level 4: CSS Extraction into Per-Component Stylesheets
+## [v7.6.5.6] — 2026-04-07 — Phase X Level 4: CSS Extraction into Per-Component Stylesheets
 
 ### Changes
 
