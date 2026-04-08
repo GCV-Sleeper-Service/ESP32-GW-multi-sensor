@@ -7,7 +7,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 ### Changes
 
 - **Phase X completion:** All 10 Phase X steps (v7.6.4.0 + v7.6.5.0–v7.6.5.8) delivered. Dashboard architecture refactor complete.
-- **Preflight enhancement:** Added `dashboard_component_files()` check to `scripts/preflight.sh` — verifies all 33 expected component/core files exist (10 core modules, 1 core CSS, 1 template, 7 full-triad components, 1 template+CSS component, 1 JS-only component)
+- **Preflight enhancement:** Added `dashboard_component_files()` check to `scripts/preflight.sh` — verifies all 36 expected component/core files exist (10 core JS modules, 1 core CSS, 1 template, 7 full-triad components, 1 template+CSS component, 1 JS-only component)
 - **Critical Rules updated:**
   - **Rule 6:** Marked as "Structurally resolved by Phase X v7.6.5.3" — dashboard.html is now generated, manual mirroring no longer possible
   - **Rule 37:** Full pipeline reference updated with `provision.sh` device-switching note
@@ -36,7 +36,7 @@ FIXTURE_SET=aggregator  npx playwright test --grep "Aggregator" --project=chromi
 
 ### Notes
 
-- This is a documentation-only and tooling-only release. No dashboard source code, CSS, or firmware changes.
+- This release includes no functional changes. Version strings were updated in source files as part of the standard version bump process.
 - Phase X is now **COMPLETE**. All 10 steps delivered.
 - Dashboard context requirements reduced from 55K–70K tokens to 8K–15K tokens (6x–8x improvement).
 - Next phase options: Phase Y (firmware refactor) or Phase 7 (persistence engine).

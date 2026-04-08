@@ -30,11 +30,11 @@ This session completed the final step of Phase X (dashboard architecture refacto
 ### 1. Pre-Condition Verification
 
 Verified current state before making changes:
-- All component files exist (8 full-triad, 1 template+CSS, 1 JS-only)
+- All component files exist (7 full-triad, 1 template+CSS, 1 JS-only)
 - All core files exist (10 JS modules + 1 base.css + 1 dashboard.tmpl.html)
 - Board in CI-safe satellite mode (C3 SuperMini default)
 - Branch: `claude/update-dashboard-architecture`
-- Current version: 7.6.5.7 (from PR #148)
+- Current version: 7.6.5.6 (from PR #146)
 
 ### 2. Preflight Enhancement
 
@@ -45,7 +45,7 @@ Added `dashboard_component_files()` function to `scripts/preflight.sh`:
 - Checks 7 full-triad components (index.js + template.html + styles.css)
 - Checks device-info (template.html + styles.css only)
 - Checks import-panel (index.js only)
-- **Total: 33 files validated**
+- **Total: 36 files validated**
 
 Output on success: `all dashboard component/core files present: PASS`
 
@@ -155,7 +155,7 @@ Created `prompts/handoff/phaseX-results.md` following phaseD-results.md format:
 **Key metrics documented:**
 - Tokens per dashboard task: 55K–70K → 8K–15K (6x–8x improvement)
 - Largest single file: 3,955 lines → 634 lines (6.2x reduction)
-- Total source files: 2 (monolith) → 33 (modular)
+- Total source files: 2 (monolith) → 36 (modular)
 
 ### 8. Version Bump
 
@@ -226,8 +226,8 @@ Ran `bash scripts/preflight.sh` — all 68 checks PASS, including:
 
 ### Pre-Condition State Verification
 
-✅ Confirmed all component files exist (33 total)
-✅ Confirmed core files exist (11 files)
+✅ Confirmed all component files exist (36 total)
+✅ Confirmed core files exist (12 files: 10 JS + 1 CSS + 1 template)
 ✅ Confirmed board in CI-safe satellite mode
 ✅ Baseline Playwright tests: not run (pre-existing green state from v7.6.5.7)
 
@@ -254,7 +254,7 @@ Ran `bash scripts/preflight.sh` — all 68 checks PASS, including:
 
 ### Scope Constraints
 
-✅ Did NOT modify any dashboard source code, CSS, or HTML templates
+✅ Did NOT modify any dashboard source code, CSS, or HTML templates (only version strings updated by bump-version.sh)
 ✅ Did NOT modify any test logic
 ✅ Did NOT modify build pipeline scripts (only preflight)
 ✅ No functional changes to dashboard behavior
@@ -309,7 +309,7 @@ Total:     125 passed, 46 skipped
 | 23 | Run full Playwright suite — aggregator (step 10) | ✅ PASS | 11 passed, 1 skipped |
 | 24 | Run preflight with new component checks (step 11) | ✅ PASS | All 68 checks PASS including new check |
 | 25 | Session log + Instruction Compliance table (step 12) | ✅ PASS | This document |
-| 26 | NO dashboard source/CSS/HTML changes (scope constraint) | ✅ PASS | Only preflight.sh modified in scripts/ |
+| 26 | NO dashboard source/CSS/HTML changes (scope constraint) | ✅ PASS | Only preflight.sh modified; version strings updated by bump-version.sh |
 | 27 | NO test logic changes (scope constraint) | ✅ PASS | No test files modified |
 | 28 | NO build pipeline script changes except preflight (scope constraint) | ✅ PASS | Only preflight.sh modified |
 | 29 | Provide preflight output showing new component checks (deliverable) | ✅ PASS | See Validation Evidence section |
@@ -350,7 +350,7 @@ All 10 steps delivered:
 - v7.6.5.8 — Phase X closure (this step)
 
 **Dashboard architecture:**
-- Source files: 33 (10 core + 9 components + template)
+- Source files: 36 (10 core JS + 1 core CSS + 1 template + 9 components)
 - Context reduction: 6x–8x improvement
 - LESSON-OPS-043 structurally resolved
 - Three-pass build pipeline operational

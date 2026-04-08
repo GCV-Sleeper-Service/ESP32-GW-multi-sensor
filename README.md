@@ -6,8 +6,8 @@ Supports **ESP32-C3**, **ESP32-S3**, **ESP32-WROOM-32D**, and other ESP32 varian
 
 No cloud. No database. No Home Assistant required. Just ESP32 hardware, the gateway firmware, and a browser.
 
-> **Current version: v7.5.5.5** — Phase 5 complete (Aggregator MVP).
-> Multi-board support, unified satellite/aggregator architecture, manifest-driven dashboard with environmental + network device cards.
+> **Current version: v7.6.5.8** — Phase X complete (Dashboard Architecture Refactor).
+> Multi-board support, unified satellite/aggregator architecture, manifest-driven dashboard with environmental + network device cards, modular component-based architecture.
 > Default config on `main`: **3 BLE sensors + 1 WAN ping probe** on ESP32-C3.
 
 **Satellite hardware cost: ~$35 USD.**
@@ -206,8 +206,8 @@ The dashboard is built from modular source files using a three-pass build pipeli
 
 1. **JS modules** (`dashboard/core/*.js` + `dashboard/components/*/index.js`) are bundled into `dashboard/dashboard.js`
 2. **Generator** (`render_sensor_config.py`) injects sensor metadata into the bundle
-3. **HTML assembly** (`build-dashboard.sh`) combines CSS, component templates, and JS into `dashboard/dashboard.html`
-4. **Minification** and **header generation** produce the final firmware-embedded artifact
+3. **HTML assembly** (`build-dashboard.sh`) uses three passes to combine CSS (pass 0), component templates (pass 1), and JS (pass 2) into `dashboard/dashboard.html`
+4. **Minification and header generation** produce the final firmware-embedded artifact
 
 `dashboard.js` and `dashboard.html` are generated files — never edit them directly. Edit the source modules and run the pipeline.
 

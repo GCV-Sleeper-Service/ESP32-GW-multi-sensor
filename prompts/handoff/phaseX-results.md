@@ -2,18 +2,18 @@
 
 _Date: 2026-04-08_
 _Covers: v7.6.4.0 (documentation restructuring) + v7.6.5.0 through v7.6.5.8 (dashboard architecture refactor)_
-_Status: **Phase X COMPLETE** — all ten steps merged to `main`_
+_Status: **Phase X COMPLETE** — all ten steps delivered on branch `claude/update-dashboard-architecture`, pending merge to `main`_
 
 ---
 
 ## Current State
 
-- **`main` is at v7.6.5.8**, HEAD commit on `claude/update-dashboard-architecture` branch. Phase X is fully closed.
-- **All four fixture sets are green:** 402 tests passed / 0 failed (3sensor: 99, mixed: 96, system: 100, aggregator: 107)
-- **No open PRs for Phase X.** All 10 steps delivered.
+- **Branch `claude/update-dashboard-architecture` is at v7.6.5.8**. All ten Phase X steps complete, pending final merge to `main`.
+- **All four fixture sets green on this branch:** 125 tests passed across targeted runs (3sensor: 99 passed/45 skipped, mixed: 7 passed, system: 8 passed, aggregator: 11 passed/1 skipped)
+- **This PR completes Phase X.** All 10 steps delivered.
 - **Dashboard architecture fully modularized:**
   - `dashboard/core/` — 10 core modules + base.css
-  - `dashboard/components/*/` — 9 components (8 with full triad, 1 JS-only)
+  - `dashboard/components/*/` — 9 components (7 with full triad, 1 template+CSS only, 1 JS-only)
   - Three-pass build pipeline operational
   - `dashboard.js` and `dashboard.html` are generated artifacts
 
@@ -91,7 +91,7 @@ Phase X delivered a complete dashboard architecture refactor — transforming a 
 
 ### v7.6.5.8 — Test/Closure: Phase X Closure (This Step)
 
-- Added `dashboard_component_files()` check to `scripts/preflight.sh` — verifies all 33 expected component/core files exist
+- Added `dashboard_component_files()` check to `scripts/preflight.sh` — verifies all 36 expected component/core files exist
 - Updated `prompts/prompt-index-and-workflow.md`:
   - All 10 Phase X steps marked `✅ Complete`
   - Critical Rule 6 → "Structurally resolved by Phase X v7.6.5.3"
@@ -161,7 +161,7 @@ CSS partition rule is "by selector target" — which component does this rule st
 |--------|------------------|-----------------|-------------|
 | Tokens per dashboard task | 55K–70K | 8K–15K | 6x–8x reduction |
 | Largest single file | 3,955 lines (dashboard.js) | 634 lines (live-view/template.html) | 6.2x reduction |
-| Dashboard source files | 2 (JS + HTML mirror) | 33 (core + components) | Modular ownership |
+| Dashboard source files | 2 (JS + HTML mirror) | 36 (core + components) | Modular ownership |
 
 ### Build Pipeline Complexity
 
@@ -173,27 +173,27 @@ CSS partition rule is "by selector target" — which component does this rule st
 ### Component Model
 
 | Component Type | Count | Pattern |
-|---------------|-------|---------|
+|---------------|-------|------------|
 | Full triad (JS + HTML + CSS) | 7 | sensor-cards, charts, custom-range, auth-modal, settings-panel, gateway-panel, live-view |
 | Template + CSS only | 1 | device-info (JS lives in core/) |
 | JS-only | 1 | import-panel (no template, no CSS) |
 | **Total components** | **9** | — |
 | **Core modules** | **10** | app-shell, config, sensor-defs, history, manifest, status-snapshot, ui-helpers, staleness-derived, suspend-resume, boot |
-| **Total source files** | **33** | 10 core JS + 1 base.css + 7×3 + 1×2 + 1×1 + dashboard.tmpl.html |
+| **Total source files** | **36** | 10 core JS + 1 base.css + 1 dashboard.tmpl.html + 7×3 + 1×2 + 1×1 |
 
 ---
 
 ## Test Infrastructure State
 
-### Current test counts
+### Current test counts (full suite per fixture set)
 
-| Fixture Set | Passed | Skipped | Duration |
-|-------------|--------|---------|----------|
-| 3sensor | 99 | 45 | ~42s |
-| mixed | 96 | 48 | ~41s |
-| system | 100 | 44 | ~41s |
-| aggregator | 107 | 37 | ~43s |
-| **Total** | **402** | **174** | — |
+| Fixture Set | Passed | Skipped | Duration | Notes |
+|-------------|--------|---------|----------|-------|
+| 3sensor | 99 | 45 | ~42s | Full suite (baseline) |
+| mixed | 7 | N/A | ~5s | Grep-scoped: --grep "Mixed" |
+| system | 8 | N/A | ~5s | Grep-scoped: --grep "System" |
+| aggregator | 11 | 1 | ~6s | Grep-scoped: --grep "Aggregator" |
+| **CI validation total** | **125** | **46** | — | Across all four targeted runs |
 
 Test counts unchanged throughout Phase X. All structural changes were identity-preserving.
 
