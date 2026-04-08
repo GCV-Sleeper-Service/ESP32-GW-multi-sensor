@@ -248,7 +248,7 @@ All steps shipped. No prompts needed.
 - v7.6.0.4: full dashboard add/remove/test workflow via browser; verify async safety (no stale panel during poll)
 - v7.6.0.5: Playwright + Phase D closure verification (all 4 fixture sets)
 
-### Phase X — Dashboard Architecture Refactor ⬅ NEXT
+### Phase X — Dashboard Architecture Refactor ✅ COMPLETE
 
 **Phase X plan:** `Docs/phase-X-architecture-and-refactor-plan-dashboard.md`
 
@@ -471,6 +471,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 51 | `build-dashboard.sh` marker resolution must use `re.subn` with **lambda replacement** and CRLF-tolerant `\r?\n` patterns — never `bytes.replace()` with hardcoded `\n`, never `re.sub()` with raw bytes as replacement (backreference risk). | BUG-076 / LESSON-OPS-099; updated v7.6.5.6 (Gemini HIGH finding) |
 | 52 | Build tool dependencies used via shell scripts must be wired as `devDependencies` with `npx` invocation in scripts — never as global-only requirements. Global-only tooling causes silent CI mismatches on fresh installs. | v7.6.5.5 PR #146 CODEX/GPT review finding |
 v7.6.5.6 PR #147 |
+| 53 | When using `re.sub()` / `re.subn()` to inject raw file contents (CSS, JS, HTML) as a replacement, ALWAYS use a lambda function — never pass raw bytes directly. CSS/JS commonly contain backslash sequences that `re.sub` interprets as backreferences. | LESSON-OPS-121 / v7.6.5.6 PR #147 |
 | 54 | When an acceptance criterion is contradicted by another requirement, the agent MUST stop and escalate to the operator — never self-waive. Document the contradiction in session log § Accepted Exceptions after operator confirms the waiver. | v7.6.5.6 PR #147 — agent self-waived output-identity gate |
 | 55 | CSS partition rule is "by selector target" — which component does this rule style? Global `@media` rules targeting selectors from multiple components belong in `core/base.css` regardless of source proximity in the original file. | v7.6.5.6 PR #147 — global @media initially misplaced |
 | 56 | Version bumps (VERSION file, App.version, fixtures, firmware YAML) are out of scope for test-only PRs. Version bumps belong in the step that delivers code changes. | v7.6.5.7 PR #148 — three agents attempted version bumps before revert |
@@ -557,7 +558,7 @@ After each step completes:
 | **Critical Rule 37 updated** | Added provision.sh device-switching note and full three-pass pipeline reference |
 | **Critical Rules 47–49 updated** | Simplified to essential guidance: 47 (source modules location), 48 (pipeline after edits), 49 (provision.sh mandatory for board switching) |
 | **Board provisioning table added** | New section after Critical Rules documenting provision.sh commands and CI-safe/unsafe states |
-| **preflight.sh updated** | dashboard_component_files() check added — verifies all expected component/core files exist (33 files total) |
+| **preflight.sh updated** | dashboard_component_files() check added — verifies all expected component/core files exist (36 files total) |
 | **Phase X marked COMPLETE** | All 10 steps (v7.6.4.0 + v7.6.5.0–v7.6.5.8) delivered; dashboard architecture refactor complete |
 | **Document header `_Last updated_` refreshed** | Reflects 2026-04-08 and Phase X completion state |
 
