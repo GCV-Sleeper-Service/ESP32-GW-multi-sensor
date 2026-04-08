@@ -200,6 +200,19 @@ The project follows a manifest-driven architecture. `config/sensors.json` drives
 
 See [Docs/v7.5-v7.6-architecture-plan.md](Docs/v7.5-v7.6-architecture-plan.md) for the full architecture document.
 
+## Dashboard Architecture
+
+The dashboard is built from modular source files using a three-pass build pipeline:
+
+1. **JS modules** (`dashboard/core/*.js` + `dashboard/components/*/index.js`) are bundled into `dashboard/dashboard.js`
+2. **Generator** (`render_sensor_config.py`) injects sensor metadata into the bundle
+3. **HTML assembly** (`build-dashboard.sh`) combines CSS, component templates, and JS into `dashboard/dashboard.html`
+4. **Minification** and **header generation** produce the final firmware-embedded artifact
+
+`dashboard.js` and `dashboard.html` are generated files — never edit them directly. Edit the source modules and run the pipeline.
+
+See `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` for the full architecture plan.
+
 ## Development Roadmap
 
 | Phase | Version | Description | Status |

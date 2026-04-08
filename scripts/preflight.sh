@@ -491,6 +491,49 @@ dashboard_html_sync() {
 
 dashboard_html_sync
 
+dashboard_component_files() {
+  echo "Checking dashboard component/core structure..."
+  local missing=0
+  for f in \
+    dashboard/core/app-shell.js \
+    dashboard/core/config.js \
+    dashboard/core/sensor-defs.js \
+    dashboard/core/history.js \
+    dashboard/core/manifest.js \
+    dashboard/core/status-snapshot.js \
+    dashboard/core/ui-helpers.js \
+    dashboard/core/staleness-derived.js \
+    dashboard/core/suspend-resume.js \
+    dashboard/core/boot.js \
+    dashboard/core/base.css \
+    dashboard/dashboard.tmpl.html
+  do
+    [[ -f "$f" ]] || { echo "  MISSING: $f"; missing=$((missing+1)); }
+  done
+  # 7 components with full triad: index.js + template.html + styles.css
+  for comp in sensor-cards charts custom-range auth-modal settings-panel gateway-panel live-view; do
+    for ext in index.js template.html styles.css; do
+      f="dashboard/components/$comp/$ext"
+      [[ -f "$f" ]] || { echo "  MISSING: $f"; missing=$((missing+1)); }
+    done
+  done
+  # device-info: template.html + styles.css only (JS lives in core/)
+  for ext in template.html styles.css; do
+    f="dashboard/components/device-info/$ext"
+    [[ -f "$f" ]] || { echo "  MISSING: $f"; missing=$((missing+1)); }
+  done
+  # import-panel: index.js only (JS-only component — no template, no CSS)
+  f="dashboard/components/import-panel/index.js"
+  [[ -f "$f" ]] || { echo "  MISSING: $f"; missing=$((missing+1)); }
+  if [[ $missing -eq 0 ]]; then
+    pass "all dashboard component/core files present"
+  else
+    fail "$missing dashboard component/core file(s) missing"
+  fi
+}
+
+dashboard_component_files
+
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   echo "✗ Preflight failed with $FAIL_COUNT error(s)"
   exit 1
