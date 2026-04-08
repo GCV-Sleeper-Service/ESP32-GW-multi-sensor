@@ -265,6 +265,33 @@ All steps shipped. No prompts needed.
 | v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-08 |
 | v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-08 |
 
+Phase X is COMPLETE.
+
+All 10 steps shipped: v7.6.4.0 (documentation restructuring) + v7.6.5.0–v7.6.5.8 (dashboard architecture refactor), delivered across PRs #131–#149
+402/0 test count maintained throughout — no tests broken at any step; all structural changes were identity-preserving
+Phase X results document produced: prompts/handoff/phaseX-results.md
+Context reduction achieved: 55K–70K tokens → 8K–15K tokens per dashboard task (6x–8x)
+LESSON-OPS-043 structurally resolved: manual mirror problem class eliminated at v7.6.5.3
+11 new Critical Rules (47–57) established from Phase X execution
+Next phase determination: ⚠️ OPERATOR DECISION REQUIRED
+
+Phase Y (v7.6.6.x) — firmware refactor of sensor_history_multi.h using same Phase X methodology. Recommended by Phase X plan before Phase 7 so firmware changes happen on an already-split codebase.
+Phase 7 (v7.7.0.x) — per-device persistence engine. Feature work that benefits from reduced context window.
+The Phase 7 prompt (v7.7.0.0) exists but needs updates (stale doc references, resolved Rule 6 still referenced). These updates should be applied before starting Phase 7 regardless of Phase Y decision.
+
+**v7.6.5.8 delivery summary (PR #149):**
+- Added `dashboard_component_files()` preflight check — validates all 36 expected source files exist
+- Updated Critical Rules: Rule 6 marked structurally resolved, Rule 37 updated with provision.sh,
+  Rules 47–49 simplified for Phase X architecture
+- Added Board Provisioning section with provision.sh command table
+- Produced `prompts/handoff/phaseX-results.md` — comprehensive Phase X delivery record
+- Updated README with Dashboard Architecture section
+- Updated `Docs/lessons/dashboard.md` with LESSON-OPS-117–120 (identity gate, contiguous-slice,
+  three-pass pipeline, CSS partition by selector target)
+- Updated `Docs/writing-guide/checklists/dashboard.md` with Phase X prompt patterns
+- Version bump: 7.6.5.6 → 7.6.5.8 (no functional changes)
+- **Consolidated audit:** `prompts/phaseX/v7.6.5.8-PR149-consolidated-audit-and-lessons.md`
+
 **v7.6.5.7 delivery summary (PR #148):**
 - Split 1,853-line `tests/browser/dashboard.spec.js` monolith into 10 domain-scoped spec files
   covering all 21 test groups, plus `test-helpers.js` shared helpers
@@ -372,7 +399,7 @@ All steps shipped. No prompts needed.
 ### Phase 7 — Per-Device Persistence Engine - After Phase Y (Phase Y Not Scoped Yet)
 
 
-**`main` is at v7.6.0.5. Phase 7 starts at v7.7.0.0.**
+**`main` is at v7.6.5.8. Phase 7 starts at v7.7.0.0.**
 
 Before starting Phase 7, read `prompts/handoff/phaseD-results.md` for the active lessons and API contracts that Phase 7 must remain compatible with. Also read `prompts/handoff/session-handoff-v7.7.0.0.md` for the full Phase 7 entry context.
 
