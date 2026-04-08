@@ -197,12 +197,15 @@ test.describe('21. Satellite Management', () => {
     await urlInput.fill('http://192.168.1.130');
     const addBtn = page.locator('#sat-add-btn');
 
+    // Set up response listener BEFORE clicking so it is registered before the response arrives
+    const addResponse = page.waitForResponse(resp => resp.url().includes('/api/aggregator/add-satellite') && resp.status() === 200);
+
     // Click add and immediately verify input still exists (before request completes)
     await addBtn.click();
     await expect(urlInput).toBeVisible();
 
     // Wait for the add-satellite API response to complete
-    await page.waitForResponse(resp => resp.url().includes('/api/aggregator/add-satellite') && resp.status() === 200);
+    await addResponse;
 
     // Panel must still be usable — no crash/blank
     await expect(page.locator('#sat-add-btn')).toBeVisible();
@@ -245,10 +248,14 @@ test.describe('21. Satellite Management', () => {
 
     // Set up dialog handler for confirmation prompt, then click remove (on last satellite = one we just added)
     page.on('dialog', dialog => dialog.accept());
+
+    // Set up response listener BEFORE clicking so it is registered before the response arrives
+    const deleteResponse = page.waitForResponse(resp => resp.url().includes('/api/aggregator/satellite/') && resp.request().method() === 'DELETE');
+
     await removeBtns.last().click();
 
     // Wait for delete API response to complete
-    await page.waitForResponse(resp => resp.url().includes('/api/aggregator/satellite/') && resp.request().method() === 'DELETE');
+    await deleteResponse;
 
     // Panel must still render after delete — test button still visible (this is the regression test)
     await expect(page.locator('#sat-test-btn')).toBeVisible();
