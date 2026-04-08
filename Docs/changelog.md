@@ -2,6 +2,51 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.5.7] — 2026-04-07 — Phase X Level 5: Test Spec Split
+
+### Changes
+
+- **Test spec split:** Decomposed the 1,853-line `tests/browser/dashboard.spec.js` monolith (21 groups, 144 test cases) into domain-scoped files:
+  - `tests/browser/test-helpers.js` — shared helpers: `waitForDashboardReady`, `stopDashboardNetwork`, `loadDashboard`, `waitForConnected`, `waitForAggregatorReady`
+  - `tests/browser/boot-structure.spec.js` — groups 1 (Boot and structure), 3 (Transport / status): 7 tests
+  - `tests/browser/sensor-cards.spec.js` — groups 2 (Sensor cards), 11 (Card renderer registry), 17 (Network Card Renderer), 18 (Mixed-Category Rendering): 27 tests
+  - `tests/browser/history-charts.spec.js` — groups 4 (History and charts), 5 (Custom date range), 13 (Manifest-driven history fetching), 16 (BUG-043 Request Scheduling): 25 tests
+  - `tests/browser/theme-export.spec.js` — groups 6 (Theme toggle), 7 (Export controls), 8 (Console error guard): 7 tests
+  - `tests/browser/metric-formatters.spec.js` — group 12 (Metric formatter registry): 6 tests
+  - `tests/browser/regression.spec.js` — groups 14 (Phase 2 Closure), 15 (Phase 3 Closure v2 API): 15 tests
+  - `tests/browser/aggregator.spec.js` — group 19 (Aggregator Mode): 11 tests
+  - `tests/browser/system-devices.spec.js` — group 20 (System Devices and Data Ingest): 8 tests
+  - `tests/browser/satellite-management.spec.js` — group 21 (Satellite Management): 19 tests
+  - `tests/browser/manifest.spec.js` — groups 9 (Manifest v2 loader) and 10 (Manifest v2 fallback chain) added alongside existing manifest boot flow tests
+- **`dashboard.spec.js` converted to empty stub** — retained for reference, contains no test cases
+- **CI workflow updated:** `.github/workflows/browser-tests.yml` mixed/aggregator/system matrix steps updated to reference the new domain-scoped spec files instead of `dashboard.spec.js`
+- **All test counts unchanged:** 99 passed / 45 skipped (3sensor), 7 passed (mixed --grep), 8 passed (system --grep), 11 passed / 1 skipped (aggregator --grep)
+
+### Validation
+
+```
+FIXTURE_SET=3sensor     npx playwright test --project=chromium → 99 passed, 45 skipped ✅
+FIXTURE_SET=mixed       npx playwright test --grep "Mixed" --project=chromium → 7 passed ✅
+FIXTURE_SET=system      npx playwright test --grep "System" --project=chromium → 8 passed ✅
+FIXTURE_SET=aggregator  npx playwright test --grep "Aggregator" --project=chromium → 11 passed, 1 skipped ✅
+```
+
+Per-file independent runs under FIXTURE_SET=3sensor:
+
+| File | Result |
+|------|--------|
+| `aggregator.spec.js` | 11 skipped (requires aggregator fixture) |
+| `boot-structure.spec.js` | 7 passed |
+| `history-charts.spec.js` | 25 passed |
+| `manifest.spec.js` | 10 passed |
+| `metric-formatters.spec.js` | 6 passed |
+| `regression.spec.js` | 15 passed |
+| `satellite-management.spec.js` | 19 skipped (requires aggregator fixture) |
+| `sensor-cards.spec.js` | 20 passed, 7 skipped |
+| `sensor-count.spec.js` | 9 passed (pre-existing, not part of split) |
+| `system-devices.spec.js` | 8 skipped (requires system fixture) |
+| `theme-export.spec.js` | 7 passed |
+
 ## [v7.6.5.6] — 2026-04-07 — Phase X Level 4: CSS Extraction into Per-Component Stylesheets
 
 ### Changes
