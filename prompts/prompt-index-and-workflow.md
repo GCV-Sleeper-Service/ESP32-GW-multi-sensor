@@ -259,8 +259,8 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 49 | scripts/provision.sh is the mandatory entry point for switching between aggregator, WROOM satellite, and C3 satellite (default/CI-safe) configs. Always run `bash scripts/provision.sh satellite` before pushing to remote — failure to do so will break CI. Run `bash scripts/provision.sh status` to verify current state at any time. | Phase X v7.6.5.8 |
 | 50 | When planning file concatenations for non-contiguous modules, verify that all source modules in the group are physically adjacent in the bundle output. Modules can only be safely concatenated if contiguous. If intervening modules exist, keep them as separate components — the identity gate will catch violations but the plan should catch them first. | LESSON-OPS-118 / v7.6.5.4 |
 | 51 | `build-dashboard.sh` marker resolution must use `re.subn` with **lambda replacement** and CRLF-tolerant `\r?\n` patterns — never `bytes.replace()` with hardcoded `\n`, never `re.sub()` with raw bytes as replacement (backreference risk). | BUG-076 / LESSON-OPS-099; updated v7.6.5.6 (Gemini HIGH finding) |
-| 52 | Build tool dependencies used via shell scripts must be wired as `devDependencies` with `npx` invocation in scripts — never as global-only requirements. Global-only tooling causes silent CI mismatches on fresh installs. | v7.6.5.5 PR #146 CODEX/GPT review finding |
-v7.6.5.6 PR #147 |
+| 52 | Build tool dependencies used via shell scripts must be wired as `devDependencies` with `npx` invocation in scripts — never as global-only requirements. Global-only tooling causes silent CI mismatches on fresh installs. | v7.6.5.5 PR #146 CODEX/GPT review finding 
+| | | 
 | 53 | When using `re.sub()` / `re.subn()` to inject raw file contents (CSS, JS, HTML) as a replacement, ALWAYS use a lambda function — never pass raw bytes directly. CSS/JS commonly contain backslash sequences that `re.sub` interprets as backreferences. | LESSON-OPS-121  v7.6.5.6 PR #147 |
 | 54 | When an acceptance criterion is contradicted by another requirement, the agent MUST stop and escalate to the operator — never self-waive. Document the contradiction in session log § Accepted Exceptions after operator confirms the waiver. | v7.6.5.6 PR #147 — agent self-waived output-identity gate |
 | 55 | CSS partition rule is "by selector target" — which component does this rule style? Global `@media` rules targeting selectors from multiple components belong in `core/base.css` regardless of source proximity in the original file. | v7.6.5.6 PR #147 — global @media initially misplaced |
@@ -358,13 +358,14 @@ After each step completes:
 
 Phase X complete. All 10 steps delivered. Critical Rules 47–57 added. Board provisioning table added. Phase X results document produced.
 
-### 2026-04-04 — Phase D Closure (v7.6.0.5)
-
-Phase D complete. All 6 steps delivered. Critical Rules 38–46 added. Phase D results document produced. OI-001 noted.
 
 ### 2026-04-06 through 2026-04-08 — Phase X Execution (v7.6.5.0–v7.6.5.7)
 
 Per-step revision entries for each Phase X step have been condensed. Detailed delivery summaries are preserved in the Phase X results document (`prompts/handoff/phaseX-results.md`) and in individual consolidated audits (`prompts/phaseX/v7.6.5.x-PRxxx-consolidated-audit-and-lessons.md`).
+
+### 2026-04-04 — Phase D Closure (v7.6.0.5)
+
+Phase D complete. All 6 steps delivered. Critical Rules 38–46 added. Phase D results document produced. OI-001 noted.
 
 ### 2026-03-29 through 2026-04-02 — Phase D Execution (v7.6.0.0–v7.6.0.4)
 
