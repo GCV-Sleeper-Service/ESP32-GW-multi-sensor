@@ -269,3 +269,46 @@ If a prompt contains copy-ready code, that code is an upstream artifact in the i
 - Comments and docstrings must match the actual implementation behavior, not describe an idealized version.
 
 **Why this matters:** Phase 6 showed that prompt-authored code was the primary defect source across four of five steps. The agents didn't invent bugs — they copied them from the prompt.
+
+---
+
+## 4. The Two-Prompt Pattern (Phase X)
+
+Phase X proved that a single agent prompt is not enough. Every step needs two sessions:
+
+**Session 1 — Agent execution.** The coding agent receives the implementation prompt, reads all required files, implements the change, runs the validation pipeline, and creates a PR.
+
+**Session 2 — Review.** A separate agent (fresh context, no carry-over from Session 1) receives a review prompt targeting that step's exact failure modes. The reviewer verifies acceptance criteria, checks for scope violations, produces the consolidated audit, inspects the next step's handoff and prompt, and confirms post-merge deliverables.
+
+This pattern catches classes of error that self-review misses: confirmation bias ("I just wrote it, so it must match the spec"), context-window pressure (long execution sessions lose early instructions), and scope drift (agents that continue into the next step unbidden).
+
+### 4.1 Implementation Prompt Anatomy (Proven Structure)
+
+The Phase X execution established a refined 10-section prompt structure:
+
+1. **§1 — Imperative reading order.** Numbered, not optional. "Read file X" not "You may want to read file X." Specific callouts for trap functions and boundary conditions.
+2. **§2 — Pre-implementation verification gate.** Checks the agent must pass before writing any code. Catches stale branches, wrong baselines, and failed assumptions.
+3. **§3 — Scope boundary.** What IS and what IS NOT in scope. Named files and functions, not descriptions.
+4. **§4 — Do-NOT list.** Explicit anti-patterns for this step, placed at the point of risk — not gathered at the top of the document.
+5. **§5 — Implementation instructions.** Exact files, exact functions, exact changes. Data flow traced end-to-end.
+6. **§6 — Acceptance criteria.** Checklist format. Each item is a concrete, testable assertion.
+7. **§7 — Pipeline commands.** Full regeneration pipeline as of this step. No shortcuts.
+8. **§8 — Verification gate.** Identity/compile/test gate specific to this step's risk profile.
+9. **§9 — Post-merge deliverables.** Consolidated audit, changelog entry, session log, instruction compliance table. Demanded explicitly — not left as afterthoughts.
+10. **§10 — Domain-specific anti-patterns.** Consolidated reference for patterns that must never appear.
+
+### 4.2 Key Insight: Handoff Documents Alone Are Insufficient
+
+A handoff document provides context — what happened before, what this step delivers, what comes next. But handoff documents do not drive agent completeness. Agents treat handoffs as background reading and skip to "what do I implement?"
+
+Effective prompts require the following at the point of risk (not in a separate document):
+- **Imperative numbered reading order** — the agent reads in the order you specify, not the order it prefers
+- **Pre-implementation verification gates** — the agent proves it understands the starting state before touching code
+- **Inline anti-patterns** — placed next to the instruction they guard, not gathered in a separate section
+- **Explicit post-merge deliverable blocks** — demanding the consolidated audit before session close
+
+### 4.3 Chain-Inspection Pattern
+
+From Phase X v7.6.5.1 onward, every step's post-merge deliverables include reviewing and updating the next step's handoff and prompt. This creates a forward-inspection chain: step N's closure verifies that step N+1's assumptions are still valid given what actually happened during step N.
+
+Without this pattern, prompts written at plan time accumulate stale references as earlier steps introduce small deviations from the plan.

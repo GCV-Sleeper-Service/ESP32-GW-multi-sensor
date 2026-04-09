@@ -395,3 +395,63 @@ Before finalizing:
 - [ ] Device testing section includes reboot-persistence cycle
 - [ ] No Arduino-isms (`String`, `Serial`, `delay`, `millis`)
 - [ ] Namespace isolation verified for NVS operations
+
+---
+
+## C++ File Split Patterns (Phase Y)
+
+Phase Y splits a monolithic C++ header into fragment source files that are concatenated by an assembly script to produce the original file. These checklist items apply to any prompt that creates, moves, or modifies fragment files.
+
+### Assembly Strategy Checks
+
+- [ ] Fragment files are contiguous byte-slices of the original — no reordering, no content changes
+- [ ] Fragment line counts sum to the original file's line count
+- [ ] `assemble-sensor-history.sh --check` passes (SHA-256 of non-generated regions matches)
+- [ ] Assembly script's fragment order matches the dependency order (definitions before uses)
+- [ ] No fragment file appears in the YAML `includes:` list — only the assembled artifact
+
+### `#include` and Symbol Visibility
+
+- [ ] All `#include` directives are in the first fragment (`config.h`) — no fragment adds its own includes
+- [ ] Forward declarations are not needed (assembly concatenation order guarantees definition-before-use)
+- [ ] If a fragment were loaded in isolation, IDE tooling would see incomplete types — this is expected and acceptable under the assembly strategy (Option B)
+
+### `static` Keyword Scope
+
+- [ ] `static` functions/variables in a header have per-translation-unit scope when included — under assembly, the file is one translation unit, so `static` means file-scoped (one copy)
+- [ ] No `static` variable is duplicated across fragments — each `static` has exactly one owning fragment
+- [ ] After split, verify no `static` became accidentally invisible (e.g., defined in fragment B but called from fragment A that precedes it in assembly order)
+
+### Mutex and Lock Visibility
+
+- [ ] `s_cache_mutex` defined once in `aggregator-runtime.h`
+- [ ] `AGG_LOCK` / `AGG_UNLOCK` macros defined in the same fragment as the mutex
+- [ ] All fragments that reference the mutex come AFTER the defining fragment in assembly order
+- [ ] No fragment redefines or shadows the mutex
+
+### Deferred-Task Accessibility
+
+- [ ] All 4 deferred-task pairs (`reboot`, `delete-data`, `reset-satellites`, `save-satellites-nvs`) have explicit fragment homes
+- [ ] Task functions are defined before their scheduling call sites in assembly order
+- [ ] `vTaskDelete(nullptr)` is present at end of each task function
+- [ ] Task stack sizes are 8192+ bytes
+
+### Generator Marker Blocks
+
+- [ ] Generator marker delimiters (`SENSOR_MANIFEST:*_BEGIN` / `*_END`) exist in fragment `data-model.h` as stubs only
+- [ ] No generated content exists inside fragments — only in the assembled artifact after `render_sensor_config.py --write`
+- [ ] `render_sensor_config.py` continues to target `dashboard/sensor_history_multi.h` (the assembled artifact), not any fragment file
+
+### `maybe_yield_nvs_scan_()` Accessibility
+
+- [ ] Defined once in `nvs-persistence.h`
+- [ ] Called from all NVS scan loops (same fragment + `web-handler.h` via assembly order)
+- [ ] Not duplicated in any other fragment
+
+### Phase Y Verification Strategies
+
+- [ ] **Compile gate:** `esphome config` validates for all board profiles after each step
+- [ ] **Assembly identity gate:** `assemble-sensor-history.sh --check` confirms non-generated regions match
+- [ ] **Preflight gate:** All existing preflight checks pass + new fragment-specific checks
+- [ ] **Playwright gate:** All 4 fixture sets green (125+ tests total)
+- [ ] **Device test gate (v7.6.6.5/6/7):** Flash real hardware and verify NVS persistence, aggregator runtime, and full endpoint surface

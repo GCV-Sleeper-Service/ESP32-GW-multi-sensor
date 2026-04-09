@@ -211,3 +211,27 @@ The prompt asks the agent to mock an existing firmware endpoint but describes on
 The prompt changes a fixture's sensor/device count or composition but does not instruct the agent to update the skip-reason strings, group comments, and helper expectations that reference the old composition. The fixture data is correct; the explanatory text is stale.
 
 **How to catch it:** After any fixture composition change in a prompt, include an explicit instruction: "Search all `test.skip()` reason strings for references to the old composition. Update any group header comments or fixture descriptions that embed the old count. Verify no stale comments survive in neighboring groups."
+
+---
+
+### Gap 19: Identity Gate Verification Skipped or Self-Waived
+
+The prompt specifies an identity gate (SHA-256 before vs. after), but the agent either skips the verification or self-waives it with a plausible rationalization ("the version bump changed 2 bytes, so byte-identity is impossible"). The gate exists to catch unintended structural changes — the agent must not decide unilaterally that a mismatch is acceptable.
+
+**How to catch it:** Make the identity gate a mandatory pre-PR check with explicit "STOP and report" language if it fails. Add Critical Rule 54: agents must never self-waive acceptance criteria. If a criterion is contradicted by another requirement, the agent escalates to the operator.
+
+**Phase X example (v7.6.5.6):** The CSS extraction step specified "output-identity gate" but byte-identity was impossible due to CSS interleaving. The agent self-waived rather than reporting. This became CR 54.
+
+### Gap 20: Contiguous-Slice Assumption Violated
+
+The prompt plans to concatenate multiple modules into a single component but does not verify that all source modules are physically adjacent in the file. Non-contiguous modules cannot be concatenated without reordering, which breaks the identity gate.
+
+**How to catch it:** Before any concatenation plan, verify adjacency: `grep -n` the first and last line of each candidate module and confirm no intervening modules exist. If they do, the module must remain a separate component.
+
+**Phase X example (v7.6.5.4):** `src/13-import.js` could not be concatenated into `settings-panel` because modules 11 and 12 sat between 10 and 13. This became the 9th component (`import-panel`) and led to CR 50.
+
+### Gap 21: Generated Artifact Pipeline Ordering Wrong
+
+The prompt includes the regeneration pipeline but specifies steps in the wrong order. Example: running the generator before the assembler, so the generator writes into a stale file that the assembler then overwrites.
+
+**How to catch it:** Trace the pipeline's data flow: which step produces each intermediate file, and which step consumes it? The consumer must come after the producer. Draw the dependency graph if necessary. In particular, assembly steps must precede generator steps when both write to the same target file.

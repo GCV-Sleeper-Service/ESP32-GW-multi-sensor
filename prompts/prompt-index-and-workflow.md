@@ -145,19 +145,29 @@ Open Item OI-001: fix inaccurate parallelism comment in `tests/mock-server/serve
 
 Phase X complete (v7.6.4.0 + v7.6.5.0–v7.6.5.8, 2026-04-05 to 2026-04-08). Dashboard monolith (3,955 lines) refactored into modular component architecture with three-pass build pipeline. Context reduced 6x–8x (55K→8K tokens). LESSON-OPS-043 structurally resolved. 11 new Critical Rules (47–57). 402/0 tests maintained throughout. Results: `prompts/handoff/phaseX-results.md`. Quality check: `prompts/handoff/phaseX-results-quality-check.md`. Plan: `Docs/phase-X-architecture-and-refactor-plan-dashboard.md`. Prompts: `prompts/phaseX/`.
 
-### Phase Y — Firmware Refactor: sensor_history_multi.h ⬅ NEXT (Planned)
+### Phase Y — Firmware Refactor: sensor_history_multi.h ⬅ NEXT
 
-**Version range:** v7.6.6.x
-**Status:** Planned — prompts not yet produced.
+**Version range:** v7.6.6.0–v7.6.6.8
+**Status:** Prompt package produced. Execution pending.
 **Plan:** `Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md`
 **Inventory:** `Docs/phase-Y-current-state-inventory-sensor-history-v2.md`
+**Audit Template:** `prompts/phaseY/pr-audit-question-template-phaseY.md`
+**Bug Escalation:** `prompts/phaseY/phase-y-bug-escalation-prompt.md`
+**Two-Session Prompts:** `prompts/handoff/phaseY/phase-y-two-session-prompts.md`
 
-Phase Y applies the same structural-refactor methodology proven in Phase X to the firmware side. The target is `firmware/custom_components/ble_gateway/sensor_history_multi.h` — a large monolithic header that will be decomposed into focused modules. Recommended before Phase 7 so persistence engine work happens on an already-split codebase.
+Phase Y applies the same structural-refactor methodology proven in Phase X to the firmware side. Splits the 4,325-line `dashboard/sensor_history_multi.h` monolith into 8 fragment source files in `firmware/core/`, assembled by `scripts/assemble-sensor-history.sh`. Option B (assembled artifact) strategy — zero generator changes, zero YAML changes, SHA-256 identity gate.
 
-**Pre-requisites before starting Phase Y:**
-- Operator decision to proceed (Phase Y vs Phase 7 first)
-- Prompt production session (prompts not yet created)
-- Phase Y plan review and any updates based on Phase X lessons
+| Version | Scope | Prompt File | Handoff | Status |
+|---------|-------|-------------|---------|--------|
+| v7.6.6.0 | Pre-step: `provision.sh` full pipeline automation | `prompts/phaseY/v7.6.6.0-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.0.md` | Pending |
+| v7.6.6.1 | Establish assembly script + 8 fragments + SHA-256 baseline | `prompts/phaseY/v7.6.6.1-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.1.md` | Pending |
+| v7.6.6.2 | Wire assembly into pipeline + fragment-level preflight | `prompts/phaseY/v7.6.6.2-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.2.md` | Pending |
+| v7.6.6.3 | Validate edit-fragment workflow end-to-end | `prompts/phaseY/v7.6.6.3-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.3.md` | Pending |
+| v7.6.6.4 | Ping adapter fragment validation | `prompts/phaseY/v7.6.6.4-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.4.md` | Pending |
+| v7.6.6.5 | Device test gate: NVS persistence on C3 | `prompts/phaseY/v7.6.6.5-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.5.md` | Pending |
+| v7.6.6.6 | Device test gate: aggregator runtime on S3 | `prompts/phaseY/v7.6.6.6-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.6.md` | Pending |
+| v7.6.6.7 | Full endpoint smoke test (all 21 handlers) | `prompts/phaseY/v7.6.6.7-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.7.md` | Pending |
+| v7.6.6.8 | Closure: preflight + docs + Critical Rules 58–62 | `prompts/phaseY/v7.6.6.8-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.8.md` | Pending |
 
 ### Phase 7 — Per-Device Persistence Engine — After Phase Y
 
