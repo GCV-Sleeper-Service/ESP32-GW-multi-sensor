@@ -117,7 +117,7 @@ The S3 with PSRAM changes the calculus entirely:
 
 ### ESP32-C6 (512 KB SRAM, no PSRAM)
 
-25% more SRAM than C3, plus WiFi 6 is more efficient. Good enough for a 4-sensor satellite. No PSRAM means satellite role only — same as C3 and WROOM-32D. Aggregator role requires PSRAM (see `Docs/architecture-forward-looking-notes.md` §1).
+25% more SRAM than C3, plus WiFi 6 is more efficient. Good enough for a 4-sensor satellite. No PSRAM means satellite role only — same as C3 and WROOM-32D. Aggregator role requires PSRAM (see `Docs/architecture-overview.md`).
 
 ### ESP32-P4 (768 KB SRAM + up to 32 MB PSRAM)
 

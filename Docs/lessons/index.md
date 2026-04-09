@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-04-05 — v7.6.4.0 documentation restructuring._
+_Last updated: 2026-04-08 — Documentation reorganization (Issue #140)._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -50,6 +50,7 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | BUG-040 | build-pipeline.md |
 | BUG-041 | build-pipeline.md |
 | BUG-042 | build-pipeline.md |
+| BUG-043 | firmware.md |
 | BUG-044 | firmware.md |
 | BUG-045 | dashboard.md |
 | BUG-046 | dashboard.md |
@@ -77,6 +78,8 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | BUG-069 | dashboard.md |
 | BUG-070 | firmware.md |
 | BUG-071 | dashboard.md |
+| BUG-072 | dashboard.md |
+| BUG-073 | dashboard.md |
 | BUG-074 | dashboard.md |
 | BUG-075 | firmware.md |
 | BUG-076 | firmware.md |
@@ -85,7 +88,6 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | BUG-079 | firmware.md |
 | BUG-080 | dashboard.md |
 | BUG-081 | dashboard.md |
-| BUG-082 | dashboard.md |
 | LESSON-OPS-001 | build-pipeline.md |
 | LESSON-OPS-002 | build-pipeline.md |
 | LESSON-OPS-003 | testing.md |
@@ -163,6 +165,10 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-077 | build-pipeline.md |
 | LESSON-OPS-078 | dashboard.md |
 | LESSON-OPS-079 | testing.md |
+| LESSON-OPS-080 | firmware.md |
+| LESSON-OPS-081 | firmware.md |
+| LESSON-OPS-082 | firmware.md |
+| LESSON-OPS-083 | firmware.md |
 | LESSON-OPS-085 | firmware.md |
 | LESSON-OPS-086 | build-pipeline.md |
 | LESSON-OPS-087 | build-pipeline.md |
@@ -195,5 +201,7 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-114 | testing.md |
 | LESSON-OPS-115 | build-pipeline.md |
 | LESSON-OPS-116 | build-pipeline.md |
-| LESSON-OPS-117 | build-pipeline.md |
-| LESSON-OPS-118 | build-pipeline.md |
+| LESSON-OPS-117 | dashboard.md |
+| LESSON-OPS-118 | dashboard.md |
+| LESSON-OPS-119 | dashboard.md |
+| LESSON-OPS-120 | dashboard.md |

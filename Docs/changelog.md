@@ -41,7 +41,13 @@ FIXTURE_SET=aggregator  npx playwright test --grep "Aggregator" --project=chromi
 - Dashboard context requirements reduced from 55K–70K tokens to 8K–15K tokens (6x–8x improvement).
 - Next phase options: Phase Y (firmware refactor) or Phase 7 (persistence engine).
 
+### Post-merge fix (PR #150)
+
+- **Race-condition test fix:** `tests/browser/satellite-management.spec.js` — `waitForResponse` listener must be registered before the click that triggers the response. Standard Playwright listener-before-action pattern applied. No test count changes; stability improved for 2 intermittently-failing satellite management tests.
+
 ## [v7.6.5.7] — 2026-04-07 — Phase X Level 5: Test Spec Split
+
+**Note:** v7.6.5.7 is a test-only step — no version bump was applied per Critical Rule 56 (version bumps belong in steps that deliver code changes). VERSION file remained at 7.6.5.6; the v7.6.5.8 closure step applied the bump to 7.6.5.8.
 
 ### Changes
 
@@ -302,7 +308,7 @@ Resolution: `13-import.js` remains a separate component at `components/import-pa
 
 ---
 
-
+## [v7.6.5.3] — 2026-04-06 — Phase X Level 2: Retire Manual Mirror + CI Build Gate
 
 ### Changes
 

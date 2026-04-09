@@ -42,7 +42,7 @@ _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
 
 ---
 
-### BUG-044 — BUG-043 preflight enhancements and browser regression tests specified but never implemented (2026-03-18)
+### Follow-up to BUG-043: Preflight enhancements and browser regression tests specified but never implemented (2026-03-18)
 
 **Date:** 2026-03-18 (discovered during post-Phase-3 codebase audit)
 **Version observed:** v7.5.3.9

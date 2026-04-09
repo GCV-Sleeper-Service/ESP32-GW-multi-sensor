@@ -27,7 +27,9 @@ _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
 **Fix:** Routed all YAML marker replacements through `apply_yaml_marker_block()`, which captures the indentation column of the marker line and re-applies it to every inserted line.
 
 **Lesson:** See LESSON-OPS-040.
-- **LESSON-OPS-118:** Non-contiguous module concatenation breaks byte order. Only physically adjacent modules can be concatenated without violating the identity gate.### BUG-036: YAML generator reintroduced broken indentation after hotfix — preflight passed but compile failed (v7.5.0.1)
+- **LESSON-OPS-118:** Non-contiguous module concatenation breaks byte order. Only physically adjacent modules can be concatenated without violating the identity gate.
+
+### BUG-036: YAML generator reintroduced broken indentation after hotfix — preflight passed but compile failed (v7.5.0.1)
 
 **Symptom:** After the initial YAML indentation fix, running `python3 scripts/render_sensor_config.py --write` again silently reintroduced bad indentation into the YAML. `bash ./scripts/preflight.sh` passed. `esphome compile` failed near the averaging block with `expected <block end>`.
 
@@ -445,7 +447,7 @@ code comment whether auth is required and why. If omitted, auth is assumed requi
 
 ---
 
-## LESSON-OPS-089-LEGACY — Preflight checks must be environment-aware
+## Historical note (superseded LESSON-OPS-089) — Preflight checks must be environment-aware
 
 **Context:** Historically (before PR #96), `scripts/preflight.sh` hardcoded `check_contains "fixture_manifest_sensor_count" tests/fixtures/manifest.json '"sensor_count": 5'`. This was correct for the C3 satellite profile (3 ThermoPro + wan_ping + nas01 = 5 sensors) but broke when `config/gateway.json` pointed to the S3 aggregator sensor file (`config/sensors-agg-s3-16m-1.json`) which has only 1 sensor (wan_ping).
 
@@ -537,7 +539,9 @@ bash scripts/preflight.sh
 
 ---
 
-### LESSON-OPS-117: `bundle-dashboard.sh --check` must strip SENSOR_MANIFEST marker blocks before diffing (v7.6.5.3)
+#### Implementation note: `bundle-dashboard.sh --check` must strip SENSOR_MANIFEST marker blocks before diffing (v7.6.5.3)
+
+_See LESSON-OPS-117 in `dashboard.md` for the general Identity Gate Pattern._
 
 **Context:** `render_sensor_config.py --write` legitimately post-modifies `SENSOR_MANIFEST` marker blocks inside `dashboard.js` after bundling. These blocks are injection targets (sensor definitions from the active config), not source code. A naive `diff` between a fresh bundle from `dashboard/src/` and the committed `dashboard.js` will always fail after a full pipeline run because the committed version has been post-modified.
 
@@ -547,7 +551,9 @@ bash scripts/preflight.sh
 
 ---
 
-### LESSON-OPS-118: Non-contiguous modules cannot be concatenated without breaking byte order (v7.6.5.4)
+#### Implementation note: Non-contiguous modules cannot be concatenated without breaking byte order (v7.6.5.4)
+
+_See LESSON-OPS-118 in `dashboard.md` for the general Contiguous-Slice Splitting pattern._
 
 **Context:** The Phase X architecture plan (§6 v7.6.5.4) specified concatenating `src/09-export.js + src/10-storage-stats.js + src/13-import.js` into `components/settings-panel/index.js` with a 17-entry FILES array. The coding agent identified during execution that this is physically impossible: modules 11 (suspend-resume) and 12 (management) sit between 10 and 13 in the original `dashboard.js` byte stream.
 

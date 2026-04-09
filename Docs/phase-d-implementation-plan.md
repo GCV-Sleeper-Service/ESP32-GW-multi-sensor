@@ -26,9 +26,9 @@ Replace the compile-time satellite list with a runtime-configurable system. When
 
 ## Architecture Reference
 
-- `Docs/v7.5-v7.6-architecture-plan.md` — Section 11 Phase D references
-- `Docs/architecture-revision-and-action-plan.md` — Section 6 Phase D scope
-- `Docs/aggregator-satellite-gateway-principles.txt` — user design principles
+- `Docs/archive/completed-phases/v7.5-v7.6-architecture-plan.md` — Section 11 Phase D references (archived)
+- `Docs/archive/architecture-revision-and-action-plan.md` — Section 6 Phase D scope (archived)
+- `Docs/archive/aggregator-satellite-gateway-principles.txt` — user design principles (archived)
 - `dashboard/sensor_history_multi.h` — current `SatelliteCache`, `SATELLITE_IDS[]`, polling task, stub endpoints
 
 ---
@@ -339,7 +339,7 @@ The Settings panel gets three new elements:
 - `tests/mock-server/server.js` — stateful mock routes for add/delete/test/reset endpoints
 - `tests/fixtures/variants/aggregator/` — updated fixtures if needed
 - `.github/workflows/browser-tests.yml` — CI matrix update if needed
-- `Docs/v7.5-v7.6-architecture-plan.md` — Phase D COMPLETE status
+- `Docs/archive/completed-phases/v7.5-v7.6-architecture-plan.md` — Phase D COMPLETE status (archived)
 - `Docs/changelog.md` — Phase D closure entry
 - `Docs/aggregator-setup.md` — update with runtime management workflow
 - Version bump

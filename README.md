@@ -31,13 +31,13 @@ No cloud. No database. No Home Assistant required. Just ESP32 hardware, the gate
 - Polls satellite APIs and presents a unified dashboard with per-gateway tabs
 - Gateway selector with status indicators, summary cards, per-device views
 - Settings panel showing satellite configuration and health
-- Runtime satellite management planned for Phase D (v7.6.x)
+- Runtime satellite management via dashboard UI (Phase D — complete)
 
 **Development infrastructure:**
 - Manifest-driven code generation — single `config/sensors.json` drives firmware, dashboard, and test artifacts
 - Multi-board support via board profiles (`firmware/boards/*.yaml`)
-- Playwright browser regression suite (117 tests across 3 fixture variants)
-- CI pipeline with 53 preflight checks, fixture validation, and automated test runs
+- Playwright browser regression suite (402 tests across 4 fixture variants)
+- CI pipeline with 68 preflight checks, fixture validation, and automated test runs
 
 ## Quick Start
 
@@ -152,9 +152,9 @@ ESP32-GW-multi-sensor/
 | `/api/aggregator/gateways` | GET | Satellite list with cached manifests and status |
 | `/api/aggregator/live` | GET | Merged live data from all satellites |
 | `/api/aggregator/proxy/{gw_id}/...` | GET | Proxy requests to satellite APIs |
-| `/api/aggregator/add-satellite` | POST | Add satellite (stub — Phase D) |
-| `/api/aggregator/satellite/{id}` | DELETE | Remove satellite (stub — Phase D) |
-| `/api/aggregator/test-satellite` | POST | Probe satellite URL (stub — Phase D) |
+| `/api/aggregator/add-satellite` | POST | Add satellite at runtime (NVS-persisted) |
+| `/api/aggregator/satellite/{id}` | DELETE | Remove satellite at runtime |
+| `/api/aggregator/test-satellite` | POST | Probe satellite URL (connectivity test) |
 
 ### Legacy + Management
 
@@ -198,7 +198,7 @@ The project follows a manifest-driven architecture. `config/sensors.json` drives
 - **Dashboard** uses `CARD_RENDERERS` and `METRIC_FORMATTERS` registries for manifest-driven rendering
 - **Aggregator** uses a unified boot path (satellite pipeline + overlay) per LESSON-OPS-074
 
-See [Docs/v7.5-v7.6-architecture-plan.md](Docs/v7.5-v7.6-architecture-plan.md) for the full architecture document.
+See [Docs/architecture-overview.md](Docs/architecture-overview.md) for the full architecture document.
 
 ## Dashboard Architecture
 
@@ -222,8 +222,10 @@ See `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` for the full arch
 | Phase 3 | v7.5.3.x | C++ SensorEntity model | ✅ Complete |
 | Phase 4 | v7.5.4.x | First non-climate sensor (ping probe) | ✅ Complete |
 | Phase 5 | v7.5.5.x | Aggregator MVP (multi-gateway) | ✅ Complete |
-| **Phase 6** | **v7.5.6.x** | **Data ingest + system metrics** | **Next** |
-| Phase D | v7.6.0.x | Runtime satellite management | Planned |
+| Phase 6 | v7.5.6.x | Data ingest + system metrics | ✅ Complete |
+| Phase D | v7.6.0.x | Runtime satellite management | ✅ Complete |
+| Phase X | v7.6.4.0–v7.6.5.8 | Dashboard architecture refactor | ✅ Complete |
+| **Phase Y** | **v7.6.6.x** | **Firmware refactor (sensor_history_multi.h)** | **Planned** |
 | Phase 7 | v7.7.x | Per-device persistence engine | Planned |
 | Phase E | v8.x | Captive portal + WiFi config | Future |
 
@@ -231,14 +233,14 @@ See `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` for the full arch
 
 | Document | Content |
 |----------|---------|
+| [Docs/architecture-overview.md](Docs/architecture-overview.md) | Architecture overview — hardware, firmware, dashboard, build pipeline, phase history |
 | [Docs/changelog.md](Docs/changelog.md) | Full release history |
-| [Docs/v7.5-v7.6-architecture-plan.md](Docs/v7.5-v7.6-architecture-plan.md) | Architecture plan (Phases 1–6) |
 | [Docs/phase-d-implementation-plan.md](Docs/phase-d-implementation-plan.md) | Phase D (runtime satellite management) |
-| [Docs/phase6-implementation-plan.md](Docs/phase6-implementation-plan.md) | Phase 6 (data ingest + system metrics) |
+| [Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md](Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md) | Phase Y firmware refactor plan |
 | [Docs/v7.7-v7.8-persistence-architecture.md](Docs/v7.7-v7.8-persistence-architecture.md) | Phase 7 persistence architecture |
 | [Docs/aggregator-setup.md](Docs/aggregator-setup.md) | Aggregator deployment guide |
-| [Docs/bugs-and-lessons-learned.md](Docs/bugs-and-lessons-learned.md) | Bug database + operational lessons |
-| [Docs/writing-prompts-for-coding-agents-guide.md](Docs/writing-prompts-for-coding-agents-guide.md) | AI agent prompt methodology |
+| [Docs/lessons/index.md](Docs/lessons/index.md) | Bug database + operational lessons (by domain) |
+| [Docs/writing-guide/methodology.md](Docs/writing-guide/methodology.md) | AI agent prompt methodology |
 
 ## License
 

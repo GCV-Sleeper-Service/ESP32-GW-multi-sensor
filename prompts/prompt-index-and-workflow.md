@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-08 — Phase X COMPLETE: All 10 steps delivered (v7.6.4.0 + v7.6.5.0–v7.6.5.8). Dashboard architecture refactored. Next: Phase Y (firmware refactor) or Phase 7 (persistence engine)._
+_Last updated: 2026-04-08 — Documentation reorganization (Issue #140). Current Phase: **Phase Y** (planned). Phase X complete._
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -21,19 +21,19 @@ Your job as the human operator is to:
 
 | Document | Location | Purpose |
 |----------|----------|---------| 
-| Architecture Plan | `Docs/v7.5-v7.6-architecture-plan.md` | Design rationale and phase definitions |
+| **Architecture Overview** | `Docs/architecture-overview.md` | Project architecture entry point — hardware, firmware, dashboard, build pipeline, phase history |
 | Persistence Architecture | `Docs/v7.7-v7.8-persistence-architecture.md` | Per-device persistence design for Phase 7 |
-| Phase 4 Implementation Plan | `Docs/phase4-implementation-plan.md` | Step-level scope for Phase 4 |
-| Phase 5 Implementation Plan | `Docs/phase5-implementation-plan.md` | Step-level scope for Phase 5 |
-| Phase 6 Implementation Plan | `Docs/phase6-implementation-plan.md` | Step-level scope for Phase 6 |
-| Phase D Implementation Plan | `Docs/phase-d-implementation-plan.md` | Step-level scope for Phase D |
+| Phase D Implementation Plan | `Docs/phase-d-implementation-plan.md` | Step-level scope for Phase D (API contracts reference) |
 | Phase 7 Implementation Plan | `Docs/v7.7-implementation-plan.md` | Step-level scope for Phase 7 |
+| Phase Y Plan | `Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md` | Firmware refactor plan |
+| Phase Y Inventory | `Docs/phase-Y-current-state-inventory-sensor-history-v2.md` | Current state inventory for Phase Y |
 | Bugs & Lessons Learned | `Docs/lessons/index.md` | Project guardrails and failure history (split by domain at v7.6.4.0) |
 | **Prompt Writing Guide** | `Docs/writing-guide/methodology.md` | How to create and audit prompts (split into methodology + gap catalog at v7.6.4.0) |
-| Architecture Forward-Looking Notes | `Docs/architecture-forward-looking-notes.md` | Post-Phase-6 architectural decisions and risks |
-| **Phase D Results and Summary** | `prompts/handoff/phaseD-results.md` | Phase D delivery record, lessons, API contracts |
-| Phase X Architecture Plan | `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` | Dashboard refactor design and step details |
+| **Phase D Results and Summary** | `prompts/handoff/phaseD/phaseD-results.md` | Phase D delivery record, lessons, API contracts |
+| **Phase X Results and Summary** | `prompts/handoff/phaseX-results.md` | Phase X delivery record, lessons, metrics |
+| Phase X Architecture Plan | `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` | Dashboard refactor design (methodology reference) |
 | Phase X Audit Template | `prompts/phaseX/pr-audit-question-template.md` | Stable core + level-specific PR audit questions |
+| Archived plans (Phases 3–6) | `Docs/archive/completed-phases/` | Historical implementation plans |
 
 ---
 
@@ -121,287 +121,49 @@ The agent will:
 
 ### Phase 3 — C++ SensorEntity Model ✅ COMPLETE
 
-All steps shipped. No prompts needed.
-
-| Version | Scope | Status |
-|---------|-------|--------|
-| v7.5.3.0 | Pre-Phase 3 cleanup | ✅ Complete |
-| v7.5.3.1 | Define SensorEntity structs | ✅ Complete |
-| v7.5.3.2 | Generator dual output | ✅ Complete |
-| v7.5.3.3 | Wire YAML lambdas (dual-write) | ✅ Complete |
-| v7.5.3.4 | BUG-043 hotfix + LWIP sockets | ✅ Complete |
-| v7.5.3.5 | BUG-043 continued fix (sequential history) | ✅ Complete |
-| (no bump) | BUG-043 gzip + pre-reserved history response | ✅ Complete |
-| v7.5.3.6 | `/api/v2/live` endpoint | ✅ Complete |
-| v7.5.3.7 | `/api/v2/history` endpoint (RAM-only) | ✅ Complete |
-| v7.5.3.8 | Remove SensorSlot (BIG SWITCHOVER) | ✅ Complete |
-| v7.5.3.9 | Phase 3 closure | ✅ Complete |
-
-### BUG-043 / BUG-044 Supplementary ✅ COMPLETE
-
-| Item | Scope | Status |
-|------|-------|--------|
-| Preflight enhancements | 5 new checks | ✅ Complete (2026-03-18) |
-| Browser regression tests | Group 16: 8 tests | ✅ Complete (2026-03-18) |
+Phase 3 complete (v7.5.3.0–v7.5.3.9). SensorEntity C++ model, v2 API endpoints, BUG-043/044 fixes. Plan: `Docs/archive/completed-phases/phase3-implementation-plan.md`.
 
 ### Phase 4 — First Non-Climate Sensor (Ping Probe) ✅ COMPLETE
 
-| Version | Scope | Prompt File | Status |
-|---------|-------|-------------|--------|
-| v7.5.4.0 | Add ping device to manifest (BUG-045 fix) | _(completed, no expanded prompt needed)_ | ✅ Complete |
-| v7.5.4.1 | Implement ICMP ping adapter | `prompts/phase4/v7.5.4.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-19 |
-| v7.5.4.2 | Add network card renderer | `prompts/phase4/v7.5.4.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-19 |
-| v7.5.4.3 | Mixed-category test fixtures | `prompts/phase4/v7.5.4.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-20 |
-| v7.5.4.4 | Phase 4 closure | `prompts/phase4/v7.5.4.4-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-20 |
-| **v7.5.4.5** | **Post-Phase-4 review fixes** | _(manual review session, not agent-driven)_ | ✅ Complete 2026-03-21 |
-
-**v7.5.4.5 fixes (from post-Phase-4 review):**
-- BUG-052: `/sensors.json` v1 projection filtered to environmental only
-- BUG-053: `/api/status` category-aware fields
-- BUG-054: Calendar date picker dark/light mode CSS
-- BUG-055: `bump-version.sh` stale `.min.html` handling
-- BUG-056: WAN Latency removed from temperature/humidity charts (`chartIdx` filtering)
+Phase 4 complete (v7.5.4.0–v7.5.4.5, 2026-03-19 to 2026-03-21). ICMP ping adapter, network card renderer, mixed-category fixtures. Plan: `Docs/archive/completed-phases/phase4-implementation-plan.md`. Prompts: `prompts/phase4/`.
 
 ### Phase 5 — Aggregator MVP ✅ COMPLETE
 
-| Version | Scope | Prompt File | Status |
-|---------|-------|-------------|--------|
-| v7.5.5.0 | Aggregator config schema | `prompts/phase5/v7.5.5.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-21 |
-| v7.5.5.1 | Aggregator polling task | `prompts/phase5/v7.5.5.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-22 |
-| (no bump) | Multi-board infrastructure | PR #66 + follow-up fixes (BUG-060, BUG-061) | ✅ Complete 2026-03-24 |
-| (no bump) | Pre-v7.5.5.2 infrastructure | Config separation, ota_0 preflight, validate-device.sh, PR66 Codex fixes, BUG-062 | ✅ Complete 2026-03-24 |
-| v7.5.5.2 | Aggregator API endpoints | `prompts/phase5/v7.5.5.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-24 |
-| v7.5.5.3 | Aggregator dashboard UI + settings panel groundwork | `prompts/phase5/v7.5.5.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-24 |
-| (no bump) | v7.5.5.3 hotfix: BUG-064–067, LESSON-OPS-074 | Manual session (not agent-driven) | ✅ Complete 2026-03-25 |
-| v7.5.5.4 | Aggregator Playwright tests | `prompts/phase5/v7.5.5.4-hotfix-addendum.md` + `v7.5.5.4-implementation-instructions-for-coding-agent-updated.md` | ✅ Complete 2026-03-25 |
-| v7.5.5.5 | Phase 5 closure | `prompts/phase5/v7.5.5.5-update-notes.md` + `v7.5.5.5-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-25 |
-
-**Phase 5 device testing requirements:**
-- v7.5.5.0: compile-only (both with and without `aggregator.json`)
-- v7.5.5.1: **requires TWO devices** — satellite + aggregator. Verify polling logs, satellite unaffected, heap stable, unreachable/recovery test
-- Pre-v7.5.5.2 infra: run `validate-device.sh` on both devices, verify S3 uses its own sensor config, verify preflight catches bad ota_0
-- v7.5.5.2: verify aggregator API endpoints, history proxy, heap after proxy
-- v7.5.5.3: **requires TWO devices** — test satellite mode unchanged, test aggregator UI (gateway selector, settings panel, stale indicators, per-gateway view, board-correct About card)
-- v7.5.5.4: Playwright only — no device testing
-- v7.5.5.5: final verification, screenshot for record
+Phase 5 complete (v7.5.5.0–v7.5.5.5, 2026-03-21 to 2026-03-25). Aggregator config, polling, API, dashboard UI, Playwright tests. Plan: `Docs/archive/completed-phases/phase5-implementation-plan.md`. Prompts: `prompts/phase5/`.
 
 ### Phase 6 — Data Ingest and System Metrics ✅ COMPLETE
 
-| Version | Scope | Prompt File | Status |
-|---------|-------|-------------|--------|
-| v7.5.6.0 | POST /api/ingest endpoint | `prompts/phase6/v7.5.6.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-26 |
-| v7.5.6.1 | System device category | `prompts/phase6/v7.5.6.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-26 |
-| v7.5.6.2 | System card renderer | `prompts/phase6/v7.5.6.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-26 |
-| v7.5.6.3 | Exporter scripts + docs | `prompts/phase6/v7.5.6.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-26 |
-| v7.5.6.4 | Tests + Phase 6 closure | `prompts/phase6/v7.5.6.4-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-26 |
-
-**Phase 6 device testing requirements:**
-- v7.5.6.0: verify ingest endpoint with curl (200/404/400 cases), heap stable
-- v7.5.6.1: full endpoint audit (sensors.json, api/status, api/v2/live, legacy history 404)
-- v7.5.6.2: push test data via ingest, verify system card renders with usage bars
-- v7.5.6.3: run bash/Python exporters from an external host, verify dashboard shows data
-- v7.5.6.4: Playwright only + Phase 6 closure verification
-
-### v7.5.7.0 — Aggregator Manifest Truncation Fix + PSRAM Scaling ✅ COMPLETE
-
-| Version | Scope | Prompt File | Status |
-|---------|-------|-------------|--------|
-| v7.5.7.0 | Manifest buffer increase, truncation guard, PSRAM-aware MAX_SATELLITES | `prompts/phase6/v7.5.7.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-28 |
-
-**Reference:** [Issue #85](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/issues/85) — resolved by PR #93
-
-**v7.5.7.0 device testing requirements:**
-- Compile and flash aggregator board (S3)
-- Verify manifest buffer handles 5+ sensor satellites without truncation
-- Verify AGGREGATOR_ENABLED=1 and MAX_SATELLITES=8 on S3, AGGREGATOR_ENABLED=0 on C3 (satellite only)
-- Verify `/api/aggregator/gateways` emits valid JSON for all satellites
-- Heap check after aggregator boot
+Phase 6 complete (v7.5.6.0–v7.5.6.4, 2026-03-26). POST /api/ingest, system device category, card renderer, exporters, tests. v7.5.7.0 (aggregator manifest truncation fix, 2026-03-28) also shipped. Plan: `Docs/archive/completed-phases/phase6-implementation-plan.md`. Prompts: `prompts/phase6/`.
 
 ### Phase D — Runtime Satellite Management (v7.6.0.x) ✅ COMPLETE
 
-**Phase D delivered runtime satellite management — satellites can be added, removed, and tested via the dashboard UI at runtime, with no YAML editing or reflashing required.**
+Phase D complete (v7.6.0.0–v7.6.0.5, 2026-03-29 to 2026-04-04). Runtime satellite management — add/remove/test satellites via dashboard UI, NVS persistence, deferred task pattern. 7 bugs fixed (BUG-075–081), 402/0 tests, Critical Rules 38–46 added. Results: `prompts/handoff/phaseD/phaseD-results.md`. Prompts: `prompts/phaseD/`.
 
-**Phase D results and summary:** `prompts/handoff/phaseD-results.md` — delivery record, API contracts, active lessons, delivery metrics, retrospective.
+Open Item OI-001: fix inaccurate parallelism comment in `tests/mock-server/server.js` lines 92–95 — first Phase 7 PR touching `server.js` must resolve this.
 
-| Version | Scope | Prompt File | Status |
-|---------|-------|-------------|--------|
-| v7.6.0.0 | NVS satellite persistence layer | `prompts/phaseD/v7.6.0.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-29 |
-| v7.6.0.1 | POST /api/aggregator/add-satellite | `prompts/phaseD/v7.6.0.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-03-31 |
-| v7.6.0.2 | DELETE /api/aggregator/satellite/{id} | `prompts/phaseD/v7.6.0.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-02 |
-| v7.6.0.3 | POST /api/aggregator/test-satellite | `prompts/phaseD/v7.6.0.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-02 |
-| v7.6.0.4 | Dashboard add/remove/test UI (PR #126 + PR #128) | `prompts/phaseD/v7.6.0.4-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-03 |
-| v7.6.0.5 | Playwright tests + Phase D closure | `prompts/phaseD/v7.6.0.5-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-04 |
+### Phase X — Dashboard Architecture Refactor (v7.6.4.0–v7.6.5.8) ✅ COMPLETE
 
-**Phase D delivery summary (from `prompts/phaseD/phaseD-results.md`):**
-- 7 new bugs discovered and fixed (BUG-075 through BUG-081)
-- 402/0 tests across all four fixture sets (3sensor: 99, mixed: 96, system: 100, aggregator: 107)
-- Every step required exactly 1 fixup PR or equivalent — ≤1 target met, never beaten
-- New LESSON-OPS entries: 097–114 (see `Docs/bugs-and-lessons-learned.md`)
-- New Critical Rules: 38–44 (all in the table below)
-- Open Item OI-001: fix inaccurate parallelism comment in `tests/mock-server/server.js` lines 92–95 — first Phase 7 PR that touches `server.js` must resolve this
+Phase X complete (v7.6.4.0 + v7.6.5.0–v7.6.5.8, 2026-04-05 to 2026-04-08). Dashboard monolith (3,955 lines) refactored into modular component architecture with three-pass build pipeline. Context reduced 6x–8x (55K→8K tokens). LESSON-OPS-043 structurally resolved. 11 new Critical Rules (47–57). 402/0 tests maintained throughout. Results: `prompts/handoff/phaseX-results.md`. Quality check: `prompts/handoff/phaseX-results-quality-check.md`. Plan: `Docs/phase-X-architecture-and-refactor-plan-dashboard.md`. Prompts: `prompts/phaseX/`.
 
-**Phase D device testing requirements (for reference):**
-- v7.6.0.0: boot with NVS satellite list, reboot persistence, fallback to compile-time defaults
-- v7.6.0.1: add satellite via API, verify polling starts, verify NVS persistence after reboot
-- v7.6.0.2: remove satellite via API, verify polling stops, verify NVS updated, array dense after compaction
-- v7.6.0.3: test-satellite probe returns manifest info, verify no side effects (no NVS write, satellite count unchanged)
-- v7.6.0.4: full dashboard add/remove/test workflow via browser; verify async safety (no stale panel during poll)
-- v7.6.0.5: Playwright + Phase D closure verification (all 4 fixture sets)
+### Phase Y — Firmware Refactor: sensor_history_multi.h ⬅ NEXT (Planned)
 
-### Phase X — Dashboard Architecture Refactor ✅ COMPLETE
+**Version range:** v7.6.6.x
+**Status:** Planned — prompts not yet produced.
+**Plan:** `Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md`
+**Inventory:** `Docs/phase-Y-current-state-inventory-sensor-history-v2.md`
 
-**Phase X plan:** `Docs/phase-X-architecture-and-refactor-plan-dashboard.md`
+Phase Y applies the same structural-refactor methodology proven in Phase X to the firmware side. The target is `firmware/custom_components/ble_gateway/sensor_history_multi.h` — a large monolithic header that will be decomposed into focused modules. Recommended before Phase 7 so persistence engine work happens on an already-split codebase.
 
-| Version | Scope | Prompt File | Status |
-|---------|-------|-------------|--------|
-| v7.6.4.0 | Documentation restructuring | `prompts/phaseX/v7.6.4.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-05 |
-| v7.6.5.0 | Module split (21 modules) | `prompts/phaseX/v7.6.5.0-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
-| v7.6.5.1 | CI + preflight wiring | `prompts/phaseX/v7.6.5.1-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
-| v7.6.5.2 | Template creation | `prompts/phaseX/v7.6.5.2-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
-| v7.6.5.3 | Retire manual mirror | `prompts/phaseX/v7.6.5.3-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-06 |
-| v7.6.5.4 | Component directories | `prompts/phaseX/v7.6.5.4-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
-| v7.6.5.5 | HTML template extraction | `prompts/phaseX/v7.6.5.5-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
-| v7.6.5.6 | CSS extraction | `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-07 |
-| v7.6.5.7 | Test spec split | `prompts/phaseX/v7.6.5.7-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-08 |
-| v7.6.5.8 | Phase X closure | `prompts/phaseX/v7.6.5.8-implementation-instructions-for-coding-agent.md` | ✅ Complete 2026-04-08 |
+**Pre-requisites before starting Phase Y:**
+- Operator decision to proceed (Phase Y vs Phase 7 first)
+- Prompt production session (prompts not yet created)
+- Phase Y plan review and any updates based on Phase X lessons
 
-Phase X is COMPLETE.
-
-All 10 steps shipped: v7.6.4.0 (documentation restructuring) + v7.6.5.0–v7.6.5.8 (dashboard architecture refactor), delivered across PRs #131–#149
-402/0 test count maintained throughout — no tests broken at any step; all structural changes were identity-preserving
-Phase X results document produced: prompts/handoff/phaseX-results.md
-Context reduction achieved: 55K–70K tokens → 8K–15K tokens per dashboard task (6x–8x)
-LESSON-OPS-043 structurally resolved: manual mirror problem class eliminated at v7.6.5.3
-11 new Critical Rules (47–57) established from Phase X execution
-Next phase determination: ⚠️ OPERATOR DECISION REQUIRED
-
-Phase Y (v7.6.6.x) — firmware refactor of sensor_history_multi.h using same Phase X methodology. Recommended by Phase X plan before Phase 7 so firmware changes happen on an already-split codebase.
-Phase 7 (v7.7.0.x) — per-device persistence engine. Feature work that benefits from reduced context window.
-The Phase 7 prompt (v7.7.0.0) exists but needs updates (stale doc references, resolved Rule 6 still referenced). These updates should be applied before starting Phase 7 regardless of Phase Y decision.
-
-**v7.6.5.8 delivery summary (PR #149):**
-- Added `dashboard_component_files()` preflight check — validates all 36 expected source files exist
-- Updated Critical Rules: Rule 6 marked structurally resolved, Rule 37 updated with provision.sh,
-  Rules 47–49 simplified for Phase X architecture
-- Added Board Provisioning section with provision.sh command table
-- Produced `prompts/handoff/phaseX-results.md` — comprehensive Phase X delivery record
-- Updated README with Dashboard Architecture section
-- Updated `Docs/lessons/dashboard.md` with LESSON-OPS-117–120 (identity gate, contiguous-slice,
-  three-pass pipeline, CSS partition by selector target)
-- Updated `Docs/writing-guide/checklists/dashboard.md` with Phase X prompt patterns
-- Version bump: 7.6.5.6 → 7.6.5.8 (no functional changes)
-- **Consolidated audit:** `prompts/phaseX/v7.6.5.8-PR149-consolidated-audit-and-lessons.md`
-
-**v7.6.5.7 delivery summary (PR #148):**
-- Split 1,853-line `tests/browser/dashboard.spec.js` monolith into 10 domain-scoped spec files
-  covering all 21 test groups, plus `test-helpers.js` shared helpers
-- `dashboard.spec.js` retained as empty stub (no test cases)
-- CI workflow updated: mixed/aggregator/system matrix steps target new domain-scoped files
-- Test counts unchanged: 99 passed / 45 skipped (3sensor), 7 (mixed), 8 (system), 11+1 skipped (aggregator)
-- No dashboard source, build script, or CSS changes (VERSION remains at 7.6.5.6)
-- Remediation: out-of-scope version bump reverted; `manifest.spec.js` helpers deduplicated;
-  unused `page` fixture removed (CR32); changelog per-file table corrected
-
-**v7.6.5.6 delivery summary (PR #147):**
-- Extracted CSS from `dashboard.tmpl.html` `<style>` block (491 lines, 35,088 bytes) into 9 per-component CSS files:
-  `core/base.css` (102 lines, 7,613 bytes — includes global @media breakpoints),
-  `device-info/styles.css` (38 lines), `settings-panel/styles.css` (8 lines),
-  `live-view/styles.css` (4 lines), `sensor-cards/styles.css` (106 lines),
-  `charts/styles.css` (24 lines), `auth-modal/styles.css` (60 lines),
-  `custom-range/styles.css` (109 lines), `gateway-panel/styles.css` (40 lines)
-- `import-panel` correctly excluded (JS-only, no CSS)
-- `dashboard.tmpl.html` updated: `<style>` content replaced with `{{CSS_PLACEHOLDER}}`
-- `scripts/build-dashboard.sh` updated for three-pass assembly:
-  Pass 0: concatenate `core/base.css` + 8 `components/*/styles.css` → replace `{{CSS_PLACEHOLDER}}` (explicit cascade order, no glob);
-  Pass 1: `{{COMPONENT:name}}` markers → component templates;
-  Pass 2: `{{JS_PLACEHOLDER}}` → bundled JS
-- All three passes use `re.subn` with lambda replacement (backreference-safe) and CRLF-tolerant patterns
-- CSS file existence validated before concatenation with targeted error messages
-- Shell-resident CSS (`.about-bar`, `.export-*`) correctly in `core/base.css`
-- Global `@media` breakpoints (1200px, 1024px, 640px) correctly in `core/base.css` (initially misplaced in `gateway-panel/styles.css`, fixed in commit 14490d9)
-- Accepted exceptions documented in session log and changelog:
-  Output-identity gate: normalized semantic equivalence (CSS interleaving makes byte-identical output impossible);
-  JS version bump despite Do-NOT list (prompt self-contradiction);
-  Global @media relocated after initial error
-- Diff gate: normalized semantic equivalence ✅ (~186 lines of CSS positional reordering; all 35,088 bytes preserved)
-- Preflight passes; build produces 239,626 bytes
-- **Consolidated audit:** `prompts/phaseX/v7.6.5.6-PR147-consolidated-audit-and-lessons.md`
-- Device testing: not applicable (CSS extraction only; no runtime change)
-
-**v7.6.5.5 delivery summary (PR #146):**
-- Extracted 8 component `template.html` files from `dashboard/dashboard.tmpl.html`:
-  `auth-modal` (1427 B), `custom-range` (2755 B), `device-info` (15522 B),
-  `settings-panel` (2560 B), `live-view` (634 B), `gateway-panel` (438 B),
-  `sensor-cards` (454 B), `charts` (3062 B)
-- `dashboard.tmpl.html` reduced from 66356 B → 39711 B (8 markers replace extracted sections)
-- `scripts/build-dashboard.sh` updated for two-pass assembly:
-  Pass 1: `{{COMPONENT:name}}` markers → component templates (CRLF-tolerant `re.sub`);
-  Pass 2: `{{JS_PLACEHOLDER}}` → bundled JS
-- Security: component name validated against `^[a-z0-9-]+$`; realpath + commonpath confinement
-- `html-minifier-terser` moved to `devDependencies`; `minify-dashboard.sh` updated to use `npx`
-- Generated header updated: lists `dashboard/components/*/template.html` as build inputs
-- Accepted exceptions documented in session log and changelog:
-  `device-info`: `#c3DescriptionBlock` (`.about-bar`) stays in shell — non-contiguous with `.top-grid`
-  `settings-panel`: `#exportSection` (`.export-section`) stays in shell — non-contiguous with `.storage-card`
-  `import-panel`: JS-only component, no `template.html`, no marker — deferred to v7.6.5.6
-- Normalized diff evidence produced: only GENERATED header line differs between edf8d0d → f83330a
-- Diff gate: two-pass output byte-identical to v7.6.5.4 baseline (except version churn)
-- All 402 tests pass; preflight passes
-- **Consolidated audit:** `prompts/phaseX/v7.6.5.5-PR146-consolidated-audit-and-lessons.md` 
-- Device testing: not applicable (identity gate substitutes; no runtime change)
-
-**v7.6.5.4 delivery summary (PR #145):**
-- Created `dashboard/core/` (8 files) and `dashboard/components/` (9 subdirectories with `index.js`)
-- 14 individual file moves + 3 concatenations (`09+10 → settings-panel`, `14+15 → sensor-cards`, `17+18 → live-view`)
-- **Plan correction:** `src/13-import.js` moved to `components/import-panel/index.js` as a separate component — concatenation into `settings-panel` was physically impossible without breaking byte order (modules 11 and 12 sit between 10 and 13); FILES array is 18 entries (not 17 as planned)
-- `import-panel` is JS-only — no HTML template, no CSS; excluded from v7.6.5.5 (HTML extraction) and v7.6.5.6 (CSS extraction)
-- `scripts/bundle-dashboard.sh` updated — 21-entry `MODULES`/`src/` array replaced with 18-entry `FILES` array using `dashboard/core/` and `dashboard/components/*/index.js` paths
-- `scripts/bump-version.sh` updated — `App.version` sed target updated to `dashboard/core/app-shell.js`
-- `scripts/build-dashboard.sh` updated — `<!-- GENERATED -->` header source path updated
-- `dashboard/src/` fully removed
-- Identity gate: PASS (version-normalized SHA256 match confirmed)
-- All Playwright tests pass; preflight passes
-- Documentation fixup commit (post-merge): `Docs/changelog.md` corrected (17-entry → 18-entry, plan correction section added)
-- Consolidated audit: `prompts/phaseX/v7.6.5.4-PR145-consolidated-audit-and-lessons.md`
-- Device testing: not applicable (pure file moves, identity gate substitutes)
-
-**v7.6.5.3 delivery summary (PR #135):**
-- `scripts/build-dashboard.sh` modified — `<!-- GENERATED -->` header prepended to all `--write` output
-- `<!-- GENERATED -->` header text: `GENERATED — Do not edit. Source: dashboard/dashboard.tmpl.html + dashboard/dashboard.js (bundled from dashboard/src/*.js)`
-- `.github/workflows/browser-tests.yml` updated — `build-dashboard.sh --check` step added (after bundle sync check, before Playwright); `scripts/build-dashboard.sh` and `scripts/bundle-dashboard.sh` added to `push.paths` and `pull_request.paths`
-- LESSON-OPS-043 marked structurally resolved in `Docs/lessons/dashboard.md` — manual mirror problem class can no longer occur
-- Two pre-existing conditions handled correctly: `bump-version.sh` sed removal (done in v7.6.5.2) and `dashboard_html_sync()` preflight check (already present from v7.6.5.2) — no duplicates added
-- Pipeline ordering inconsistency across docs resolved: canonical 8-step (full manual) and 6-step (bump-version subset) sequences documented and aligned
-- All 7 Playwright fixture sets pass
-- Review feedback addressed in commit 6dabe6d: CI path filters, pipeline ordering, session log compliance table corrections, GENERATED header text
-- Consolidated audit: `prompts/phaseX/v7.6.5.3-PR135-consolidated-audit-and-lessons.md`
-- Device testing: ⏳ **Pending operator execution post-merge** — S3 aggregator at 192.168.120.191, verify page load / SSE / charts / management actions
-
-**v7.6.5.2 delivery summary (PR #134):**
-- `dashboard/dashboard.tmpl.html` created — copy of `dashboard.html` with `<script>…</script>` block replaced by `{{JS_PLACEHOLDER}}`
-- `scripts/build-dashboard.sh` added — Python binary exact-substitution, `--write` and `--check` modes, strict CLI validation
-- `preflight.sh` updated — `dashboard_tmpl_has_placeholder` (exactly-one check) and `dashboard_html_sync` checks added
-- `bump-version.sh` updated — redundant `sed` on `dashboard.html` removed; `build-dashboard.sh --write` added to pipeline
-- Bit-for-bit gate passed — idempotency confirmed pre- and post-version bump
-- All 224 Playwright tests pass (46 skipped, 0 failed) across all four fixture sets
-- Consolidated audit: `prompts/phaseX/v7.6.5.2-PR134-consolidated-audit-and-lessons.md`
-
-**v7.6.5.0 delivery summary (PR #132):**
-- 21 source modules extracted from 3,955-line `dashboard.js` monolith into `dashboard/src/`
-- `scripts/bundle-dashboard.sh` added with `--write` and `--check` modes
-- Identity gate passed: SHA-256 before split = SHA-256 after bundle
-- `dashboard.html` unchanged (Level 1 constraint)
-- All 402 Playwright tests pass across all fixture sets
-- Post-review fixes: bundler strict arg validation; HTML/header revert; preflight version sourced from HTML
-- Consolidated audit: `prompts/phaseX/v7.6.5.0-PR132-consolidated-audit-and-lessons.md- Consolidated audit: `prompts/phaseX/v7.6.5.0-PR132-consolidated-audit-and-lessons.md`
-- `v7.6.5.1` prompt and handoff were patched at v7.6.5.0 to reflect corrected bundle-first pipeline order (see v7.6.5.0 revision history entry)
-
-### Phase 7 — Per-Device Persistence Engine - After Phase Y (Phase Y Not Scoped Yet)
-
+### Phase 7 — Per-Device Persistence Engine — After Phase Y
 
 **`main` is at v7.6.5.8. Phase 7 starts at v7.7.0.0.**
 
-Before starting Phase 7, read `prompts/handoff/phaseD-results.md` for the active lessons and API contracts that Phase 7 must remain compatible with. Also read `prompts/handoff/session-handoff-v7.7.0.0.md` for the full Phase 7 entry context.
+Before starting Phase 7, read `prompts/handoff/phaseD/phaseD-results.md` for the active lessons and API contracts that Phase 7 must remain compatible with. Also read `prompts/handoff/session-handoff-v7.7.0.0.md` for the full Phase 7 entry context.
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
@@ -425,15 +187,16 @@ Before starting Phase 7, read `prompts/handoff/phaseD-results.md` for the active
 
 | Phase | Version Range | Description | Implementation Plan |
 |-------|--------------|-------------|---------------------|
-| Phase 1 | v7.5.0.x | Manifest v2 endpoint | `Docs/v7.5-v7.6-architecture-plan.md` §11 |
+| Phase 1 | v7.5.0.x | Manifest v2 endpoint | `Docs/archive/completed-phases/v7.5-v7.6-architecture-plan.md` §11 |
 | Phase 2 | v7.5.1.x | Dashboard consumes manifest | Same |
-| Phase 3 | v7.5.3.x | SensorEntity C++ model | `Docs/phase3-implementation-plan.md` |
-| Phase 4 | v7.5.4.x | First non-climate sensor (ping) | `Docs/phase4-implementation-plan.md` |
-| Phase 5 | v7.5.5.x | Aggregator MVP | `Docs/phase5-implementation-plan.md` |
-| Phase 6 | v7.5.6.x | Data ingest + system metrics | `Docs/phase6-implementation-plan.md` |
+| Phase 3 | v7.5.3.x | SensorEntity C++ model | `Docs/archive/completed-phases/phase3-implementation-plan.md` |
+| Phase 4 | v7.5.4.x | First non-climate sensor (ping) | `Docs/archive/completed-phases/phase4-implementation-plan.md` |
+| Phase 5 | v7.5.5.x | Aggregator MVP | `Docs/archive/completed-phases/phase5-implementation-plan.md` |
+| Phase 6 | v7.5.6.x | Data ingest + system metrics | `Docs/archive/completed-phases/phase6-implementation-plan.md` |
 | **Phase D** | **v7.6.0.x** | **Runtime satellite management** | **`Docs/phase-d-implementation-plan.md`** |
 | **Phase X** | **v7.6.4.0** | **Documentation restructuring (pre-step)** | **`Docs/phase-X-architecture-and-refactor-plan-dashboard.md`** |
 | **Phase X** | **v7.6.5.0–v7.6.5.8** | **Dashboard architecture refactor** | **Same** |
+| **Phase Y** | **v7.6.6.x** | **Firmware refactor (sensor_history_multi.h)** | **`Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md`** |
 | **Phase 7** | **v7.7.0.x–v7.7.2.x** | **Per-device persistence engine** | **`Docs/v7.7-v7.8-persistence-architecture.md`** |
 | Phase E | v8.0.x | Captive portal + WiFi config | _Not yet planned_ |
 
@@ -576,238 +339,40 @@ After each step completes:
 
 ## Revision History
 
-### 2026-04-08 — v7.6.5.8 Complete: Phase X Closure
+### 2026-04-08 — Documentation Reorganization (Issue #140)
 
 | Change | Why |
 |--------|-----|
-| **v7.6.5.8 marked complete** | Phase X closure: documentation updates, preflight component checks, prompt index finalization, Phase X results document |
-| **Critical Rule 6 updated** | Marked as "Structurally resolved by Phase X v7.6.5.3" — dashboard.html is now generated, manual mirroring no longer possible |
-| **Critical Rule 37 updated** | Added provision.sh device-switching note and full three-pass pipeline reference |
-| **Critical Rules 47–49 updated** | Simplified to essential guidance: 47 (source modules location), 48 (pipeline after edits), 49 (provision.sh mandatory for board switching) |
-| **Board provisioning table added** | New section after Critical Rules documenting provision.sh commands and CI-safe/unsafe states |
-| **preflight.sh updated** | dashboard_component_files() check added — verifies all expected component/core files exist (36 files total) |
-| **Phase X marked COMPLETE** | All 10 steps (v7.6.4.0 + v7.6.5.0–v7.6.5.8) delivered; dashboard architecture refactor complete |
-| **Document header `_Last updated_` refreshed** | Reflects 2026-04-08 and Phase X completion state |
+| **Docs reorganized** | Session logs → `Docs/archive/session-logs/`; completed phase plans → `Docs/archive/completed-phases/`; Phase X artifacts → `Docs/archive/phase-x-artifacts/`; postmortems → `Docs/archive/postmortems/` |
+| **`Docs/architecture-overview.md` created** | New canonical architecture entry point consolidating project overview, phase history, active documents, and key constraints |
+| **Lessons index audited and fixed** | 9 missing entries added (BUG-043, BUG-072/073, LESSON-OPS-080–083, LESSON-OPS-119/120); 1 phantom entry removed (BUG-082); LESSON-OPS-117/118 duplication resolved (dashboard.md canonical, build-pipeline.md demoted to notes) |
+| **Changelog fixed** | Missing `## [v7.6.5.3]` heading added; PR #150 post-merge note added under v7.6.5.8; v7.6.5.7 version-skip annotation added |
+| **Phase Y section added** | v7.6.6.x, status Planned, links to plan and inventory documents |
+| **Completed phases summarized** | Phase 3–6, Phase D, Phase X step tables replaced with one-line summaries and archive references |
+| **Related Documents updated** | Architecture overview added; archived plans referenced; phaseD-results.md path corrected to `prompts/handoff/phaseD/` |
+| **Phase X handoffs moved** | `prompts/handoff/session-handoff-v7.6.*.md` → `prompts/handoff/phaseX/` |
+| **README updated** | Phase D marked complete; aggregator API stubs updated; architecture doc link updated; Phase Y noted as planned |
+| **Revision history condensed** | Per-step entries replaced with phase-level summaries |
 
-### 2026-04-08 — v7.6.5.7 Complete: Test Spec Split
+### 2026-04-08 — Phase X Closure (v7.6.5.8)
 
-| Change | Why |
-|--------|-----|
-| **v7.6.5.7 marked complete** | PR #148 merged — 1,853-line dashboard.spec.js monolith split into 10 domain-scoped spec files + test-helpers.js; all 21 groups mapped; CI workflow updated; 99/45 (3sensor) unchanged |
-| **v7.6.5.8 marked ⬅ Next** | Phase X closure step |
-| **Critical Rules 56–57 added** | Version bump scope (56); helper deduplication audit for split targets (57) |
-| **v7.6.5.7 delivery summary added** | Quick-reference for operator |
-| **Document header `_Last updated_` refreshed** | Reflects current session date and v7.6.5.7 closure state |
+Phase X complete. All 10 steps delivered. Critical Rules 47–57 added. Board provisioning table added. Phase X results document produced.
 
-### 2026-04-07 — v7.6.5.6 Complete: Phase X Level 3 CSS Extraction
+### 2026-04-04 — Phase D Closure (v7.6.0.5)
 
-| Change | Why |
-|--------|-----|
-| **v7.6.5.6 marked complete** | PR #147 merged (commits: 22fe76c, e951572, 50562c9, 5dea1ac, 14490d9) — 9 CSS files extracted from monolithic `<style>` block; three-pass assembly (CSS → components → JS); `re.subn` + lambda for all passes; global @media breakpoints correctly placed in `core/base.css` |
-| **Three-pass assembly contract established** | `build-dashboard.sh` now runs Pass 0 (CSS injection), Pass 1 (component markers), Pass 2 (JS injection); all passes use `re.subn` + lambda with CRLF-tolerant patterns |
-| **Normalized semantic equivalence gate established** | Byte-identical output is impossible when source CSS is interleaved across component boundaries; future extraction steps use sorted byte comparison + specificity analysis as evidence |
-| **Critical Rules 53–55 added** | Lambda replacement for `re.sub` (53); escalate contradictory criteria (54); CSS partition by selector target not proximity (55) |
-| **Rule 51 updated** | Now mandates lambda replacement (not just CRLF tolerance) |
-| **v7.6.5.7 marked ⬅ Next** | Test spec split — next step in Level Test/Closure |
+Phase D complete. All 6 steps delivered. Critical Rules 38–46 added. Phase D results document produced. OI-001 noted.
 
-### 2026-04-07 — v7.6.5.5 Complete: Phase X Level 3 HTML Template Extraction
+### 2026-04-06 through 2026-04-08 — Phase X Execution (v7.6.5.0–v7.6.5.7)
 
-| Change | Why |
-|--------|-----|
-| **v7.6.5.5 marked complete** | PR #146 merged (commits: 710ba31, edf8d0d, f83330a, c1ae068) — 8 `template.html` files extracted; two-pass assembly; CRLF-tolerant `re.sub` marker replacement; path-confined component resolution; accepted exceptions documented |
-| **Two-pass assembly contract established** | `build-dashboard.sh` now runs Pass 1 (component markers) then Pass 2 (JS injection); both passes use realpath + commonpath confinement and regex name validation; CRLF-tolerant |
-| **Accepted exceptions pattern established** | Non-contiguous DOM targets (`#c3DescriptionBlock`, `#exportSection`) kept in shell and explicitly documented in session log § Accepted Exceptions + changelog entry; `import-panel` JS-only exception also documented |
-| **Normalized diff evidence pattern established** | Version-normalized diff (`sed + diff`) run between baseline and PR head to prove structural identity when version bump is part of the same PR; output recorded in session log |
-| **Critical Rules 51–52 added** | Rule 51: CRLF-tolerant `re.sub` for marker replacement (not `bytes.replace`). Rule 52: `devDependencies` + `npx` for build tool deps. |
-| **Consolidated audit MISSING** | `v7.6.5.5-PR146-consolidated-audit-and-lessons.md` was not produced during agent execution — **must be created post-merge as a manual operator task** (see Post-PR Closure section in handoff) |
-| **v7.6.5.6 is next** | CSS extraction — review `prompts/handoff/session-handoff-v7.6.5.6.md` and `prompts/phaseX/v7.6.5.6-implementation-instructions-for-coding-agent.md` before starting; verify CSS selector families still match delivered `dashboard.tmpl.html` structure |
-| **Document header `_Last updated_` refreshed** | Reflects v7.6.5.5 closure state |
+Per-step revision entries for each Phase X step have been condensed. Detailed delivery summaries are preserved in the Phase X results document (`prompts/handoff/phaseX-results.md`) and in individual consolidated audits (`prompts/phaseX/v7.6.5.x-PRxxx-consolidated-audit-and-lessons.md`).
 
-### 2026-04-07 — v7.6.5.4 Complete: Phase X Level 3 Component Directory Scaffolding
+### 2026-03-29 through 2026-04-02 — Phase D Execution (v7.6.0.0–v7.6.0.4)
 
-| Change | Why |
-|--------|-----|
-| **v7.6.5.4 marked complete** | PR #145 merged — `dashboard/core/` and `dashboard/components/` created; 14 file moves + 3 concatenations; `dashboard/src/` removed; identity gate PASS |
-| **Plan correction: import-panel as separate component** | `src/13-import.js` could not be concatenated into `settings-panel` without breaking byte order (modules 11 and 12 are physically between 10 and 13); `import-panel/index.js` created as a 9th component; FILES array is 18 entries (not 17); classified as plan correction, not agent error |
-| **`bundle-dashboard.sh` FILES array updated** | 21-entry `MODULES`/`src/` array replaced with 18-entry `FILES` array using `dashboard/core/` and `dashboard/components/*/index.js` paths; loop variable `mod` → `src` |
-| **`bump-version.sh` path updated** | `App.version` sed target changed from `dashboard/src/00-app-shell.js` to `dashboard/core/app-shell.js` |
-| **`build-dashboard.sh` header updated** | `<!-- GENERATED -->` source path updated to reflect new component directory structure |
-| **Post-merge documentation fixup** | `Docs/changelog.md` corrected: "17-entry" → "18-entry", plan correction section added; `prompts/phaseX/v7.6.5.4-PR145-consolidated-audit-and-lessons.md` created |
-| **Critical Rule 50 added** | LESSON-OPS-118: non-contiguous module concatenation breaks byte order — verify physical adjacency before specifying concatenations in architecture plans |
-| **v7.6.5.5 is next** | HTML template extraction for 8 template-bearing components (import-panel excluded — JS-only) |
-| **Document header `_Last updated_` refreshed** | Reflects 2026-04-07 and v7.6.5.4 closure state |
+Per-step revision entries condensed. Delivery details preserved in Phase D results (`prompts/handoff/phaseD/phaseD-results.md`).
 
-### 2026-04-06 — v7.6.5.3 Complete: Phase X Level 2 Retire Manual Mirror + CI Build Gate
+### 2026-03-18 through 2026-03-28 — Phases 3–6 + v7.5.7.0
 
-| Change | Why |
-|--------|-----|
-| **v7.6.5.3 marked complete** | PR #135 merged — `<!-- GENERATED -->` header added to `build-dashboard.sh` output; CI `build-dashboard.sh --check` step added to `browser-tests.yml`; LESSON-OPS-043 marked structurally resolved |
-| **`scripts/build-dashboard.sh` updated** | `<!-- GENERATED — Do not edit. Source: dashboard/dashboard.tmpl.html + dashboard/dashboard.js (bundled from dashboard/src/*.js) -->` header prepended to every `--write` output; header included in `--check` comparison so generated file always opens with the comment |
-| **`.github/workflows/browser-tests.yml` updated** | `build-dashboard.sh --check` added after bundle sync check and before Playwright (3sensor leg); `scripts/build-dashboard.sh` and `scripts/bundle-dashboard.sh` added to `push.paths` and `pull_request.paths` |
-| **LESSON-OPS-043 marked structurally resolved** | Resolution note added to `Docs/lessons/dashboard.md` — manual mirror of `dashboard.js` → `dashboard.html` can no longer occur; `dashboard.html` is now a fully generated artifact |
-| **Pipeline ordering inconsistency resolved** | Canonical 8-step (full manual) and 6-step (bump-version subset) sequences aligned across `Docs/changelog.md`, `Docs/lessons/build-pipeline.md`, session log, and this document |
-| **Critical Rule 37 updated** | Two-variant pipeline (8-step manual / 6-step bump-version subset) documented; bundle-first invariant stated explicitly for both variants |
-| **Critical Rules 47–48 added** | Rule 47: `dashboard.html` is a generated artifact — never hand-edit. Rule 48: CI path filters must include all scripts that can change checked artifacts |
-| **v7.6.5.3 consolidated audit produced** | `prompts/phaseX/v7.6.5.3-PR135-consolidated-audit-and-lessons.md` |
-| **Level 2 → Level 3 gate check: conditionally ready** | CI green (all 7 fixture sets); bit-for-bit gate passed (v7.6.5.2 pre-condition); device testing pending operator post-merge execution |
-| **Document header `_Last updated_` refreshed** | Reflects v7.6.5.3 closure state |
-
-### 2026-04-06 — v7.6.5.2 Complete: Phase X Level 2 Template Creation
-
-| Change | Why |
-|--------|-----|
-| **v7.6.5.2 marked complete** | PR #134 merged — `dashboard/dashboard.tmpl.html` created; `scripts/build-dashboard.sh` created; bit-for-bit idempotency gate passed pre- and post-bump; all 224 tests pass |
-| **`preflight.sh` updated** | `dashboard_tmpl_has_placeholder()` (exactly-one `{{JS_PLACEHOLDER}}` check) and `dashboard_html_sync()` (calls `build-dashboard.sh --check`) added in correct order before exit block |
-| **`bump-version.sh` cleaned** | Redundant `sed` that directly edited `dashboard.html` removed; `build-dashboard.sh --write` inserted after `render_sensor_config.py --write` so version propagates through the full pipeline |
-| **Critical Rule 37 wording updated** | `build-dashboard.sh --write` added as Step 3 of the canonical 6-step regeneration pipeline |
-| **v7.6.5.2 consolidated audit produced** | `prompts/phaseX/v7.6.5.2-PR134-consolidated-audit-and-lessons.md` |
-| **Level 2 gate check: ready for v7.6.5.3** | `build-dashboard.sh --check` passes; template injection exact; pipeline produces clean output; v7.6.5.3 may proceed |
-| **Document header `_Last updated_` refreshed** | Reflects current session date and v7.6.5.2 closure state |
-
-### 2026-04-06 — v7.6.5.1 Complete: Phase X Level 1 CI + Preflight Wiring
-
-| Change | Why |
-|--------|-----|
-| **v7.6.5.1 marked complete** | PR #133 merged — `dashboard_js_bundle_sync` preflight check added; CI bundle check step added to `.github/workflows/browser-tests.yml` (before Playwright, `3sensor` matrix only); negative case verified |
-| **`bump-version.sh` patched** | Now calls `bundle-dashboard.sh --write` before `render_sensor_config.py --write` to prevent generator markers being wiped by a subsequent bundle |
-| **LESSON-OPS-091 updated** | Bundle step added as Step 1 of the canonical 6-step regeneration pipeline; marker-ordering wording corrected in both `Docs/lessons/build-pipeline.md` and `Docs/aggregator-setup.md` |
-| **`aggregator-setup.md` Section 7.1 corrected** | `bash scripts/preflight.sh` removed from numbered 6-step pipeline block; placed in a separate post-pipeline verification paragraph |
-| **Critical Rule 37 wording updated** | Now references `bundle-dashboard.sh --write` as Step 1 of the full canonical pipeline |
-| **v7.6.5.1 consolidated audit produced** | `prompts/phaseX/v7.6.5.1-PR133-consolidated-audit-and-lessons.md` |
-| **Level 1 → Level 2 gate check passed** | All five gate conditions green; v7.6.5.2 may proceed |
-| **Document header `_Last updated_` refreshed** | Reflects current session date and v7.6.5.1 closure state |
-
-### 2026-04-06 — v7.6.5.0 Complete: Phase X Level 1 Module Split
-
-| Change | Why |
-|--------|-----|
-| **v7.6.5.0 marked complete** | PR #132 merged — 21 source modules extracted from `dashboard.js` monolith into `dashboard/src/`; identity gate (SHA-256) confirmed; all 402 tests pass |
-| **`scripts/bundle-dashboard.sh` added** | Concatenates modules in dependency order; `--write` and `--check` modes; strict arg validation (post-review fix) |
-| **`dashboard.html` unchanged** | Level 1 constraint; HTML/header revert applied as post-review fix; preflight now reads version from frozen HTML |
-| **v7.6.5.1 prompt and handoff patched** | Bundle-first pipeline order corrected in both files to prevent generator markers being wiped |
-| **v7.6.5.0 delivery summary added to Step Index** | Quick-reference for operator |
-| **Document header `_Last updated_` refreshed** | Reflects current session date and v7.6.5.0 closure state |
-
-### 2026-04-05 — v7.6.4.0 Complete: Documentation Restructuring
-
-| Change | Why |
-|--------|-----|
-| **Bugs & Lessons Learned split into `Docs/lessons/`** | 3,069-line monolith split into 6 domain files (index, dashboard, firmware, build-pipeline, testing, operations); 69 bugs + 97 lessons distributed by domain |
-| **Writing Guide split into `Docs/writing-guide/`** | 1,674-line guide split into methodology, gap catalog, and domain-specific checklists (dashboard, firmware) |
-| **Related Documents table updated** | `bugs-and-lessons-learned.md` → `Docs/lessons/index.md`; `writing-prompts-for-coding-agents-guide.md` → `Docs/writing-guide/methodology.md` |
-| **v7.6.4.0 marked complete** | Phase X pre-step complete — documentation-only change, no code/test/pipeline changes |
-
-### 2026-04-05 — Phase X Prompts Produced
-
-| Change | Why |
-|--------|-----|
-| **Phase X section added to Step Index** | 10 steps (v7.6.4.0 + v7.6.5.0–v7.6.5.8) with prompt file paths |
-| **Phase X added to Version Number ↔ Phase Mapping** | v7.6.4.0 and v7.6.5.x ranges |
-| **Phase X plan and audit template added to Related Documents** | Cross-reference |
-| **Phase 7 ⬅ NEXT moved to Phase X** | Phase X executes before Phase 7 |
-
-### 2026-04-04 — Phase D Complete; Critical Rules 45–46 Added; Phase D Results Document Produced
-
-**Context:** Phase D (v7.6.0.0–v7.6.0.5) fully merged and verified. Post-Phase-D documentation session. Document restored from truncated commit state and updated to reflect Phase D closure.
-
-| Change | Why |
-|--------|-----|
-| **Phase D steps v7.6.0.3–v7.6.0.5 marked complete** | All six steps confirmed shipped; 402/0 tests green across all four fixture sets |
-| **Phase D COMPLETE banner added to Step Index** | Phase D is closed; Phase 7 is now the active next milestone |
-| **`prompts/handoff/phaseD-results.md` added to Related Documents** | New canonical Phase D delivery record; Phase 7 prompts must read this before authoring |
-| **Phase D delivery summary added to Step Index** | Quick-reference for operator: bug count, test count, fixup rate, open items |
-| **Open Item OI-001 noted** | Inaccurate parallelism comment in `server.js` lines 92–95; must be fixed in first Phase 7 PR touching that file |
-| **Critical Rule 45 added** | BUG-080/081 / LESSON-OPS-111: DOM staleness after async auth flows — re-query after `await`, suppress poll rerenders during in-flight actions |
-| **Critical Rule 46 added** | LESSON-OPS-112: mock response shapes verified against firmware `httpd_resp_sendstr()` — not prompt descriptions |
-| **Phase 7 ⬅ NEXT marker added** | Operator orientation: main is at v7.6.0.5, next step is v7.7.0.0 |
-| **`<phase>` fill-in hint updated** | Added `phaseD` example to workflow template for completeness |
-| **Document header `_Last updated_` refreshed** | Reflects current session date and closure state |
-
-### 2026-04-02 — v7.6.0.2 Complete; Critical Rules 43–44 Added
-
-| Change | Why |
-|--------|-----|
-| **v7.6.0.2 marked complete** | PR #114 + #116 merged 2026-04-02 |
-| **Critical Rules 43–44 added** | BUG-077 (Arduino `String`), BUG-078 (`init_response_()` status code mapping), BUG-079 (`HTTP_DELETE` not registered in `begin()`) |
-
-### 2026-03-31 — BUG-075/076 Root Cause Resolved; Critical Rules 38–42 Added
-
-**Context:** PR #105 branch — dashboard content-type fixes, generated file regeneration, documentation updates.
-
-| Change | Why |
-|--------|-----|
-| **Critical Rules 38–42 added** | httpd stack hardcoded at 4 KB by ESPHome — CONFIG_HTTPD_STACK_SIZE inert. Local component override (`firmware/local_components/web_server_idf/`) patches stack to 16 KB. Deferred task pattern required for NVS handlers. ESPHome only supports form-urlencoded POST. |
-| **BUG-075/076 root cause resolved** | httpd task stack hardcoded at 4 KB by ESPHome; deferred task pattern (xTaskCreate 8192-byte stack) applied to management handlers |
-| **dashboard.js / dashboard.html content-type fixed** | Changed from `application/json` to `application/x-www-form-urlencoded`; `body: \'{}\'` → `body: \'a=1\'` |
-| **LESSON-OPS-099–101 added** | ESPHome POST body consumption rules; httpd stack limit; deferred task pattern |
-
-### 2026-03-29 — v7.6.0.0 Complete (Phase D Step 0)
-
-**Context:** v7.6.0.0 merged (PR #98 + review fixes PR #99). NVS satellite persistence layer operational. Device testing fix applied to all Phase D prompts.
-
-| Change | Why |
-|--------|-----|
-| **v7.6.0.0 marked complete** | PR #98 merged with review fixes from PR #99 |
-| **v7.6.0.1 prompt updated** | Back-ported 5 findings from v7.6.0.0 review (mutex, NVS seeding, key buffers, auth pattern, erase semantics) — Section 3a added |
-| **All Phase D device testing sections fixed** | All 6 prompts referenced wrong YAML (`esp32-c3-multi-sensor.yaml` instead of `esp32-s3-devkitc1-n16r8-gw.yaml`) — LESSON-OPS-090 |
-| **Regeneration pipeline completed** | `minify-dashboard.sh` added to all pipeline references — LESSON-OPS-091 |
-| **Critical Rules 36–37 added** | Rule 36 (correct YAML path), Rule 37 (full pipeline with minification) |
-| **`render_sensor_config.py` enhancement** | Prints build target/commands after `--write` to prevent YAML path confusion |
-| **LESSON-OPS-090–096** | 7 new lessons from v7.6.0.0 execution and review |
-| **`Docs/aggregator-setup.md` rewritten Section 7** | Added "Which YAML Do I Compile?" decision table, complete 5-step pipeline |
-
-### 2026-03-28 — Post-v7.5.7.0 Completion and Phase D Readiness
-
-**Context:** v7.5.7.0 merged (PR #93). Phase D prompts finalized and corrections applied.
-
-| Change | Why |
-|--------|-----|
-| **v7.5.7.0 marked complete** | PR #93 merged 2026-03-28T21:19:35Z |
-| **Phase D prompt files linked** | Canonical prompts exist in `prompts/phaseD/`, replacing "_Prompt not yet created_" placeholders |
-| **v7.5.7.0 audit corrections applied to Phase D prompts** | LESSON-OPS-086 (Do-NOT regeneration churn), LESSON-OPS-087 (cross-language constants), LESSON-OPS-088 (compliance table templating) |
-| **Device testing sections expanded** | Specific build/flash commands, `esphome clean` requirement, preflight steps, concrete device IPs |
-| **`curl -X POST` commands fixed** | Added `-H "Content-Length: 0"` — curl does not send POST without it |
-
-### 2026-03-27 — Post-Phase-6 Completion Update
-
-**Context:** Phase 6 complete (v7.5.6.4). Post-phase documentation batch merged. Phase D preparation underway.
-
-| Change | Why |
-|--------|-----|
-| **Phase 6 steps v7.5.6.2–6.4 marked complete** | Workflow index was stale — steps had been merged but not reflected |
-| **v7.5.7.0 added to index** | Manifest truncation fix (Issue #85) must ship before Phase D |
-| **Critical rules 29–35 added** | Phase 6 audit identified 7 new rules for prompt quality, mock fidelity, fixture ripple, script quality |
-| **Architecture Forward-Looking Notes added to Related Documents** | New document created during Phase 6 assessment |
-| **Phase 7 prompts reviewed and updated** | Checked against updated writing guide (§3.12, §3.13) |
-
-### 2026-03-24 — Architecture Review Revision
-
-**Context:** Comprehensive repo analysis after multi-board infrastructure push. User design principles reviewed. Architecture revision document produced.
-
-| Change | Why |
-|--------|-----|
-| **Infrastructure step added to Phase 5 index** | Config separation, ota_0 preflight, validate-device.sh, PR66 Codex fixes, BUG-062 must be done before v7.5.5.2 |
-| **v7.5.5.3 scope expanded** | User principles require dashboard-first configuration. Settings panel groundwork (read-only satellite list, stubbed management API) included to avoid dashboard rework later. |
-| **Critical rules 22–25 added** | LESSON-OPS-070 (ota_0), LESSON-OPS-071 (lazy imports), LESSON-OPS-072 (heap PSRAM), LESSON-OPS-073 (LXC USB) |
-| **Multi-board infrastructure step marked complete** | PR #66 + BUG-060/061 follow-up fixes |
-| **Device testing requirements updated** | Pre-v7.5.5.2 infra step needs validate-device.sh testing; v7.5.5.3 needs settings panel and board About card testing |
-
-### 2026-03-21 — Post-Phase-4 Review Revision
-
-**Context:** Comprehensive post-Phase-4 review identified 5 bugs (BUG-052 through BUG-056) and multiple prompt quality gaps. Four independent third-party analyses (GP, GE, Codex, SO) reviewed the Phase 4 prompt set and implementation quality.
-
-| Change | Why |
-|--------|-----|
-| **Phase 5 prompts revised (all 6 files)** | SO analysis identified 18 gaps. Critical fixes: CI-exact pre-conditions, FreeRTOS mutex for shared cache, pointer lifetime clarification, `_aggregatorReady` signal, MANDATORY existing-test audit, `waitForAggregatorReady()` helper, URL collision check, preflight updates, mock server 404, Closure Gate. |
-| **Phase 6 prompts created (5 new files)** | Created from scratch incorporating all Phase 4 lessons: endpoint audit checklist, `chartIdx` verification, `NUM_SENSORS` protection, test group guardrails, MANDATORY fixture audit, CI matrix instructions. |
-| **Phase 7 prompts updated (3 files)** | CI-exact pre-conditions, session log mandate, Instruction Compliance Output. 8 remaining prompts to be created when implementation begins. |
-| **Writing guide updated (1115 lines)** | 3 new gap categories (11-13), Section 13 with 5 case studies, expanded Appendix B. |
-| **Session log mandate added to ALL prompts** | Phase 4 produced zero session logs. Now a MANDATORY deliverable in every prompt. |
-| **Instruction Compliance Output added to ALL prompts** | Prevents PR-057 class deviation where agents implement differently than specified. |
-| **Validation Evidence added to test-step prompts** | Exact command + pass/fail/skip counts required as proof of CI-exact execution. |
-| **Step Index expanded** | v7.5.4.5, Phase 6, expanded Phase 7 with "prompt not yet created" status. |
-| **Critical Rules expanded (15→21)** | Rules 15-21 from LESSON-OPS-064/065/066, BUG-051/056, and review findings. |
-| **Workflow updated** | Agent deliverables now include session log, compliance output, validation evidence. |
+Per-step revision entries condensed. Step tables, device testing requirements, and delivery details are preserved in the archived implementation plans (`Docs/archive/completed-phases/`) and in the changelog (`Docs/changelog.md`).
 
 ### 2026-03-18 — Initial Version
 
