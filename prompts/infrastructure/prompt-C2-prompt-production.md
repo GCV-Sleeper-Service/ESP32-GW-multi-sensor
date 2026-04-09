@@ -109,7 +109,8 @@ Produce one session handoff per Phase Y step. Each handoff must follow the estab
 - Pre-conditions (gate checks before starting)
 - Key files to read
 - Critical constraints and anti-patterns for this specific step
-- Post-merge deliverables (inspection of next step's handoff, consolidated audit)
+- Workfolow as it was outlined in the phaseX session prompts. IMPORTANT: Refer to existing session handoffs from phaseX for structure and outline, for example use the document prompts/handoff/phaseX/session-handoff-v7.6.5.7.md 
+- Post-merge deliverables (inspection of next step's handoff, consolidated audit), check phaseX handoff document  prompts/handoff/phaseX/session-handoff-v7.6.5.7.md for reference
 - Pipeline commands to run
 
 Save to: `prompts/handoff/phaseY/session-handoff-v7.6.6.{N}.md` for each step defined in the Phase Y plan.
