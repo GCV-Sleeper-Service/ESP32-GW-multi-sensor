@@ -145,7 +145,7 @@ Under Option B the ESPHome compiler never sees the fragment files directly. `sen
 
 **Status:** Pre-step — no fragment extraction, no code changes to `sensor_history_multi.h`
 
-**Problem solved:** `provision.sh` currently auto-runs only `render_sensor_config.py --write` (an incorrectly-positioned step 0). The remaining 7 pipeline steps must be manually run by the operator. This is a Known operational gap (v2 inventory §12.2 and research brief R8). The `assemble-firmware-modules.sh` step must also be insertable into the pipeline before Phase Y fragment work begins.
+**Problem solved:** `provision.sh` currently auto-runs only `render_sensor_config.py --write` (an incorrectly-positioned step 0). The remaining 8 pipeline steps must be manually run by the operator. This is a Known operational gap (v2 inventory §12.2 and research brief R8). The `assemble-firmware-modules.sh` step must also be insertable into the pipeline before Phase Y fragment work begins.
 
 **Files created / modified:**
 
