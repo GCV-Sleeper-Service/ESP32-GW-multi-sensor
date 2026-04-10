@@ -78,6 +78,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > If a gate fails, include the specific file and line numbers involved.
 
 Wait for the sub-agent to return results before proceeding.
+Proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -107,7 +108,9 @@ Using the deep-research results from Step 1, provide:
 Do NOT re-read full implementation files — use the sub-agent's findings. Only fetch
 specific file sections (line ranges) if the sub-agent results are ambiguous.
 
-Post findings as a PR comment on #<PR_NUMBER>.
+Produce your findings as a PR comment on #<PR_NUMBER> 
+For PR comment output: render the full comment content in chat output as a markdown code block labelled "PASTE THIS AS PR COMMENT". 
+Do not attempt to post it via any tool. It will be posted manually by PR owner.
 
 ---
 
@@ -142,7 +145,7 @@ Use the sub-agent results from Step 1 as the primary evidence source.
 
 ### 4b. Inspect Next Step Artifacts
 
-Review and update if necessary:
+If updates are needed, use githubwrite to commit them directly to main. Do not just note the issue — fix it.:
 - `prompts/handoff/phaseY/session-handoff-v7.6.6.1.md` — verify scope still matches
 after seeing the actual `provision.sh` changes
 - `prompts/phaseY/v7.6.6.1-implementation-instructions-for-coding-agent.md` — verify
@@ -201,6 +204,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > If a gate fails, include the specific file and line numbers involved.
 
 Wait for the sub-agent to return results before proceeding.
+Proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -229,8 +233,9 @@ Using the deep-research results from Step 1, provide:
 Do NOT re-read full files — use the sub-agent's findings. Only fetch specific file
 sections if the sub-agent results are ambiguous on a particular gate.
 
-Post findings as a PR comment on #<PR_NUMBER>.
-
+Produce your findings as a PR comment on #<PR_NUMBER> 
+For PR comment output: render the full comment content in chat output as a markdown code block labelled "PASTE THIS AS PR COMMENT". 
+Do not attempt to post it via any tool. It will be posted manually by PR owner.
 ---
 
 ## Step 3 — Fix Prompt Generation (if needed)
@@ -262,7 +267,7 @@ Use the sub-agent results from Step 1 as the primary evidence source.
 
 ### 4b. Inspect Next Step Artifacts
 
-Review and update if necessary:
+If updates are needed, use githubwrite to commit them directly to main. Do not just note the issue — fix it.:
 - `prompts/handoff/phaseY/session-handoff-v7.6.6.2.md`
 - `prompts/phaseY/v7.6.6.2-implementation-instructions-for-coding-agent.md`
 
@@ -311,6 +316,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > If a gate fails, include the specific file and line numbers involved.
 
 Wait for the sub-agent to return results before proceeding.
+Proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -336,8 +342,9 @@ Using the deep-research results from Step 1, provide:
 3. **Resolved vs. remaining** — what was fixed and what still needs work
 4. **Concrete fix list** — what specific changes are needed before merge (if any)
 
-Post findings as a PR comment on #<PR_NUMBER>.
-
+Produce your findings as a PR comment on #<PR_NUMBER> 
+For PR comment output: render the full comment content in chat output as a markdown code block labelled "PASTE THIS AS PR COMMENT". 
+Do not attempt to post it via any tool. It will be posted manually by PR owner.
 ---
 
 ## Step 3 — Fix Prompt Generation (if needed)
@@ -368,7 +375,7 @@ Use the sub-agent results from Step 1 as the primary evidence source.
 
 ### 4b. Inspect Next Step Artifacts
 
-Review and update if necessary:
+If updates are needed, use githubwrite to commit them directly to main. Do not just note the issue — fix it.:
 - `prompts/handoff/phaseY/session-handoff-v7.6.6.3.md`
 - `prompts/phaseY/v7.6.6.3-implementation-instructions-for-coding-agent.md`
 
@@ -417,6 +424,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > For each gate, report: PASS / FAIL / UNCLEAR, with a one-line evidence summary.
 
 Wait for the sub-agent to return results before proceeding.
+Proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -442,8 +450,9 @@ Using the deep-research results from Step 1, provide:
 3. **Resolved vs. remaining** — what was fixed and what still needs work
 4. **Concrete fix list** — what specific changes are needed before merge (if any)
 
-Post findings as a PR comment on #<PR_NUMBER>.
-
+Produce your findings as a PR comment on #<PR_NUMBER> 
+For PR comment output: render the full comment content in chat output as a markdown code block labelled "PASTE THIS AS PR COMMENT". 
+Do not attempt to post it via any tool. It will be posted manually by PR owner.
 ---
 
 ## Step 3 — Fix Prompt Generation (if needed)
@@ -470,7 +479,7 @@ Produce `prompts/phaseY/v7.6.6.3-PR<NN>-consolidated-audit-and-lessons.md` using
 
 ### 4b. Inspect Next Step Artifacts
 
-Review and update if necessary:
+If updates are needed, use githubwrite to commit them directly to main. Do not just note the issue — fix it.:
 - `prompts/handoff/phaseY/session-handoff-v7.6.6.4.md`
 - `prompts/phaseY/v7.6.6.4-implementation-instructions-for-coding-agent.md`
 
@@ -515,6 +524,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > For each gate, report: PASS / FAIL / UNCLEAR, with a one-line evidence summary.
 
 Wait for the sub-agent to return results before proceeding.
+Proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -540,8 +550,9 @@ Using the deep-research results from Step 1, provide:
 3. **Resolved vs. remaining**
 4. **Concrete fix list** — if any
 
-Post findings as a PR comment on #<PR_NUMBER>.
-
+Produce your findings as a PR comment on #<PR_NUMBER> 
+For PR comment output: render the full comment content in chat output as a markdown code block labelled "PASTE THIS AS PR COMMENT". 
+Do not attempt to post it via any tool. It will be posted manually by PR owner.
 ---
 
 ## Step 3 — Fix Prompt Generation (if needed)
@@ -563,7 +574,7 @@ Produce `prompts/phaseY/v7.6.6.4-PR<NN>-consolidated-audit-and-lessons.md` using
 
 ### 4b. Inspect Next Step Artifacts
 
-Review and update if necessary:
+If updates are needed, use githubwrite to commit them directly to main. Do not just note the issue — fix it.:
 - `prompts/handoff/phaseY/session-handoff-v7.6.6.5.md`
 - `prompts/phaseY/v7.6.6.5-implementation-instructions-for-coding-agent.md`
 
@@ -613,6 +624,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > For each gate, report: PASS / FAIL / UNCLEAR, with a one-line evidence summary.
 
 Wait for the sub-agent to return results before proceeding.
+Proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -639,8 +651,9 @@ Using the deep-research results from Step 1, provide:
 4. **Resolved vs. remaining**
 5. **Concrete fix list** — if any
 
-Post findings as a PR comment on #<PR_NUMBER>.
-
+Produce your findings as a PR comment on #<PR_NUMBER> 
+For PR comment output: render the full comment content in chat output as a markdown code block labelled "PASTE THIS AS PR COMMENT". 
+Do not attempt to post it via any tool. It will be posted manually by PR owner.
 ---
 
 ## Step 3 — Fix Prompt Generation (if needed)
@@ -664,7 +677,7 @@ Produce `prompts/phaseY/v7.6.6.5-PR<NN>-consolidated-audit-and-lessons.md` using
 
 ### 4b. Inspect Next Step Artifacts
 
-Review and update if necessary:
+If updates are needed, use githubwrite to commit them directly to main. Do not just note the issue — fix it.:
 - `prompts/handoff/phaseY/session-handoff-v7.6.6.6.md`
 - `prompts/phaseY/v7.6.6.6-implementation-instructions-for-coding-agent.md`
 
@@ -723,6 +736,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > For each gate, report: PASS / FAIL / UNCLEAR, with a one-line evidence summary.
 
 Wait for the sub-agent to return results before proceeding.
+Proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -749,8 +763,9 @@ Using the deep-research results from Step 1, provide:
 4. **Resolved vs. remaining**
 5. **Concrete fix list** — if any
 
-Post findings as a PR comment on #<PR_NUMBER>.
-
+Produce your findings as a PR comment on #<PR_NUMBER> 
+For PR comment output: render the full comment content in chat output as a markdown code block labelled "PASTE THIS AS PR COMMENT". 
+Do not attempt to post it via any tool. It will be posted manually by PR owner.
 ---
 
 ## Step 3 — Fix Prompt Generation (if needed)
@@ -775,7 +790,7 @@ Produce `prompts/phaseY/v7.6.6.6-PR<NN>-consolidated-audit-and-lessons.md` using
 
 ### 4b. Inspect Next Step Artifacts
 
-Review and update if necessary:
+If updates are needed, use githubwrite to commit them directly to main. Do not just note the issue — fix it.:
 - `prompts/handoff/phaseY/session-handoff-v7.6.6.7.md`
 - `prompts/phaseY/v7.6.6.7-implementation-instructions-for-coding-agent.md`
 
@@ -826,6 +841,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > For each gate, report: PASS / FAIL / UNCLEAR, with a one-line evidence summary.
 
 Wait for the sub-agent to return results before proceeding.
+Proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -852,8 +868,9 @@ Using the deep-research results from Step 1, provide:
 4. **Resolved vs. remaining**
 5. **Concrete fix list** — if any
 
-Post findings as a PR comment on #<PR_NUMBER>.
-
+Produce your findings as a PR comment on #<PR_NUMBER> 
+For PR comment output: render the full comment content in chat output as a markdown code block labelled "PASTE THIS AS PR COMMENT". 
+Do not attempt to post it via any tool. It will be posted manually by PR owner.
 ---
 
 ## Step 3 — Fix Prompt Generation (if needed)
@@ -875,7 +892,7 @@ Produce `prompts/phaseY/v7.6.6.7-PR<NN>-consolidated-audit-and-lessons.md` using
 
 ### 4b. Inspect Next Step Artifacts
 
-Review and update if necessary:
+If updates are needed, use githubwrite to commit them directly to main. Do not just note the issue — fix it.:
 - `prompts/handoff/phaseY/session-handoff-v7.6.6.8.md`
 - `prompts/phaseY/v7.6.6.8-implementation-instructions-for-coding-agent.md`
 
@@ -948,6 +965,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > If a gate fails, include the specific file and line numbers involved.
 
 Wait for the sub-agent to return results before proceeding.
+Proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -984,8 +1002,9 @@ Do NOT re-read `prompts/prompt-index-and-workflow.md` — use the sub-agent's sn
 from Step 1 for Critical Rules and Step Index verification. Only fetch specific file
 sections (line ranges) if the sub-agent results are ambiguous on a particular gate.
 
-Post findings as a PR comment on #<PR_NUMBER>.
-
+Produce your findings as a PR comment on #<PR_NUMBER> 
+For PR comment output: render the full comment content in chat output as a markdown code block labelled "PASTE THIS AS PR COMMENT". 
+Do not attempt to post it via any tool. It will be posted manually by PR owner.
 ---
 
 ## Step 3 — Fix Prompt Generation (if needed)
