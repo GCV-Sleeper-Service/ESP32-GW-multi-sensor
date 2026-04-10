@@ -580,18 +580,37 @@ firmware_core_assembly_check() {
 firmware_core_assembly_check
 
 firmware_core_fragment_line_sum() {
-  if [[ ! -d "firmware/core" ]]; then
-    fail "firmware_core_fragment_line_sum (firmware/core/ missing)"
-    return
-  fi
   if [[ ! -f "dashboard/sensor_history_multi.h" ]]; then
     fail "firmware_core_fragment_line_sum (dashboard/sensor_history_multi.h missing)"
     return
   fi
+  # Use the same explicit module list as assemble-sensor-history.sh MODULES so that
+  # any non-assembled helper headers added under firmware/core/ do not cause false failures.
+  local modules=(
+    "firmware/core/config.h"
+    "firmware/core/data-model.h"
+    "firmware/core/nvs-persistence.h"
+    "firmware/core/deferred-management.h"
+    "firmware/core/ping-adapter.h"
+    "firmware/core/aggregator-runtime.h"
+    "firmware/core/web-handler.h"
+    "firmware/core/registration.h"
+  )
+  local missing=0
+  for f in "${modules[@]}"; do
+    if [[ ! -f "$f" ]]; then
+      echo "    Missing: $f"
+      missing=1
+    fi
+  done
+  if [[ $missing -eq 1 ]]; then
+    fail "firmware_core_fragment_line_sum (module file(s) missing)"
+    return
+  fi
   local fragment_total
-  fragment_total=$(cat firmware/core/*.h 2>/dev/null | wc -l | xargs)
+  fragment_total=$(cat "${modules[@]}" | wc -l | xargs)
   local committed_total
-  committed_total=$(wc -l < dashboard/sensor_history_multi.h 2>/dev/null | xargs)
+  committed_total=$(wc -l < dashboard/sensor_history_multi.h | xargs)
   if [[ "$fragment_total" -eq "$committed_total" ]]; then
     pass "firmware_core_fragment_line_sum ($fragment_total == $committed_total)"
   else
