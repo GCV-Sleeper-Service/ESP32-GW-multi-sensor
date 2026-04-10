@@ -243,25 +243,13 @@ run_full_pipeline() {
 # ---------------------------------------------------------------------------
 # Helper: print_workflow
 # target: aggregator | satellite | wroom
+# dry_run: true | false
 #
-# Emits the FULL Phase X 8-step regeneration pipeline that must be run
-# after provision.sh switches board config and does the initial render.
+# Runs the full regeneration pipeline (Phase Y — Critical Rule 37) and then
+# prints next-step instructions for the operator (flash commands, CI reminder).
 #
-# Pipeline rationale (Critical Rule 37):
-#   Step 1: bundle-dashboard.sh --write  -- assembles src modules → dashboard.js
-#   Step 2: render_sensor_config.py --write -- re-injects DEFAULT_SENSOR_META markers
-#                                              (bundle overwrites dashboard.js, erasing
-#                                               the previous injection)
-#   Step 3: node generate-fixtures.js   -- regenerates test fixtures from current config
-#   Step 4: render_sensor_config.py --write -- re-injects after fixture generation may have
-#                                              modified dashboard.js state
-#   Step 5: build-dashboard.sh --write  -- template + JS → dashboard.html
-#   Step 6: minify-dashboard.sh         -- dashboard.html → dashboard.min.html
-#   Step 7: generate-header.sh          -- dashboard.min.html → dashboard.h (gzip C header)
-#   Step 8: render_sensor_config.py --check -- final verification (markers in sync)
-#
-# Note: provision.sh already ran render_sensor_config.py --write as its own
-# internal step (run_render). The pipeline below picks up from Step 1.
+# Delegates execution to run_full_pipeline(). In --dry-run mode, pipeline steps
+# are printed but not executed; filesystem state is unchanged.
 # ---------------------------------------------------------------------------
 print_workflow() {
   local target="$1"
@@ -481,6 +469,18 @@ activate_aggregator() {
     validate_after_switch aggregator || true
     print_workflow aggregator "$dry_run"
   else
+    if [[ "$dry_run" == "true" ]]; then
+      echo ""
+      echo "  [DRY-RUN] Would switch from $current → aggregator:agg-s3-16m-1"
+      echo "  [DRY-RUN] Would run: clean_active_configs"
+      echo "  [DRY-RUN] Would copy: $BAK_GATEWAY_AGG → $ACTIVE_GATEWAY"
+      echo "  [DRY-RUN] Would copy: $BAK_AGGREGATOR_AGG → $ACTIVE_AGGREGATOR"
+      echo "  [DRY-RUN] Would copy: $BAK_SENSORS_AGG → $ACTIVE_SENSORS_AGG"
+      echo "  [DRY-RUN] Would run: render_sensor_config.py --write"
+      print_workflow aggregator "true"
+      return 0
+    fi
+
     if [[ "$current" != "c3-default" ]]; then
       echo "  Current config: $current — switching to aggregator..."
     else
@@ -533,6 +533,15 @@ activate_satellite() {
     validate_after_switch satellite || true
     print_workflow satellite "$dry_run"
   else
+    if [[ "$dry_run" == "true" ]]; then
+      echo ""
+      echo "  [DRY-RUN] Would switch from $current → c3-default"
+      echo "  [DRY-RUN] Would run: clean_active_configs"
+      echo "  [DRY-RUN] Would run: render_sensor_config.py --write"
+      print_workflow satellite "true"
+      return 0
+    fi
+
     echo "  Current config: $current — switching to C3 satellite default..."
 
     echo "  Cleaning active configs..."
@@ -591,6 +600,17 @@ activate_wroom() {
     validate_after_switch wroom || true
     print_workflow wroom "$dry_run"
   else
+    if [[ "$dry_run" == "true" ]]; then
+      echo ""
+      echo "  [DRY-RUN] Would switch from $current → wroom:sat-esp32-4m-190"
+      echo "  [DRY-RUN] Would run: clean_active_configs"
+      echo "  [DRY-RUN] Would copy: $BAK_GATEWAY_WROOM → $ACTIVE_GATEWAY"
+      echo "  [DRY-RUN] Would copy: $BAK_SENSORS_WROOM → $ACTIVE_SENSORS_WROOM"
+      echo "  [DRY-RUN] Would run: render_sensor_config.py --write"
+      print_workflow wroom "true"
+      return 0
+    fi
+
     echo "  Current config: $current — switching to WROOM satellite..."
 
     echo "  Cleaning active configs..."
@@ -631,8 +651,15 @@ activate_wroom() {
 # ---------------------------------------------------------------------------
 case "${1:-}" in
   status)     show_status ;;
-  aggregator) activate_aggregator "${2:-}" ;;
-  satellite)  activate_satellite "${2:-}" ;;
-  wroom)      activate_wroom "${2:-}" ;;
+  aggregator|satellite|wroom)
+    if [[ -n "${2:-}" && "${2:-}" != "--dry-run" ]]; then
+      echo "ERROR: Unknown option '${2:-}'. Valid options: --dry-run" >&2
+      print_usage; exit 1
+    fi
+    case "${1:-}" in
+      aggregator) activate_aggregator "${2:-}" ;;
+      satellite)  activate_satellite  "${2:-}" ;;
+      wroom)      activate_wroom      "${2:-}" ;;
+    esac ;;
   *)          print_usage; exit 1 ;;
 esac
