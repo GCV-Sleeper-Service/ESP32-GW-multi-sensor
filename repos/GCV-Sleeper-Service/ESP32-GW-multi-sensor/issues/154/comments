@@ -1,0 +1,94 @@
+## v7.6.6.0 Gate Assessment — Copilot Synthesis Review
+
+**Commit reviewed:** `38df833d4b76d6d1e045d50719a04886769ad636`  
+**Scope baseline:** `scripts/provision.sh` · `Docs/changelog.md` · `Docs/lessons/operations.md` (version-bump-only changes in other files excluded per maintainer note)
+
+---
+
+### Gate Checklist (14 gates)
+
+| # | Gate | Result | Evidence |
+|---|------|:------:|---------|
+| 1 | Pipeline ordering — `run_full_pipeline()` matches Critical Rule 37 | ✅ PASS | `provision.sh` L208–217: `steps=( bundle --write / render --write / generate-fixtures / render --write / build --write / minify / generate-header / render --check )` — exact 8-step sequence. |
+| 2 | Assembly placeholder — Step 0 is no-op echo, does NOT call missing script | ✅ PASS | L199–206: `echo "[SKIP] Step 0: assemble-sensor-history.sh …(placeholder)"` — no `bash scripts/assemble-sensor-history.sh` call. |
+| 3 | `--dry-run` support — `[DRY-RUN]` prefix, zero FS changes | ⚠️ PARTIAL | `run_full_pipeline()` dry-run is correct (L221–222). **But see Gate 3 note below** — `activate_*()` switching path mutates FS before the pipeline guard. |
+| 4 | `status` non-mutating | ✅ PASS | L633: `case status) show_status ;;` — `show_status()` (L361–458) contains zero pipeline calls. |
+| 5 | No `eval` usage in `run_full_pipeline()` | ✅ PASS | L225: `if ! $step; then` — direct word-split invocation, no `eval`. |
+| 6 | Dependency pre-checks — `require_node` and `require_npm_deps` called before pipeline | ✅ PASS | L55–71: both functions defined. L190–192: called at top of `run_full_pipeline()` before step loop. |
+| 7 | Error handling — failed step exits with message identifying which step | ✅ PASS | L226–229: `echo "ERROR: Pipeline failed at Step $i: $step" >&2; exit 1` |
+| 8 | CI-safe warning — preserved for non-satellite modes | ✅ PASS | `activate_aggregator()` L508–511 and `activate_wroom()` L622–626 both emit the `⚠️ WARNING: DO NOT push` block. |
+| 9 | All board modes run full pipeline | ✅ PASS | All three `activate_*()` functions call `print_workflow → run_full_pipeline`. |
+| 10 | No out-of-scope changes | ✅ PASS | Substantive changes limited to allowed files; version-bump propagation excluded from assessment per maintainer note. |
+| 11 | Playwright tests — all 4 fixture sets green | ✅ PASS | PR body: 3sensor 99p/45s · mixed 96p/48s · system 100p/44s · aggregator 107p/37s. |
+| 12 | Session log — `Docs/session-log-*-v7.6.6.0.md` | ❌ FAIL | Not found in `Docs/` directory on the PR branch. Most recent log is `session-log-2026-04-06-v7.6.5.0.md`. Required by Critical Rule 20. |
+| 13 | Changelog entry — present and accurate | ✅ PASS | `Docs/changelog.md` L5–12: `[v7.6.6.0] — 2026-04-10` entry accurately describes all changes. |
+| 14 | LESSON-OPS entry — added to `Docs/lessons/operations.md` | ✅ PASS | `LESSON-OPS-121: Full Pipeline Automation in provision.sh (v7.6.6.0)` present with root cause, fix, and updated rule. |
+
+---
+
+### Gate 3 Deep-Dive — `--dry-run` Mutation Issue (Blocking)
+
+Reading `activate_satellite()` (identical pattern in `activate_aggregator` and `activate_wroom`):
+
+```bash
+activate_satellite() {
+  local dry_run="false"
+  [[ "\x24{1:-}" == "--dry-run" ]] && dry_run="true"
+  ...
+  if [[ "current" == "c3-default" ]]; then
+    # Already in mode — goes straight to print_workflow → SAFE ✅
+    print_workflow satellite "$dry_run"
+  else
+    clean_active_configs     # ❌ MUTATES FS — runs regardless of --dry-run
+    cp "$BAK_GATEWAY_AGG" …  # ❌ MUTATES FS — runs regardless of --dry-run
+    run_render               # ❌ MUTATES FS — runs regardless of --dry-run
+    ...
+    print_workflow satellite "$dry_run"   # dry_run only guards the pipeline from here
+  fi
+}
+```
+
+**When the board is already in the target mode**, `--dry-run` is fully non-mutating ✅. **When a board switch is required**, `clean_active_configs`, `cp`, and `run_render` all execute before `print_workflow` is reached. Only the 8-step pipeline inside `run_full_pipeline()` is skipped. This was raised as "blocking" by the GPT review and is confirmed by direct code reading at L488–511 (aggregator) and L531–568 (satellite).
+
+---
+
+### Review Comment Assessment
+
+| Source | Finding | Warranted? | Fixed? | Remaining Action |
+|--------|---------|:----------:|:------:|-----------------|
+| [Review #4086878659](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/154#pullrequestreview-4086878659) inline | `$step` word-split execution — fragile for future paths with spaces | Partially | No | Low-priority hardening; all current paths are safe |
+| [Review #4086878659](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/154#pullrequestreview-4086878659) inline | Unknown second arg (e.g. `--typo`) silently executes full live pipeline | Yes | No | Fix arg validation in `activate_*()` or `main` |
+| [Review #4086902469](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/154#pullrequestreview-4086902469) inline | `print_workflow()` header comment says "Phase X / emits manual steps" but now *executes* the pipeline — misleading | Yes | No | Update function comment (stale "Phase X" reference, L247–265) |
+| [Comment #4219935730](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/154#issuecomment-4219935730) | High: scope breach (27 files). Medium: `--typo` silent. Low: `$step` fragility | Partially | Partially | Scope waived per maintainer; `--typo` validation still open |
+| [Comment #4219959989](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/154#issuecomment-4219959989) | Blocking: `--dry-run` mutates FS on board-switch path. High: unknown arg. Medium: `$step`. Low: stale comment | Yes | Partially | `--dry-run` FS mutation confirmed open; arg validation open; stale comment open |
+
+---
+
+### Summary: Resolved vs. Remaining
+
+**Resolved ✅** — 12 of 14 gates pass. Core delivery is solid:
+- Pipeline ordering matches Critical Rule 37 exactly (bundle → render → fixtures → render → build → minify → header → check)
+- Step 0 is a true no-op placeholder (no missing-script call)
+- `status` is fully non-mutating
+- No `eval` usage
+- Dependency pre-checks present and called before step loop
+- Error handling names the failing step
+- CI-safe warnings preserved for aggregator and wroom
+- All three board modes reach `run_full_pipeline()`
+- Playwright 4-fixture-set green
+- Changelog and LESSON-OPS-121 present and accurate
+
+**Remaining — must fix before merge:**
+
+| # | Item | Severity |
+|---|------|---------|
+| A | **`--dry-run` mutates FS on board-switch path** — `clean_active_configs`, `cp`, `run_render` execute before dry-run guard (`provision.sh` ~L488–511, ~L531–568, ~L593–626) | **Blocking** |
+| B | **Session log `Docs/session-log-*-v7.6.6.0.md` absent** — required by Critical Rule 20 | **Required** |
+| C | Unknown second arg silently runs live pipeline (no `[[ "${1:-}" == "" || "${1:-}" == "--dry-run" ]]` guard in `activate_*()` or `main`) | Medium |
+| D | `print_workflow()` header comment still references "Phase X" and "emits manual pipeline" — now executes it (`provision.sh` L247–265) | Low |
+
+**Step 3 fix prompt will be generated** to address items A, B, C, D. Item D can be bundled into the same commit.
+
+---
+
+_Reviewed by Copilot against commit `38df833` · `provision.sh` read in full · all 5 review threads read in full · `Docs/` listing confirmed for session log absence._
