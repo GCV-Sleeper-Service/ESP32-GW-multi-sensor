@@ -566,10 +566,14 @@ firmware_core_assembly_check() {
     fail "firmware_core_assembly_check (script missing)"
     return
   fi
-  if bash scripts/assemble-sensor-history.sh --check >/dev/null 2>&1; then
+  if ! command -v sha256sum >/dev/null 2>&1; then
+    fail "firmware_core_assembly_check (sha256sum missing — install coreutils)"
+    return
+  fi
+  if bash scripts/assemble-sensor-history.sh --check >/dev/null; then
     pass "firmware_core_assembly_check"
   else
-    fail "firmware_core_assembly_check (SHA-256 mismatch — run: bash scripts/assemble-sensor-history.sh --check)"
+    fail "firmware_core_assembly_check (SHA-256 mismatch — inspect: bash scripts/assemble-sensor-history.sh --check; regenerate: bash scripts/assemble-sensor-history.sh --write)"
   fi
 }
 
@@ -580,10 +584,14 @@ firmware_core_fragment_line_sum() {
     fail "firmware_core_fragment_line_sum (firmware/core/ missing)"
     return
   fi
+  if [[ ! -f "dashboard/sensor_history_multi.h" ]]; then
+    fail "firmware_core_fragment_line_sum (dashboard/sensor_history_multi.h missing)"
+    return
+  fi
   local fragment_total
-  fragment_total=$(cat firmware/core/*.h 2>/dev/null | wc -l)
+  fragment_total=$(cat firmware/core/*.h 2>/dev/null | wc -l | xargs)
   local committed_total
-  committed_total=$(wc -l < dashboard/sensor_history_multi.h 2>/dev/null)
+  committed_total=$(wc -l < dashboard/sensor_history_multi.h 2>/dev/null | xargs)
   if [[ "$fragment_total" -eq "$committed_total" ]]; then
     pass "firmware_core_fragment_line_sum ($fragment_total == $committed_total)"
   else
