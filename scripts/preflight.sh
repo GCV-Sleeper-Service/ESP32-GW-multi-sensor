@@ -561,6 +561,38 @@ firmware_core_fragments_exist() {
 
 firmware_core_fragments_exist
 
+firmware_core_assembly_check() {
+  if [[ ! -f "scripts/assemble-sensor-history.sh" ]]; then
+    fail "firmware_core_assembly_check (script missing)"
+    return
+  fi
+  if bash scripts/assemble-sensor-history.sh --check >/dev/null 2>&1; then
+    pass "firmware_core_assembly_check"
+  else
+    fail "firmware_core_assembly_check (SHA-256 mismatch — run: bash scripts/assemble-sensor-history.sh --check)"
+  fi
+}
+
+firmware_core_assembly_check
+
+firmware_core_fragment_line_sum() {
+  if [[ ! -d "firmware/core" ]]; then
+    fail "firmware_core_fragment_line_sum (firmware/core/ missing)"
+    return
+  fi
+  local fragment_total
+  fragment_total=$(cat firmware/core/*.h 2>/dev/null | wc -l)
+  local committed_total
+  committed_total=$(wc -l < dashboard/sensor_history_multi.h 2>/dev/null)
+  if [[ "$fragment_total" -eq "$committed_total" ]]; then
+    pass "firmware_core_fragment_line_sum ($fragment_total == $committed_total)"
+  else
+    fail "firmware_core_fragment_line_sum (fragments: $fragment_total, committed: $committed_total)"
+  fi
+}
+
+firmware_core_fragment_line_sum
+
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   echo "✗ Preflight failed with $FAIL_COUNT error(s)"
   exit 1

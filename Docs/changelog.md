@@ -2,6 +2,15 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.6.2] — 2026-04-10 — Phase Y: Fragment-Level Preflight Checks
+
+### Added
+- `firmware_core_assembly_check` preflight check — verifies assembly identity (SHA-256 of non-generated regions)
+- `firmware_core_fragment_line_sum` preflight check — verifies fragment line counts match committed file
+
+### Fixed
+- `scripts/bump-version.sh` — now updates version strings in `firmware/core/config.h` and `firmware/core/data-model.h` so that `firmware_core_assembly_check` passes after version bumps
+
 ## [v7.6.6.1] — 2026-04-10 — Phase Y: Establish Assembly Script and Fragment Baseline
 
 ### Added

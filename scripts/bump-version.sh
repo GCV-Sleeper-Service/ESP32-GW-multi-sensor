@@ -66,6 +66,19 @@ sed -i "s/const VERSION = 'v[0-9.]*'/const VERSION = 'v${NEW_VER}'/" tests/fixtu
 echo "→ Updating dashboard/core/app-shell.js..."
 sed -i "s/App\.version = 'v[0-9.]*'/App.version = 'v${NEW_VER}'/" dashboard/core/app-shell.js
 
+# Update version strings in Phase Y firmware fragment source files.
+# render_sensor_config.py --write updates these same strings in the assembled
+# sensor_history_multi.h; the fragment sources must stay in sync so that
+# firmware_core_assembly_check (preflight) can verify SHA-256 identity.
+if [[ -f "firmware/core/config.h" ]]; then
+  echo "→ Updating firmware/core/config.h..."
+  sed -i "s/sensor_history_multi-v[0-9.]*\.h/sensor_history_multi-v${NEW_VER}.h/g" firmware/core/config.h
+fi
+if [[ -f "firmware/core/data-model.h" ]]; then
+  echo "→ Updating firmware/core/data-model.h..."
+  sed -i "s|// ── SENSOR COUNT CONFIGURATION GUIDE (v[0-9.]*) ──|// ── SENSOR COUNT CONFIGURATION GUIDE (v${NEW_VER}) ──|" firmware/core/data-model.h
+fi
+
 # 2. Regenerate all generated artifacts from canonical sources
 echo "→ Running bundle-dashboard.sh --write..."
 bash scripts/bundle-dashboard.sh --write
