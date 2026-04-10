@@ -64,7 +64,7 @@ check_contains_regex "dashboard_h_version_matches" dashboard/dashboard.h "Dashbo
 check_contains "dashboard_h_gzip_format" dashboard/dashboard.h "DASHBOARD_HTML_GZ"
 check_not_contains "dashboard_h_no_raw_literal" dashboard/dashboard.h "R\"DASH64("
 check_contains "firmware_version_matches" firmware/esp32-c3-multi-sensor.yaml "${VER_TAG}"
-check_contains "history_header_version_matches" dashboard/sensor_history_multi.h "sensor_history_multi-${VER_TAG}.h"
+check_contains "history_header_version_matches" dashboard/sensor_history_multi.h "config-${VER_TAG}.h"
 check_contains "history_handler_has_api_manifest_route" dashboard/sensor_history_multi.h "/api/manifest"
 check_contains "history_handler_has_api_v2_live_route" dashboard/sensor_history_multi.h "/api/v2/live"
 check_contains "history_handler_has_api_v2_history_route" dashboard/sensor_history_multi.h "/api/v2/history/"

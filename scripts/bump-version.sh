@@ -72,7 +72,7 @@ sed -i "s/App\.version = 'v[0-9.]*'/App.version = 'v${NEW_VER}'/" dashboard/core
 # firmware_core_assembly_check (preflight) can verify SHA-256 identity.
 if [[ -f "firmware/core/config.h" ]]; then
   echo "→ Updating firmware/core/config.h..."
-  sed -i "s/sensor_history_multi-v[0-9.]*\.h/sensor_history_multi-v${NEW_VER}.h/g" firmware/core/config.h
+  sed -i "s/config-v[0-9.]*\.h/config-v${NEW_VER}.h/g" firmware/core/config.h
 fi
 if [[ -f "firmware/core/data-model.h" ]]; then
   echo "→ Updating firmware/core/data-model.h..."
