@@ -10,6 +10,9 @@
 
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
 OUTPUT="dashboard/sensor_history_multi.h"
 MODULES=(
   "firmware/core/config.h"
@@ -35,6 +38,7 @@ case "${1:-}" in
       sed '/SENSOR_MANIFEST:HEADER_BEGIN/,/SENSOR_MANIFEST:HEADER_END/{ /SENSOR_MANIFEST:HEADER_BEGIN/!{ /SENSOR_MANIFEST:HEADER_END/!d; }; }' \
         | sed '/SENSOR_MANIFEST:ENTITY_BEGIN/,/SENSOR_MANIFEST:ENTITY_END/{ /SENSOR_MANIFEST:ENTITY_BEGIN/!{ /SENSOR_MANIFEST:ENTITY_END/!d; }; }'
     }
+    [[ -f "$OUTPUT" ]] || { echo "ERROR: $OUTPUT not found — run --write first"; exit 1; }
     ASSEMBLED=$(cat "${MODULES[@]}" | strip_generated | sha256sum | cut -d' ' -f1)
     COMMITTED=$(strip_generated < "$OUTPUT" | sha256sum | cut -d' ' -f1)
     if [[ "$ASSEMBLED" == "$COMMITTED" ]]; then
