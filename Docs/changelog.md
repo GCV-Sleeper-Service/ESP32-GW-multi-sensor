@@ -2,6 +2,35 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.6.5] — 2026-04-10 — Phase Y: Device Integration Test — PASS
+
+### Validated
+- Full device integration test on physical ESP32-C3 hardware (MAC `ac:a7:04:ba:cb:18`, rev0.4, 4MB flash)
+- Firmware v7.6.6.4 flashed via USB JTAG, compiled ESPHome 2026.2.1 / ESP-IDF 5.5.2
+
+### Device Test Evidence
+
+**Serial boot log (Checkpoint B):**
+- `Restored 24 persisted hourly segment(s) into RAM` — NVS restore on first boot ✓
+- 5 devices registered: Office, First Floor, Outside, WAN Latency, NAS Health ✓
+- `setup() finished successfully!` — no crash, no boot loop ✓
+- `Persisted segment slot 895 (1775839500..1775844000), segments=896, size=232 bytes` — hourly NVS persist ✓
+- Reboot triggered by WiFi disconnect (`esp_restart`); after reboot: `Restored 24 persisted hourly segment(s)` — segment count preserved ✓
+
+**HTTP API tests (curl):**
+- `GET /api/storage-stats` — 895 valid segments, 1080 capacity, NVS healthy ✓
+- `GET /api/manifest` — schema_version 2, version v7.6.6.4, 5 sensors, 8 metrics correct ✓
+- `GET /api/v2/history/outside/temp` — CSV stream with persisted epoch timestamps ✓
+- `GET /api/v2/live` — 3 env sensors + wan_ping live data; nas01 null (expected, no push source) ✓
+- `GET /api/status` — uptime 2225s, all 3 env sensors valid, free_heap 57740 bytes ✓
+- `POST /api/reboot` (Basic auth) — `{"ok":true,"message":"Reboot scheduled"}` ✓
+- **Persistence gate**: `diff pre-reboot-stats.json post-reboot-stats.json` → **empty diff** (zero NVS change across reboot) ✓
+- Post-reboot history stream scrolled forward by exactly 900s (one sample interval) ✓
+
+### All preflight checks pass (v7.6.6.5)
+- All Phase Y checks: `firmware_core_fragments_exist`, `firmware_core_assembly_check`, `firmware_core_fragment_line_sum` (4326 == 4326) ✓
+- All version sync checks ✓
+
 ## [v7.6.6.4] — 2026-04-10 — Phase Y: Ping Adapter Fragment Validation
 
 ### Validated
