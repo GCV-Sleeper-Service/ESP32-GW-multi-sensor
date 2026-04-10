@@ -4,6 +4,10 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ## [v7.6.6.5] — 2026-04-10 — Phase Y: Device Integration Test — PASS
 
+> This release records the passing device integration test results for the v7.6.6.4 firmware.
+> Per the project workflow, the version bump to v7.6.6.5 occurs after the physical device test confirms
+> v7.6.6.4 is working correctly. The HTTP API responses therefore report `"version": "v7.6.6.4"`.
+
 ### Validated
 - Full device integration test on physical ESP32-C3 hardware (MAC `ac:a7:04:ba:cb:18`, rev0.4, 4MB flash)
 - Firmware v7.6.6.4 flashed via USB JTAG, compiled ESPHome 2026.2.1 / ESP-IDF 5.5.2
