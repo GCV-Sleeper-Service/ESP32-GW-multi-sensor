@@ -2,6 +2,17 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.6.4] — 2026-04-10 — Phase Y: Ping Adapter Fragment Validation
+
+### Validated
+- `firmware/core/ping-adapter.h` confirmed as authoritative source for PingAdapter subsystem
+- `#ifdef PING_DEVICE_INDEX` compile-guard boundary intact (line 1)
+- PingAdapter class complete (168 lines, includes start callback, ESP-IDF ping callbacks, ping task)
+- No cross-fragment symbol leakage: no `s_cache_mutex` or `HistoryMeta` definitions in code (comment-only reference noted and confirmed benign)
+- Assembly identity gate passes: SHA-256 `65ae35f8…` verified
+- All preflight checks pass (all Phase Y checks: fragments exist, assembly identity, fragment line sum 4326)
+- All Playwright tests pass across all 4 fixture sets (3sensor/chromium: 99 passed; 3sensor/firefox: 99 passed; mixed: 7 passed; system: 8 passed; aggregator: 11 passed)
+
 ## [v7.6.6.3] — 2026-04-10 — Phase Y: Fragment Editing Workflow Validated
 
 ### Validated
