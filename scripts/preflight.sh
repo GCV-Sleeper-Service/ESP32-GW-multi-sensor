@@ -534,6 +534,33 @@ dashboard_component_files() {
 
 dashboard_component_files
 
+firmware_core_fragments_exist() {
+  local expected=(
+    "firmware/core/config.h"
+    "firmware/core/data-model.h"
+    "firmware/core/nvs-persistence.h"
+    "firmware/core/deferred-management.h"
+    "firmware/core/ping-adapter.h"
+    "firmware/core/aggregator-runtime.h"
+    "firmware/core/web-handler.h"
+    "firmware/core/registration.h"
+  )
+  local missing=0
+  for f in "${expected[@]}"; do
+    if [[ ! -f "$f" ]]; then
+      echo "    Missing: $f"
+      missing=1
+    fi
+  done
+  if [[ $missing -eq 1 ]]; then
+    fail "firmware_core_fragments_exist"
+  else
+    pass "firmware_core_fragments_exist"
+  fi
+}
+
+firmware_core_fragments_exist
+
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   echo "✗ Preflight failed with $FAIL_COUNT error(s)"
   exit 1

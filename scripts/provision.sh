@@ -196,13 +196,18 @@ run_full_pipeline() {
   echo " Running full regeneration pipeline (Critical Rule 37)"
   echo "─────────────────────────────────────────────────────"
 
-  # Step 0: Assembly placeholder — no-op until v7.6.6.1 adds the script
-  # When assemble-sensor-history.sh exists, this becomes:
-  #   bash scripts/assemble-sensor-history.sh --write
-  if [[ "$dry_run" == "true" ]]; then
-    echo "  [DRY-RUN] Step 0: assemble-sensor-history.sh --write (placeholder — script not yet created)"
+  if [[ -f "scripts/assemble-sensor-history.sh" ]]; then
+    if [[ "$dry_run" == "true" ]]; then
+      echo "  [DRY-RUN] Step 0: bash scripts/assemble-sensor-history.sh --write"
+    else
+      echo "  Running   Step 0: bash scripts/assemble-sensor-history.sh --write"
+      if ! bash scripts/assemble-sensor-history.sh --write; then
+        echo "ERROR: Assembly failed" >&2
+        exit 1
+      fi
+    fi
   else
-    echo "  [SKIP]    Step 0: assemble-sensor-history.sh --write (placeholder — script not yet created)"
+    echo "  [SKIP]    Step 0: assemble-sensor-history.sh (not yet created)"
   fi
 
   local steps=(

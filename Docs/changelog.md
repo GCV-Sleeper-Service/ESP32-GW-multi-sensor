@@ -2,6 +2,17 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.6.1] — 2026-04-10 — Phase Y: Establish Assembly Script and Fragment Baseline
+
+### Added
+- `firmware/core/` — 8 fragment source files extracted from `sensor_history_multi.h`
+- `scripts/assemble-sensor-history.sh` — assembly script with --write, --check, --list, --dry-run modes
+- `firmware_core_fragments_exist` preflight check
+
+### Changed
+- `scripts/provision.sh` — assembly step activated (no longer placeholder)
+- `scripts/preflight.sh` — added fragment existence check
+
 ## [v7.6.6.0] — 2026-04-10 — Phase Y Pre-Step: provision.sh Full Pipeline Automation
 
 ### Changed
