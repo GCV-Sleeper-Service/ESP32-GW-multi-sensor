@@ -30,21 +30,44 @@ ACTIVE_SENSORS_WROOM="$CONFIG_DIR/sensors-sat-esp32-4m-190.json"
 # Helper: print_usage
 # ---------------------------------------------------------------------------
 print_usage() {
-  echo "Usage: bash scripts/provision.sh <command>"
+  echo "Usage: bash scripts/provision.sh <command> [--dry-run]"
   echo ""
   echo "Commands:"
-  echo "  status      Show current configuration (no changes made)"
-  echo "  aggregator  Switch to S3 aggregator (agg-s3-16m-1)"
-  echo "  satellite   Switch to C3 satellite (default, CI-safe)"
-  echo "  wroom       Switch to WROOM satellite (sat-esp32-4m-190)"
+  echo "  status                Show current configuration (no changes made)"
+  echo "  aggregator [--dry-run]  Switch to S3 aggregator (agg-s3-16m-1)"
+  echo "  satellite  [--dry-run]  Switch to C3 satellite (default, CI-safe)"
+  echo "  wroom      [--dry-run]  Switch to WROOM satellite (sat-esp32-4m-190)"
   echo ""
-  echo "Workflow (Phase X pipeline):"
+  echo "Options:"
+  echo "  --dry-run   Print pipeline steps without executing them"
+  echo ""
+  echo "Workflow (Phase Y pipeline):"
   echo "  1. bash scripts/provision.sh status      -- check current board"
-  echo "  2. bash scripts/provision.sh <target>    -- switch board config + render"
-  echo "  3. Run remaining regeneration steps (see Next steps after switching)"
-  echo "  4. Flash device"
-  echo "  5. bash scripts/provision.sh satellite   -- ALWAYS before pushing"
-  echo "  6. bash scripts/preflight.sh             -- confirm CI-safe"
+  echo "  2. bash scripts/provision.sh <target>    -- switch board config + run full pipeline"
+  echo "  3. Flash device"
+  echo "  4. bash scripts/provision.sh satellite   -- ALWAYS before pushing"
+  echo "  5. bash scripts/preflight.sh             -- confirm CI-safe"
+}
+
+# ---------------------------------------------------------------------------
+# Helper: require_node
+# ---------------------------------------------------------------------------
+require_node() {
+  if ! command -v node &>/dev/null; then
+    echo "ERROR: node is required but not found in PATH." >&2
+    echo "Install Node.js: https://nodejs.org/" >&2
+    exit 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Helper: require_npm_deps
+# ---------------------------------------------------------------------------
+require_npm_deps() {
+  if [[ ! -d "node_modules" ]]; then
+    echo "ERROR: node_modules/ not found. Run 'npm install' first." >&2
+    exit 1
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -146,6 +169,78 @@ run_render() {
 }
 
 # ---------------------------------------------------------------------------
+# Helper: run_full_pipeline
+# Runs the full regeneration pipeline (Critical Rule 37).
+# Called after board switch to bring all generated artifacts into sync.
+#
+# Pipeline ordering rationale:
+#   Step 0: assemble-sensor-history.sh --write (placeholder until v7.6.6.1)
+#   Step 1: bundle-dashboard.sh --write (assembles dashboard src → dashboard.js)
+#   Step 2: render_sensor_config.py --write (injects sensor markers)
+#   Step 3: generate-fixtures.js (regenerates test fixtures)
+#   Step 4: render_sensor_config.py --write (re-injects after fixture gen)
+#   Step 5: build-dashboard.sh --write (template + JS → dashboard.html)
+#   Step 6: minify-dashboard.sh (dashboard.html → dashboard.min.html)
+#   Step 7: generate-header.sh (min.html → dashboard.h gzip C header)
+#   Step 8: render_sensor_config.py --check (final verification)
+# ---------------------------------------------------------------------------
+run_full_pipeline() {
+  local dry_run="${1:-false}"
+
+  require_python3
+  require_node
+  require_npm_deps
+
+  echo ""
+  echo "─────────────────────────────────────────────────────"
+  echo " Running full regeneration pipeline (Critical Rule 37)"
+  echo "─────────────────────────────────────────────────────"
+
+  # Step 0: Assembly placeholder — no-op until v7.6.6.1 adds the script
+  # When assemble-sensor-history.sh exists, this becomes:
+  #   bash scripts/assemble-sensor-history.sh --write
+  if [[ "$dry_run" == "true" ]]; then
+    echo "  [DRY-RUN] Step 0: assemble-sensor-history.sh --write (placeholder — script not yet created)"
+  else
+    echo "  [SKIP]    Step 0: assemble-sensor-history.sh --write (placeholder — script not yet created)"
+  fi
+
+  local steps=(
+    "bash scripts/bundle-dashboard.sh --write"
+    "python3 scripts/render_sensor_config.py --write"
+    "node tests/fixtures/generate-fixtures.js"
+    "python3 scripts/render_sensor_config.py --write"
+    "bash scripts/build-dashboard.sh --write"
+    "bash scripts/minify-dashboard.sh"
+    "bash scripts/generate-header.sh"
+    "python3 scripts/render_sensor_config.py --check"
+  )
+
+  local i=1
+  for step in "${steps[@]}"; do
+    if [[ "$dry_run" == "true" ]]; then
+      echo "  [DRY-RUN] Step $i: $step"
+    else
+      echo "  Running   Step $i: $step"
+      if ! $step; then
+        echo ""
+        echo "ERROR: Pipeline failed at Step $i: $step" >&2
+        exit 1
+      fi
+    fi
+    ((i++))
+  done
+
+  echo "─────────────────────────────────────────────────────"
+  if [[ "$dry_run" == "true" ]]; then
+    echo " Pipeline dry-run complete (no changes made)"
+  else
+    echo " Pipeline complete — all steps succeeded"
+  fi
+  echo "─────────────────────────────────────────────────────"
+}
+
+# ---------------------------------------------------------------------------
 # Helper: print_workflow
 # target: aggregator | satellite | wroom
 #
@@ -170,20 +265,14 @@ run_render() {
 # ---------------------------------------------------------------------------
 print_workflow() {
   local target="$1"
+  local dry_run="${2:-false}"
+
+  run_full_pipeline "$dry_run"
+
   echo ""
   echo "─────────────────────────────────────────────────────"
-  echo "Next steps — run in order (Phase X pipeline):"
+  echo "Next steps:"
   echo "─────────────────────────────────────────────────────"
-  echo "  # Full regeneration pipeline (Critical Rule 37):"
-  echo "  bash scripts/bundle-dashboard.sh --write"
-  echo "  python3 scripts/render_sensor_config.py --write"
-  echo "  node tests/fixtures/generate-fixtures.js"
-  echo "  python3 scripts/render_sensor_config.py --write"
-  echo "  bash scripts/build-dashboard.sh --write"
-  echo "  bash scripts/minify-dashboard.sh"
-  echo "  bash scripts/generate-header.sh"
-  echo "  python3 scripts/render_sensor_config.py --check"
-  echo ""
   echo "  # Verify:"
   echo "  bash scripts/preflight.sh"
   echo ""
@@ -372,6 +461,9 @@ show_status() {
 # activate_aggregator
 # ---------------------------------------------------------------------------
 activate_aggregator() {
+  local dry_run="false"
+  [[ "${1:-}" == "--dry-run" ]] && dry_run="true"
+
   require_python3
 
   echo "════════════════════════════════════════"
@@ -387,7 +479,7 @@ activate_aggregator() {
   if [[ "$current" == "aggregator:agg-s3-16m-1" ]]; then
     echo "  Already in aggregator mode. Validating..."
     validate_after_switch aggregator || true
-    print_workflow aggregator
+    print_workflow aggregator "$dry_run"
   else
     if [[ "$current" != "c3-default" ]]; then
       echo "  Current config: $current — switching to aggregator..."
@@ -409,7 +501,7 @@ activate_aggregator() {
     echo "  Validating..."
     validate_after_switch aggregator || true
 
-    print_workflow aggregator
+    print_workflow aggregator "$dry_run"
   fi
 
   echo ""
@@ -423,6 +515,9 @@ activate_aggregator() {
 # activate_satellite
 # ---------------------------------------------------------------------------
 activate_satellite() {
+  local dry_run="false"
+  [[ "${1:-}" == "--dry-run" ]] && dry_run="true"
+
   require_python3
 
   echo "════════════════════════════════════════"
@@ -436,7 +531,7 @@ activate_satellite() {
   if [[ "$current" == "c3-default" ]]; then
     echo "  Already in C3 satellite default mode. Validating..."
     validate_after_switch satellite || true
-    print_workflow satellite
+    print_workflow satellite "$dry_run"
   else
     echo "  Current config: $current — switching to C3 satellite default..."
 
@@ -463,7 +558,7 @@ activate_satellite() {
     echo "  Validating..."
     validate_after_switch satellite || true
 
-    print_workflow satellite
+    print_workflow satellite "$dry_run"
   fi
 
   echo ""
@@ -476,6 +571,9 @@ activate_satellite() {
 # activate_wroom
 # ---------------------------------------------------------------------------
 activate_wroom() {
+  local dry_run="false"
+  [[ "${1:-}" == "--dry-run" ]] && dry_run="true"
+
   require_python3
 
   echo "════════════════════════════════════════"
@@ -491,7 +589,7 @@ activate_wroom() {
   if [[ "$current" == "wroom:sat-esp32-4m-190" ]]; then
     echo "  Already in WROOM satellite mode. Validating..."
     validate_after_switch wroom || true
-    print_workflow wroom
+    print_workflow wroom "$dry_run"
   else
     echo "  Current config: $current — switching to WROOM satellite..."
 
@@ -518,7 +616,7 @@ activate_wroom() {
     echo "  Validating..."
     validate_after_switch wroom || true
 
-    print_workflow wroom
+    print_workflow wroom "$dry_run"
   fi
 
   echo ""
@@ -533,8 +631,8 @@ activate_wroom() {
 # ---------------------------------------------------------------------------
 case "${1:-}" in
   status)     show_status ;;
-  aggregator) activate_aggregator ;;
-  satellite)  activate_satellite ;;
-  wroom)      activate_wroom ;;
+  aggregator) activate_aggregator "${2:-}" ;;
+  satellite)  activate_satellite "${2:-}" ;;
+  wroom)      activate_wroom "${2:-}" ;;
   *)          print_usage; exit 1 ;;
 esac
