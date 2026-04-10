@@ -25,7 +25,7 @@ The design goal for these prompts is:
 
 ---
 
-## Shared Perplexity session protocol
+## Shared Perplexity session protocol for Agent Sessions
 
 This protocol applies to every step unless the step section says otherwise.
 
@@ -68,7 +68,34 @@ Report remaining risks and post-step deliverables.
 - **Do not read the full Phase Y architecture doc.** The relevant subsection path is provided in each step's inline context header.
 - **Scope discipline is not relaxed.** These optimizations are for context handling only, not for loosening requirements.
 
+### Agent Output Formats — Turn 3 output
+
+```
+## Compliance table — v7.6.6.X
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| [gate 1] | PASS/FAIL | [one-line evidence] |
+...
+
+## Changed files
+- [file]: [what changed]
+
+## Validations run
+- [validation]: [result]
+
+## Remaining risks
+- [risk, if any]
+
+## Post-step deliverables
+- [deliverable, if any]
+```
+
 ---
+
+## Shared Perplexity session protocol
+
+This protocol applies to every step unless the step section says otherwise.
 
 ### Review session — three-turn structure
 
@@ -106,34 +133,7 @@ If post-merge deliverables are required, list them explicitly.
 - **Do not soften blocking device-test failures.** If a device gate fails, the verdict is BLOCKED regardless of other gates.
 - **Do not reread the full repo.** Treat the gate checklist from Turn 1 as the complete contract.
 
----
-
-## Output formats
-
-### Agent session — Turn 3 output
-
-```
-## Compliance table — v7.6.6.X
-
-| Gate | Status | Evidence |
-|------|--------|----------|
-| [gate 1] | PASS/FAIL | [one-line evidence] |
-...
-
-## Changed files
-- [file]: [what changed]
-
-## Validations run
-- [validation]: [result]
-
-## Remaining risks
-- [risk, if any]
-
-## Post-step deliverables
-- [deliverable, if any]
-```
-
-### Review session — Turn 3 output
+### Review Output Formats — Turn 3 output
 
 ```
 ## Gate checklist — v7.6.6.X PR #NN
@@ -162,8 +162,6 @@ MERGE-READY / NEEDS-FIX / BLOCKED
 ## Post-merge deliverables (if MERGE-READY)
 - [deliverable]
 ```
-
----
 
 ---
 
@@ -216,6 +214,75 @@ Evidence needed: pipeline run output · preflight output · Playwright results.
 ## Step 2 — Review prompt
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
+
+### Review session — three-turn structure
+
+**Turn 1 — Spec extraction (≤ 300 tokens output)**
+
+Read only:
+- The inline review context header (provided below).
+- The step handoff file.
+- The implementation-instructions file.
+
+Produce:
+1. Gate checklist (items only, one line each).
+2. Allowed diff scope.
+3. Required evidence artifacts.
+4. Blocking gate verdict criteria.
+
+Do **not** open the PR diff yet.
+
+**Turn 2 — Diff + evidence audit**
+
+Fetch the PR diff for the exact files listed in the gate checklist.  
+Fetch evidence artifacts listed in Turn 1 (logs, session log, compliance table from the agent session).  
+For each gate: record PASS / FAIL / UNCLEAR with one-line evidence.  
+Only open source files if a gate cannot be decided from the diff alone.
+
+**Turn 3 — Verdict + output**
+
+Produce the full review output (see Output format below).  
+If post-merge deliverables are required, list them explicitly.
+
+### Review session — coordinator constraints
+
+- **Diff-first.** Do not open source files unless the diff is ambiguous.
+- **Missing evidence ≠ failing evidence.** Mark gates UNCLEAR, not FAIL, when evidence is simply absent from the PR.
+- **Do not soften blocking device-test failures.** If a device gate fails, the verdict is BLOCKED regardless of other gates.
+- **Do not reread the full repo.** Treat the gate checklist from Turn 1 as the complete contract.
+
+### Review Output Formats — Turn 3 output
+
+```
+## Gate checklist — v7.6.6.X PR #NN
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| [gate 1] | PASS/FAIL/UNCLEAR | [one-line evidence] |
+...
+
+## Reviewer finding assessment
+
+| Finding | Warranted? | Fixed? | Remaining action |
+|---------|------------|--------|-----------------|
+| [finding] | Y/N | Y/N | [action or none] |
+
+## Resolved vs. remaining
+- Resolved: [list]
+- Remaining: [list or "none"]
+
+## Verdict
+MERGE-READY / NEEDS-FIX / BLOCKED
+
+## Fix list (if NEEDS-FIX)
+1. [specific fix]
+
+## Post-merge deliverables (if MERGE-READY)
+- [deliverable]
+```
+
+---
+
 
 Use the **Shared Perplexity session protocol** above.
 
@@ -297,6 +364,75 @@ Evidence needed: wc -l output · --check output · --list output · diff assembl
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
+### Review session — three-turn structure
+
+**Turn 1 — Spec extraction (≤ 300 tokens output)**
+
+Read only:
+- The inline review context header (provided below).
+- The step handoff file.
+- The implementation-instructions file.
+
+Produce:
+1. Gate checklist (items only, one line each).
+2. Allowed diff scope.
+3. Required evidence artifacts.
+4. Blocking gate verdict criteria.
+
+Do **not** open the PR diff yet.
+
+**Turn 2 — Diff + evidence audit**
+
+Fetch the PR diff for the exact files listed in the gate checklist.  
+Fetch evidence artifacts listed in Turn 1 (logs, session log, compliance table from the agent session).  
+For each gate: record PASS / FAIL / UNCLEAR with one-line evidence.  
+Only open source files if a gate cannot be decided from the diff alone.
+
+**Turn 3 — Verdict + output**
+
+Produce the full review output (see Output format below).  
+If post-merge deliverables are required, list them explicitly.
+
+### Review session — coordinator constraints
+
+- **Diff-first.** Do not open source files unless the diff is ambiguous.
+- **Missing evidence ≠ failing evidence.** Mark gates UNCLEAR, not FAIL, when evidence is simply absent from the PR.
+- **Do not soften blocking device-test failures.** If a device gate fails, the verdict is BLOCKED regardless of other gates.
+- **Do not reread the full repo.** Treat the gate checklist from Turn 1 as the complete contract.
+
+### Review Output Formats — Turn 3 output
+
+```
+## Gate checklist — v7.6.6.X PR #NN
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| [gate 1] | PASS/FAIL/UNCLEAR | [one-line evidence] |
+...
+
+## Reviewer finding assessment
+
+| Finding | Warranted? | Fixed? | Remaining action |
+|---------|------------|--------|-----------------|
+| [finding] | Y/N | Y/N | [action or none] |
+
+## Resolved vs. remaining
+- Resolved: [list]
+- Remaining: [list or "none"]
+
+## Verdict
+MERGE-READY / NEEDS-FIX / BLOCKED
+
+## Fix list (if NEEDS-FIX)
+1. [specific fix]
+
+## Post-merge deliverables (if MERGE-READY)
+- [deliverable]
+```
+
+---
+
+
 Use the **Shared Perplexity session protocol** above.
 
 **Turn 1 reads (do not open more than these):**
@@ -371,6 +507,74 @@ Evidence needed: preflight run output · pipeline run output.
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
+### Review session — three-turn structure
+
+**Turn 1 — Spec extraction (≤ 300 tokens output)**
+
+Read only:
+- The inline review context header (provided below).
+- The step handoff file.
+- The implementation-instructions file.
+
+Produce:
+1. Gate checklist (items only, one line each).
+2. Allowed diff scope.
+3. Required evidence artifacts.
+4. Blocking gate verdict criteria.
+
+Do **not** open the PR diff yet.
+
+**Turn 2 — Diff + evidence audit**
+
+Fetch the PR diff for the exact files listed in the gate checklist.  
+Fetch evidence artifacts listed in Turn 1 (logs, session log, compliance table from the agent session).  
+For each gate: record PASS / FAIL / UNCLEAR with one-line evidence.  
+Only open source files if a gate cannot be decided from the diff alone.
+
+**Turn 3 — Verdict + output**
+
+Produce the full review output (see Output format below).  
+If post-merge deliverables are required, list them explicitly.
+
+### Review session — coordinator constraints
+
+- **Diff-first.** Do not open source files unless the diff is ambiguous.
+- **Missing evidence ≠ failing evidence.** Mark gates UNCLEAR, not FAIL, when evidence is simply absent from the PR.
+- **Do not soften blocking device-test failures.** If a device gate fails, the verdict is BLOCKED regardless of other gates.
+- **Do not reread the full repo.** Treat the gate checklist from Turn 1 as the complete contract.
+
+### Review Output Formats — Turn 3 output
+
+```
+## Gate checklist — v7.6.6.X PR #NN
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| [gate 1] | PASS/FAIL/UNCLEAR | [one-line evidence] |
+...
+
+## Reviewer finding assessment
+
+| Finding | Warranted? | Fixed? | Remaining action |
+|---------|------------|--------|-----------------|
+| [finding] | Y/N | Y/N | [action or none] |
+
+## Resolved vs. remaining
+- Resolved: [list]
+- Remaining: [list or "none"]
+
+## Verdict
+MERGE-READY / NEEDS-FIX / BLOCKED
+
+## Fix list (if NEEDS-FIX)
+1. [specific fix]
+
+## Post-merge deliverables (if MERGE-READY)
+- [deliverable]
+```
+
+---
+
 Use the **Shared Perplexity session protocol** above.
 
 **Turn 1 reads (do not open more than these):**
@@ -443,6 +647,74 @@ Evidence needed: SHA before/after · --check outputs at each stage · final wc -
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
+### Review session — three-turn structure
+
+**Turn 1 — Spec extraction (≤ 300 tokens output)**
+
+Read only:
+- The inline review context header (provided below).
+- The step handoff file.
+- The implementation-instructions file.
+
+Produce:
+1. Gate checklist (items only, one line each).
+2. Allowed diff scope.
+3. Required evidence artifacts.
+4. Blocking gate verdict criteria.
+
+Do **not** open the PR diff yet.
+
+**Turn 2 — Diff + evidence audit**
+
+Fetch the PR diff for the exact files listed in the gate checklist.  
+Fetch evidence artifacts listed in Turn 1 (logs, session log, compliance table from the agent session).  
+For each gate: record PASS / FAIL / UNCLEAR with one-line evidence.  
+Only open source files if a gate cannot be decided from the diff alone.
+
+**Turn 3 — Verdict + output**
+
+Produce the full review output (see Output format below).  
+If post-merge deliverables are required, list them explicitly.
+
+### Review session — coordinator constraints
+
+- **Diff-first.** Do not open source files unless the diff is ambiguous.
+- **Missing evidence ≠ failing evidence.** Mark gates UNCLEAR, not FAIL, when evidence is simply absent from the PR.
+- **Do not soften blocking device-test failures.** If a device gate fails, the verdict is BLOCKED regardless of other gates.
+- **Do not reread the full repo.** Treat the gate checklist from Turn 1 as the complete contract.
+
+### Review Output Formats — Turn 3 output
+
+```
+## Gate checklist — v7.6.6.X PR #NN
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| [gate 1] | PASS/FAIL/UNCLEAR | [one-line evidence] |
+...
+
+## Reviewer finding assessment
+
+| Finding | Warranted? | Fixed? | Remaining action |
+|---------|------------|--------|-----------------|
+| [finding] | Y/N | Y/N | [action or none] |
+
+## Resolved vs. remaining
+- Resolved: [list]
+- Remaining: [list or "none"]
+
+## Verdict
+MERGE-READY / NEEDS-FIX / BLOCKED
+
+## Fix list (if NEEDS-FIX)
+1. [specific fix]
+
+## Post-merge deliverables (if MERGE-READY)
+- [deliverable]
+```
+
+---
+
 Use the **Shared Perplexity session protocol** above.
 
 **Turn 1 reads (do not open more than these):**
@@ -511,6 +783,74 @@ Evidence needed: wc -l output · --check output · grep evidence for guard and c
 ## Step 2 — Review prompt
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
+
+### Review session — three-turn structure
+
+**Turn 1 — Spec extraction (≤ 300 tokens output)**
+
+Read only:
+- The inline review context header (provided below).
+- The step handoff file.
+- The implementation-instructions file.
+
+Produce:
+1. Gate checklist (items only, one line each).
+2. Allowed diff scope.
+3. Required evidence artifacts.
+4. Blocking gate verdict criteria.
+
+Do **not** open the PR diff yet.
+
+**Turn 2 — Diff + evidence audit**
+
+Fetch the PR diff for the exact files listed in the gate checklist.  
+Fetch evidence artifacts listed in Turn 1 (logs, session log, compliance table from the agent session).  
+For each gate: record PASS / FAIL / UNCLEAR with one-line evidence.  
+Only open source files if a gate cannot be decided from the diff alone.
+
+**Turn 3 — Verdict + output**
+
+Produce the full review output (see Output format below).  
+If post-merge deliverables are required, list them explicitly.
+
+### Review session — coordinator constraints
+
+- **Diff-first.** Do not open source files unless the diff is ambiguous.
+- **Missing evidence ≠ failing evidence.** Mark gates UNCLEAR, not FAIL, when evidence is simply absent from the PR.
+- **Do not soften blocking device-test failures.** If a device gate fails, the verdict is BLOCKED regardless of other gates.
+- **Do not reread the full repo.** Treat the gate checklist from Turn 1 as the complete contract.
+
+### Review Output Formats — Turn 3 output
+
+```
+## Gate checklist — v7.6.6.X PR #NN
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| [gate 1] | PASS/FAIL/UNCLEAR | [one-line evidence] |
+...
+
+## Reviewer finding assessment
+
+| Finding | Warranted? | Fixed? | Remaining action |
+|---------|------------|--------|-----------------|
+| [finding] | Y/N | Y/N | [action or none] |
+
+## Resolved vs. remaining
+- Resolved: [list]
+- Remaining: [list or "none"]
+
+## Verdict
+MERGE-READY / NEEDS-FIX / BLOCKED
+
+## Fix list (if NEEDS-FIX)
+1. [specific fix]
+
+## Post-merge deliverables (if MERGE-READY)
+- [deliverable]
+```
+
+---
 
 Use the **Shared Perplexity session protocol** above.
 
@@ -583,6 +923,74 @@ Blocking rule: if device gate FAIL → verdict is BLOCKED; do not advance Phase 
 ## Step 2 — Review prompt
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
+
+### Review session — three-turn structure
+
+**Turn 1 — Spec extraction (≤ 300 tokens output)**
+
+Read only:
+- The inline review context header (provided below).
+- The step handoff file.
+- The implementation-instructions file.
+
+Produce:
+1. Gate checklist (items only, one line each).
+2. Allowed diff scope.
+3. Required evidence artifacts.
+4. Blocking gate verdict criteria.
+
+Do **not** open the PR diff yet.
+
+**Turn 2 — Diff + evidence audit**
+
+Fetch the PR diff for the exact files listed in the gate checklist.  
+Fetch evidence artifacts listed in Turn 1 (logs, session log, compliance table from the agent session).  
+For each gate: record PASS / FAIL / UNCLEAR with one-line evidence.  
+Only open source files if a gate cannot be decided from the diff alone.
+
+**Turn 3 — Verdict + output**
+
+Produce the full review output (see Output format below).  
+If post-merge deliverables are required, list them explicitly.
+
+### Review session — coordinator constraints
+
+- **Diff-first.** Do not open source files unless the diff is ambiguous.
+- **Missing evidence ≠ failing evidence.** Mark gates UNCLEAR, not FAIL, when evidence is simply absent from the PR.
+- **Do not soften blocking device-test failures.** If a device gate fails, the verdict is BLOCKED regardless of other gates.
+- **Do not reread the full repo.** Treat the gate checklist from Turn 1 as the complete contract.
+
+### Review Output Formats — Turn 3 output
+
+```
+## Gate checklist — v7.6.6.X PR #NN
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| [gate 1] | PASS/FAIL/UNCLEAR | [one-line evidence] |
+...
+
+## Reviewer finding assessment
+
+| Finding | Warranted? | Fixed? | Remaining action |
+|---------|------------|--------|-----------------|
+| [finding] | Y/N | Y/N | [action or none] |
+
+## Resolved vs. remaining
+- Resolved: [list]
+- Remaining: [list or "none"]
+
+## Verdict
+MERGE-READY / NEEDS-FIX / BLOCKED
+
+## Fix list (if NEEDS-FIX)
+1. [specific fix]
+
+## Post-merge deliverables (if MERGE-READY)
+- [deliverable]
+```
+
+---
 
 Use the **Shared Perplexity session protocol** above.
 
@@ -657,6 +1065,74 @@ Blocking rule: if device gate FAIL → verdict is BLOCKED.
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
+### Review session — three-turn structure
+
+**Turn 1 — Spec extraction (≤ 300 tokens output)**
+
+Read only:
+- The inline review context header (provided below).
+- The step handoff file.
+- The implementation-instructions file.
+
+Produce:
+1. Gate checklist (items only, one line each).
+2. Allowed diff scope.
+3. Required evidence artifacts.
+4. Blocking gate verdict criteria.
+
+Do **not** open the PR diff yet.
+
+**Turn 2 — Diff + evidence audit**
+
+Fetch the PR diff for the exact files listed in the gate checklist.  
+Fetch evidence artifacts listed in Turn 1 (logs, session log, compliance table from the agent session).  
+For each gate: record PASS / FAIL / UNCLEAR with one-line evidence.  
+Only open source files if a gate cannot be decided from the diff alone.
+
+**Turn 3 — Verdict + output**
+
+Produce the full review output (see Output format below).  
+If post-merge deliverables are required, list them explicitly.
+
+### Review session — coordinator constraints
+
+- **Diff-first.** Do not open source files unless the diff is ambiguous.
+- **Missing evidence ≠ failing evidence.** Mark gates UNCLEAR, not FAIL, when evidence is simply absent from the PR.
+- **Do not soften blocking device-test failures.** If a device gate fails, the verdict is BLOCKED regardless of other gates.
+- **Do not reread the full repo.** Treat the gate checklist from Turn 1 as the complete contract.
+
+### Review Output Formats — Turn 3 output
+
+```
+## Gate checklist — v7.6.6.X PR #NN
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| [gate 1] | PASS/FAIL/UNCLEAR | [one-line evidence] |
+...
+
+## Reviewer finding assessment
+
+| Finding | Warranted? | Fixed? | Remaining action |
+|---------|------------|--------|-----------------|
+| [finding] | Y/N | Y/N | [action or none] |
+
+## Resolved vs. remaining
+- Resolved: [list]
+- Remaining: [list or "none"]
+
+## Verdict
+MERGE-READY / NEEDS-FIX / BLOCKED
+
+## Fix list (if NEEDS-FIX)
+1. [specific fix]
+
+## Post-merge deliverables (if MERGE-READY)
+- [deliverable]
+```
+
+---
+
 Use the **Shared Perplexity session protocol** above.
 
 **Turn 1 reads (do not open more than these):**
@@ -698,6 +1174,74 @@ Phase Y plan section: Docs/phase-Y-architecture-and-refactor-plan-sensor-history
 ## Step 1 — Agent prompt
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
+
+### Review session — three-turn structure
+
+**Turn 1 — Spec extraction (≤ 300 tokens output)**
+
+Read only:
+- The inline review context header (provided below).
+- The step handoff file.
+- The implementation-instructions file.
+
+Produce:
+1. Gate checklist (items only, one line each).
+2. Allowed diff scope.
+3. Required evidence artifacts.
+4. Blocking gate verdict criteria.
+
+Do **not** open the PR diff yet.
+
+**Turn 2 — Diff + evidence audit**
+
+Fetch the PR diff for the exact files listed in the gate checklist.  
+Fetch evidence artifacts listed in Turn 1 (logs, session log, compliance table from the agent session).  
+For each gate: record PASS / FAIL / UNCLEAR with one-line evidence.  
+Only open source files if a gate cannot be decided from the diff alone.
+
+**Turn 3 — Verdict + output**
+
+Produce the full review output (see Output format below).  
+If post-merge deliverables are required, list them explicitly.
+
+### Review session — coordinator constraints
+
+- **Diff-first.** Do not open source files unless the diff is ambiguous.
+- **Missing evidence ≠ failing evidence.** Mark gates UNCLEAR, not FAIL, when evidence is simply absent from the PR.
+- **Do not soften blocking device-test failures.** If a device gate fails, the verdict is BLOCKED regardless of other gates.
+- **Do not reread the full repo.** Treat the gate checklist from Turn 1 as the complete contract.
+
+### Review Output Formats — Turn 3 output
+
+```
+## Gate checklist — v7.6.6.X PR #NN
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| [gate 1] | PASS/FAIL/UNCLEAR | [one-line evidence] |
+...
+
+## Reviewer finding assessment
+
+| Finding | Warranted? | Fixed? | Remaining action |
+|---------|------------|--------|-----------------|
+| [finding] | Y/N | Y/N | [action or none] |
+
+## Resolved vs. remaining
+- Resolved: [list]
+- Remaining: [list or "none"]
+
+## Verdict
+MERGE-READY / NEEDS-FIX / BLOCKED
+
+## Fix list (if NEEDS-FIX)
+1. [specific fix]
+
+## Post-merge deliverables (if MERGE-READY)
+- [deliverable]
+```
+
+---
 
 Use the **Shared Perplexity session protocol** above.
 
@@ -803,6 +1347,74 @@ Evidence needed: preflight run output with total count · exact wording comparis
 ## Step 2 — Review prompt
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
+
+### Review session — three-turn structure
+
+**Turn 1 — Spec extraction (≤ 300 tokens output)**
+
+Read only:
+- The inline review context header (provided below).
+- The step handoff file.
+- The implementation-instructions file.
+
+Produce:
+1. Gate checklist (items only, one line each).
+2. Allowed diff scope.
+3. Required evidence artifacts.
+4. Blocking gate verdict criteria.
+
+Do **not** open the PR diff yet.
+
+**Turn 2 — Diff + evidence audit**
+
+Fetch the PR diff for the exact files listed in the gate checklist.  
+Fetch evidence artifacts listed in Turn 1 (logs, session log, compliance table from the agent session).  
+For each gate: record PASS / FAIL / UNCLEAR with one-line evidence.  
+Only open source files if a gate cannot be decided from the diff alone.
+
+**Turn 3 — Verdict + output**
+
+Produce the full review output (see Output format below).  
+If post-merge deliverables are required, list them explicitly.
+
+### Review session — coordinator constraints
+
+- **Diff-first.** Do not open source files unless the diff is ambiguous.
+- **Missing evidence ≠ failing evidence.** Mark gates UNCLEAR, not FAIL, when evidence is simply absent from the PR.
+- **Do not soften blocking device-test failures.** If a device gate fails, the verdict is BLOCKED regardless of other gates.
+- **Do not reread the full repo.** Treat the gate checklist from Turn 1 as the complete contract.
+
+### Review Output Formats — Turn 3 output
+
+```
+## Gate checklist — v7.6.6.X PR #NN
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| [gate 1] | PASS/FAIL/UNCLEAR | [one-line evidence] |
+...
+
+## Reviewer finding assessment
+
+| Finding | Warranted? | Fixed? | Remaining action |
+|---------|------------|--------|-----------------|
+| [finding] | Y/N | Y/N | [action or none] |
+
+## Resolved vs. remaining
+- Resolved: [list]
+- Remaining: [list or "none"]
+
+## Verdict
+MERGE-READY / NEEDS-FIX / BLOCKED
+
+## Fix list (if NEEDS-FIX)
+1. [specific fix]
+
+## Post-merge deliverables (if MERGE-READY)
+- [deliverable]
+```
+
+---
 
 Use the **Shared Perplexity session protocol** above.
 
