@@ -2,6 +2,19 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.6.3] — 2026-04-10 — Phase Y: Fragment Editing Workflow Validated
+
+### Validated
+- Edit-fragment → assemble → pipeline → check workflow works end-to-end
+- Assembly identity gate correctly detects unauthorized fragment changes (deliberate single-byte break → FAIL)
+- Gate correctly passes after changes are reverted (PASS → CHANGE → FAIL → PASS cycle confirmed)
+
+### Validation Evidence
+- Stage 1 (baseline): `--check` PASS, SHA-256 `82219f2b…`, fragment total 4326 lines
+- Stage 2 (edit+reassemble): added trailing blank line to `registration.h`, reassembled → 4327 lines; identity correctly updated
+- Stage 3 (deliberate break): added trailing space to `config.h` line 1, ran `--check` WITHOUT reassembling → FAIL (SHA mismatch detected, diff shown)
+- Stage 4 (revert): reverted space, ran `--check` → PASS, SHA restored
+
 ## [v7.6.6.2] — 2026-04-10 — Phase Y: Fragment-Level Preflight Checks
 
 ### Added
