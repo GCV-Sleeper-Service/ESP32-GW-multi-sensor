@@ -182,7 +182,8 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   char req[512];
   int req_len = snprintf(req, sizeof(req),
       "GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", path, host);
-  if (lwip_send(sock, req, req_len, 0) < 0) { lwip_close(sock); return false; }
+  if (req_len < 0 || (size_t)req_len >= sizeof(req)) { lwip_close(sock); return false; }
+  if (lwip_send(sock, req, (size_t)req_len, 0) < 0) { lwip_close(sock); return false; }
 
   // ── Read response headers into small stack buffer ──────────────
   // Read one byte at a time until \r\n\r\n to find the header/body split.

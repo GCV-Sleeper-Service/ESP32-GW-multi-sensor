@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// sensor_history_multi-v7.6.6.1.h - hourly persistence with dedicated history NVS partition
+// sensor_history_multi-v7.6.6.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -496,7 +496,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.6.1) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.6.0) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -1569,7 +1569,8 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   char req[512];
   int req_len = snprintf(req, sizeof(req),
       "GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", path, host);
-  if (lwip_send(sock, req, req_len, 0) < 0) { lwip_close(sock); return false; }
+  if (req_len < 0 || (size_t)req_len >= sizeof(req)) { lwip_close(sock); return false; }
+  if (lwip_send(sock, req, (size_t)req_len, 0) < 0) { lwip_close(sock); return false; }
 
   // ── Read response headers into small stack buffer ──────────────
   // Read one byte at a time until \r\n\r\n to find the header/body split.
