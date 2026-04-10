@@ -1285,3 +1285,26 @@ Add/discovery endpoints may be open with documented rationale.
 
 
 ---
+
+## LESSON-OPS-118 — Fragment boundary comments may reference adjacent-fragment symbols
+
+**Date:** 2026-04-10
+**Trigger:** v7.6.6.4 CHECKPOINT A false failure — `grep -c "s_cache_mutex" firmware/core/ping-adapter.h` returned 1 due to a documentation comment at lines 160–168 describing thread-safety for the aggregator-runtime section.
+
+**Root cause:** When fragments are extracted via `sed -n` line ranges, documentation comments at section boundaries may reference symbols that belong to the next fragment. This is correct content — the monolith's byte-identical split includes these comments. A raw `grep -c` cannot distinguish comments from code usage.
+
+**Rule:** All cross-fragment symbol leakage checks must strip comment lines before grepping:
+```bash
+grep -v '^\s*//' firmware/core/some-fragment.h | grep -c "symbol_name"
+```
+
+**Affected checks:**
+- v7.6.6.4 CHECKPOINT A (cross-fragment leakage)
+- v7.6.6.8 `mutex_single_owner` preflight check
+
+**See also:** LESSON-OPS-097 (identity gate), Critical Rule 37 (pipeline ordering)
+
+---
+
+
+---

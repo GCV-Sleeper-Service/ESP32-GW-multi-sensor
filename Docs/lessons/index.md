@@ -205,3 +205,4 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-118 | dashboard.md |
 | LESSON-OPS-119 | dashboard.md |
 | LESSON-OPS-120 | dashboard.md |
+| LESSON-OPS-121 | firmware.md |

@@ -409,7 +409,7 @@ Then implement:
 
   1. Validate fragment content: `head -1 firmware/core/ping-adapter.h` → `#ifdef PING_DEVICE_INDEX`
   2. Verify PingAdapter class exists: `grep "class PingAdapter"` → exactly 1 match
-  3. Verify no cross-fragment symbol leakage (no `s_cache_mutex`, no `HistoryMeta` in this fragment)
+  3. Verify no cross-fragment symbol leakage in code (no `s_cache_mutex`, no `HistoryMeta` in non-comment lines)
   4. Verify `wc -l` → 168 lines
 
 ---
@@ -417,7 +417,7 @@ Then implement:
 Run:
   head -1 firmware/core/ping-adapter.h — must start with #ifdef PING_DEVICE_INDEX
   grep -c "class PingAdapter" firmware/core/ping-adapter.h — must be exactly 1
-  grep -c "s_cache_mutex\|HistoryMeta" firmware/core/ping-adapter.h — must be 0
+  grep -v '^\s*//' firmware/core/ping-adapter.h | grep -c "s_cache_mutex\|HistoryMeta" — must be 0 (comments excluded; boundary comments referencing adjacent-fragment symbols are expected)
   wc -l firmware/core/ping-adapter.h — must be 168
 If ANY fails: STOP. Fragment content is incorrect — escalate.
 ---
