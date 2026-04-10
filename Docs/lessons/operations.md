@@ -73,3 +73,13 @@ Related: BUG-061
 
 
 ---
+
+### LESSON-OPS-121: Full Pipeline Automation in provision.sh (v7.6.6.0)
+
+**Root cause:** After Phase X added the 8-step regeneration pipeline (bundle → render → fixtures → render → build → minify → header → check), operators had to run 8 manual commands after every `provision.sh` switch. This was error-prone — steps were skipped or run in the wrong order.
+
+**Fix:** `provision.sh` now runs the full pipeline automatically after switching board configurations. `--dry-run` flag prints steps without executing. Dependency pre-checks verify `node` and `node_modules` exist before starting.
+
+**Rule:** `provision.sh` is the single entry point for board switching AND pipeline execution (Critical Rule 49, updated).
+
+---

@@ -2,13 +2,13 @@
   "ok": true,
   "schema_version": 2,
   "source": "system",
-  "version": "v7.6.5.8",
+  "version": "v7.6.6.0",
   "gateway": {
     "id": "gw-main",
     "name": "Main Gateway",
     "role": "satellite",
     "hardware": "ESP32-C3",
-    "firmware_version": "v7.6.5.8",
+    "firmware_version": "v7.6.6.0",
     "api_version": "v2"
   },
   "history": {

@@ -2,6 +2,14 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.6.0] — 2026-04-10 — Phase Y Pre-Step: provision.sh Full Pipeline Automation
+
+### Changed
+- `scripts/provision.sh` — full regeneration pipeline now runs automatically on board switch
+- Added `--dry-run` support to all board modes (satellite, aggregator, wroom)
+- Added `require_node()` and `require_npm_deps()` dependency pre-checks
+- Assembly step placeholder (no-op) for Phase Y v7.6.6.1
+
 ## [v7.6.5.8] — 2026-04-08 — Phase X Closure: Documentation and Preflight Finalization
 
 ### Changes
