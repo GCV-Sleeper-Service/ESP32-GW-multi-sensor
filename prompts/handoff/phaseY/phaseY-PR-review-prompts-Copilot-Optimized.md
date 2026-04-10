@@ -78,7 +78,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > If a gate fails, include the specific file and line numbers involved.
 
 Wait for the sub-agent to return results before proceeding.
-Proceed directly from Step 1 results without waiting for human confirmation.
+Once agent finishes working and results from sub-agent are available, proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -204,7 +204,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > If a gate fails, include the specific file and line numbers involved.
 
 Wait for the sub-agent to return results before proceeding.
-Proceed directly from Step 1 results without waiting for human confirmation.
+Once agent finishes working and results from sub-agent are available, proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -316,7 +316,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > If a gate fails, include the specific file and line numbers involved.
 
 Wait for the sub-agent to return results before proceeding.
-Proceed directly from Step 1 results without waiting for human confirmation.
+Once agent finishes working and results from sub-agent are available, proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -424,7 +424,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > For each gate, report: PASS / FAIL / UNCLEAR, with a one-line evidence summary.
 
 Wait for the sub-agent to return results before proceeding.
-Proceed directly from Step 1 results without waiting for human confirmation.
+Once agent finishes working and results from sub-agent are available, proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -524,7 +524,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > For each gate, report: PASS / FAIL / UNCLEAR, with a one-line evidence summary.
 
 Wait for the sub-agent to return results before proceeding.
-Proceed directly from Step 1 results without waiting for human confirmation.
+Once agent finishes working and results from sub-agent are available, proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -624,7 +624,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > For each gate, report: PASS / FAIL / UNCLEAR, with a one-line evidence summary.
 
 Wait for the sub-agent to return results before proceeding.
-Proceed directly from Step 1 results without waiting for human confirmation.
+Once agent finishes working and results from sub-agent are available, proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -736,7 +736,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > For each gate, report: PASS / FAIL / UNCLEAR, with a one-line evidence summary.
 
 Wait for the sub-agent to return results before proceeding.
-Proceed directly from Step 1 results without waiting for human confirmation.
+Once agent finishes working and results from sub-agent are available, proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -841,7 +841,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > For each gate, report: PASS / FAIL / UNCLEAR, with a one-line evidence summary.
 
 Wait for the sub-agent to return results before proceeding.
-Proceed directly from Step 1 results without waiting for human confirmation.
+Once agent finishes working and results from sub-agent are available, proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
@@ -965,7 +965,7 @@ Use the deep-research agent on `GCV-Sleeper-Service/ESP32-GW-multi-sensor` with 
 > If a gate fails, include the specific file and line numbers involved.
 
 Wait for the sub-agent to return results before proceeding.
-Proceed directly from Step 1 results without waiting for human confirmation.
+Once agent finishes working and results from sub-agent are available, proceed directly from Step 1 results without waiting for human confirmation.
 
 ---
 
