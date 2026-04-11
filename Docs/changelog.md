@@ -5,12 +5,14 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 ## [v7.6.6.7] — 2026-04-11 — Phase Y: Full Endpoint Smoke Test — PASS
 
 > This release records the passing full endpoint smoke test across both the C3 satellite and S3
-> aggregator board profiles. The HTTP API responses report `"firmware_version": "v7.6.6.6"` because
-> no firmware source changed in this step — only documentation and version stamp files were updated.
-> The history proxy issue remains tracked as a known deferred bug.
+> aggregator board profiles. No functional firmware logic changed — devices under test were running
+> the v7.6.6.6 binary at time of testing; this PR records the v7.6.6.7 version-stamp release.
+> Two deferred gaps remain: the history proxy endpoint (non-functional, carried from v7.6.6.6)
+> and the import/export cycle (crashes board — dedicated fix required post-Phase Y).
 
 ### Validated
 
+- Phase A (C3 Satellite) — all 13 local GET endpoints + auth gate + management endpoints tested
 - Phase B (S3 Aggregator) — all 6 aggregator-specific endpoints re-validated
 - Phase C (Cleanup) — satellite mode restored, full pipeline clean, all Playwright tests pass
 
@@ -51,8 +53,12 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ### Known Deferred Issues
 
-- History proxy (`GET /api/aggregator/proxy/{gw}/history/{device}/{metric}`) returns empty body.
+- **History proxy** (`GET /api/aggregator/proxy/{gw}/history/{device}/{metric}`) returns empty body.
   Documented in v7.6.6.6. Non-blocking — all other aggregator mutation and read flows pass.
+
+- **Import/export cycle** (`/api/import/begin`, `/api/import/d/{data}`, `/api/import/w/{data}`,
+  `/api/import/finish`) — execution crashes the ESP32-C3 board. This is a pre-existing firmware
+  bug unrelated to Phase Y scope. These endpoints are deferred to a post-Phase Y bug-fix step.
 
 ## [v7.6.6.6] — 2026-04-11 — Phase Y: Multi-Satellite Aggregator Device Integration Test — PASS
 

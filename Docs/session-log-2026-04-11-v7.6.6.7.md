@@ -3,19 +3,22 @@
 _Date: 2026-04-11_
 _Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
 _Branch: `copilot/implement-comprehensive-endpoint-test`_
-_Status: COMPLETE — Phase B (aggregator) + Phase C (cleanup + playwright) passed_
+_Status: COMPLETE — Phase A (satellite) + Phase B (aggregator) + Phase C (cleanup + playwright) passed_
 
 ---
 
 ## Summary
 
-v7.6.6.7 records the full endpoint smoke test for the Phase Y firmware. The S3 aggregator (Phase B,
-6 aggregator-specific endpoints) and cleanup/Playwright gate (Phase C) were completed on physical
-hardware. All Playwright test suites pass. The pipeline is clean in satellite mode. Version bumped
-to v7.6.6.7. No firmware source was changed — documentation and version-stamp files only.
+v7.6.6.7 records the full endpoint smoke test for the Phase Y firmware. The C3 satellite (Phase A,
+13 local GET endpoints + auth gate + management endpoints) and S3 aggregator (Phase B, 6
+aggregator-specific endpoints) were tested on physical hardware. Cleanup and Playwright gate
+(Phase C) also completed. All Playwright test suites pass. The pipeline is clean in satellite mode.
+Version bumped to v7.6.6.7. No functional firmware logic changed — devices under test were running
+the v7.6.6.6 binary at time of testing; this PR records the v7.6.6.7 version-stamp release.
 
-The history proxy endpoint (`GET /api/aggregator/proxy/{gw}/history/{device}/{metric}`) remains
-non-functional; this is a documented deferred bug carried forward from v7.6.6.6.
+Two known deferred gaps are documented below:
+- History proxy (`GET /api/aggregator/proxy/{gw}/history/{device}/{metric}`) — non-functional, carried from v7.6.6.6.
+- Import/export cycle (`/api/import/begin`, `/api/import/d/`, `/api/import/w/`, `/api/import/finish`) — crashes the board on execution; deferred for bug fix post-Phase Y.
 
 ---
 
@@ -29,8 +32,241 @@ non-functional; this is a documented deferred bug carried forward from v7.6.6.6.
 
 ## Device Test Evidence
 
-**Hardware:** ESP32-S3-DevKitC1-N16R8 at `192.168.120.191` (aggregator mode)
-**Satellites:** sat-c3-4m-189 (ESP32-C3, v7.6.6.6, 192.168.120.189), sat-esp32-4m-190 (ESP32, v7.6.5.3, 192.168.120.190)
+**C3 Satellite:** ESP32-C3 SuperMini at `192.168.120.189` (satellite mode, firmware v7.6.6.6)
+**S3 Aggregator:** ESP32-S3-DevKitC1-N16R8 at `192.168.120.191` (aggregator mode)
+**Satellites known to aggregator:** sat-c3-4m-189 (ESP32-C3, v7.6.6.6, 192.168.120.189), sat-esp32-4m-190 (ESP32, v7.6.5.3, 192.168.120.190)
+
+---
+
+### Phase A — C3 Satellite Endpoint Tests (192.168.120.189)
+
+**Endpoint 1 — `GET /history/0/temp` (no auth)**
+
+```bash
+curl -s http://192.168.120.189/history/0/temp | head -20
+```
+✅ PASS — CSV history stream returned (epoch timestamps at 900s intervals).
+
+---
+
+**Endpoint 2 — `GET /history/0/hum` (no auth)**
+
+```bash
+curl -s http://192.168.120.189/history/0/hum | head -20
+```
+✅ PASS — CSV history stream returned.
+
+---
+
+**Endpoint 3 — `GET /sensors.json` (no auth)**
+
+```bash
+curl -s http://192.168.120.189/sensors.json | jq
+```
+✅ PASS — JSON sensor projection returned.
+
+---
+
+**Endpoint 4 — `GET /api/manifest` (no auth)**
+
+```bash
+curl -s http://192.168.120.189/api/manifest | jq
+```
+✅ PASS — schema_version 2, version v7.6.6.6, 5 sensors, 8 metrics.
+
+---
+
+**Endpoint 5 — `GET /dashboard` (no auth)**
+
+```bash
+curl -s -o /dev/null -w "%{http_code} %{size_download}" http://192.168.120.189/dashboard
+```
+✅ PASS — 200, 37 kB gzip-compressed dashboard.
+
+---
+
+**Endpoint 6 — `GET /dashboard.html` (no auth)**
+
+```bash
+curl -s -o /dev/null -w "%{http_code} %{size_download}" http://192.168.120.189/dashboard.html
+```
+✅ PASS — 200, same payload as `/dashboard`.
+
+---
+
+**Endpoint 7 — `GET /dashboard-download` (no auth)**
+
+```bash
+curl -s -o /dev/null -w "%{http_code} %{content_type}" http://192.168.120.189/dashboard-download
+```
+✅ PASS — 200, attachment content-disposition.
+
+---
+
+**Endpoint 8 — `GET /favicon.ico` (no auth)**
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" http://192.168.120.189/favicon.ico
+```
+✅ PASS — 200 (suppression path).
+
+---
+
+**Endpoint 9 — `GET /api/storage-stats` (no auth)**
+
+```bash
+curl -s http://192.168.120.189/api/storage-stats | jq
+```
+✅ PASS — valid_segments, capacity, NVS healthy.
+
+---
+
+**Endpoint 10 — `GET /api/status` (no auth)**
+
+```bash
+curl -s http://192.168.120.189/api/status | jq
+```
+✅ PASS — free_heap present, version v7.6.6.6, uptime, sensor_count 5.
+
+---
+
+**Endpoint 11 — `GET /api/v2/live` (no auth)**
+
+```bash
+curl -s http://192.168.120.189/api/v2/live | jq
+```
+✅ PASS — office/first_floor/outside/wan_ping live; nas01 null (expected — no ingest source).
+
+---
+
+**Endpoint 12 — `GET /api/v2/history/outside/temperature` (no auth)**
+
+```bash
+curl -s "http://192.168.120.189/api/v2/history/outside/temperature" | jq | head -20
+```
+✅ PASS — JSON history array with epoch timestamps at 900s intervals.
+
+---
+
+**Endpoint 13 — `POST /api/ingest/0/temperature` (no auth)**
+
+```bash
+curl -s -d 'a=1' -X POST "http://192.168.120.189/api/ingest/0/temperature"
+```
+✅ PASS — endpoint responded (value validation result OK).
+
+---
+
+### Phase A — Auth Gate
+
+**Unauthenticated request (expected: 401)**
+
+```bash
+curl -s -d 'a=1' -X POST http://192.168.120.189/api/reboot | jq
+```
+```json
+{
+  "ok": false,
+  "message": "Management authentication required",
+  "status": 401
+}
+```
+✅ PASS — 401 Unauthorized returned without credentials.
+
+**Authenticated request (expected: 200)**
+
+```bash
+curl -s -u <user>:<pass> -d 'a=1' -X POST http://192.168.120.189/api/reboot | jq
+```
+```json
+{
+  "ok": true,
+  "message": "Reboot scheduled"
+}
+```
+✅ PASS — 200 OK returned with valid credentials. Device rebooted and came back online.
+
+---
+
+### Phase A — Management Endpoints
+
+**Endpoint 19 — `POST /api/reboot` (authenticated)**
+
+Tested via auth gate above. ✅ PASS.
+
+---
+
+**Endpoint 20 — `POST /api/delete-data` (authenticated)**
+
+```bash
+curl -s -u <user>:<pass> -d 'a=1' -X POST http://192.168.120.189/api/delete-data
+```
+✅ PASS — 200, deferred deletion initiated.
+
+---
+
+**Endpoint 21 — `POST /api/system/reset-satellites` (authenticated)**
+
+```bash
+curl -s -u <user>:<pass> -d 'a=1' -X POST http://192.168.120.189/api/system/reset-satellites
+```
+✅ PASS — 200, no-op on satellite (no aggregator context); returned success.
+
+---
+
+### Phase A — Import/Export Cycle (DEFERRED — Known Bug)
+
+**Status: ⚠️ DEFERRED — board crashes on import/export endpoint execution**
+
+The import/export endpoints (`/api/import/begin`, `/api/import/d/{data}`,
+`/api/import/w/{data}`, `/api/import/finish`) were not tested in this session
+because executing them crashes the board. This is a pre-existing firmware bug
+that is unrelated to Phase Y scope.
+
+**Impact:** These endpoints (endpoints 14–18) are deferred for a dedicated
+bug-fix step post-Phase Y. They do not block the Phase Y gate.
+
+| # | Endpoint | Method | Auth | Status |
+|---|----------|--------|------|--------|
+| 14 | `/api/import/begin` | POST | Yes | ⚠️ Deferred — board crash bug |
+| 15 | `/api/import/begin/single/{id}` | POST | Yes | ⚠️ Deferred — board crash bug |
+| 16 | `/api/import/d/{data}` | POST | Yes | ⚠️ Deferred — board crash bug |
+| 17 | `/api/import/w/{data}` | POST | Yes | ⚠️ Deferred — board crash bug |
+| 18 | `/api/import/finish` | POST | Yes | ⚠️ Deferred — board crash bug |
+
+---
+
+### Phase A — Complete Endpoint Summary
+
+| # | Endpoint | Method | Auth | Board | Result |
+|---|----------|--------|------|-------|--------|
+| 1 | `/history/{id}/temp` | GET | No | C3 (189) | ✅ 200 — CSV history stream |
+| 2 | `/history/{id}/hum` | GET | No | C3 (189) | ✅ 200 — CSV history stream |
+| 3 | `/sensors.json` | GET | No | C3 (189) | ✅ 200 — JSON sensor projection |
+| 4 | `/api/manifest` | GET | No | C3 (189) | ✅ 200 — schema_version 2, v7.6.6.6 |
+| 5 | `/dashboard` | GET | No | C3 (189) | ✅ 200 — 37 kB gzip dashboard |
+| 6 | `/dashboard.html` | GET | No | C3 (189) | ✅ 200 — same as `/dashboard` |
+| 7 | `/dashboard-download` | GET | No | C3 (189) | ✅ 200 — attachment disposition |
+| 8 | `/favicon.ico` | GET | No | C3 (189) | ✅ 200 — suppression path |
+| 9 | `/api/storage-stats` | GET | No | C3 (189) | ✅ 200 — NVS stats healthy |
+| 10 | `/api/status` | GET | No | C3 (189) | ✅ 200 — free_heap, uptime, sensor_count 5 |
+| 11 | `/api/v2/live` | GET | No | C3 (189) | ✅ 200 — 4 live sensors |
+| 12 | `/api/v2/history/{device}/{metric}` | GET | No | C3 (189) | ✅ 200 — JSON history |
+| 13 | `/api/ingest/{device}/{metric}` | POST | No | C3 (189) | ✅ 200 — endpoint responded |
+| 14 | `/api/import/begin` | POST | Yes | C3 (189) | ⚠️ Deferred — board crash bug |
+| 15 | `/api/import/begin/single/{id}` | POST | Yes | C3 (189) | ⚠️ Deferred — board crash bug |
+| 16 | `/api/import/d/{data}` | POST | Yes | C3 (189) | ⚠️ Deferred — board crash bug |
+| 17 | `/api/import/w/{data}` | POST | Yes | C3 (189) | ⚠️ Deferred — board crash bug |
+| 18 | `/api/import/finish` | POST | Yes | C3 (189) | ⚠️ Deferred — board crash bug |
+| 19 | `/api/reboot` | POST | Yes | C3 (189) | ✅ 200 (auth gate verified) |
+| 20 | `/api/delete-data` | POST | Yes | C3 (189) | ✅ 200 — deferred deletion |
+| 21 | `/api/system/reset-satellites` | POST | Yes | C3 (189) | ✅ 200 — no-op on satellite |
+| B1 | `/api/aggregator/gateways` | GET | No | S3 (191) | ✅ 200 — 2 satellites, manifests cached |
+| B2 | `/api/aggregator/live` | GET | No | S3 (191) | ✅ 200 — live data both satellites |
+| B3 | `/api/aggregator/proxy/…` | GET | No | S3 (191) | ⚠️ Empty — deferred bug |
+| B4 | `/api/aggregator/add-satellite` | POST | No | S3 (191) | ✅ 200 ok:true |
+| B5 | `/api/aggregator/test-satellite` | POST | Yes | S3 (191) | ✅ 200 ok:true |
+| B6 | `/api/aggregator/satellite/{id}` | DELETE | Yes | S3 (191) | ✅ 200 ok:true |
 
 ---
 
@@ -140,7 +376,7 @@ curl -s -d 'a=1' -X POST "http://192.168.120.191/api/aggregator/add-satellite?ur
 **Endpoint 5 — `POST /api/aggregator/test-satellite` (authenticated)**
 
 ```bash
-curl -s -u ESPadmin:ESPpass100 -d "url=http://192.168.120.189" -X POST http://192.168.120.191/api/aggregator/test-satellite
+curl -s -u <user>:<pass> -d "url=http://192.168.120.189" -X POST http://192.168.120.191/api/aggregator/test-satellite
 ```
 ```json
 {
@@ -160,7 +396,7 @@ curl -s -u ESPadmin:ESPpass100 -d "url=http://192.168.120.189" -X POST http://19
 **Endpoint 6 — `DELETE /api/aggregator/satellite/sat-c3-4m-189` (authenticated)**
 
 ```bash
-curl -s -u ESPadmin:ESPpass100 -X DELETE "http://192.168.120.191/api/aggregator/satellite/sat-c3-4m-189"
+curl -s -u <user>:<pass> -X DELETE "http://192.168.120.191/api/aggregator/satellite/sat-c3-4m-189"
 ```
 ```json
 {"ok":true}
@@ -246,11 +482,21 @@ All Phase Y checks pass:
 
 ---
 
-## Known Deferred Gap: History Proxy Non-Functional
+## Known Deferred Gaps
+
+### Gap 1: History Proxy Non-Functional
 
 `GET /api/aggregator/proxy/{gw}/history/{device}/{metric}` returns an empty body.
 First observed in v7.6.6.6, confirmed again in this session. Non-blocking — all other
 aggregator read/mutation flows pass. Tracked for resolution post-Phase Y.
+
+### Gap 2: Import/Export Cycle Crashes Board
+
+The import/export endpoint sequence (`/api/import/begin` → `/api/import/d/` →
+`/api/import/w/` → `/api/import/finish`) crashes the ESP32-C3 board on execution.
+This is a pre-existing firmware bug. Endpoints 14–18 are deferred and are excluded
+from the Phase Y smoke test gate. A dedicated bug-fix step is required post-Phase Y
+before these endpoints can be validated on hardware.
 
 ---
 
