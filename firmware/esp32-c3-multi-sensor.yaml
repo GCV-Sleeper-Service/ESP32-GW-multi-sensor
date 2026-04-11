@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.6.6.5
+# ESP32-C3 Multi-Sensor Gateway - v7.6.6.6
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -53,7 +53,7 @@ esphome:
       priority: -100
       then:
         - lambda: |-
-            register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.6.6.5");
+            register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.6.6.6");
             id(dashboard_link).publish_state(
               "Dashboard: /dashboard or /dashboard.html — Download: /dashboard-download");
     - # Priority 600: run after WiFi and SNTP are available.

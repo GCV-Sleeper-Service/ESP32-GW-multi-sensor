@@ -2,6 +2,45 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.6.6] — 2026-04-11 — Phase Y: Multi-Satellite Aggregator Device Integration Test — PASS
+
+> This release records the passing device integration test results for the v7.6.6.5 aggregator firmware
+> running on ESP32-S3 hardware. The HTTP API responses therefore report `"firmware_version": "v7.6.6.5"`.
+> The history proxy issue is tracked separately (new issue opened).
+
+### Validated
+- Full device integration test on physical ESP32-S3 hardware (rev0.2, 2 cores)
+- Firmware v7.6.6.5 flashed via USB, compiled ESPHome 2026.2.1 / ESP-IDF
+
+### Device Test Evidence
+
+**Serial boot log (Checkpoint B):**
+- `Aggregator polling task started (init pending)` — aggregator task boots cleanly ✓
+- `NVS satellite[0]: id=sat-c3-4m-189 url=http://192.168.120.189 poll=30s` — NVS persistence of satellites across reboot ✓
+- `NVS satellite[1]: id=sat-esp32-4m-190 url=http://192.168.120.190 poll=30s` — second satellite also persisted ✓
+- `Loaded 2 satellites from NVS` — NVS satellite restore on boot ✓
+- `setup() finished successfully!` — no crash, no boot loop ✓
+- `[sat-c3-4m-189] recovered (was unreachable)` → live 451B, status 511B, manifest 5736B ✓
+- `[sat-esp32-4m-190] recovered (was unreachable)` → live 451B, status 511B, manifest 5770B ✓
+- `Boot seems successful; resetting boot loop counter` — safe-mode gate passed ✓
+- `PingAdapter: rtt=40ms success=100% (3/3)` — WAN latency adapter on gateway functional ✓
+- Continuous poll cycle (both satellites reachable, live + status every ~30s) ✓
+
+**HTTP API tests (curl):**
+- `GET /api/aggregator/gateways` — 2 satellites listed, both `"reachable": true`, manifests cached, full manifest inline ✓
+  - `sat-c3-4m-189`: firmware v7.6.6.4, 5 sensors (office, first_floor, outside, wan_ping, nas01) ✓
+  - `sat-esp32-4m-190`: firmware v7.6.5.3, 5 sensors (office, first_floor, outside, wan_ping, nas01) ✓
+- `GET /api/aggregator/live` — live data from both satellites returned ✓
+  - sat-c3-4m-189: office 22.2°C/30%hum, first_floor 16.6°C/40%hum, outside 13.8°C/41%hum, wan_ping 52ms/100% ✓
+  - sat-esp32-4m-190: office 22.2°C/30%hum, first_floor 16.6°C/40%hum, outside 13.7°C/41%hum, wan_ping 34.7ms/100% ✓
+- `POST /api/aggregator/test-satellite` — returns 400 `Missing url parameter` for incomplete curl call (correct validation) ✓
+- Add/test/remove satellite operations confirmed working via dashboard UI ✓
+- History proxy (`GET /api/aggregator/proxy/…`) — not functional; tracked as new issue
+
+### All preflight checks pass (v7.6.6.6)
+- All Phase Y checks: `firmware_core_fragments_exist`, `firmware_core_assembly_check`, `firmware_core_fragment_line_sum` (4326 == 4326) ✓
+- All version sync checks ✓
+
 ## [v7.6.6.5] — 2026-04-10 — Phase Y: Device Integration Test — PASS
 
 > This release records the passing device integration test results for the v7.6.6.4 firmware.
