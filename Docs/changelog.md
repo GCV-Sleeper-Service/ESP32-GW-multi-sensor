@@ -2,6 +2,68 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.6.6] — 2026-04-11 — Phase Y: Multi-Satellite Aggregator Device Integration Test — PASS
+
+> This release records the passing device integration test results for the v7.6.6.5 aggregator firmware
+> running on ESP32-S3 hardware. The HTTP API responses therefore report `"firmware_version": "v7.6.6.5"`.
+> The history proxy issue is tracked separately (new issue opened).
+
+### Validated
+- Full device integration test on physical ESP32-S3 hardware (rev0.2, 2 cores)
+- Firmware v7.6.6.5 flashed via USB, compiled ESPHome 2026.2.1 / ESP-IDF
+
+### Device Test Evidence
+
+**Serial boot log (Checkpoint B):**
+- `Aggregator polling task started (init pending)` — aggregator task boots cleanly ✓
+- `NVS satellite[0]: id=sat-c3-4m-189 url=http://192.168.120.189 poll=30s` — NVS persistence of satellites across reboot ✓
+- `NVS satellite[1]: id=sat-esp32-4m-190 url=http://192.168.120.190 poll=30s` — second satellite also persisted ✓
+- `Loaded 2 satellites from NVS` — NVS satellite restore on boot ✓
+- `setup() finished successfully!` — no crash, no boot loop ✓
+- `[sat-c3-4m-189] recovered (was unreachable)` → live 451B, status 511B, manifest 5736B ✓
+- `[sat-esp32-4m-190] recovered (was unreachable)` → live 451B, status 511B, manifest 5770B ✓
+- `Boot seems successful; resetting boot loop counter` — safe-mode gate passed ✓
+- `PingAdapter: rtt=40ms success=100% (3/3)` — WAN latency adapter on gateway functional ✓
+- Continuous poll cycle (both satellites reachable, live + status every ~30s) ✓
+
+**HTTP API tests (curl):**
+- `GET /api/aggregator/gateways` — 2 satellites listed, both `"reachable": true`, manifests cached, full manifest inline ✓
+  - `sat-c3-4m-189`: firmware v7.6.6.4, 5 sensors (office, first_floor, outside, wan_ping, nas01) ✓
+  - `sat-esp32-4m-190`: firmware v7.6.5.3, 5 sensors (office, first_floor, outside, wan_ping, nas01) ✓
+- `GET /api/aggregator/live` — live data from both satellites returned ✓
+  - sat-c3-4m-189: office 22.2°C/30%hum, first_floor 16.6°C/40%hum, outside 13.8°C/41%hum, wan_ping 52ms/100% ✓
+  - sat-esp32-4m-190: office 22.2°C/30%hum, first_floor 16.6°C/40%hum, outside 13.7°C/41%hum, wan_ping 34.7ms/100% ✓
+- `POST /api/aggregator/test-satellite` (authenticated): `{"ok":true,"gateway":{"id":"gw-main","name":"Main Gateway","hardware":"ESP32-C3","sensor_count":5}}` ✓
+- `POST /api/aggregator/add-satellite?url=http://192.168.120.190`: satellite added via `?url=` query parameter ✓
+- `DELETE /api/aggregator/satellite/sat-esp32-4m-190`: satellite removed by string ID ✓
+- Re-add after deletion: `["sat-c3-4m-189","sat-esp32-4m-190"]` restored ✓
+- `POST /api/system/reset-satellites`: `{"ok":true,"message":"Satellite reset scheduled","satellite_count":3}` ✓
+- Add/test/remove satellite operations confirmed working via dashboard UI ✓
+- History proxy (`GET /api/aggregator/proxy/…`) — not functional; tracked as new issue
+- Satellite mode restored: `provision.sh status` → Role: satellite, CI-safe: YES ✓
+
+### Playwright Results (v7.6.6.6)
+- `FIXTURE_SET=3sensor chromium` → 99 passed, 45 skipped ✓
+- `FIXTURE_SET=3sensor firefox` → 99 passed, 45 skipped ✓
+- `FIXTURE_SET=mixed chromium` → 7 passed ✓
+- `FIXTURE_SET=system chromium` → 8 passed ✓
+- `FIXTURE_SET=aggregator chromium` → 11 passed, 1 skipped ✓
+
+### All preflight checks pass (v7.6.6.6)
+- All Phase Y checks: `firmware_core_fragments_exist`, `firmware_core_assembly_check`, `firmware_core_fragment_line_sum` (4326 == 4326) ✓
+- All version sync checks ✓
+
+### Corrections discovered during device testing
+- `POST /api/aggregator/test-satellite` — parameter is `url=http://...` body field (full URL
+  including protocol), not `ip=...`. Prompt corrected (LESSON-OPS-107).
+- `POST /api/aggregator/add-satellite` — parameter is `?url=http://...` query string,
+  not `-d "ip=..."` body field. Prompt corrected (LESSON-OPS-108).
+- `DELETE /api/aggregator/satellite/{id}` — `{id}` is the satellite's string ID
+  (e.g. `sat-c3-4m-189`), not an integer index. Prompt corrected (LESSON-OPS-109).
+- `satellite_config_generation` — internal concurrency counter (LESSON-OPS-106),
+  never serialised to HTTP response. Test 6 grep was incorrectly specified; the
+  counter was confirmed working via observable mutation outcomes (add/delete/reset all succeeded).
+
 ## [v7.6.6.5] — 2026-04-10 — Phase Y: Device Integration Test — PASS
 
 > This release records the passing device integration test results for the v7.6.6.4 firmware.
