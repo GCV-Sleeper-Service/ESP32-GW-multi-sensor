@@ -2,6 +2,58 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.6.7] — 2026-04-11 — Phase Y: Full Endpoint Smoke Test — PASS
+
+> This release records the passing full endpoint smoke test across both the C3 satellite and S3
+> aggregator board profiles. The HTTP API responses report `"firmware_version": "v7.6.6.6"` because
+> no firmware source changed in this step — only documentation and version stamp files were updated.
+> The history proxy issue remains tracked as a known deferred bug.
+
+### Validated
+
+- Phase B (S3 Aggregator) — all 6 aggregator-specific endpoints re-validated
+- Phase C (Cleanup) — satellite mode restored, full pipeline clean, all Playwright tests pass
+
+### Device Test Evidence — Phase B: S3 Aggregator Endpoints (192.168.120.191)
+
+**Aggregator endpoint tests:**
+- `GET /api/aggregator/gateways` — 2 satellites listed, both `"reachable": true`, `consecutive_failures: 0`, full manifests embedded inline ✓
+  - `sat-c3-4m-189`: firmware v7.6.6.6, 5 sensors (office, first_floor, outside, wan_ping, nas01) ✓
+  - `sat-esp32-4m-190`: firmware v7.6.5.3, 5 sensors (office, first_floor, outside, wan_ping, nas01) ✓
+- `GET /api/aggregator/live` — live data from both satellites returned ✓
+  - sat-c3-4m-189: office 20.5°C/30%hum, first_floor 15.6°C/40%hum, outside 9.1°C/45%hum, wan_ping 59.7ms/100% ✓
+  - sat-esp32-4m-190: office 20.5°C/30%hum, first_floor 15.7°C/40%hum, outside 9.2°C/45%hum, wan_ping 77.3ms/100% ✓
+- `GET /api/aggregator/proxy/…` — not functional (documented bug, deferred) ⚠️
+- `POST /api/aggregator/add-satellite?url=http://192.168.120.190` — `{"ok":true,"satellite":{"id":"sat-esp32-4m-190",...,"poll":30}}` ✓
+- `POST /api/aggregator/test-satellite` (authenticated, `-d "url=http://192.168.120.189"`): `{"ok":true,"gateway":{"id":"gw-main","name":"Main Gateway","hardware":"ESP32-C3","sensor_count":5}}` ✓
+- `DELETE /api/aggregator/satellite/sat-c3-4m-189` (authenticated): `{"ok":true}` ✓
+
+### Phase C: Cleanup and Verification
+
+- `bash scripts/provision.sh satellite` — full 9-step pipeline ran and completed cleanly ✓
+  - Step 0 (assemble): 8 fragments → 4326 lines ✓
+  - Step 1 (bundle): 18 modules → 173046 bytes ✓
+  - Steps 2–8: render, fixtures, render, build-html, minify, header, check — all PASS ✓
+- `bash scripts/provision.sh status` → Role: satellite, CI-safe: YES ✓
+
+### Playwright Results (v7.6.6.7)
+
+- `FIXTURE_SET=3sensor chromium` → 99 passed, 45 skipped ✓
+- `FIXTURE_SET=3sensor firefox` → 99 passed, 45 skipped ✓
+- `FIXTURE_SET=mixed chromium` → 7 passed ✓
+- `FIXTURE_SET=system chromium` → 8 passed ✓
+- `FIXTURE_SET=aggregator chromium` → 11 passed, 1 skipped ✓
+
+### All preflight checks pass (v7.6.6.7)
+
+- All Phase Y checks: `firmware_core_fragments_exist`, `firmware_core_assembly_check`, `firmware_core_fragment_line_sum` (4326 == 4326) ✓
+- All version sync checks ✓
+
+### Known Deferred Issues
+
+- History proxy (`GET /api/aggregator/proxy/{gw}/history/{device}/{metric}`) returns empty body.
+  Documented in v7.6.6.6. Non-blocking — all other aggregator mutation and read flows pass.
+
 ## [v7.6.6.6] — 2026-04-11 — Phase Y: Multi-Satellite Aggregator Device Integration Test — PASS
 
 > This release records the passing device integration test results for the v7.6.6.5 aggregator firmware
