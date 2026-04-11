@@ -38,6 +38,150 @@ Two known deferred gaps are documented below:
 
 ---
 
+### ESPHome Build & Flash Log
+
+**C3 Satellite — `esphome run firmware/esp32-c3-multi-sensor.yaml`**
+
+```
+Successfully created ESP32C3 image.
+merge_factory_bin([".pioenvs/esp32-c3-multi/firmware.bin"], [".pioenvs/esp32-c3-multi/firmware.elf"])
+Info: bootloader.bin not found - skipping
+Info: partition-table.bin not found - skipping
+Info: ota_data_initial.bin not found - skipping
+Info: esp32-c3-multi.bin not found - skipping
+Using FLASH_EXTRA_IMAGES from PlatformIO environment
+Merging binaries into /root/config/ESP32-GW-multi-sensor/firmware/.esphome/build/esp32-c3-multi/.pioenvs/esp32-c3-multi/firmware.factory.bin
+Merging binaries with esptool
+SHA digest in image updated.
+Wrote 0x1762a0 bytes to file '/root/config/ESP32-GW-multi-sensor/firmware/.esphome/build/esp32-c3-multi/.pioenvs/esp32-c3-multi/firmware.factory.bin', ready to flash to offset 0x0.
+Successfully created /root/config/ESP32-GW-multi-sensor/firmware/.esphome/build/esp32-c3-multi/.pioenvs/esp32-c3-multi/firmware.factory.bin
+esp32_copy_ota_bin([".pioenvs/esp32-c3-multi/firmware.bin"], [".pioenvs/esp32-c3-multi/firmware.elf"])
+Copied firmware to /root/config/ESP32-GW-multi-sensor/firmware/.esphome/build/esp32-c3-multi/.pioenvs/esp32-c3-multi/firmware.ota.bin
+================================================================= [SUCCESS] Took 16.69 seconds =================================================================
+INFO Build Info: config_hash=0xa69d6c72 build_time_str=2026-04-11 13:46:45 -0700
+INFO Successfully compiled program.
+Found multiple options for uploading, please choose one:
+  [1] /dev/ttyACM0 (USB JTAG/serial debug unit)
+  [2] Over The Air (192.168.120.189)
+(number): 2
+INFO Connecting to 192.168.120.189 port 3232...
+INFO Connected to 192.168.120.189
+INFO Uploading /root/config/ESP32-GW-multi-sensor/firmware/.esphome/build/esp32-c3-multi/.pioenvs/esp32-c3-multi/firmware.bin (1467040 bytes)
+Uploading: [============================================================] 100% Done...
+
+INFO Upload took 5.60 seconds, waiting for result...
+INFO OTA successful
+INFO Successfully uploaded program.
+INFO Starting log output from 192.168.120.189 using esphome API
+INFO Successfully resolved esp32-c3-multi @ 192.168.120.189 in 0.000s
+INFO Trying to connect to esp32-c3-multi @ 192.168.120.189 in the background
+INFO Successfully connected to esp32-c3-multi @ 192.168.120.189 in 0.006s
+INFO Successful handshake with esp32-c3-multi @ 192.168.120.189 in 0.101s
+[15:52:15.201][I][app:215]: ESPHome version 2026.2.1 compiled on 2026-04-11 13:46:45 -0700
+[15:52:15.269][I][app:222]: ESP32 Chip: ESP32-C3 rev0.4, 1 core(s)
+[15:53:05.846][I][safe_mode:071]: Boot seems successful; resetting boot loop counter
+[15:53:06.465][I][history:1351][ping_adapter]: PingAdapter: rtt=73ms success=100% (3/3)
+[15:54:07.024][I][history:1351][ping_adapter]: PingAdapter: rtt=90ms success=100% (3/3)
+INFO Processing unexpected disconnect from ESPHome API for esp32-c3-multi @ 192.168.120.189
+WARNING Disconnected from API
+INFO Successfully resolved esp32-c3-multi @ 192.168.120.189 in 0.000s
+INFO Successfully connected to esp32-c3-multi @ 192.168.120.189 in 0.003s
+INFO Successful handshake with esp32-c3-multi @ 192.168.120.189 in 0.102s
+[15:55:17.034][I][safe_mode:071]: Boot seems successful; resetting boot loop counter
+[15:55:17.639][I][history:1351][ping_adapter]: PingAdapter: rtt=63ms success=100% (3/3)
+[15:56:18.259][I][history:1351][ping_adapter]: PingAdapter: rtt=68ms success=100% (3/3)
+[15:57:18.832][I][history:1351][ping_adapter]: PingAdapter: rtt=92ms success=100% (3/3)
+[15:58:19.439][I][history:1351][ping_adapter]: PingAdapter: rtt=64ms success=100% (3/3)
+```
+✅ PASS — C3 board: ESPHome 2026.2.1 compiled and flashed via OTA (1 467 040 bytes, 5.60 s). Boot
+loop counter reset, WAN ping adapter healthy. No crash on boot.
+
+---
+
+**S3 Aggregator — `esphome run firmware/esp32-s3-devkitc1-n16r8-gw.yaml`**
+
+```
+Successfully created ESP32S3 image.
+merge_factory_bin([".pioenvs/agg-s3-16m-1/firmware.bin"], [".pioenvs/agg-s3-16m-1/firmware.elf"])
+Info: bootloader.bin not found - skipping
+Info: partition-table.bin not found - skipping
+Info: ota_data_initial.bin not found - skipping
+Info: agg-s3-16m-1.bin not found - skipping
+Using FLASH_EXTRA_IMAGES from PlatformIO environment
+Merging binaries into /root/config/ESP32-GW-multi-sensor/firmware/.esphome/build/agg-s3-16m-1/.pioenvs/agg-s3-16m-1/firmware.factory.bin
+Merging binaries with esptool
+SHA digest in image updated.
+Wrote 0xf9140 bytes to file '/root/config/ESP32-GW-multi-sensor/firmware/.esphome/build/agg-s3-16m-1/.pioenvs/agg-s3-16m-1/firmware.factory.bin', ready to flash to offset 0x0.
+Successfully created /root/config/ESP32-GW-multi-sensor/firmware/.esphome/build/agg-s3-16m-1/.pioenvs/agg-s3-16m-1/firmware.factory.bin
+esp32_copy_ota_bin([".pioenvs/agg-s3-16m-1/firmware.bin"], [".pioenvs/agg-s3-16m-1/firmware.elf"])
+Copied firmware to /root/config/ESP32-GW-multi-sensor/firmware/.esphome/build/agg-s3-16m-1/.pioenvs/agg-s3-16m-1/firmware.ota.bin
+================================================================= [SUCCESS] Took 17.40 seconds =================================================================
+INFO Build Info: config_hash=0xd2021a9c build_time_str=2026-04-11 14:28:24 -0700
+INFO Successfully compiled program.
+Found multiple options for uploading, please choose one:
+  [1] /dev/ttyACM0 (USB JTAG/serial debug unit)
+  [2] Over The Air (192.168.120.191)
+(number): 2
+INFO Connecting to 192.168.120.191 port 3232...
+INFO Connected to 192.168.120.191
+INFO Uploading /root/config/ESP32-GW-multi-sensor/firmware/.esphome/build/agg-s3-16m-1/.pioenvs/agg-s3-16m-1/firmware.bin (954688 bytes)
+Uploading: [============================================================] 100% Done...
+
+INFO Upload took 4.02 seconds, waiting for result...
+INFO OTA successful
+INFO Successfully uploaded program.
+INFO Starting log output from 192.168.120.191 using esphome API
+INFO Successfully resolved agg-s3-16m-1 @ 192.168.120.191 in 0.000s
+INFO Successfully connected to agg-s3-16m-1 @ 192.168.120.191 in 5.296s
+INFO Successful handshake with agg-s3-16m-1 @ 192.168.120.191 in 0.080s
+[14:33:07.200][I][app:215]: ESPHome version 2026.2.1 compiled on 2026-04-11 14:28:24 -0700
+[14:33:07.251][I][app:222]: ESP32 Chip: ESP32-S3 rev0.2, 2 core(s)
+[14:33:18.306][I][aggregator:1936][agg_poll]: [sat-c3-4m-189] recovered (was unreachable)
+[14:33:18.311][I][aggregator:1938][agg_poll]: [sat-c3-4m-189] live: 450 bytes
+[14:33:18.856][I][aggregator:1978][agg_poll]: [sat-c3-4m-189] status: 511 bytes
+[14:33:26.075][I][aggregator:2017][agg_poll]: [sat-c3-4m-189] manifest: 5736 bytes
+[14:33:35.300][I][aggregator:1936][agg_poll]: [sat-esp32-4m-190] recovered (was unreachable)
+[14:33:35.306][I][aggregator:1938][agg_poll]: [sat-esp32-4m-190] live: 450 bytes
+[14:33:36.849][I][aggregator:1978][agg_poll]: [sat-esp32-4m-190] status: 511 bytes
+[14:33:44.096][I][aggregator:2017][agg_poll]: [sat-esp32-4m-190] manifest: 5770 bytes
+[14:33:55.988][I][aggregator:1938][agg_poll]: [sat-c3-4m-189] live: 450 bytes
+[14:33:56.611][I][aggregator:1978][agg_poll]: [sat-c3-4m-189] status: 511 bytes
+[14:34:01.493][I][safe_mode:071]: Boot seems successful; resetting boot loop counter
+[14:34:02.107][I][history:1279][ping_adapter]: PingAdapter: rtt=45ms success=100% (3/3)
+[14:34:05.613][I][aggregator:1938][agg_poll]: [sat-esp32-4m-190] live: 450 bytes
+[14:34:06.755][I][aggregator:1978][agg_poll]: [sat-esp32-4m-190] status: 511 bytes
+[14:34:32.440][I][aggregator:1938][agg_poll]: [sat-c3-4m-189] live: 450 bytes
+[14:34:33.136][I][aggregator:1978][agg_poll]: [sat-c3-4m-189] status: 511 bytes
+[14:34:42.070][I][aggregator:1938][agg_poll]: [sat-esp32-4m-190] live: 450 bytes
+[14:34:43.209][I][aggregator:1978][agg_poll]: [sat-esp32-4m-190] status: 511 bytes
+[14:35:01.925][I][aggregator:1938][agg_poll]: [sat-c3-4m-189] live: 450 bytes
+[14:35:02.652][I][aggregator:1978][agg_poll]: [sat-c3-4m-189] status: 511 bytes
+[14:35:02.706][I][history:1279][ping_adapter]: PingAdapter: rtt=42ms success=100% (3/3)
+[14:35:10.638][I][aggregator:1938][agg_poll]: [sat-esp32-4m-190] live: 451 bytes
+[14:35:12.501][I][aggregator:1978][agg_poll]: [sat-esp32-4m-190] status: 511 bytes
+[14:35:38.192][I][aggregator:1938][agg_poll]: [sat-c3-4m-189] live: 450 bytes
+[14:35:39.333][I][aggregator:1978][agg_poll]: [sat-c3-4m-189] status: 511 bytes
+[14:35:45.468][W][component:422]: debug set Warning flag: unspecified
+[14:35:46.470][W][component:462]: debug cleared Warning flag
+[14:35:48.007][I][aggregator:1938][agg_poll]: [sat-esp32-4m-190] live: 451 bytes
+[14:35:48.650][I][aggregator:1978][agg_poll]: [sat-esp32-4m-190] status: 511 bytes
+[14:36:02.258][I][aggregator:4035][httpd]: Deleting satellite[1]: id=sat-esp32-4m-190
+[14:36:02.278][I][aggregator:1793][agg_nvs_save]: NVS agg_sats: saved 1 satellites from snapshot
+[14:36:03.306][I][history:1279][ping_adapter]: PingAdapter: rtt=42ms success=100% (3/3)
+[14:36:14.436][I][aggregator:1938][agg_poll]: [sat-c3-4m-189] live: 450 bytes
+[14:36:16.190][I][aggregator:1978][agg_poll]: [sat-c3-4m-189] status: 511 bytes
+[14:36:47.820][I][aggregator:1938][agg_poll]: [sat-c3-4m-189] live: 450 bytes
+[14:36:49.773][I][aggregator:1978][agg_poll]: [sat-c3-4m-189] status: 511 bytes
+[14:36:51.001][I][aggregator:3986][httpd]: Added satellite[1]: id=sat-esp32-4m-190 name=Second satellite - esp32 wroom 4mb flash url=http://192.168.120.190 poll=30s
+[14:37:03.790][I][aggregator:1936][agg_poll]: [sat-esp32-4m-190] recovered (was unreachable)
+```
+✅ PASS — S3 aggregator: ESPHome 2026.2.1 compiled and flashed via OTA (954 688 bytes, 4.02 s).
+Both satellites recovered on boot (sat-c3-4m-189 live/status/manifest cached, sat-esp32-4m-190
+live/status/manifest cached). NVS satellite list persisted across reboot. Boot loop counter reset,
+WAN ping adapter healthy. DELETE and re-add satellite cycle confirmed in log.
+
+---
+
 ### Phase A — C3 Satellite Endpoint Tests (192.168.120.189)
 
 **Endpoint 1 — `GET /history/0/temp` (no auth)**
