@@ -312,3 +312,60 @@ Effective prompts require the following at the point of risk (not in a separate 
 From Phase X v7.6.5.1 onward, every step's post-merge deliverables include reviewing and updating the next step's handoff and prompt. This creates a forward-inspection chain: step N's closure verifies that step N+1's assumptions are still valid given what actually happened during step N.
 
 Without this pattern, prompts written at plan time accumulate stale references as earlier steps introduce small deviations from the plan.
+
+### 4.4 Checkpoint Pattern (Phase Y)
+
+Mid-implementation checkpoints (`⛔ CHECKPOINT`) and pre-PR gates (`⛔ PRE-PR GATE`) are mandatory in every implementation prompt. The checkpoint pattern was introduced during Phase Y and validated across 9 steps.
+
+**Placement rules:**
+1. Every implementation prompt must contain at least one `⛔ CHECKPOINT` between task groups and one `⛔ PRE-PR GATE` before PR creation.
+2. The mid-implementation checkpoint verifies the most critical intermediate state — typically after the riskiest edit but before subsequent edits that depend on it.
+3. The pre-PR gate verifies: scope (files changed match expected list), all acceptance criteria, all pipeline steps, all deliverables.
+
+**Checkpoint template:**
+```
+⛔ CHECKPOINT — [description of what to verify]
+
+Before proceeding, verify:
+1. [specific verification command with expected output]
+2. [second verification]
+
+If any check fails, STOP and fix before continuing.
+```
+
+**Pre-PR gate template:**
+```
+⛔ PRE-PR GATE
+
+Before creating the PR:
+1. `git diff --name-only` — verify ONLY expected files are modified
+2. [pipeline commands: assemble, preflight, compile, test]
+3. [acceptance criteria verification commands]
+4. Session log is complete with: ESPHome output, Playwright fixture table, evidence summary
+```
+
+**Evidence from Phase Y:** The v7.6.6.1 checkpoint caught a security defect (lwip_send buffer over-read) during the checkpoint pass rather than at end-of-step validation. Without the checkpoint, 6 subsequent steps would have been built on a vulnerable codebase.
+
+**Full reference:** `Docs/writing-guide/prompt-guide-addendum-checkpoints-and-multi-llm-2026-04-09.md`
+
+### 4.5 Multi-LLM Execution Strategy (Phase Y)
+
+Phase Y validated a multi-LLM workflow where different agents serve different roles:
+
+- **Primary execution:** GitHub Copilot — IDE integration, repo context, PR creation
+- **Architectural advisor + prompt producer:** Claude — long-context reasoning, document production
+- **Post-execution review (3-turn):** Perplexity — GitHub MCP access, structured review protocol
+- **Fallback execution:** GPT, Codex — token constraints on Copilot, alternative reasoning
+
+**Critical constraint (validated by cross-LLM analysis):** Every LLM asked to "optimise" an agent prompt strips safety constraints — the constraints it considers redundant are exactly the ones that prevent the failure modes documented in the lessons database. **Original prompts with the universal multi-LLM execution preamble are the only prompts used for execution.** LLM-specific "optimised" variants are never used.
+
+**Reviewer diversity principle:** Multi-reviewer diversity catches more failure classes than depth on any single reviewer. Phase Y's four-reviewer pattern (Copilot bot + Gemini + GPT/Codex + Perplexity) caught different defect types — the lwip_send security defect was only caught by Gemini; a dry-run bypass was only caught by GPT. No single reviewer caught everything.
+
+**Perplexity three-turn review structure:** Post-Copilot-execution review via GitHub MCP:
+- Turn 1: Extract gate checklist from inline context
+- Turn 2: Fetch PR diff and compliance table, check each gate item
+- Turn 3: Produce structured verdict and fix list
+
+The compliance table in the PR description substitutes for shell command verification when using a non-IDE reviewer.
+
+**Full reference:** `Docs/writing-guide/multi-llm-prompt-optimization-analysis-2026-04-09.md`

@@ -455,3 +455,35 @@ Phase Y splits a monolithic C++ header into fragment source files that are conca
 - [ ] **Preflight gate:** All existing preflight checks pass + new fragment-specific checks
 - [ ] **Playwright gate:** All 4 fixture sets green (125+ tests total)
 - [ ] **Device test gate (v7.6.6.5/6/7):** Flash real hardware and verify NVS persistence, aggregator runtime, and full endpoint surface
+
+## Security Review for Network I/O Code
+
+Any step that modifies `firmware/core/aggregator-runtime.h` or `firmware/core/web-handler.h` (or any fragment containing network I/O) must include a security review checkpoint before PR creation.
+
+### Pre-PR Security Checklist
+
+- [ ] No unbounded buffer reads — all `lwip_recv` / `lwip_read` calls have explicit size limits
+- [ ] All `snprintf` return values are checked (return ≥ buffer size = truncation)
+- [ ] All `lwip_send` calls use `strlen()` or tracked length — never `sizeof()` on a partially-filled buffer
+- [ ] No new `setsockopt` calls without `lwip_` prefix (Rule 27)
+- [ ] No new `beginResponseStream` calls (Rule 8)
+- [ ] All new endpoints have explicit auth decisions documented in the code block (LESSON-OPS-110)
+- [ ] `fetch_to_buffer()` callers check return value AND `out_len`
+
+### Origin
+
+Phase Y v7.6.6.1: Gemini caught an `lwip_send(sizeof(buf))` over-read that no other reviewer detected. The fix was a single-line change (`strlen` instead of `sizeof`), but the defect would have sent uninitialised memory to satellite connections.
+
+## Preflight Check Design Rules
+
+When adding new preflight checks to `scripts/preflight.sh`, follow these principles:
+
+### Semantic vs. Presence Checks
+
+- [ ] **Prefer semantic assertions** over substring presence. A check that matches `reboot_task_` could be satisfied by a comment containing the string. A check that matches the function definition pattern (e.g., `void reboot_task_.*{`) catches the actual implementation.
+- [ ] **Definition vs. call site:** When checking that a function exists in a specific fragment, match the definition pattern (`returntype functionname.*{`), not just the function name. Comments, string literals, and documentation can contain function names without the function being present.
+- [ ] **Negative checks are fragile:** A check like `! grep -q "bad_pattern"` can be defeated by renaming. Prefer positive checks that assert the correct pattern is present.
+
+### Origin
+
+Phase Y: `deferred_task_pairs_in_expected_homes` initially used presence-only checks. A comment containing `reboot_task_` would have satisfied the check without the function definition being present. Fixed to use definition pattern matching for `maybe_yield` — remaining deferred-task checks should be upgraded similarly.

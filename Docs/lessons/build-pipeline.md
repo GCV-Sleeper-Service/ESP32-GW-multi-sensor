@@ -591,3 +591,26 @@ _See LESSON-OPS-118 in `dashboard.md` for the general Contiguous-Slice Splitting
 **See also:** Critical Rules 58–62, LESSON-OPS-122 (fragment architecture), firmware.md.
 
 ---
+
+### LESSON-OPS-124 — Version-bump cascade collisions (Phase Y closure)
+
+**Date:** 2026-04-12
+
+**Problem:** Agents run `bump-version.sh` reflexively even when version bumps are out of scope for a step. This happened in 4 of 9 Phase Y steps (44%). The script modifies VERSION, fixture variants, firmware YAML headers, and `render_sensor_config.py` VERSION — triggering cascade failures when the PR diff includes files the step wasn't supposed to touch.
+
+**Root cause:** Critical Rule 56 says "version bumps are out of scope for test-only PRs" but agents interpret version bumps as non-behavioral changes and run the script anyway. The rule's wording ("test-only PRs") is too narrow — it should apply to any PR where version bump is not explicitly in scope.
+
+**Fix:** When `bump-version.sh` is NOT in scope for a step, add it to the §10 DO-NOT list **by name**:
+```
+Do NOT run bump-version.sh — version bump is not in scope for this step.
+```
+
+When `bump-version.sh` IS in scope, list its side-effect files explicitly in the acceptance criteria:
+- `VERSION`
+- All fixture variant version strings
+- Firmware YAML `app_version:` fields
+- `render_sensor_config.py` VERSION constant
+
+**See also:** Critical Rule 56 (version bumps out of scope for test-only PRs).
+
+---

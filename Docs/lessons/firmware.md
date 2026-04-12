@@ -10,15 +10,9 @@ _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
 
 ---
 
-
----
-
 ### BUG-016: `html-minifier-terser` CLI flags wrong (v7.4.1.0)
 
 **Fix:** Use positional input plus `--output`.
-
----
-
 
 ---
 
@@ -28,17 +22,11 @@ _Split from Docs/bugs-and-lessons-learned.md at v7.6.4.0._
 
 ---
 
-
----
-
 ### BUG-023: Output bundle file naming caused confusion about destination paths (v7.4.3.0)
 
 **Fix:** Files renamed and placed in correct locations after clarification.
 
 **Lesson:** See LESSON-OPS-025.
-
----
-
 
 ---
 
@@ -237,9 +225,6 @@ When debugging real-device crashes involving the dashboard:
 - **ESPHome handler ordering**: `HistoryWebHandler` must be registered before ESPHome's web_server handler or it will never be reached for routes the catch-all intercepts (LESSON-OPS-054)
 
 Related: LESSON-OPS-050, LESSON-OPS-051, LESSON-OPS-052, LESSON-OPS-053, LESSON-OPS-054
-
----
-
 
 ---
 
@@ -546,18 +531,12 @@ the DELETE satellite endpoint added in PR #110 (v7.6.0.2).
 
 ---
 
-
----
-
 ## Lessons Learned
 
 ### LESSON-OPS-005: Raw logs and curated docs stay separate
 
 - Raw logs → `build-logs/` (gitignored)
 - Durable documentation → `Docs/`
-
----
-
 
 ---
 
@@ -570,15 +549,9 @@ the DELETE satellite endpoint added in PR #110 (v7.6.0.2).
 
 ---
 
-
----
-
 ### LESSON-OPS-008: `CONFIG_HTTPD_MAX_REQ_HDR_LEN` is a RAM multiplier
 
 Increasing it increases per-connection cost. On this device class, overly large header buffers can create new failures.
-
----
-
 
 ---
 
@@ -588,24 +561,15 @@ Do not script imaginary flags. Test the exact command in a shell first.
 
 ---
 
-
----
-
 ### LESSON-OPS-012: Script execute permissions may be lost
 
 After a fresh clone or after pulling new scripts, run `chmod +x scripts/*.sh`.
 
 ---
 
-
----
-
 ### LESSON-OPS-013: `git pull` can fail after a broken or partial prior pull
 
 If Git says local changes would be overwritten and the changes are unwanted, reset the affected file(s) before retrying.
-
----
-
 
 ---
 
@@ -619,15 +583,9 @@ Do not advertise a roadmap item as if it is already merged.
 
 ---
 
-
----
-
 ### LESSON-OPS-016: Every substantial development session should leave continuity breadcrumbs
 
 For meaningful sessions, update: a session log, the fresh-start handoff, and any changed roadmap/implementation-plan docs.
-
----
-
 
 ---
 
@@ -637,24 +595,15 @@ If a comment/header is clearly stale, normalize it during the same session that 
 
 ---
 
-
----
-
 ### LESSON-OPS-020: "Data available: unknown" is expected on a freshly-flashed device
 
 The first NVS history persist runs at 2:10 AM. Until then, `retention_oldest_epoch` returns 0. This is not a bug or a fetch failure.
 
 ---
 
-
----
-
 ### LESSON-OPS-023: Verify new workflow files are committed to the correct branch and appear in git log
 
 After committing a new workflow file: `git show --name-only HEAD | grep workflow`. Do not assume file-system presence equals committed state.
-
----
-
 
 ---
 
@@ -670,24 +619,15 @@ After committing a new workflow file: `git show --name-only HEAD | grep workflow
 
 ---
 
-
----
-
 ### LESSON-OPS-027: New GitHub Actions workflows only appear after merging to main
 
 GitHub registers workflow files from the default branch only. A new `.github/workflows/*.yml` file on a feature branch will not appear in the Actions sidebar until it is merged to `main`.
 
 ---
 
-
----
-
 ### LESSON-OPS-032: NVS count-mismatch protection is already in place — no new C++ guard needed (v7.4.4.0)
 
 The `meta.num_sensors == NUM_SENSORS` check in the NVS restore path already rejects history segments from a different sensor count cleanly. The correct response to a count change is: load nothing from the old segments, require an explicit history delete, and document the procedure.
-
----
-
 
 ---
 
@@ -699,15 +639,9 @@ If the same sensor facts appear in multiple repo files, manual editing will even
 
 ---
 
-
----
-
 ### LESSON-OPS-038: Safety prompts belong on destructive CLI paths, not only in prose documentation (v7.4.5.1)
 
 Documenting that a path is destructive is not enough. If a CLI command can erase retained state, the operator should have to acknowledge that at runtime or opt into bypassing the prompt deliberately.
-
----
-
 
 ---
 
@@ -716,9 +650,6 @@ Documenting that a path is destructive is not enough. If a CLI command can erase
 Generated text that contains escape sequences like `\xC2\xB0`, `\n`, or `\t` is unsafe as a raw string argument to `re.sub()`. Use a lambda function as the replacement instead: `re.sub(pattern, lambda m: generated_text, source)`.
 
 Also: do not use brittle exact-string patching against compacted one-line C++ source blocks. Use function-anchor detection, regex-based matching, or brace-aware insertion instead.
-
----
-
 
 ---
 
@@ -763,9 +694,6 @@ Related: BUG-043
 
 ---
 
-
----
-
 ### LESSON-OPS-056: Never use beginResponseStream for large HTTP responses on ESP32-C3
 
 **Date:** 2026-03-17
@@ -773,9 +701,6 @@ Related: BUG-043
 `AsyncWebServer::beginResponseStream()` builds the response in an internal `std::string` that grows through repeated `print()` calls. Each `std::string` reallocation temporarily holds both old and new buffers. For a 24KB response (typical for 336 NVS segments × 4 points × 20 bytes/line), the growth from 16KB→32KB requires 48KB of simultaneous heap — nearly the entire free heap when SSE/polling connections are active.
 
 **Rule:** Any HTTP response that could exceed ~10KB must use pre-reserved `std::string` with `csv.reserve(estimated_size)` followed by zero-copy `beginResponse(200, content_type, reinterpret_cast<const uint8_t*>(str.data()), str.size())`. This pattern makes a single heap allocation at the estimated final size, avoiding the reallocation cascade.
-
----
-
 
 ---
 
@@ -803,9 +728,6 @@ Related: BUG-045
 
 ---
 
-
----
-
 ### LESSON-OPS-060: Compile-time NVS schema constant changes require a firmware migration/re-save path (2026-03-19)
 
 **Date:** 2026-03-19
@@ -830,9 +752,6 @@ Simply resetting the struct in RAM is never sufficient — the stale blob surviv
 all code paths.
 
 Related: BUG-046, BUG-045
-
----
-
 
 ---
 
@@ -867,9 +786,6 @@ Related: BUG-048, BUG-046, BUG-045, LESSON-OPS-060
 
 ---
 
-
----
-
 ### LESSON-OPS-068: Use lwip_*() prefixed functions, not BSD socket aliases, in ESPHome C++ code (2026-03-22)
 
 **Context:** ESPHome defines `namespace esphome::socket` which collides with lwIP's BSD-compatible inline wrappers (`socket()`, `connect()`, `close()` etc.). This is not visible when reading lwIP documentation because the aliases work fine in standalone ESP-IDF projects — the collision only appears inside the ESPHome build environment.
@@ -890,9 +806,6 @@ Related: BUG-057, PR #64
 
 ---
 
-
----
-
 ### LESSON-OPS-069: Interval-based "due" checks must handle the never-succeeded case (2026-03-23)
 
 **Context:** A common pattern for periodic tasks is `bool due = (last_run == 0) || (now - last_run >= interval)`. The `== 0` clause handles the "first run" case. But if the first run FAILS and `last_run` is never set, the task retries on every loop iteration regardless of the interval — the backoff is dead code.
@@ -905,9 +818,6 @@ Related: BUG-057, PR #64
 **Applies to:** Aggregator polling task, any future periodic fetch/sync operations.
 
 Related: BUG-058
-
----
-
 
 ---
 
@@ -946,9 +856,6 @@ Related: v7.5.5.0 PR #62
 ---
 
 
----
-
-
 ### LESSON-OPS-072: `esp_get_free_heap_size()` includes PSRAM on boards that have it (2026-03-23)
 
 **Context:** The S3 aggregator reported 8.4 MB free heap via `/api/status`, which is correct (it includes PSRAM) but misleading when compared to C3 values (~70 KB, internal SRAM only). Monitoring dashboards and health checks that threshold on free heap will behave differently across board types.
@@ -956,9 +863,6 @@ Related: v7.5.5.0 PR #62
 **Rule:** Always report both internal and total heap separately. Use `esp_get_free_internal_heap_size()` for internal SRAM (comparable across all boards) and `esp_get_free_heap_size()` for total (includes PSRAM where available). The `/api/status` endpoint should expose `free_heap` (internal, backward-compatible), `free_heap_internal`, and `free_heap_total`.
 
 Related: BUG-062
-
----
-
 
 ---
 
@@ -1002,9 +906,6 @@ v2 manifest format: `"sensors": [{ "id": ..., "name": ..., "category": ... }]`.
 
 **Detection:** "No device data available" displayed in gateway device view despite fixture
 containing manifest data.
-
----
-
 
 ---
 
@@ -1076,9 +977,6 @@ A mock that only validates device existence is a stub, not a contract-faithful i
 
 ---
 
-
----
-
 ### LESSON-OPS-100: ESPHome httpd task stack is hardcoded at 4 KB — CONFIG_HTTPD_STACK_SIZE has no effect (2026-03-30)
 
 `HTTPD_DEFAULT_CONFIG()` in ESP-IDF hardcodes `.stack_size = 4096` as a literal.
@@ -1087,9 +985,6 @@ ESPHome's `web_server_idf.cpp` never overrides this. `CONFIG_HTTPD_STACK_SIZE` i
 The only way to increase the httpd stack is via a local ESPHome component override
 (see LESSON-OPS-102). NVS-heavy handlers must additionally use the deferred task
 pattern (see LESSON-OPS-101). Codified as Critical Rules 40, 41, and 42.
-
----
-
 
 ---
 
@@ -1106,9 +1001,6 @@ Minimum task stack for NVS operations: 8192 bytes. Add
 
 ---
 
-
----
-
 ### LESSON-OPS-102: ESPHome httpd stack must be patched via local component override (2026-03-31)
 
 Because `CONFIG_HTTPD_STACK_SIZE` is inert (LESSON-OPS-100), the only way to
@@ -1119,9 +1011,6 @@ component into `firmware/local_components/web_server_idf/` and patches
 include an `external_components` block pointing to `local_components`. The script
 must be re-run after every ESPHome version upgrade. Use `--check` to verify.
 Codified as Critical Rule 42.
-
----
-
 
 ---
 
@@ -1156,9 +1045,6 @@ Codified as Critical Rule 44.
 
 ---
 
-
----
-
 ### LESSON-OPS-105 — Snapshot-based deferred NVS persistence (2026-04-02)
 
 **Context:** v7.6.0.2 DELETE endpoint needs to persist satellite config to NVS after
@@ -1174,9 +1060,6 @@ the slow flash write.
 
 **Pattern:** snapshot-under-lock → heap-allocate → pass to task → write → free → delete task.
 Applicable anywhere a slow I/O operation needs a consistent view of mutex-protected state.
-
----
-
 
 ---
 
@@ -1198,9 +1081,6 @@ changes (add/delete) are rare human-initiated operations, not high-frequency eve
 
 ---
 
-
----
-
 ### LESSON-OPS-107 — NVS save failure after delete is a known limitation (2026-04-02)
 
 **Context:** After DELETE compacts the satellite array and decrements
@@ -1212,9 +1092,6 @@ has the old config).
 impractical — would require re-inserting the deleted entry at its original position and
 re-expanding the array. The deferred snapshot pattern minimizes but cannot eliminate this
 window. A future improvement could retry NVS writes or add a "dirty" flag checked at boot.
-
----
-
 
 ---
 
@@ -1236,9 +1113,6 @@ so the request never reached the handler. See LESSON-OPS-109.
 
 ---
 
-
----
-
 ### LESSON-OPS-109 — Plain-text 405 = canHandle() returned false (2026-04-02)
 
 **Observation:** ESPAsyncWebServer (built on ESP-IDF httpd layer) sends plain-text 405 responses when
@@ -1254,9 +1128,6 @@ request never reached the handler at all.
 **Example:** BUG-079 — DELETE to `/api/aggregator/satellite/{id}` returned plain-text 405 because
 the `canHandle()` HTTP_DELETE check was missing, even though `handleRequest()` had proper DELETE
 dispatch code.
-
----
-
 
 ---
 
@@ -1280,9 +1151,6 @@ Auth: NOT REQUIRED — [one-sentence rationale]
 
 **Corollary:** Destructive or topology-revealing management endpoints require auth.
 Add/discovery endpoints may be open with documented rationale.
-
----
-
 
 ---
 
@@ -1324,5 +1192,22 @@ grep -v '^\s*//' firmware/core/some-fragment.h | grep -c "symbol_name"
 **See also:** Critical Rules 58–62, LESSON-OPS-118 (fragment boundary comments), build-pipeline.md LESSON-OPS-123.
 
 ---
+
+### LESSON-OPS-125 — Reviewer inline suggestions break SHA-256 identity gate (Phase Y closure)
+
+**Date:** 2026-04-12
+
+**Problem:** During Phase Y v7.6.6.1, a reviewer bot (Gemini) posted an inline code suggestion for `aggregator-runtime.h` — a security fix for an `lwip_send` buffer over-read. The agent accepted the suggestion directly, which modified the fragment file. This was correct behaviour (the fix was valid), but it changed the SHA-256 hash of the assembled artifact, causing the identity gate to fail.
+
+**Root cause:** Reviewer inline suggestions bypass the agent's implementation instructions. The agent applies them without checking whether the affected file is under an identity gate. For assembled-artifact architectures (Phase Y's fragment model), any change to a fragment file must be followed by `assemble-sensor-history.sh --write` and a fresh `--check` pass.
+
+**Fix for prompts touching fragment files:** Add explicit guidance:
+```
+Do not accept inline code suggestions from reviewer bots for fragment files without re-running the assembly pipeline. The SHA-256 gate will fail on any unassembled change.
+```
+
+**Note:** The Gemini security fix was correct and was properly propagated. The lesson is about the *process* of accepting it, not the *content* of the fix.
+
+**See also:** Critical Rules 58, 62 (fragment architecture guardrails), LESSON-OPS-122 (fragment architecture).
 
 ---
