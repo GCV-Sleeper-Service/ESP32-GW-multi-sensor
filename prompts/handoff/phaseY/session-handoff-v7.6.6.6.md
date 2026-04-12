@@ -66,8 +66,8 @@ If the device test fails, Phase Y is **blocked**. Use `prompts/phaseY/phase-y-bu
 
 ### Test credentials
 
-- Username: `ESPadmin`
-- Password: `ESppass100`
+- Username: - use the provisioned username
+- Password: - use the provisioned password
 
 ### Acceptance criteria
 

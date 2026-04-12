@@ -130,7 +130,7 @@ observed, and segment count preserved across reboot.
 
 Pre-reboot stats snapshot taken, then `POST /api/reboot` triggered:
 ```
-curl -s -u ESPadmin:ESPpass100 -d 'a=1' -X POST http://192.168.120.189/api/reboot
+curl -s -u <user>:<pass> -d 'a=1' -X POST http://192.168.120.189/api/reboot
 → {"ok":true,"message":"Reboot scheduled"}
 ```
 

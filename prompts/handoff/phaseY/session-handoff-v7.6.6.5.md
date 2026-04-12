@@ -65,8 +65,8 @@ The assembled file is byte-identical to the pre-split monolith (SHA-256 verified
 
 ### Test credentials
 
-- Username: `ESPadmin`
-- Password: `ESppass100`
+- Username: - use the provisioned username
+- Password: - use the provisioned password
 
 ### Acceptance criteria
 

@@ -505,7 +505,7 @@ If board is not responding or boot log shows crash: STOP. Use bug escalation pro
   5. Test 2: `curl -s http://192.168.120.189/api/manifest | python3 -m json.tool` then history endpoint
   6. Test 3: `curl -s http://192.168.120.189/api/v2/live | python3 -m json.tool`
   7. Test 4: `curl -s http://192.168.120.189/api/status | python3 -m json.tool`
-  8. Test 5 (reboot persistence): record storage-stats → `curl -s -u ESPadmin:ESppass100 -d 'a=1' -X POST http://192.168.120.189/api/reboot` → wait 60s → re-check storage-stats → segments must not decrease
+  8. Test 5 (reboot persistence): record storage-stats → `curl -s -u <user>:<pass> -d 'a=1' -X POST http://192.168.120.189/api/reboot` → wait 60s → re-check storage-stats → segments must not decrease
   9. Test 6 (optional): observe hourly persist cycle
 
 ---
@@ -598,12 +598,12 @@ If board is not responding: STOP. Use bug escalation prompt.
   4. Test 1: `curl -s http://192.168.120.191/api/aggregator/gateways | python3 -m json.tool`
   5. Test 2: `curl -s http://192.168.120.191/api/aggregator/live | python3 -m json.tool`
   6. Test 3: Proxy history endpoint
-  7. Test 4: `curl -s -u ESPadmin:ESppass100 -d "ip=192.168.120.189" -X POST http://192.168.120.191/api/aggregator/test-satellite`
+  7. Test 4: `curl -s -u <user>:<pass> -d "ip=192.168.120.189" -X POST http://192.168.120.191/api/aggregator/test-satellite`
   8. Test 5: `curl -s -d "ip=192.168.120.189" -X POST http://192.168.120.191/api/aggregator/add-satellite`
   9. Test 6: Check config_generation in gateways response
-  10. Test 7: `curl -s -u ESPadmin:ESppass100 -X DELETE http://192.168.120.191/api/aggregator/satellite/0`
+  10. Test 7: `curl -s -u <user>:<pass> -X DELETE http://192.168.120.191/api/aggregator/satellite/0`
   11. Test 8: Re-add satellite, Test 9: Reboot persistence (pre/post gateways comparison)
-  12. Test 10: `curl -s -u ESPadmin:ESppass100 -d 'a=1' -X POST http://192.168.120.191/api/system/reset-satellites`
+  12. Test 10: `curl -s -u <user>:<pass> -d 'a=1' -X POST http://192.168.120.191/api/system/reset-satellites`
 
 ---
 ⛔ CHECKPOINT C (all aggregator tests complete):

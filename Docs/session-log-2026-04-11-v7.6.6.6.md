@@ -148,7 +148,7 @@ and other curl tests).
 **Test 4 — Test satellite / probe (POST, authenticated)**
 
 ```bash
-curl -s -u ESPadmin:ESPpass100 -d "url=http://192.168.120.189" -X POST \
+curl -s -u <user>:<pass> -d "url=http://192.168.120.189" -X POST \
   http://192.168.120.191/api/aggregator/test-satellite
 ```
 ```json
@@ -199,7 +199,7 @@ counter (add, delete, reset) were confirmed working via observable outcomes.
 **Test 7 — Delete satellite (DELETE, authenticated)**
 
 ```bash
-curl -s -u ESPadmin:ESPpass100 -X DELETE \
+curl -s -u <user>:<pass> -X DELETE \
   "http://192.168.120.191/api/aggregator/satellite/sat-esp32-4m-190"
 ```
 ```json
@@ -249,7 +249,7 @@ Loaded 2 satellites from NVS
 **Test 10 — Reset satellites (POST, authenticated)**
 
 ```bash
-curl -s -u ESPadmin:ESPpass100 -d 'a=1' -X POST \
+curl -s -u <user>:<pass> -d 'a=1' -X POST \
   http://192.168.120.191/api/system/reset-satellites
 ```
 ```json

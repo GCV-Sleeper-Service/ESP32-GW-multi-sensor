@@ -58,8 +58,8 @@ This step is the final device-test gate before Phase Y closure. It validates **a
 
 ### Test credentials
 
-- Username: `ESPadmin`
-- Password: `ESppass100`
+- Username: - use the provisioned username
+- Password: - use the provisioned password
 
 ### All 21 endpoint handlers
 

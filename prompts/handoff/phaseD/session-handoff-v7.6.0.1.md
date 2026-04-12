@@ -114,7 +114,7 @@ Before merging the v7.6.0.1 PR:
   - [ ] Test 4: Missing URL parameter (expected: 400 "Missing url parameter")
   - [ ] Test 5: Bad URL format (expected: 400 "URL must start with http://")
   - [ ] Test 6: Unreachable URL (expected: 400 "Satellite unreachable or invalid manifest")
-  - [ ] Test 7: Reboot persistence: `curl -d 'a=1' -u ESPadmin:ESppass100 http://192.168.120.191/api/reboot` then verify
+  - [ ] Test 7: Reboot persistence: `curl -d 'a=1' -u <user>:<pass> http://192.168.120.191/api/reboot` then verify
 - [ ] All Playwright fixture sets passing:
   ```bash
   FIXTURE_SET=3sensor npx playwright test --project=chromium
