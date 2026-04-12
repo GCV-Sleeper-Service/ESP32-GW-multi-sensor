@@ -9,7 +9,7 @@ _Status: Complete_
 
 ## Current State
 
-- **`main` is at v7.6.6.8.** Phase Y is fully closed.
+- **Branch `copilot/add-new-preflight-checks` is at v7.6.6.8.** Merge pending.
 - **All four fixture sets are green:** 402 tests passed / 0 failed (3sensor: 99, mixed: 96, system: 100, aggregator: 107)
 - **Preflight:** 68 checks pass (6 new Phase Y closure checks added in v7.6.6.8)
 - **Assembly identity:** `assemble-sensor-history.sh --check` exit 0 throughout all 9 steps
