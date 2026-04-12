@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-08 — Documentation reorganization (Issue #140). Current Phase: **Phase Y** (planned). Phase X complete._
+_Last updated: 2026-04-12 — Phase Y closure (v7.6.6.8). Phase Y complete. Critical Rules 58–62 added. Current Phase: **Phase 7** (pending)._
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -145,29 +145,28 @@ Open Item OI-001: fix inaccurate parallelism comment in `tests/mock-server/serve
 
 Phase X complete (v7.6.4.0 + v7.6.5.0–v7.6.5.8, 2026-04-05 to 2026-04-08). Dashboard monolith (3,955 lines) refactored into modular component architecture with three-pass build pipeline. Context reduced 6x–8x (55K→8K tokens). LESSON-OPS-043 structurally resolved. 11 new Critical Rules (47–57). 402/0 tests maintained throughout. Results: `prompts/handoff/phaseX-results.md`. Quality check: `prompts/handoff/phaseX-results-quality-check.md`. Plan: `Docs/phase-X-architecture-and-refactor-plan-dashboard.md`. Prompts: `prompts/phaseX/`.
 
-### Phase Y — Firmware Refactor: sensor_history_multi.h ⬅ NEXT
+### Phase Y — Firmware Refactor: sensor_history_multi.h ✅ COMPLETE
+
+Phase Y complete (v7.6.6.0–v7.6.6.8, 2026-04-10 to 2026-04-12). Firmware monolith (4,325 lines) decomposed into 8 source fragments in `firmware/core/`, assembled by `scripts/assemble-sensor-history.sh`. Option B (assembled artifact) — zero generator changes, zero YAML changes, SHA-256 identity gate. Context reduced 3.6×–9× per task. 5 new Critical Rules (58–62) added. 402/0 Playwright tests maintained throughout. Device tests passed on both C3 and S3 hardware. Results: `prompts/handoff/phaseY-results.md`. Plan: `Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md`. Prompts: `prompts/phaseY/`.
 
 **Version range:** v7.6.6.0–v7.6.6.8
-**Status:** Prompt package produced. Execution pending.
 **Plan:** `Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md`
 **Inventory:** `Docs/phase-Y-current-state-inventory-sensor-history-v2.md`
 **Audit Template:** `prompts/phaseY/pr-audit-question-template-phaseY.md`
 **Bug Escalation:** `prompts/phaseY/phase-y-bug-escalation-prompt.md`
 **Two-Session Prompts:** `prompts/handoff/phaseY/phase-y-two-session-prompts.md`
 
-Phase Y applies the same structural-refactor methodology proven in Phase X to the firmware side. Splits the 4,325-line `dashboard/sensor_history_multi.h` monolith into 8 fragment source files in `firmware/core/`, assembled by `scripts/assemble-sensor-history.sh`. Option B (assembled artifact) strategy — zero generator changes, zero YAML changes, SHA-256 identity gate.
-
 | Version | Scope | Prompt File | Handoff | Status |
 |---------|-------|-------------|---------|--------|
-| v7.6.6.0 | Pre-step: `provision.sh` full pipeline automation | `prompts/phaseY/v7.6.6.0-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.0.md` | Pending |
-| v7.6.6.1 | Establish assembly script + 8 fragments + SHA-256 baseline | `prompts/phaseY/v7.6.6.1-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.1.md` | Pending |
-| v7.6.6.2 | Wire assembly into pipeline + fragment-level preflight | `prompts/phaseY/v7.6.6.2-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.2.md` | Pending |
-| v7.6.6.3 | Validate edit-fragment workflow end-to-end | `prompts/phaseY/v7.6.6.3-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.3.md` | Pending |
-| v7.6.6.4 | Ping adapter fragment validation | `prompts/phaseY/v7.6.6.4-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.4.md` | Pending |
-| v7.6.6.5 | Device test gate: NVS persistence on C3 | `prompts/phaseY/v7.6.6.5-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.5.md` | Pending |
-| v7.6.6.6 | Device test gate: aggregator runtime on S3 | `prompts/phaseY/v7.6.6.6-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.6.md` | Pending |
-| v7.6.6.7 | Full endpoint smoke test (all 21 handlers) | `prompts/phaseY/v7.6.6.7-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.7.md` | Pending |
-| v7.6.6.8 | Closure: preflight + docs + Critical Rules 58–62 | `prompts/phaseY/v7.6.6.8-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.8.md` | Pending |
+| v7.6.6.0 | Pre-step: `provision.sh` full pipeline automation | `prompts/phaseY/v7.6.6.0-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.0.md` | ✅ Complete |
+| v7.6.6.1 | Establish assembly script + 8 fragments + SHA-256 baseline | `prompts/phaseY/v7.6.6.1-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.1.md` | ✅ Complete |
+| v7.6.6.2 | Wire assembly into pipeline + fragment-level preflight | `prompts/phaseY/v7.6.6.2-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.2.md` | ✅ Complete |
+| v7.6.6.3 | Validate edit-fragment workflow end-to-end | `prompts/phaseY/v7.6.6.3-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.3.md` | ✅ Complete |
+| v7.6.6.4 | Ping adapter fragment validation | `prompts/phaseY/v7.6.6.4-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.4.md` | ✅ Complete |
+| v7.6.6.5 | Device test gate: NVS persistence on C3 | `prompts/phaseY/v7.6.6.5-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.5.md` | ✅ Complete |
+| v7.6.6.6 | Device test gate: aggregator runtime on S3 | `prompts/phaseY/v7.6.6.6-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.6.md` | ✅ Complete |
+| v7.6.6.7 | Full endpoint smoke test (all 21 handlers) | `prompts/phaseY/v7.6.6.7-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.7.md` | ✅ Complete |
+| v7.6.6.8 | Closure: preflight + docs + Critical Rules 58–62 | `prompts/phaseY/v7.6.6.8-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.8.md` | ✅ Complete |
 
 ### Phase 7 — Per-Device Persistence Engine — After Phase Y
 
@@ -276,6 +275,11 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 55 | CSS partition rule is "by selector target" — which component does this rule style? Global `@media` rules targeting selectors from multiple components belong in `core/base.css` regardless of source proximity in the original file. | v7.6.5.6 PR #147 — global @media initially misplaced |
 | 56 | Version bumps (VERSION file, App.version, fixtures, firmware YAML) are out of scope for test-only PRs. Version bumps belong in the step that delivers code changes. | v7.6.5.7 PR #148 — three agents attempted version bumps before revert |
 | 57 | When splitting a monolithic test file into domain-scoped files, any pre-existing spec file that receives new test groups must be audited for duplicate helper functions. Local copies must be replaced with imports from the shared helpers module. | v7.6.5.7 PR #148 — `manifest.spec.js` had divergent local copies |
+| 58 | Source modules for `sensor_history_multi.h` live in `firmware/core/`. Never add code to `dashboard/sensor_history_multi.h` directly — it is an assembled artifact. | Phase Y v7.6.6.1 |
+| 59 | `render_sensor_config.py` writes into the assembled `dashboard/sensor_history_multi.h`. Never redirect the generator to fragment files. | Phase Y D3 |
+| 60 | `s_cache_mutex` and `AGG_LOCK`/`AGG_UNLOCK` are defined once in `firmware/core/aggregator-runtime.h`. Never redefine or shadow them. | Phase Y v7.6.6.6 |
+| 61 | `maybe_yield_nvs_scan_()` is defined once in `firmware/core/nvs-persistence.h`. Call it in every NVS scan loop. | Phase Y v7.6.6.5 |
+| 62 | The assembly fragment order in `assemble-sensor-history.sh` is the dependency order. Never reorder fragments. | Phase Y v7.6.6.1 |
 
 ---
 
@@ -363,6 +367,14 @@ After each step completes:
 | **Phase X handoffs moved** | `prompts/handoff/session-handoff-v7.6.*.md` → `prompts/handoff/phaseX/` |
 | **README updated** | Phase D marked complete; aggregator API stubs updated; architecture doc link updated; Phase Y noted as planned |
 | **Revision history condensed** | Per-step entries replaced with phase-level summaries |
+
+### 2026-04-12 — Phase Y Closure (v7.6.6.8)
+
+Phase Y complete. All 9 steps delivered. Critical Rules 58–62 added. 6 new preflight checks added (68 total). Phase Y results document produced (`prompts/handoff/phaseY-results.md`).
+
+### 2026-04-10 through 2026-04-11 — Phase Y Execution (v7.6.6.0–v7.6.6.7)
+
+Per-step revision entries condensed. Delivery details preserved in Phase Y results (`prompts/handoff/phaseY-results.md`) and individual consolidated audits (`prompts/phaseY/v7.6.6.x-PRxxx-consolidated-audit-and-lessons.md`).
 
 ### 2026-04-08 — Phase X Closure (v7.6.5.8)
 

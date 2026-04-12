@@ -566,3 +566,28 @@ _See LESSON-OPS-118 in `dashboard.md` for the general Contiguous-Slice Splitting
 **Critical Rule candidate:** Consider adding as a critical rule if future phases involve similar restructuring.
 
 ---
+
+
+### LESSON-OPS-123 — Assembly step in regeneration pipeline (Phase Y)
+
+**Date:** 2026-04-12
+**Context:** Phase Y added `assemble-sensor-history.sh` as Step 0 in the regeneration pipeline. It concatenates 8 firmware fragments into `dashboard/sensor_history_multi.h`.
+
+**Pipeline order after Phase Y:**
+1. `assemble-sensor-history.sh --write` (fragments → assembled artifact)
+2. `bundle-dashboard.sh --write`
+3. `render_sensor_config.py --write` (writes generated content into assembled artifact)
+4. `generate-fixtures.js`
+5. `render_sensor_config.py --write`
+6. `build-dashboard.sh --write`
+7. `minify-dashboard.sh`
+8. `generate-header.sh`
+9. `render_sensor_config.py --check`
+
+**Generator/assembly sync:** The generator writes into the assembled file (not fragments). After the generator runs, the assembled file differs from pure fragment concatenation in the `SENSOR_MANIFEST` marker regions. The `--check` mode strips generated content before comparing SHA-256 hashes.
+
+**Preflight runs `--check` separately** — not in the pipeline — to verify hand-maintained fragment regions match the committed file.
+
+**See also:** Critical Rules 58–62, LESSON-OPS-122 (fragment architecture), firmware.md.
+
+---

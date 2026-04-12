@@ -2,6 +2,22 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.6.8] — 2026-04-12 — Phase Y: Closure
+
+### Added
+- 6 new Phase Y preflight checks: `sensor_history_monolith_is_assembled`, `firmware_core_fragment_count`, `no_generator_markers_in_fragments`, `deferred_task_pairs_in_expected_homes`, `maybe_yield_present_in_nvs_persistence`, `mutex_single_owner` (total: 68 checks, was 62)
+- Critical Rules 58–62 (fragment architecture guards) to `prompts/prompt-index-and-workflow.md`
+- Phase Y results document (`prompts/handoff/phaseY-results.md`)
+
+### Changed
+- `README.md` — documented `firmware/core/` structure with fragment table; updated Phase Y status to ✅ Complete; updated preflight count to 68
+- `Docs/lessons/firmware.md` — added LESSON-OPS-122 (fragment architecture for sensor_history_multi.h)
+- `Docs/lessons/build-pipeline.md` — added LESSON-OPS-123 (assembly step in regeneration pipeline)
+- `prompts/prompt-index-and-workflow.md` — Phase Y marked complete, all 9 steps ✅ Complete, Phase Y completion summary added, revision history updated
+
+### Phase Y Complete
+9 steps (v7.6.6.0–v7.6.6.8). 4,325-line monolith decomposed into 8 source fragments. Zero runtime behavior changes. Device tests passed on both C3 and S3. 402/0 Playwright tests maintained throughout.
+
 ## [v7.6.6.7] — 2026-04-11 — Phase Y: Full Endpoint Smoke Test — PASS
 
 > This release records the passing full endpoint smoke test across both the C3 satellite and S3
