@@ -620,6 +620,142 @@ firmware_core_fragment_line_sum() {
 
 firmware_core_fragment_line_sum
 
+# ── Phase Y closure checks (v7.6.6.8) ────────────────────────────────────────
+
+sensor_history_monolith_is_assembled() {
+  if bash scripts/assemble-sensor-history.sh --check > /dev/null 2>&1; then
+    pass "sensor_history_monolith_is_assembled"
+  else
+    fail "sensor_history_monolith_is_assembled"
+  fi
+}
+
+firmware_core_fragment_count() {
+  # Use explicit fragment list to avoid false positives when helper headers live beside fragments.
+  local modules=(
+    "firmware/core/config.h"
+    "firmware/core/data-model.h"
+    "firmware/core/nvs-persistence.h"
+    "firmware/core/deferred-management.h"
+    "firmware/core/ping-adapter.h"
+    "firmware/core/aggregator-runtime.h"
+    "firmware/core/web-handler.h"
+    "firmware/core/registration.h"
+  )
+  local expected_count="${#modules[@]}"
+  local count=0
+  local f
+  for f in "${modules[@]}"; do
+    if [[ -f "$f" ]]; then
+      count=$((count + 1))
+    else
+      echo "    Missing: $f"
+    fi
+  done
+  if [[ "$count" -eq "$expected_count" ]]; then
+    pass "firmware_core_fragment_count"
+  else
+    echo "    Expected $expected_count fragments, found $count"
+    fail "firmware_core_fragment_count"
+  fi
+}
+
+no_generator_markers_in_fragments() {
+  # SENSOR_MANIFEST marker delimiters must be isolated to firmware/core/data-model.h only —
+  # that is the designated generator-target fragment. No other fragment should contain
+  # SENSOR_MANIFEST markers, which would indicate accidental marker propagation.
+  local violations=0
+  for f in firmware/core/*.h; do
+    [[ "$f" == "firmware/core/data-model.h" ]] && continue
+    if grep -q "SENSOR_MANIFEST:" "$f"; then
+      echo "    SENSOR_MANIFEST marker found in non-data-model fragment: $f"
+      violations=1
+    fi
+  done
+  if [[ $violations -eq 0 ]]; then
+    pass "no_generator_markers_in_fragments"
+  else
+    fail "no_generator_markers_in_fragments"
+  fi
+}
+
+deferred_task_pairs_in_expected_homes() {
+  local ok=0
+  # Pair 1 & 2: reboot + delete-data in deferred-management.h
+  if [[ -f firmware/core/deferred-management.h ]]; then
+    grep -q "reboot_task_" firmware/core/deferred-management.h || { echo "    Missing reboot_task_ in deferred-management.h"; ok=1; }
+    grep -q "schedule_reboot_" firmware/core/deferred-management.h || { echo "    Missing schedule_reboot_ in deferred-management.h"; ok=1; }
+    grep -q "delete_data_task_" firmware/core/deferred-management.h || { echo "    Missing delete_data_task_ in deferred-management.h"; ok=1; }
+    grep -q "schedule_delete_data_" firmware/core/deferred-management.h || { echo "    Missing schedule_delete_data_ in deferred-management.h"; ok=1; }
+  else
+    echo "    Missing fragment: firmware/core/deferred-management.h"
+    ok=1
+  fi
+  # Pair 3 & 4: reset-satellites + save-satellites-nvs in aggregator-runtime.h
+  if [[ -f firmware/core/aggregator-runtime.h ]]; then
+    grep -q "reset_satellites_task_" firmware/core/aggregator-runtime.h || { echo "    Missing reset_satellites_task_ in aggregator-runtime.h"; ok=1; }
+    grep -q "schedule_reset_satellites_" firmware/core/aggregator-runtime.h || { echo "    Missing schedule_reset_satellites_ in aggregator-runtime.h"; ok=1; }
+    grep -q "save_satellites_nvs_task_" firmware/core/aggregator-runtime.h || { echo "    Missing save_satellites_nvs_task_ in aggregator-runtime.h"; ok=1; }
+    grep -q "schedule_save_satellites_nvs_" firmware/core/aggregator-runtime.h || { echo "    Missing schedule_save_satellites_nvs_ in aggregator-runtime.h"; ok=1; }
+  else
+    echo "    Missing fragment: firmware/core/aggregator-runtime.h"
+    ok=1
+  fi
+  if [[ $ok -eq 0 ]]; then
+    pass "deferred_task_pairs_in_expected_homes"
+  else
+    fail "deferred_task_pairs_in_expected_homes"
+  fi
+}
+
+maybe_yield_present_in_nvs_persistence() {
+  local def_in_nvs other_def
+  def_in_nvs=$(grep -v '^[[:space:]]*//' firmware/core/nvs-persistence.h \
+    | grep -c 'maybe_yield_nvs_scan_.*{' || true)
+  other_def=0
+  for f in firmware/core/*.h; do
+    [[ "$f" == "firmware/core/nvs-persistence.h" ]] && continue
+    local c
+    c=$(grep -v '^[[:space:]]*//' "$f" | grep -c 'maybe_yield_nvs_scan_.*{' || true)
+    other_def=$((other_def + c))
+  done
+  if [[ "$def_in_nvs" -ge 1 && "$other_def" -eq 0 ]]; then
+    pass "maybe_yield_present_in_nvs_persistence"
+  else
+    echo "    maybe_yield_nvs_scan_ in nvs-persistence.h=$def_in_nvs, other fragments=$other_def"
+    fail "maybe_yield_present_in_nvs_persistence"
+  fi
+}
+
+mutex_single_owner() {
+  # s_cache_mutex must be DEFINED (declared) in aggregator-runtime.h only.
+  # Other fragments (e.g. web-handler.h) may reference it — only the definition must be unique.
+  # Strip comment lines before counting — ping-adapter.h has boundary comments
+  # referencing s_cache_mutex which are documentation, not definitions.
+  local agg_def other_def
+  agg_def=$(grep -v '^[[:space:]]*//' firmware/core/aggregator-runtime.h | grep -c "SemaphoreHandle_t s_cache_mutex" || true)
+  other_def=0
+  for f in firmware/core/*.h; do
+    [[ "$f" == "firmware/core/aggregator-runtime.h" ]] && continue
+    local c
+    c=$(grep -v '^[[:space:]]*//' "$f" | grep -c "SemaphoreHandle_t s_cache_mutex" || true)
+    other_def=$((other_def + c))
+  done
+  if [[ "$agg_def" -eq 1 && "$other_def" -eq 0 ]]; then
+    pass "mutex_single_owner"
+  else
+    echo "    s_cache_mutex definition: aggregator-runtime.h=$agg_def, other fragments=$other_def"
+    fail "mutex_single_owner"
+  fi
+}
+
+sensor_history_monolith_is_assembled
+firmware_core_fragment_count
+no_generator_markers_in_fragments
+deferred_task_pairs_in_expected_homes
+maybe_yield_present_in_nvs_persistence
+mutex_single_owner
+
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   echo "✗ Preflight failed with $FAIL_COUNT error(s)"
   exit 1
