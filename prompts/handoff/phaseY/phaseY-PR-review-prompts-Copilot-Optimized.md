@@ -142,6 +142,7 @@ Produce `prompts/phaseY/v7.6.6.0-PR<NN>-consolidated-audit-and-lessons.md` using
   - Is the pipeline ordering identical to Critical Rule 37?
 
 Use the sub-agent results from Step 1 as the primary evidence source.
+Once produced, use githubwrite to commit the file directly to main.
 
 ### 4b. Inspect Next Step Artifacts
 
@@ -264,6 +265,7 @@ Produce `prompts/phaseY/v7.6.6.1-PR<NN>-consolidated-audit-and-lessons.md` using
   - `--check` uses `strip_generated()` for generator-aware comparison?
 
 Use the sub-agent results from Step 1 as the primary evidence source.
+Once produced, use githubwrite to commit the file directly to main.
 
 ### 4b. Inspect Next Step Artifacts
 
@@ -372,6 +374,7 @@ Produce `prompts/phaseY/v7.6.6.2-PR<NN>-consolidated-audit-and-lessons.md` using
   - No `--check` after generator in pipeline (only in preflight)?
 
 Use the sub-agent results from Step 1 as the primary evidence source.
+Once produced, use githubwrite to commit the file directly to main.
 
 ### 4b. Inspect Next Step Artifacts
 
@@ -477,6 +480,9 @@ Produce `prompts/phaseY/v7.6.6.3-PR<NN>-consolidated-audit-and-lessons.md` using
   - Deliberate-break test executed and documented?
   - No permanent fragment changes?
 
+Use the sub-agent results from Step 1 as the primary evidence source.
+Once produced, use githubwrite to commit the file directly to main.
+
 ### 4b. Inspect Next Step Artifacts
 
 If updates are needed, use githubwrite to commit them directly to main. Do not just note the issue — fix it.:
@@ -571,6 +577,9 @@ Produce `prompts/phaseY/v7.6.6.4-PR<NN>-consolidated-audit-and-lessons.md` using
   - PingAdapter fragment: compile-guard boundary intact?
   - No cross-fragment symbol leakage?
   - Assembly identity holds?
+
+Use the sub-agent results from Step 1 as the primary evidence source.
+Once produced, use githubwrite to commit the file directly to main.
 
 ### 4b. Inspect Next Step Artifacts
 
@@ -674,6 +683,9 @@ Produce `prompts/phaseY/v7.6.6.5-PR<NN>-consolidated-audit-and-lessons.md` using
   - NVS device test: boot restore confirmed?
   - History retention survives reboot?
   - Hourly persist writes observed (if applicable)?
+
+Use the sub-agent results from Step 1 as the primary evidence source.
+Once produced, use githubwrite to commit the file directly to main.
 
 ### 4b. Inspect Next Step Artifacts
 
@@ -788,6 +800,9 @@ Produce `prompts/phaseY/v7.6.6.6-PR<NN>-consolidated-audit-and-lessons.md` using
   - Satellite NVS survives reboot?
   - Satellite mode restored before PR?
 
+Use the sub-agent results from Step 1 as the primary evidence source.
+Once produced, use githubwrite to commit the file directly to main.
+
 ### 4b. Inspect Next Step Artifacts
 
 If updates are needed, use githubwrite to commit them directly to main. Do not just note the issue — fix it.:
@@ -889,6 +904,9 @@ Produce `prompts/phaseY/v7.6.6.7-PR<NN>-consolidated-audit-and-lessons.md` using
   - All 21 endpoint handlers verified?
   - Both C3 and S3 board profiles tested?
   - Auth behavior confirmed?
+
+Use the sub-agent results from Step 1 as the primary evidence source.
+Once produced, use githubwrite to commit the file directly to main.
 
 ### 4b. Inspect Next Step Artifacts
 
@@ -1041,6 +1059,8 @@ Produce `prompts/phaseY/v7.6.6.8-PR<NN>-consolidated-audit-and-lessons.md` using
 Use the sub-agent results from Step 1 as the primary evidence source.
 Use the sub-agent's prompt-index snapshot for the Critical Rules and Step Index
 tables — do NOT re-read the file.
+
+Once produced, use githubwrite to commit the file directly to main.
 
 ### 4b. Phase Y Completion Summary
 
