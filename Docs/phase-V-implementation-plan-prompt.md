@@ -78,9 +78,10 @@ The agent must read all of the following before writing a single plan step.
 ### Lessons database (constraints — must not violate)
 
 - `Docs/lessons/build-pipeline.md` — all LESSON-OPS-* and LESSON-BUILD-* entries
-- `Docs/lessons/firmware-rules.md` — all Critical Rules (Rule 8, 24, 27, 38, 39, 40, 41, 47, 48, 58, 62)
+- `Docs/lessons/firmware.md` — all firmware-domain LESSON-OPS and BUG entries
+- `prompts/prompt-index-and-workflow.md` — Critical Rules table (Rule 8, 24, 27, 38, 39, 40, 41, 47, 48, 58, 62) — this is the canonical location for all Critical Rules
 - `Docs/lessons/testing.md` — Playwright test patterns
-- `Docs/lessons/security.md` — LESSON-SEC-* entries (if present)
+- `Docs/lessons/operations.md` — LESSON-OPS entries for operational patterns (auth, provisioning, deployment, operational patterns, deployment, and auth-policy lessons)
 
 ### Active open issues (read bodies, not just titles)
 
@@ -136,7 +137,7 @@ Phase V is a **three-sub-phase remediation and hardening cycle** targeting the o
 
 ### Hard constraints inherited from prior phases
 
-All Critical Rules from `Docs/lessons/firmware-rules.md` apply. Key ones for Phase V:
+All Critical Rules from `prompts/prompt-index-and-workflow.md` apply (currently Rules 1–62). Key ones for Phase V:
 
 | Rule | Constraint |
 |------|-----------|
@@ -198,6 +199,8 @@ The 8 fragments are: `config.h`, `data-model.h`, `nvs-persistence.h`, `aggregato
 - Respond immediately with `{\"ok\":true,\"status\":\"queued\"}` to the POST
 - Add an atomic `s_import_ready` flag; `/api/import/d/` and `/api/import/w/` gate on this flag
 - The deferred task sets `s_import_ready = true` after `build_import_epoch_map_()` completes
+- New endpoint `/api/import/status` — add to `canHandle()` POST section (line ~21 area in web-handler.h) alongside existing `/api/import/*` routes; handler returns `{"ready":true/false,"stage":"idle|preparing|ready"}`; this endpoint does NOT require auth (dashboard polls it during import flow; same policy as existing import endpoints)
+- The `s_import_ready` flag and `s_import_stage` string must be `static` variables in `web-handler.h` (same fragment as the other import handlers) — do not split across fragments
 - Add `/api/import/status` endpoint returning `{\"ready\":true/false}` for dashboard polling
 - Dashboard JS must poll `/api/import/status` before sending data chunks
 - Acceptance: `POST /api/import/begin` does not crash or watchdog-reset ESP32-C3; confirmed with `free_heap` before and after; full import sequence (begin → d/ × N → finish) completes on C3
@@ -246,6 +249,8 @@ The plan must open with a threat model section for V2 that covers:
 - All callers (external push scripts, ESPHome sensors) must add `Authorization: Basic <base64>` header
 - Update any existing curl test scripts for ingest to include `-u user:pass`
 - Document in `Docs/lessons/build-pipeline.md` under a new LESSON-SEC-001 entry
+- Cross-reference LESSON-OPS-110 (prompt code snippets must include explicit auth policy) — this lesson applies to all V2 endpoint auth changes: every prompt for V2 steps must specify the auth decision inline in the code block
+
 
 #### V2-B — Bug #163 SEC-02: Auth guard on `/api/aggregator/add-satellite`
 - File: `firmware/core/web-handler.h` → `handle_add_satellite_()`
@@ -494,6 +499,8 @@ The plan must produce or specify the production of the following artefacts, matc
 | `Docs/decisions/SEC-ADR-001-residual-vulnerabilities.md` | Security ADR — known residual vulnerabilities |
 | `Docs/decisions/AGG-ADR-001-satellite-history-storage.md` | Aggregator history ADR — proxy vs local copy decision |
 
+**Note:** The `Docs/decisions/` directory does not yet exist in the repository. Create it as part of the output. Add a one-line `Docs/decisions/README.md`:
+
 ### 5.2 Prompt artefacts (to be produced after the plan is approved)
 
 These are NOT produced by the research agent — they are produced by a subsequent agent given the plan. The plan must include a specification of what each prompt must cover:
@@ -579,6 +586,17 @@ You are the deep-research agent. Your job is to:
 4. Do NOT produce the prompt artefacts (§5.2) — those are produced by a subsequent agent given the plan
 5. Do NOT make any code changes — this is a research and planning output only
 6. Flag any ambiguity or conflict between the plan and the Critical Rules or existing architecture as a **CONFLICT NOTE** in the relevant plan section
+
+### Output prioritisation (if context or output limits constrain)
+
+If you cannot produce all four documents at full depth in a single session, prioritise in this order:
+
+1. **`Docs/phase-V-implementation-plan.md`** — the plan is the primary deliverable. It must be complete with all step details, file lists, acceptance criteria, and version sequences.
+2. **`Docs/phase-V-capacity-study.md`** — the capacity study. Must include the per-metric cost model and the board-type capacity tables. The executive summary table and partition recommendations are the highest-value sections.
+3. **`Docs/decisions/AGG-ADR-001-satellite-history-storage.md`** — the aggregator history ADR. Can be a structured outline with decision rationale and open questions if full prose is not feasible.
+4. **`Docs/decisions/SEC-ADR-001-residual-vulnerabilities.md`** — the security ADR. Can be a structured outline listing each residual vulnerability, its rating, and its mitigation status.
+
+If you produce ADRs as outlines rather than full documents, mark them as `Status: Draft — requires expansion` in the document header.
 
 ### Conflict resolution priority
 
