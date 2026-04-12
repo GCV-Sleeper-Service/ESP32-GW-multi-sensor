@@ -126,7 +126,7 @@ ESP32-GW-multi-sensor/
     render_sensor_config.py        Generator for all sensor-dependent files
     generate-header.sh             Gzip dashboard into C header
     bump-version.sh                Atomic version bump
-    preflight.sh                   Repo validation (53 checks)
+    preflight.sh                   Repo validation (68 checks)
     exporters/                     System metrics exporter scripts (Phase 6)
   src/
     gateway_manifest.h             Generated manifest v2 JSON
