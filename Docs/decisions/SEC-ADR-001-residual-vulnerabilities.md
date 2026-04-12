@@ -157,7 +157,7 @@ For internet exposure, this is accepted until Phase E designs a credential-propa
 | `/api/import/d/` | POST | ✅ Yes (pre-existing) | RV-01 |
 | `/api/import/w/` | POST | ✅ Yes (pre-existing) | RV-01 |
 | `/api/import/finish` | POST | ✅ Yes (pre-existing) | RV-01 |
-| `/api/import/status` | GET | ✅ Yes (V1-D) | RV-01 |
+| `/api/import/status` | GET | ❌ Public (intentional) | Dashboard polls during import; read-only boolean flag |
 | `/api/aggregator/add-satellite` | POST | ✅ Yes (V2-B) | RV-01 |
 | `/api/aggregator/satellite/{id}` | DELETE | ✅ Yes (pre-existing) | RV-01 |
 | `/api/aggregator/test-satellite` | POST | ✅ Yes (pre-existing) | RV-01 |
