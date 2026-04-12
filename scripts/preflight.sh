@@ -709,9 +709,20 @@ deferred_task_pairs_in_expected_homes() {
 }
 
 maybe_yield_present_in_nvs_persistence() {
-  if [[ -f firmware/core/nvs-persistence.h ]] && grep -q "maybe_yield_nvs_scan_" firmware/core/nvs-persistence.h; then
+  local def_in_nvs other_def
+  def_in_nvs=$(grep -v '^[[:space:]]*//' firmware/core/nvs-persistence.h \
+    | grep -c 'maybe_yield_nvs_scan_.*{' || true)
+  other_def=0
+  for f in firmware/core/*.h; do
+    [[ "$f" == "firmware/core/nvs-persistence.h" ]] && continue
+    local c
+    c=$(grep -v '^[[:space:]]*//' "$f" | grep -c 'maybe_yield_nvs_scan_.*{' || true)
+    other_def=$((other_def + c))
+  done
+  if [[ "$def_in_nvs" -ge 1 && "$other_def" -eq 0 ]]; then
     pass "maybe_yield_present_in_nvs_persistence"
   else
+    echo "    maybe_yield_nvs_scan_ in nvs-persistence.h=$def_in_nvs, other fragments=$other_def"
     fail "maybe_yield_present_in_nvs_persistence"
   fi
 }
