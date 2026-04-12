@@ -86,7 +86,12 @@ For each issue:
 
 ## Hard Constraints
 
-All Critical Rules from `Docs/lessons/firmware.md` apply. Key rules for Phase V:
+All Critical Rules from `prompts/prompt-index-and-workflow.md` apply (currently Rules 1–62). Key rules for Phase V:
+
+**Additional required reading for V2 security steps:**
+- `Docs/lessons/operations.md` — operational patterns, auth-policy lessons
+- `Docs/lessons/build-pipeline.md` — contains LESSON-OPS-089 (unauthenticated add-satellite rationale, resolved in V2-B)
+- `Docs/lessons/firmware.md` — contains LESSON-OPS-110 (auth policy in prompt code blocks)
 
 | Rule | Constraint |
 |---|---|
@@ -349,6 +354,12 @@ if (strcmp(p, "/api/import/status") == 0) {
 }
 ```
 
+**Endpoint placement notes:**
+- Add to `canHandle()` POST section (line ~33 area of `web-handler.h`) alongside existing `/api/import/*` routes
+- The handler is in `web-handler.h` (same fragment as other import handlers) — do NOT split across fragments
+- `s_import_ready` must be `static volatile bool` at file scope near other `s_import_*` variables
+- Auth: NOT REQUIRED — dashboard polls this during import flow; returns only `{"ready":true/false}` (no sensitive data)
+
 6. Gate `/api/import/d/` and `/api/import/w/` on `s_import_ready`:
 ```cpp
 void handle_import_data_(...) {
@@ -377,6 +388,17 @@ After edits: `bash scripts/assemble-sensor-history.sh --write && bash scripts/pr
 - [ ] Rule 40: `build_import_epoch_map_()` deferred to xTaskCreate with ≥ 8192 B stack ✓
 - [ ] Rule 41: httpd task does not block on NVS ✓
 
+**Pre-existing Rule 8 violations (out of Phase V scope):**
+The following `beginResponseStream` calls exist in `firmware/core/web-handler.h` and are NOT fixed in Phase V. They are tracked as tech-debt for a future cleanup PR:
+- Line 428: `handle_api_live_()` — JSON response
+- Line 444: `handle_api_manifest_()` — JSON response
+- Line 447: handler near manifest — JSON response
+- Line 605: `handle_aggregator_gateways_()` — JSON response (auth-gated in V2-C)
+- Line 622: `handle_aggregator_live_()` — JSON response (auth-gated in V2-C)
+- Lines 1031, 1071, 1105, 1156, 1234: various import/NVS handlers — JSON responses
+
+Only line 817 (`handle_import_begin_()`) is fixed in V1-D because it's part of the import crash fix scope.
+
 ---
 
 ### V1-E — Enhancement #143: Version Badge in Dashboard Footer
@@ -395,8 +417,12 @@ After edits: `bash scripts/assemble-sensor-history.sh --write && bash scripts/pr
 **Implementation:**
 
 1. Edit `dashboard/dashboard.tmpl.html`:
+
+**⚠️ Do NOT edit `dashboard/core/app-shell.js` for the badge population AND `dashboard/dashboard.tmpl.html` for the span — follow the full rebuild pipeline.** The template file is the HTML source; `app-shell.js` is the JS source. Both are inputs to `bundle-dashboard.sh`. After editing both source files, run the four-command rebuild pipeline (lines 413–418).
+
    - Find the footer area near `id="pointCount"` and `id="lastUpdate"` spans
    - Add `<span id="versionBadge" style="opacity:0.55;font-size:.65rem"></span>` between them
+
 
 2. Edit `dashboard/core/app-shell.js`:
    - In `App.Boot.start()`, as the **first** action (before SSE setup):
@@ -586,6 +612,15 @@ Phase V V2 addresses the following threat landscape:
 
 **What cannot be fixed without TLS:**
 Basic Auth credential eavesdropping. This is documented as a permanent residual vulnerability in `Docs/decisions/SEC-ADR-001-residual-vulnerabilities.md` (RV-01).
+
+**Auth policy in code blocks (LESSON-OPS-110):** Every endpoint handler code block in V2 steps must include an explicit auth decision comment. This lesson was learned during Phase D when an agent dropped auth from an endpoint because the prompt didn't state the policy inline. For V2 steps, the pattern is:
+```cpp
+// Auth: REQUIRED — call authenticate_management_() before any logic
+```
+or:
+```cpp
+// Auth: NOT REQUIRED — [one-sentence rationale]
+```
 
 ---
 
@@ -949,8 +984,8 @@ See `Docs/decisions/SEC-ADR-001-residual-vulnerabilities.md` — Auth Coverage T
 **Why combined:** All three issues touch the same device info card template, `DEVICE_INFO_MAP`, and both YAML configs. Splitting them would require three consecutive dashboard rebuilds with high merge-conflict risk.
 
 **Files modified:**
-- `dashboard/components/status-snapshot/index.js` — `DEVICE_INFO_MAP` updates
-- `dashboard/components/manifest/index.js` (or `manifest.js`) — populate new fields
+- `dashboard/core/status-snapshot.js` — `DEVICE_INFO_MAP` updates
+- `dashboard/core/manifest.js` — populate new fields from `/api/manifest` response
 - `dashboard/dashboard.tmpl.html` — add new device info row IDs
 - `firmware/esp32-c3-multi-sensor.yaml` — add flash/SRAM/PSRAM text_sensors
 - `firmware/esp32-s3-multi-sensor.yaml` (or equivalent S3 YAML) — add PSRAM sensors
@@ -1156,13 +1191,20 @@ The following 7 prompt artefacts are to be produced by a **subsequent agent** af
 
 | File | Content required |
 |---|---|
-| `prompts/phaseV/phaseV-v1-agent-prompt.md` | Complete instructions for V1-A through V1-G. Must include: specific file paths, function names, line ranges (from this plan), exact code snippets for all changes, acceptance criteria as curl commands, Critical Rules checklist (Rules 8, 27, 38, 39, 40, 41, 47, 48, 58, 62), operator measurement protocol for #164 Steps 1–7, version sequence v7.6.7.0/7.1/7.2. Must NOT include V2 or V3 work. |
-| `prompts/phaseV/phaseV-v2-agent-prompt.md` | Complete instructions for V2-A through V2-J. Must include: threat model summary, auth guard code snippets for each endpoint, `fetch_to_buffer()` signature change, `/api/status/full` new endpoint spec, SEC-ADR-001 commit instruction, gate conditions for V2-H/I/J, decision table for OPT-01, LESSON-OPS-051 reminder for OPT-04. Must state explicitly that V2-H/I/J ship ONLY if gates pass. |
-| `prompts/phaseV/phaseV-v3-agent-prompt.md` | Complete instructions for V3-A through V3-F. Must include: dashboard rebuild pipeline commands, Playwright test requirements for each change, V3-C breaking-change documentation, V3-D manifest-driven metrics implementation, V3-F gate condition and no-change path, AGG-ADR-001 commit instruction. |
-| `prompts/phaseV/phaseV-review-checklist.md` | PR review checklist for all three sub-phases. Must include: security-specific checks (no new unauthenticated write endpoints, no new `beginResponseStream`, no new `setsockopt` without `lwip_` prefix), dashboard rebuild verification, fragment assembly verification, Rule compliance check per rule, heap measurement verification for gated steps. |
-| `prompts/phaseV/phaseV-handoff.md` | Handoff document from Phase V to Phase 7 planner. Must include: what Phase V changed (auth state, endpoint list, struct state), what Phase 7 inherits (open questions from AGG-ADR-001, binary sensor EventLog design, partition table change requirements), measurements from V1 operator protocol and V2 gate results. |
-| `prompts/phaseV/phaseV-pr-audit-template.md` | PR audit template matching Phase Y format. Must include: PR metadata fields (title, version, issues closed), file change checklist, acceptance criteria verification commands, Critical Rules compliance grid, heap measurement table (pre/post for C3). |
-| `prompts/phaseV/phaseV-conclusion-assessment.md` | Template for post-V3 conclusion assessment. Sections: plan vs actual (each step: shipped/deferred/changed), heap measurements at V1/V2/V3 closure, issues closed, issues deferred to Phase 7, lessons learned. To be completed after V3 merges. |
+| `prompts/phaseV/v7.6.7.0-implementation-instructions-for-coding-agent.md` | V1-A + V1-B + V1-C (proxy fix, NAS history disable, logger level). Single PR. |
+| `prompts/phaseV/v7.6.7.1-implementation-instructions-for-coding-agent.md` | V1-D (import crash fix — Rule 40 deferred task). Standalone PR — highest risk in V1. |
+| `prompts/phaseV/v7.6.7.2-implementation-instructions-for-coding-agent.md` | V1-E + V1-F + V1-G (version badge, dead code deletion, import comment). Single PR. |
+| `prompts/phaseV/v7.6.8.0-implementation-instructions-for-coding-agent.md` | V2-A + V2-B + V2-C + V2-D (auth guards on ingest, add-satellite, aggregator reads, status field strip). Single PR. |
+| `prompts/phaseV/v7.6.8.1-implementation-instructions-for-coding-agent.md` | V2-E + V2-F + V2-G (history auth+cap, DoS cooldown, SEC-ADR commit). Single PR. |
+| `prompts/phaseV/v7.6.8.2-implementation-instructions-for-coding-agent.md` | V2-H + V2-I + V2-J (gated optimisations — ship ONLY if all gates pass). Single PR. |
+| `prompts/phaseV/v7.6.9.0-implementation-instructions-for-coding-agent.md` | V3-A (device card cleanup — #143 + #144 + #136 combined). Single PR. |
+| `prompts/phaseV/v7.6.9.1-implementation-instructions-for-coding-agent.md` | V3-B + V3-C (satellite hostname/IP, CSV role column). Single PR. |
+| `prompts/phaseV/v7.6.9.2-implementation-instructions-for-coding-agent.md` | V3-D + V3-E (manifest-driven export, AGG-ADR commit). Single PR. |
+| `prompts/phaseV/v7.6.9.3-implementation-instructions-for-coding-agent.md` | V3-F (struct padding audit — conditional, only if heap < 65 KB post-V2). Single PR if triggered. |
+| `prompts/phaseV/v7.6.7.0-review-prompt.md` ... (one per step) | Perplexity three-turn review prompts |
+| `prompts/phaseV/pr-audit-question-template-phaseV.md` | 9-question stable core + sub-phase supplements |
+| `prompts/phaseV/phaseV-conclusion-assessment.md` | Post-V3 conclusion template |
+| `prompts/handoff/phaseV-results.md` | Handoff to Phase 7 (pre-filled structure, empty result cells) |
 
 ---
 
