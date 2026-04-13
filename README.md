@@ -113,7 +113,7 @@ ESP32-GW-multi-sensor/
       nvs-persistence.h            NVS persistence, restore, hourly persist (614 lines)
       deferred-management.h        Deferred reboot and delete-data tasks (50 lines)
       ping-adapter.h               PingAdapter class and ping callbacks (168 lines)
-      aggregator-runtime.h         Satellite cache, mutex, poll task, aggregator NVS (891 lines)
+      aggregator-runtime.h         Satellite cache, mutex, poll task, aggregator NVS (892 lines)
       web-handler.h                HTTP endpoint dispatch and all 21 handlers (2,006 lines)
       registration.h               Handler registration and boot orchestration (41 lines)
     esp32-c3-multi-sensor.yaml     ESPHome config (C3 default)
@@ -233,7 +233,7 @@ The firmware history/persistence engine (`dashboard/sensor_history_multi.h`) is 
 | `nvs-persistence.h` | 614 | NVS persistence, restore, hourly persist |
 | `deferred-management.h` | 50 | Deferred reboot and delete-data tasks |
 | `ping-adapter.h` | 168 | PingAdapter class and ping callbacks |
-| `aggregator-runtime.h` | 891 | Satellite cache, mutex, poll task, aggregator NVS |
+| `aggregator-runtime.h` | 892 | Satellite cache, mutex, poll task, aggregator NVS |
 | `web-handler.h` | 2,006 | HTTP endpoint dispatch and all 21 handlers |
 | `registration.h` | 41 | Handler registration and boot orchestration |
 

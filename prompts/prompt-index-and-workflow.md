@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-12 — Phase Y closure (v7.6.6.8). Phase Y complete. Critical Rules 58–62 added. Current Phase: **Phase 7** (pending)._
+_Last updated: 2026-04-12 — Phase Y closure (v7.6.6.8). Phase Y complete. Critical Rules 58–63 added. Current Phase: **Phase V** (pending)._
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -280,6 +280,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 60 | `s_cache_mutex` and `AGG_LOCK`/`AGG_UNLOCK` are defined once in `firmware/core/aggregator-runtime.h`. Never redefine or shadow them. | Phase Y v7.6.6.6 |
 | 61 | `maybe_yield_nvs_scan_()` is defined once in `firmware/core/nvs-persistence.h`. Call it in every NVS scan loop. | Phase Y v7.6.6.5 |
 | 62 | The assembly fragment order in `assemble-sensor-history.sh` is the dependency order. Never reorder fragments. | Phase Y v7.6.6.1 |
+| 63 | Session log is a **pre-merge acceptance criterion** (§6), not a post-merge deliverable (§9). Required sections: ESPHome output (or documented absence), Playwright fixture table, evidence summary. Agents treat §9 as optional — placing the session log there caused 4/9 Phase Y steps to ship without it. | Phase Y closure analysis — 44% omission rate when in §9 |
 
 ---
 
