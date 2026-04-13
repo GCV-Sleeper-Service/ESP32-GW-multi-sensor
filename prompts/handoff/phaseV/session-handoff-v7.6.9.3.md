@@ -84,10 +84,14 @@ See `prompts/phaseV/v7.6.9.3-agent-prompt-gpt-codex.md` §6 for the full checkli
 3. Agent implements per §5 with ⛔ CHECKPOINT verification
 4. Agent runs pipeline, preflight, Playwright
 5. Review the PR — verify scope, acceptance criteria, Critical Rules
-6. Merge, tag `v7.6.9.3`
-7. Execute device testing (if applicable)
-8. Produce consolidated audit
-9. Inspect and update next step's handoff + agent prompt
+6. Send universal reviewer prompt + step-specific focus areas to external reviewers (Codex/GPT/Copilot)
+   - Universal prompt: `prompts/phaseV/pr-audit-question-template-phaseV.md` (top section)
+   - Step supplement: same file, lookup table at bottom for this version
+   - Reviewers post findings as PR comments; fix any Blocking/High issues
+7. Merge, tag `v7.6.9.3`
+8. Execute device testing (if applicable)
+9. Produce consolidated audit
+10. Inspect and update next step's handoff + agent prompt
 
 ---
 

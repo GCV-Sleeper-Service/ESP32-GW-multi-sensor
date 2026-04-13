@@ -39,18 +39,34 @@ _Merge commit: `[sha]`._
 
 ## Acceptance Criteria Verification
 
-| # | Criterion (from §6) | PASS/FAIL | Evidence |
+Copy each criterion from the agent's implementation prompt §6 (e.g., `prompts/phaseV/v7.6.X.Y-agent-prompt-gpt-codex.md` → §6 — Acceptance Criteria). Mark each PASS or FAIL with evidence.
+
+| # | Criterion (from agent prompt §6) | PASS/FAIL | Evidence |
 |---|---|---|---|
-| 1 | | | |
+| 1 | [copy verbatim from §6] | | |
 | 2 | | | |
 
 ---
 
 ## External Reviewer Issues and Resolutions
 
+Record findings from all external reviewers (Codex, GPT, Copilot, Perplexity). Copy from their PR comments.
+
 | Source | Finding | Severity | Warranted? | Fixed? | Commit | Classification |
 |--------|---------|----------|-----------|--------|--------|----------------|
 | | | | | | | |
+
+---
+
+## Operator Device Testing Results
+
+_Fill in after post-merge device testing. Copy test items from the agent prompt §8. If device testing is not applicable for this step, write "N/A — no device testing required."_
+
+| Test | Board | Result | Evidence (heap values, curl output, serial log) |
+|---|---|---|---|
+| [from agent prompt §8] | C3 / S3 | PASS/FAIL | |
+
+**If any test failed:** describe symptom, link to bug escalation if used, note whether deferred or fixed in follow-up.
 
 ---
 
@@ -66,7 +82,8 @@ _Merge commit: `[sha]`._
 | Session log created | |
 | Changelog entry | |
 | Instruction Compliance Output in PR | |
-| Device testing results (if applicable) | |
+| External reviewer feedback addressed | |
+| Device testing results recorded | |
 | **Consolidated audit (this document)** | ✅ |
 | **Next step handoff/prompt inspected** | |
 
@@ -76,6 +93,7 @@ _Merge commit: `[sha]`._
 
 **Handoff reviewed:** `prompts/handoff/phaseV/session-handoff-v7.6.X.Y.md`
 **Agent prompt reviewed:** `prompts/phaseV/v7.6.X.Y-agent-prompt-gpt-codex.md`
+**Claude two-step reviewed:** `prompts/phaseV/v7.6.X.Y-claude-two-step.md`
 
 **Updates needed?**
 - [ ] No updates needed — plan assumptions still valid
