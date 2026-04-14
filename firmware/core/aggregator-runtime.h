@@ -121,8 +121,10 @@ static uint16_t s_proxy_len = 0;
 // Avoids esp_http_client.h, which is not in ESPHome's IDF PRIV_REQUIRES.
 // Uses lwip/sockets.h and lwip/netdb.h (both already available).
 // Returns true and sets *out_len on HTTP 200; false otherwise.
-static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint16_t* out_len) {
+static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint16_t* out_len,
+                            int timeout_s = 5, int* out_http_status = nullptr) {
   *out_len = 0;
+  if (out_http_status != nullptr) *out_http_status = 0;
 
   // ── Parse "http://host[:port]/path" ────────────────────────────
   if (strncmp(url, "http://", 7) != 0) return false;
@@ -169,7 +171,8 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   if (sock < 0) { lwip_freeaddrinfo(res); return false; }
 
   struct timeval tv = {};
-  tv.tv_sec = 5;
+  tv.tv_sec = timeout_s;
+  tv.tv_usec = 0;
   lwip_setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
   lwip_setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
@@ -203,10 +206,24 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   }
   if (!hdr_done) { lwip_close(sock); return false; }
 
-  // Check HTTP 200 status
+  // Parse and check HTTP status (bounded; no reliance on NUL terminator).
   if (strncmp(hdr, "HTTP/", 5) != 0) { lwip_close(sock); return false; }
-  const char* sp = (const char*)memchr(hdr, ' ', hdr_len < 20 ? hdr_len : 20);
-  if (!sp || strncmp(sp + 1, "200", 3) != 0) { lwip_close(sock); return false; }
+  const char* hdr_end = hdr + hdr_len;
+  const char* sp = (const char*)memchr(hdr, ' ', hdr_len);
+  if (!sp) { lwip_close(sock); return false; }
+  const char* status = sp + 1;
+  while (status < hdr_end && *status == ' ') status++;
+  if ((hdr_end - status) < 3) { lwip_close(sock); return false; }
+  if (status[0] < '0' || status[0] > '9' ||
+      status[1] < '0' || status[1] > '9' ||
+      status[2] < '0' || status[2] > '9') {
+    lwip_close(sock); return false;
+  }
+  int http_status_code = (status[0] - '0') * 100 +
+                         (status[1] - '0') * 10 +
+                         (status[2] - '0');
+  if (out_http_status != nullptr) *out_http_status = http_status_code;
+  if (http_status_code != 200) { lwip_close(sock); return false; }
 
   // ── Read body directly into caller's buffer ────────────────────
   int total = 0;
@@ -217,12 +234,9 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   }
   lwip_close(sock);
 
-  if (total > 0) {
-    buf[total] = '\0';
-    *out_len = (uint16_t)total;
-    return true;
-  }
-  return false;
+  buf[total] = '\0';
+  *out_len = (uint16_t)total;
+  return true;
 }
 
 // ── Satellite manifest probe helper (v7.6.0.1) ─────────────────────────────

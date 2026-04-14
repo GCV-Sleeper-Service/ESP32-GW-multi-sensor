@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// config-v7.6.6.8.h - hourly persistence with dedicated history NVS partition
+// config-v7.6.7.0.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -396,9 +396,9 @@ static const MetricDef metrics_ping[] = {
 };
 
 static const MetricDef metrics_system[] = {
-  {"cpu_pct",    "CPU Usage",  "%", 0, true},
-  {"ram_pct",    "RAM Usage",  "%", 0, true},
-  {"disk_pct",   "Disk Usage", "%", 0, true},
+  {"cpu_pct",    "CPU Usage",  "%", 0, false},
+  {"ram_pct",    "RAM Usage",  "%", 0, false},
+  {"disk_pct",   "Disk Usage", "%", 0, false},
   {"uptime_hrs", "Uptime",     "h", 3, false}
 };
 
@@ -410,9 +410,6 @@ static HistoryBuffer entity_hbuf_outside_temp;
 static HistoryBuffer entity_hbuf_outside_hum;
 static HistoryBuffer entity_hbuf_wan_ping_ping_ms;
 static HistoryBuffer entity_hbuf_wan_ping_success_pct;
-static HistoryBuffer entity_hbuf_nas01_cpu_pct;
-static HistoryBuffer entity_hbuf_nas01_ram_pct;
-static HistoryBuffer entity_hbuf_nas01_disk_pct;
 
 static constexpr int NUM_DEVICES = 5;
 static constexpr int NUM_ENV_SENSORS = 3;
@@ -483,9 +480,9 @@ static SensorEntity devices[NUM_DEVICES] = {
     .category_id = 1, .adapter = "external_push",
     .metric_defs = metrics_system,
     .metric_states = {
-      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_cpu_pct},
-      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_ram_pct},
-      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_disk_pct},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},
       {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}
     },
     .metric_count = 4,
@@ -496,7 +493,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.6.8) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.7.0) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -1508,8 +1505,10 @@ static uint16_t s_proxy_len = 0;
 // Avoids esp_http_client.h, which is not in ESPHome's IDF PRIV_REQUIRES.
 // Uses lwip/sockets.h and lwip/netdb.h (both already available).
 // Returns true and sets *out_len on HTTP 200; false otherwise.
-static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint16_t* out_len) {
+static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint16_t* out_len,
+                            int timeout_s = 5, int* out_http_status = nullptr) {
   *out_len = 0;
+  if (out_http_status != nullptr) *out_http_status = 0;
 
   // ── Parse "http://host[:port]/path" ────────────────────────────
   if (strncmp(url, "http://", 7) != 0) return false;
@@ -1556,7 +1555,8 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   if (sock < 0) { lwip_freeaddrinfo(res); return false; }
 
   struct timeval tv = {};
-  tv.tv_sec = 5;
+  tv.tv_sec = timeout_s;
+  tv.tv_usec = 0;
   lwip_setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
   lwip_setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
@@ -1590,10 +1590,24 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   }
   if (!hdr_done) { lwip_close(sock); return false; }
 
-  // Check HTTP 200 status
+  // Parse and check HTTP status (bounded; no reliance on NUL terminator).
   if (strncmp(hdr, "HTTP/", 5) != 0) { lwip_close(sock); return false; }
-  const char* sp = (const char*)memchr(hdr, ' ', hdr_len < 20 ? hdr_len : 20);
-  if (!sp || strncmp(sp + 1, "200", 3) != 0) { lwip_close(sock); return false; }
+  const char* hdr_end = hdr + hdr_len;
+  const char* sp = (const char*)memchr(hdr, ' ', hdr_len);
+  if (!sp) { lwip_close(sock); return false; }
+  const char* status = sp + 1;
+  while (status < hdr_end && *status == ' ') status++;
+  if ((hdr_end - status) < 3) { lwip_close(sock); return false; }
+  if (status[0] < '0' || status[0] > '9' ||
+      status[1] < '0' || status[1] > '9' ||
+      status[2] < '0' || status[2] > '9') {
+    lwip_close(sock); return false;
+  }
+  int http_status_code = (status[0] - '0') * 100 +
+                         (status[1] - '0') * 10 +
+                         (status[2] - '0');
+  if (out_http_status != nullptr) *out_http_status = http_status_code;
+  if (http_status_code != 200) { lwip_close(sock); return false; }
 
   // ── Read body directly into caller's buffer ────────────────────
   int total = 0;
@@ -1604,12 +1618,9 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   }
   lwip_close(sock);
 
-  if (total > 0) {
-    buf[total] = '\0';
-    *out_len = (uint16_t)total;
-    return true;
-  }
-  return false;
+  buf[total] = '\0';
+  *out_len = (uint16_t)total;
+  return true;
 }
 
 // ── Satellite manifest probe helper (v7.6.0.1) ─────────────────────────────
@@ -2599,6 +2610,24 @@ class HistoryWebHandler : public AsyncWebHandler {
     resp->addHeader("Cache-Control", "no-store");
     resp->addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE");
     resp->addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  }
+
+  static std::string json_escape_(const char *value) {
+    std::string escaped;
+    if (value == nullptr) return escaped;
+    for (const char *p = value; *p != '\0'; ++p) {
+      switch (*p) {
+        case '"': escaped += "\\\""; break;
+        case '\\': escaped += "\\\\"; break;
+        case '\b': escaped += "\\b"; break;
+        case '\f': escaped += "\\f"; break;
+        case '\n': escaped += "\\n"; break;
+        case '\r': escaped += "\\r"; break;
+        case '\t': escaped += "\\t"; break;
+        default: escaped += *p; break;
+      }
+    }
+    return escaped;
   }
 
   void send_json_error_(AsyncWebServerRequest *request, int status_code,
@@ -3902,13 +3931,29 @@ class HistoryWebHandler : public AsyncWebHandler {
     // s_proxy_tmp is only used in web handler context (single-threaded ESPHome loop)
     // The polling task never touches s_proxy_tmp — no mutex needed here.
     s_proxy_len = 0;
+    int satellite_http_status = 0;
     static_assert(sizeof(s_proxy_tmp) <= 65535,
                   "s_proxy_tmp size must fit into uint16_t for fetch_to_buffer");
     if (!fetch_to_buffer(url, s_proxy_tmp,
                          static_cast<uint16_t>(sizeof(s_proxy_tmp)),
-                         &s_proxy_len)
-        || s_proxy_len == 0) {
-      request->send(502);
+                         &s_proxy_len,
+                         15,
+                         &satellite_http_status)) {
+      ESP_LOGW(TAG, "Proxy fetch failed for %s (HTTP %d)", url, satellite_http_status);
+      std::string err_body = std::string("{\"error\":\"upstream_fetch_failed\",\"url\":\"") +
+                             json_escape_(url) + "\",\"http_status\":" +
+                             std::to_string(satellite_http_status) + "}";
+      auto *resp = request->beginResponse(502, "application/json", err_body);
+      add_common_headers_(resp);
+      request->send(resp);
+      return;
+    }
+
+    // Satellite returned 200 but has no history data.
+    if (s_proxy_len == 0) {
+      auto *resp = request->beginResponse(200, "text/plain", "");
+      add_common_headers_(resp);
+      request->send(resp);
       return;
     }
 

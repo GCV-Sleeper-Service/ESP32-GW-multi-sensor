@@ -322,6 +322,24 @@ class HistoryWebHandler : public AsyncWebHandler {
     resp->addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
   }
 
+  static std::string json_escape_(const char *value) {
+    std::string escaped;
+    if (value == nullptr) return escaped;
+    for (const char *p = value; *p != '\0'; ++p) {
+      switch (*p) {
+        case '"': escaped += "\\\""; break;
+        case '\\': escaped += "\\\\"; break;
+        case '\b': escaped += "\\b"; break;
+        case '\f': escaped += "\\f"; break;
+        case '\n': escaped += "\\n"; break;
+        case '\r': escaped += "\\r"; break;
+        case '\t': escaped += "\\t"; break;
+        default: escaped += *p; break;
+      }
+    }
+    return escaped;
+  }
+
   void send_json_error_(AsyncWebServerRequest *request, int status_code,
                         const char *message,
                         uint32_t retry_after_sec = 0) const {
@@ -1623,13 +1641,29 @@ class HistoryWebHandler : public AsyncWebHandler {
     // s_proxy_tmp is only used in web handler context (single-threaded ESPHome loop)
     // The polling task never touches s_proxy_tmp — no mutex needed here.
     s_proxy_len = 0;
+    int satellite_http_status = 0;
     static_assert(sizeof(s_proxy_tmp) <= 65535,
                   "s_proxy_tmp size must fit into uint16_t for fetch_to_buffer");
     if (!fetch_to_buffer(url, s_proxy_tmp,
                          static_cast<uint16_t>(sizeof(s_proxy_tmp)),
-                         &s_proxy_len)
-        || s_proxy_len == 0) {
-      request->send(502);
+                         &s_proxy_len,
+                         15,
+                         &satellite_http_status)) {
+      ESP_LOGW(TAG, "Proxy fetch failed for %s (HTTP %d)", url, satellite_http_status);
+      std::string err_body = std::string("{\"error\":\"upstream_fetch_failed\",\"url\":\"") +
+                             json_escape_(url) + "\",\"http_status\":" +
+                             std::to_string(satellite_http_status) + "}";
+      auto *resp = request->beginResponse(502, "application/json", err_body);
+      add_common_headers_(resp);
+      request->send(resp);
+      return;
+    }
+
+    // Satellite returned 200 but has no history data.
+    if (s_proxy_len == 0) {
+      auto *resp = request->beginResponse(200, "text/plain", "");
+      add_common_headers_(resp);
+      request->send(resp);
       return;
     }
 

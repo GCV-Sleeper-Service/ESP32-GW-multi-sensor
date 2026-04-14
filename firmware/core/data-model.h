@@ -301,9 +301,9 @@ static const MetricDef metrics_ping[] = {
 };
 
 static const MetricDef metrics_system[] = {
-  {"cpu_pct",    "CPU Usage",  "%", 0, true},
-  {"ram_pct",    "RAM Usage",  "%", 0, true},
-  {"disk_pct",   "Disk Usage", "%", 0, true},
+  {"cpu_pct",    "CPU Usage",  "%", 0, false},
+  {"ram_pct",    "RAM Usage",  "%", 0, false},
+  {"disk_pct",   "Disk Usage", "%", 0, false},
   {"uptime_hrs", "Uptime",     "h", 3, false}
 };
 
@@ -315,9 +315,6 @@ static HistoryBuffer entity_hbuf_outside_temp;
 static HistoryBuffer entity_hbuf_outside_hum;
 static HistoryBuffer entity_hbuf_wan_ping_ping_ms;
 static HistoryBuffer entity_hbuf_wan_ping_success_pct;
-static HistoryBuffer entity_hbuf_nas01_cpu_pct;
-static HistoryBuffer entity_hbuf_nas01_ram_pct;
-static HistoryBuffer entity_hbuf_nas01_disk_pct;
 
 static constexpr int NUM_DEVICES = 5;
 static constexpr int NUM_ENV_SENSORS = 3;
@@ -388,9 +385,9 @@ static SensorEntity devices[NUM_DEVICES] = {
     .category_id = 1, .adapter = "external_push",
     .metric_defs = metrics_system,
     .metric_states = {
-      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_cpu_pct},
-      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_ram_pct},
-      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_nas01_disk_pct},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},
+      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},
       {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}
     },
     .metric_count = 4,
@@ -401,7 +398,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.6.8) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.7.0) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.

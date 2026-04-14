@@ -2,6 +2,18 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.7.0] - 2026-04-14 - Phase V V1-A/B/C: Proxy Fix, NAS History Disable, Logger Level
+
+### Fixed
+- Aggregator history proxy returns JSON diagnostic on 502 instead of empty body (#161).
+- Aggregator history proxy returns 200 with empty body when satellite has no history (not 502).
+- `fetch_to_buffer()` now supports configurable timeout (default 5s, proxy uses 15s) and bounded HTTP status parsing.
+
+### Changed
+- NAS system metrics (`cpu_pct`, `ram_pct`, `disk_pct`) are now live-only; manifest/fixtures no longer advertise history URLs for these metrics.
+- Proxy failure JSON now safely escapes URL and avoids truncation-prone fixed-size payloads.
+- Logger level changed from INFO to WARN; wifi/api set to ERROR.
+
 ## [v7.6.6.8] — 2026-04-12 — Phase Y: Closure
 
 ### Added

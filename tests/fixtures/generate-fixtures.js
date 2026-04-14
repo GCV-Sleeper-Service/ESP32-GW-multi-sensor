@@ -12,7 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
-const VERSION = 'v7.6.6.8';
+const VERSION = 'v7.6.7.0';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },
@@ -126,8 +126,8 @@ const SYSTEM_METRICS = [
     class: 'analog_numeric',
     data_type: 'float',
     bounds: { min: 0, max: 100 },
-    history: true,
-    history_suffix: 'cpu_pct',
+    history: false,
+    history_suffix: '',
     display: { precision: 0, chart: true },
   },
   {
@@ -138,8 +138,8 @@ const SYSTEM_METRICS = [
     class: 'analog_numeric',
     data_type: 'float',
     bounds: { min: 0, max: 100 },
-    history: true,
-    history_suffix: 'ram_pct',
+    history: false,
+    history_suffix: '',
     display: { precision: 0, chart: true },
   },
   {
@@ -150,8 +150,8 @@ const SYSTEM_METRICS = [
     class: 'analog_numeric',
     data_type: 'float',
     bounds: { min: 0, max: 100 },
-    history: true,
-    history_suffix: 'disk_pct',
+    history: false,
+    history_suffix: '',
     display: { precision: 0, chart: true },
   },
   {
@@ -317,10 +317,10 @@ function writeFixtureSet(targetDir, sensors, tag) {
       fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-ping_ms.csv`), '');
       fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-success_pct.csv`), '');
     } else if (sensor.adapter === 'external_push') {
-      // Stub history files for system device history-enabled metrics
-      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-cpu_pct.csv`), '');
-      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-ram_pct.csv`), '');
-      fs.writeFileSync(path.join(targetDir, `history-${sensor.id}-disk_pct.csv`), '');
+      // System metrics are live-only (history disabled): remove stale CSV fixtures.
+      fs.rmSync(path.join(targetDir, `history-${sensor.id}-cpu_pct.csv`), { force: true });
+      fs.rmSync(path.join(targetDir, `history-${sensor.id}-ram_pct.csv`), { force: true });
+      fs.rmSync(path.join(targetDir, `history-${sensor.id}-disk_pct.csv`), { force: true });
     }
   });
 }
