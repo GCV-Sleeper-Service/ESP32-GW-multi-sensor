@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_aggregator_config, load_board_profile, load_gateway_config, load_manifest, manifest_v2
 
-VERSION = "7.6.6.8"
+VERSION = "7.6.7.0"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"
@@ -108,9 +108,9 @@ def render_entity_block(sensors: List[Dict]) -> str:
     if system:
         lines.extend([
             "static const MetricDef metrics_system[] = {",
-            '  {"cpu_pct",    "CPU Usage",  "%", 0, true},',
-            '  {"ram_pct",    "RAM Usage",  "%", 0, true},',
-            '  {"disk_pct",   "Disk Usage", "%", 0, true},',
+            '  {"cpu_pct",    "CPU Usage",  "%", 0, false},',
+            '  {"ram_pct",    "RAM Usage",  "%", 0, false},',
+            '  {"disk_pct",   "Disk Usage", "%", 0, false},',
             '  {"uptime_hrs", "Uptime",     "h", 3, false}',
             "};",
             "",
@@ -126,11 +126,6 @@ def render_entity_block(sensors: List[Dict]) -> str:
         lines.append(f"static HistoryBuffer entity_hbuf_{sid}_ping_ms;")
         lines.append(f"static HistoryBuffer entity_hbuf_{sid}_success_pct;")
 
-    for sensor in system:
-        sid = sensor["id"]
-        lines.append(f"static HistoryBuffer entity_hbuf_{sid}_cpu_pct;")
-        lines.append(f"static HistoryBuffer entity_hbuf_{sid}_ram_pct;")
-        lines.append(f"static HistoryBuffer entity_hbuf_{sid}_disk_pct;")
 
     lines.extend([
         "",
@@ -201,9 +196,9 @@ def render_entity_block(sensors: List[Dict]) -> str:
                 '    .category_id = 1, .adapter = "external_push",',
                 "    .metric_defs = metrics_system,",
                 "    .metric_states = {",
-                f"      {{.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_{sid}_cpu_pct}},",
-                f"      {{.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_{sid}_ram_pct}},",
-                f"      {{.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = &entity_hbuf_{sid}_disk_pct}},",
+                "      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},",
+                "      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},",
+                "      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr},",
                 "      {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}",
                 "    },",
                 "    .metric_count = 4,",

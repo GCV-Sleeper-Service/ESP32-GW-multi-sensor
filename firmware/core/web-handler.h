@@ -1623,13 +1623,30 @@ class HistoryWebHandler : public AsyncWebHandler {
     // s_proxy_tmp is only used in web handler context (single-threaded ESPHome loop)
     // The polling task never touches s_proxy_tmp — no mutex needed here.
     s_proxy_len = 0;
+    int satellite_http_status = 0;
     static_assert(sizeof(s_proxy_tmp) <= 65535,
                   "s_proxy_tmp size must fit into uint16_t for fetch_to_buffer");
     if (!fetch_to_buffer(url, s_proxy_tmp,
                          static_cast<uint16_t>(sizeof(s_proxy_tmp)),
-                         &s_proxy_len)
-        || s_proxy_len == 0) {
-      request->send(502);
+                         &s_proxy_len,
+                         15,
+                         &satellite_http_status)) {
+      ESP_LOGW(TAG, "Proxy fetch failed for %s (HTTP %d)", url, satellite_http_status);
+      char err_body[192];
+      snprintf(err_body, sizeof(err_body),
+               "{\"error\":\"upstream_fetch_failed\",\"url\":\"%s\",\"http_status\":%d}",
+               url, satellite_http_status);
+      auto *resp = request->beginResponse(502, "application/json", err_body);
+      add_common_headers_(resp);
+      request->send(resp);
+      return;
+    }
+
+    // Satellite returned 200 but has no history data.
+    if (s_proxy_len == 0) {
+      auto *resp = request->beginResponse(200, "text/plain", "");
+      add_common_headers_(resp);
+      request->send(resp);
       return;
     }
 
