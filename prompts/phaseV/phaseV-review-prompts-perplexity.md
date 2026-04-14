@@ -47,7 +47,7 @@ Evidence needed: preflight pass · assembly --check pass · Playwright results �
 ## Review prompt — v7.6.7.0
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
-Read `prompts/handoff/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
+Read `prompts/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
 Use the Shared Perplexity Review Session Protocol from that file throughout this session.
 
 **Turn 1 reads (do not open more than these):**
@@ -119,7 +119,7 @@ Evidence needed: C3 device test — no watchdog on import begin · /api/import/s
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
-Read `prompts/handoff/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
+Read `prompts/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
 Use the Shared Perplexity Review Session Protocol from that file throughout this session.
 
 **Turn 1 reads (do not open more than these):**
@@ -194,7 +194,7 @@ Evidence needed: grep zero-result for stream functions · preflight pass · Play
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
-Read `prompts/handoff/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
+Read `prompts/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
 Use the Shared Perplexity Review Session Protocol from that file throughout this session.
 
 **Turn 1 reads (do not open more than these):**
@@ -269,7 +269,7 @@ Evidence needed: curl 401 evidence for each guarded endpoint · curl 200 with cr
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
-Read `prompts/handoff/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
+Read `prompts/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
 Use the Shared Perplexity Review Session Protocol from that file throughout this session.
 
 **Turn 1 reads (do not open more than these):**
@@ -339,7 +339,7 @@ Evidence needed: curl 401 on history without auth · curl 200 with auth · large
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
-Read `prompts/handoff/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
+Read `prompts/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
 Use the Shared Perplexity Review Session Protocol from that file throughout this session.
 
 **Turn 1 reads (do not open more than these):**
@@ -411,7 +411,7 @@ Evidence needed: V1 Operator Measurement results table · 5-minute two-tab test 
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
-Read `prompts/handoff/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
+Read `prompts/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
 Use the Shared Perplexity Review Session Protocol from that file throughout this session.
 
 **Turn 1 reads (do not open more than these):**
@@ -481,7 +481,7 @@ Evidence needed: dashboard render showing device name + firmware version · PSRA
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
-Read `prompts/handoff/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
+Read `prompts/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
 Use the Shared Perplexity Review Session Protocol from that file throughout this session.
 
 **Turn 1 reads (do not open more than these):**
@@ -557,7 +557,7 @@ Evidence needed: curl gateways response showing hostname + ip fields · dashboar
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
-Read `prompts/handoff/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
+Read `prompts/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
 Use the Shared Perplexity Review Session Protocol from that file throughout this session.
 
 **Turn 1 reads (do not open more than these):**
@@ -629,7 +629,7 @@ Evidence needed: ping CSV export with ping_ms + success_pct columns populated (n
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
-Read `prompts/handoff/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
+Read `prompts/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
 Use the Shared Perplexity Review Session Protocol from that file throughout this session.
 
 **Turn 1 reads (do not open more than these):**
@@ -700,7 +700,7 @@ Evidence needed: post-V2 heap measurement confirming < 65KB (to trigger) or ≥ 
 
 Repo — https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
-Read `prompts/handoff/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
+Read `prompts/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md` first.
 Use the Shared Perplexity Review Session Protocol from that file throughout this session.
 
 **Turn 1 reads (do not open more than these):**
