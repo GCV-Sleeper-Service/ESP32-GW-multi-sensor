@@ -206,11 +206,22 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   }
   if (!hdr_done) { lwip_close(sock); return false; }
 
-  // Parse and check HTTP status
+  // Parse and check HTTP status (bounded; no reliance on NUL terminator).
   if (strncmp(hdr, "HTTP/", 5) != 0) { lwip_close(sock); return false; }
-  const char* sp = (const char*)memchr(hdr, ' ', hdr_len < 20 ? hdr_len : 20);
+  const char* hdr_end = hdr + hdr_len;
+  const char* sp = (const char*)memchr(hdr, ' ', hdr_len);
   if (!sp) { lwip_close(sock); return false; }
-  int http_status_code = (int)strtol(sp + 1, nullptr, 10);
+  const char* status = sp + 1;
+  while (status < hdr_end && *status == ' ') status++;
+  if ((hdr_end - status) < 3) { lwip_close(sock); return false; }
+  if (status[0] < '0' || status[0] > '9' ||
+      status[1] < '0' || status[1] > '9' ||
+      status[2] < '0' || status[2] > '9') {
+    lwip_close(sock); return false;
+  }
+  int http_status_code = (status[0] - '0') * 100 +
+                         (status[1] - '0') * 10 +
+                         (status[2] - '0');
   if (out_http_status != nullptr) *out_http_status = http_status_code;
   if (http_status_code != 200) { lwip_close(sock); return false; }
 
@@ -223,12 +234,9 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   }
   lwip_close(sock);
 
-  if (total > 0) {
-    buf[total] = '\0';
-    *out_len = (uint16_t)total;
-    return true;
-  }
-  return false;
+  buf[total] = '\0';
+  *out_len = (uint16_t)total;
+  return true;
 }
 
 // ── Satellite manifest probe helper (v7.6.0.1) ─────────────────────────────

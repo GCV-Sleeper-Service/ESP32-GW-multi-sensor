@@ -108,8 +108,8 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
         "min": 0,
         "max": 100
       },
-      "history": true,
-      "history_suffix": "cpu_pct",
+      "history": false,
+      "history_suffix": "",
       "display": {
         "precision": 0,
         "chart": true
@@ -126,8 +126,8 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
         "min": 0,
         "max": 100
       },
-      "history": true,
-      "history_suffix": "ram_pct",
+      "history": false,
+      "history_suffix": "",
       "display": {
         "precision": 0,
         "chart": true
@@ -144,8 +144,8 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
         "min": 0,
         "max": 100
       },
-      "history": true,
-      "history_suffix": "disk_pct",
+      "history": false,
+      "history_suffix": "",
       "display": {
         "precision": 0,
         "chart": true
@@ -257,16 +257,13 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
       },
       "measurements": [
         {
-          "key": "cpu_pct",
-          "history_url": "/api/v2/history/nas01/cpu_pct"
+          "key": "cpu_pct"
         },
         {
-          "key": "ram_pct",
-          "history_url": "/api/v2/history/nas01/ram_pct"
+          "key": "ram_pct"
         },
         {
-          "key": "disk_pct",
-          "history_url": "/api/v2/history/nas01/disk_pct"
+          "key": "disk_pct"
         },
         {
           "key": "uptime_hrs"

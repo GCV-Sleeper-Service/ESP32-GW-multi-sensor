@@ -1590,11 +1590,22 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   }
   if (!hdr_done) { lwip_close(sock); return false; }
 
-  // Parse and check HTTP status
+  // Parse and check HTTP status (bounded; no reliance on NUL terminator).
   if (strncmp(hdr, "HTTP/", 5) != 0) { lwip_close(sock); return false; }
-  const char* sp = (const char*)memchr(hdr, ' ', hdr_len < 20 ? hdr_len : 20);
+  const char* hdr_end = hdr + hdr_len;
+  const char* sp = (const char*)memchr(hdr, ' ', hdr_len);
   if (!sp) { lwip_close(sock); return false; }
-  int http_status_code = (int)strtol(sp + 1, nullptr, 10);
+  const char* status = sp + 1;
+  while (status < hdr_end && *status == ' ') status++;
+  if ((hdr_end - status) < 3) { lwip_close(sock); return false; }
+  if (status[0] < '0' || status[0] > '9' ||
+      status[1] < '0' || status[1] > '9' ||
+      status[2] < '0' || status[2] > '9') {
+    lwip_close(sock); return false;
+  }
+  int http_status_code = (status[0] - '0') * 100 +
+                         (status[1] - '0') * 10 +
+                         (status[2] - '0');
   if (out_http_status != nullptr) *out_http_status = http_status_code;
   if (http_status_code != 200) { lwip_close(sock); return false; }
 
@@ -1607,12 +1618,9 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   }
   lwip_close(sock);
 
-  if (total > 0) {
-    buf[total] = '\0';
-    *out_len = (uint16_t)total;
-    return true;
-  }
-  return false;
+  buf[total] = '\0';
+  *out_len = (uint16_t)total;
+  return true;
 }
 
 // ── Satellite manifest probe helper (v7.6.0.1) ─────────────────────────────
@@ -2602,6 +2610,24 @@ class HistoryWebHandler : public AsyncWebHandler {
     resp->addHeader("Cache-Control", "no-store");
     resp->addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE");
     resp->addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  }
+
+  static std::string json_escape_(const char *value) {
+    std::string escaped;
+    if (value == nullptr) return escaped;
+    for (const char *p = value; *p != '\0'; ++p) {
+      switch (*p) {
+        case '"': escaped += "\\\""; break;
+        case '\\': escaped += "\\\\"; break;
+        case '\b': escaped += "\\b"; break;
+        case '\f': escaped += "\\f"; break;
+        case '\n': escaped += "\\n"; break;
+        case '\r': escaped += "\\r"; break;
+        case '\t': escaped += "\\t"; break;
+        default: escaped += *p; break;
+      }
+    }
+    return escaped;
   }
 
   void send_json_error_(AsyncWebServerRequest *request, int status_code,
@@ -3914,10 +3940,9 @@ class HistoryWebHandler : public AsyncWebHandler {
                          15,
                          &satellite_http_status)) {
       ESP_LOGW(TAG, "Proxy fetch failed for %s (HTTP %d)", url, satellite_http_status);
-      char err_body[192];
-      snprintf(err_body, sizeof(err_body),
-               "{\"error\":\"upstream_fetch_failed\",\"url\":\"%s\",\"http_status\":%d}",
-               url, satellite_http_status);
+      std::string err_body = std::string("{\"error\":\"upstream_fetch_failed\",\"url\":\"") +
+                             json_escape_(url) + "\",\"http_status\":" +
+                             std::to_string(satellite_http_status) + "}";
       auto *resp = request->beginResponse(502, "application/json", err_body);
       add_common_headers_(resp);
       request->send(resp);

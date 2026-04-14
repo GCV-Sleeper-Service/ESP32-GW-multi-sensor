@@ -322,6 +322,24 @@ class HistoryWebHandler : public AsyncWebHandler {
     resp->addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
   }
 
+  static std::string json_escape_(const char *value) {
+    std::string escaped;
+    if (value == nullptr) return escaped;
+    for (const char *p = value; *p != '\0'; ++p) {
+      switch (*p) {
+        case '"': escaped += "\\\""; break;
+        case '\\': escaped += "\\\\"; break;
+        case '\b': escaped += "\\b"; break;
+        case '\f': escaped += "\\f"; break;
+        case '\n': escaped += "\\n"; break;
+        case '\r': escaped += "\\r"; break;
+        case '\t': escaped += "\\t"; break;
+        default: escaped += *p; break;
+      }
+    }
+    return escaped;
+  }
+
   void send_json_error_(AsyncWebServerRequest *request, int status_code,
                         const char *message,
                         uint32_t retry_after_sec = 0) const {
@@ -1632,10 +1650,9 @@ class HistoryWebHandler : public AsyncWebHandler {
                          15,
                          &satellite_http_status)) {
       ESP_LOGW(TAG, "Proxy fetch failed for %s (HTTP %d)", url, satellite_http_status);
-      char err_body[192];
-      snprintf(err_body, sizeof(err_body),
-               "{\"error\":\"upstream_fetch_failed\",\"url\":\"%s\",\"http_status\":%d}",
-               url, satellite_http_status);
+      std::string err_body = std::string("{\"error\":\"upstream_fetch_failed\",\"url\":\"") +
+                             json_escape_(url) + "\",\"http_status\":" +
+                             std::to_string(satellite_http_status) + "}";
       auto *resp = request->beginResponse(502, "application/json", err_body);
       add_common_headers_(resp);
       request->send(resp);

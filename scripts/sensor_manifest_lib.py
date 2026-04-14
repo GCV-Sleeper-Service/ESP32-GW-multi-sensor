@@ -58,8 +58,8 @@ _SYSTEM_METRICS = [
         "class": "analog_numeric",
         "data_type": "float",
         "bounds": {"min": 0, "max": 100},
-        "history": True,
-        "history_suffix": "cpu_pct",
+        "history": False,
+        "history_suffix": "",
         "display": {"precision": 0, "chart": True},
     },
     {
@@ -70,8 +70,8 @@ _SYSTEM_METRICS = [
         "class": "analog_numeric",
         "data_type": "float",
         "bounds": {"min": 0, "max": 100},
-        "history": True,
-        "history_suffix": "ram_pct",
+        "history": False,
+        "history_suffix": "",
         "display": {"precision": 0, "chart": True},
     },
     {
@@ -82,8 +82,8 @@ _SYSTEM_METRICS = [
         "class": "analog_numeric",
         "data_type": "float",
         "bounds": {"min": 0, "max": 100},
-        "history": True,
-        "history_suffix": "disk_pct",
+        "history": False,
+        "history_suffix": "",
         "display": {"precision": 0, "chart": True},
     },
     {
