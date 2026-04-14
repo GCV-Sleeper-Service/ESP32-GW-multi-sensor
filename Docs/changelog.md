@@ -2,6 +2,19 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+
+## [v7.6.7.2] - 2026-04-14 - Phase V V1-E/F/G: Version Badge, Dead Code Deletion, Import Comment
+
+### Added
+- Dashboard footer version badge (`versionBadge`) populated from `App.version` during boot.
+- Preflight guard `dashboard_has_version_badge` to verify badge presence in generated dashboard output.
+
+### Removed
+- Dead helper `stream_snapshot_series_()` removed from `firmware/core/nvs-persistence.h`.
+- Dead method `HistoryBuffer::stream_to()` removed from `firmware/core/data-model.h`.
+
+### Changed
+- Added import-session lifetime documentation comment at `handle_import_begin_()` referencing RV-05 rationale.
 ## [v7.6.7.1] - 2026-04-14 - Phase V V1-D: Import Crash Fix (Rule 40 Compliance)
 
 ### Fixed

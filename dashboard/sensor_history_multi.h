@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// config-v7.6.7.1.h - hourly persistence with dedicated history NVS partition
+// config-v7.6.7.2.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -178,28 +178,6 @@ class HistoryBuffer {
     }
   }
 
-  // Stream compact "epoch,value\n" to HTTP response.
-  // Gap entries -> "epoch,\n". Optional epoch filter avoids duplicates.
-  void stream_to(AsyncResponseStream *stream,
-                 uint32_t min_epoch_exclusive = 0) const {
-    if (stream == nullptr) return;
-    char line[48];
-
-    for (int i = 0; i < count_; i++) {
-      HistEntry entry = at_logical(i);
-      if (entry.epoch == 0 || entry.epoch <= min_epoch_exclusive) continue;
-
-      int len;
-      if (std::isnan(entry.value)) {
-        len = snprintf(line, sizeof(line), "%u,\n",
-                       (unsigned) entry.epoch);
-      } else {
-        len = snprintf(line, sizeof(line), "%u,%.2f\n",
-                       (unsigned) entry.epoch, entry.value);
-      }
-      if (len > 0 && len < (int) sizeof(line)) stream->print(line);
-    }
-  }
 
   // BUG-043 rev2: Append CSV to pre-reserved std::string instead of response stream.
   // This avoids the std::string reallocation cascade in beginResponseStream that
@@ -493,7 +471,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.7.1) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.7.2) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -930,40 +908,8 @@ static void append_snapshot_to_ram_(const SegmentSnapshot &snapshot) {
   }
 }
 
-static void stream_snapshot_series_(AsyncResponseStream *stream,
-                                    const SegmentSnapshot &snapshot,
-                                    int sensor_idx,
-                                    int series_kind) {
-  if (stream == nullptr || sensor_idx < 0 || sensor_idx >= NUM_SENSORS) return;
-
-  const HistEntry *entries = nullptr;
-  int count = 0;
-  if (series_kind == HISTORY_SERIES_TEMP) {
-    entries = snapshot.temp[sensor_idx];
-    count = snapshot.temp_counts[sensor_idx];
-  } else {
-    entries = snapshot.hum[sensor_idx];
-    count = snapshot.hum_counts[sensor_idx];
-  }
-
-  char line[48];
-  for (int i = 0; i < count; i++) {
-    const HistEntry &entry = entries[i];
-    if (entry.epoch == 0) continue;
-
-    int len;
-    if (std::isnan(entry.value)) {
-      len = snprintf(line, sizeof(line), "%u,\n", (unsigned) entry.epoch);
-    } else {
-      len = snprintf(line, sizeof(line), "%u,%.2f\n",
-                     (unsigned) entry.epoch, entry.value);
-    }
-    if (len > 0 && len < (int) sizeof(line)) stream->print(line);
-  }
-}
-
 // BUG-043 rev2: Append snapshot series CSV to pre-reserved std::string.
-// Same logic as stream_snapshot_series_ but writes to a string buffer
+// Writes to a string buffer
 // instead of an AsyncResponseStream — avoids the heap-killing reallocation
 // cascade of beginResponseStream for large history responses.
 static void append_snapshot_series_csv_(std::string &csv,
@@ -3125,6 +3071,12 @@ class HistoryWebHandler : public AsyncWebHandler {
     vTaskDelete(nullptr);
   }
 
+  // import_snapshot_ (~6,710 B = sizeof(SegmentSnapshot)) is allocated on first call
+  // to handle_import_begin_() and held until cleanup_import_state_() is called. If the
+  // import session is abandoned (browser closed), this allocation is held until the
+  // next /api/import/begin call or a reboot. This is accepted behaviour — the
+  // allocation is bounded and a single session at a time is the expected pattern.
+  // See Docs/decisions/SEC-ADR-001-residual-vulnerabilities.md RV-05 for rationale.
   void handle_import_begin_(AsyncWebServerRequest *request,
                             bool single_mode, int target_sensor) {
     if (!authenticate_management_(request)) return;
@@ -4393,7 +4345,6 @@ class HistoryWebHandler : public AsyncWebHandler {
   }
 #endif  // AGGREGATOR_ENABLED
 };
-
 
 // ═══════════════════════════════════════════════════════════════════
 // Handler Registration — called from YAML on_boot lambda

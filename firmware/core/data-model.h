@@ -83,28 +83,6 @@ class HistoryBuffer {
     }
   }
 
-  // Stream compact "epoch,value\n" to HTTP response.
-  // Gap entries -> "epoch,\n". Optional epoch filter avoids duplicates.
-  void stream_to(AsyncResponseStream *stream,
-                 uint32_t min_epoch_exclusive = 0) const {
-    if (stream == nullptr) return;
-    char line[48];
-
-    for (int i = 0; i < count_; i++) {
-      HistEntry entry = at_logical(i);
-      if (entry.epoch == 0 || entry.epoch <= min_epoch_exclusive) continue;
-
-      int len;
-      if (std::isnan(entry.value)) {
-        len = snprintf(line, sizeof(line), "%u,\n",
-                       (unsigned) entry.epoch);
-      } else {
-        len = snprintf(line, sizeof(line), "%u,%.2f\n",
-                       (unsigned) entry.epoch, entry.value);
-      }
-      if (len > 0 && len < (int) sizeof(line)) stream->print(line);
-    }
-  }
 
   // BUG-043 rev2: Append CSV to pre-reserved std::string instead of response stream.
   // This avoids the std::string reallocation cascade in beginResponseStream that
@@ -398,7 +376,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.7.1) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.7.2) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
