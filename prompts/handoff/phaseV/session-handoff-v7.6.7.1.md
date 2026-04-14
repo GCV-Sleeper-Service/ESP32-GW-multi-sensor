@@ -1,14 +1,23 @@
 # Session Handoff — v7.6.7.1: Import Crash Fix — Deferred Task Pattern
 
-_Date: 2026-04-12_
+_Date: 2026-04-12 (updated 2026-04-14 with v7.6.7.0 device test results)_
 _Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
-_Status: v7.6.7.0 COMPLETE. V1-A/B/C merged. Proxy fixed, NAS history disabled, logger level changed._
+_Status: v7.6.7.0 COMPLETE. V1-A/B/C merged (PR #176, head `004541b`). Proxy fixed, NAS history disabled, logger level changed._
 
 ---
 
 ## Project State Summary
 
 **v7.6.7.0 is complete.** Proxy returns diagnostic JSON on 502. NAS metrics are live-only (~2.3 KB saved). Logger at WARN level.
+
+### v7.6.7.0 Confirmed State (from device tests 2026-04-14)
+
+- Satellite `free_heap` at boot (uptime 192 s): **58,200 bytes** — use as heap baseline for v7.6.7.1 tracking (floor: 55 KB).
+- `GET /api/v2/history/nas01/cpu_pct` → `404` ✅ — NAS history correctly disabled at device level.
+- `fetch_to_buffer()` now 6 params: `(url, buf, max_len, out_len, timeout_s=5, out_http_status=nullptr)` — all pre-existing 4-arg call sites use defaults and are **unchanged**.
+- NAS entity buffers gone; `devices[4]` metric_states have `history = nullptr`.
+- `assemble --check` identity hash at merge: `c4a8d1d3c8ec9cde27392e624bd9d99897276645cb14463dacba5668f0f17e95`.
+- **Known pre-existing defect:** Aggregator proxy endpoint (`/api/aggregator/proxy/…`) returns `404` at device level — route registration gap, unrelated to v7.6.7.0 proxy logic fixes. The 502/200 logic is correct per Playwright; the route handler is simply not reachable via HTTP. This is not v7.6.7.1 scope but should be escalated as a separate issue.
 
 ---
 
@@ -45,6 +54,7 @@ _Status: v7.6.7.0 COMPLETE. V1-A/B/C merged. Proxy fixed, NAS history disabled, 
 - Auth guards (V2)
 - Any other firmware fragment changes
 - Test file modifications
+- Fix the proxy route registration gap (separate issue, not V1-D scope)
 
 ### Files modified
 
@@ -112,7 +122,7 @@ See `prompts/phaseV/v7.6.7.1-agent-prompt-gpt-codex.md` §6 for the full checkli
 - [ ] `POST /api/import/begin` returns immediately (no crash, no WDT reset)
 - [ ] `GET /api/import/status` returns `{ready:false}` then `{ready:true}`
 - [ ] Full import sequence completes without watchdog reset
-- [ ] Free heap does not drop below 55 KB during import task
+- [ ] `free_heap` does not drop below 55 KB during import task (baseline: 58,200 bytes from v7.6.7.0)
 
 **If any endpoint crashes the board:** capture serial log, use bug escalation prompt (`prompts/phaseV/phaseV-bug-escalation-to-claude.md`).
 
@@ -138,9 +148,13 @@ If any actual result from this step invalidates assumptions in the next step's h
 
 ## Context That Carries Forward to Next Step
 
+- `fetch_to_buffer()` is now 6-parameter: `(url, buf, max_len, out_len, timeout_s=5, out_http_status=nullptr)` — existing 4-arg call sites unchanged.
+- NAS entity history buffers removed; `devices[4]` `history = nullptr`.
+- Satellite `free_heap` baseline: **58,200 bytes** (v7.6.7.0, uptime 192 s). Heap floor for all subsequent steps remains 55 KB.
 - Import now uses deferred task pattern. `/api/import/status` is a new public endpoint.
 - `s_import_ready` is `static volatile bool` — data endpoints gate on it.
 - The multi-sensor import path may also need deferred task treatment — check if the agent addressed both paths.
+- Pre-existing proxy route registration gap (device-level 404 on `/api/aggregator/proxy/…`) is not V1-D scope — do not fix in v7.6.7.1.
 
 ---
 
