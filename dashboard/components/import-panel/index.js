@@ -270,6 +270,37 @@ function safeJsonResponse(r) {
   });
 }
 
+function waitForImportReady(statusEl, targetSensorId) {
+  var maxAttempts = 80;
+  var intervalMs = 250;
+  var attempt = 0;
+
+  function poll() {
+    attempt++;
+    if (statusEl) {
+      var scope = targetSensorId ? (' for ' + targetSensorId) : '';
+      statusEl.textContent = 'Waiting for import readiness' + scope +
+        '... (' + attempt + '/' + maxAttempts + ')';
+    }
+
+    return fetch(ESP_HOST + '/api/import/status', { cache: 'no-store' })
+      .then(safeJsonResponse)
+      .then(function(data) {
+        if (data && data.ready === true) return;
+        if (attempt >= maxAttempts) {
+          throw new Error('Import not ready in time - poll /api/import/status and retry');
+        }
+        return delay(intervalMs).then(poll);
+      })
+      .catch(function(err) {
+        if (attempt >= maxAttempts) throw err;
+        return delay(intervalMs).then(poll);
+      });
+  }
+
+  return poll();
+}
+
 function executeImport(batches, statusEl, importMode, targetSensorId) {
   if (isImportActive()) {
     if (statusEl) statusEl.textContent = 'Import already in progress...';
@@ -327,44 +358,49 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
       .then(function(data) {
         if (!data.ok) throw new Error(data.message || 'Begin failed');
 
-        var totalAccepted = 0;
-        var totalRejected = 0;
+        var runBatches = function() {
+          var totalAccepted = 0;
+          var totalRejected = 0;
 
-        var estimate = estimateImportDuration(batches.length);
-        return batches.reduce(function(chain, batch, idx) {
-          return chain.then(function() {
-            if (statusEl) {
-              var remainingBatches = Math.max(0, batches.length - (idx + 1));
-              var remainingSeconds = Math.round((estimate.seconds / Math.max(1, batches.length)) * remainingBatches);
-              statusEl.textContent = 'Importing batch ' + (idx + 1) + ' / ' + batches.length +
-                ' (' + batch.pointCount + ' points, ~' + formatDurationLabel(remainingSeconds) + ' left)...';
-            }
+          var estimate = estimateImportDuration(batches.length);
+          return batches.reduce(function(chain, batch, idx) {
+            return chain.then(function() {
+              if (statusEl) {
+                var remainingBatches = Math.max(0, batches.length - (idx + 1));
+                var remainingSeconds = Math.round((estimate.seconds / Math.max(1, batches.length)) * remainingBatches);
+                statusEl.textContent = 'Importing batch ' + (idx + 1) + ' / ' + batches.length +
+                  ' (' + batch.pointCount + ' points, ~' + formatDurationLabel(remainingSeconds) + ' left)...';
+              }
 
-            var pathPrefix = batch.isLast ? '/api/import/w/' : '/api/import/d/';
-            return importFetchJsonWithRetry(
-              ESP_HOST + pathPrefix + batch.data,
-              {
-                method: 'POST',
-                cache: 'no-store',
-                headers: {
-                  'Authorization': authHeader,
-                  'Content-Type': 'application/x-www-form-urlencoded'
+              var pathPrefix = batch.isLast ? '/api/import/w/' : '/api/import/d/';
+              return importFetchJsonWithRetry(
+                ESP_HOST + pathPrefix + batch.data,
+                {
+                  method: 'POST',
+                  cache: 'no-store',
+                  headers: {
+                    'Authorization': authHeader,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                  },
+                  body: 'a=1'
                 },
-                body: 'a=1'
-              },
-              'batch ' + (idx + 1) + ' of ' + batches.length,
-              statusEl
-            )
-            .then(function(result) {
-              if (!result.ok) throw new Error(result.message || 'Data write failed at batch ' + (idx + 1));
-              totalAccepted += (result.accepted || 0);
-              totalRejected += (result.rejected || 0);
-              return delay(batch.isLast ? pacing.writeBatchGapMs : pacing.dataBatchGapMs);
+                'batch ' + (idx + 1) + ' of ' + batches.length,
+                statusEl
+              )
+              .then(function(result) {
+                if (!result.ok) throw new Error(result.message || 'Data write failed at batch ' + (idx + 1));
+                totalAccepted += (result.accepted || 0);
+                totalRejected += (result.rejected || 0);
+                return delay(batch.isLast ? pacing.writeBatchGapMs : pacing.dataBatchGapMs);
+              });
             });
+          }, Promise.resolve()).then(function() {
+            return { accepted: totalAccepted, rejected: totalRejected };
           });
-        }, Promise.resolve()).then(function() {
-          return { accepted: totalAccepted, rejected: totalRejected };
-        });
+        };
+
+        if (!isSingle) return runBatches();
+        return waitForImportReady(statusEl, targetSensorId).then(runBatches);
       })
       .then(function(totals) {
         if (statusEl) statusEl.textContent = 'Finalizing import...';

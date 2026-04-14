@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// config-v7.6.7.0.h - hourly persistence with dedicated history NVS partition
+// config-v7.6.7.1.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -493,7 +493,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.7.0) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.7.1) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -2288,6 +2288,8 @@ static void start_aggregator_task() {
 // HistoryWebHandler — custom endpoints on ESPHome web server
 // ═══════════════════════════════════════════════════════════════════
 
+static volatile bool s_import_ready = false;
+
 class HistoryWebHandler : public AsyncWebHandler {
  public:
   HistoryWebHandler(std::string username, std::string password, std::string version)
@@ -2335,6 +2337,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (strcmp(p, "/dashboard-download") == 0) return true;
       if (strcmp(p, "/api/storage-stats") == 0) return true;
       if (strcmp(p, "/api/status") == 0) return true;
+      if (strcmp(p, "/api/import/status") == 0) return true;
       if (strcmp(p, "/api/v2/live") == 0) return true;
       if (len >= 20 && strncmp(p, "/api/v2/history/", 16) == 0) return true;
       if (strcmp(p, "/favicon.ico") == 0) return true;
@@ -2499,7 +2502,19 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (strcmp(p, "/api/status") == 0) {
       handle_status_(request);
       return;
-    } if (strcmp(p, "/api/manifest") == 0) { handle_api_manifest_(request); return; }
+    }
+    if (strcmp(p, "/api/import/status") == 0) {
+      const bool ready = import_active_ && s_import_ready && !import_prepare_active_;
+      std::string body = ready ? "{\"ready\":true}" : "{\"ready\":false}";
+      auto *resp = request->beginResponse(200, "application/json", body.c_str());
+      add_common_headers_(resp);
+      request->send(resp);
+      return;
+    }
+    if (strcmp(p, "/api/manifest") == 0) {
+      handle_api_manifest_(request);
+      return;
+    }
     if (strcmp(p, "/api/v2/live") == 0) {
       handle_api_v2_live_(request);
       return;
@@ -2546,6 +2561,7 @@ class HistoryWebHandler : public AsyncWebHandler {
   mutable uint16_t import_segments_written_{0};
   mutable HistoryMeta import_meta_;
   mutable SegmentSnapshot *import_snapshot_{nullptr};
+  mutable volatile bool import_prepare_active_{false};
 
   // ── Single-sensor import state ────────────────────────────────
   mutable bool import_single_mode_{false};
@@ -3061,6 +3077,8 @@ class HistoryWebHandler : public AsyncWebHandler {
     import_active_ = false;
     import_single_mode_ = false;
     import_target_sensor_ = -1;
+    import_prepare_active_ = false;
+    s_import_ready = false;
     if (import_snapshot_ != nullptr) {
       delete import_snapshot_;
       import_snapshot_ = nullptr;
@@ -3084,24 +3102,46 @@ class HistoryWebHandler : public AsyncWebHandler {
         : import_snapshot_->header.last_epoch;
   }
 
+  static void import_epoch_map_task_(void *arg) {
+    auto *handler = static_cast<HistoryWebHandler*>(arg);
+    if (handler == nullptr) {
+      s_import_ready = false;
+      vTaskDelete(nullptr);
+      return;
+    }
+
+    if (!handler->build_import_epoch_map_()) {
+      handler->cleanup_import_state_();
+      handler->import_prepare_active_ = false;
+      s_import_ready = false;
+      ESP_LOGE(TAG, "Failed to build segment index for merge");
+      vTaskDelete(nullptr);
+      return;
+    }
+
+    handler->import_prepare_active_ = false;
+    s_import_ready = true;
+    ESP_LOGI(TAG, "Import epoch map ready");
+    vTaskDelete(nullptr);
+  }
+
   void handle_import_begin_(AsyncWebServerRequest *request,
                             bool single_mode, int target_sensor) {
     if (!authenticate_management_(request)) return;
 
+    if (import_prepare_active_) {
+      send_json_error_(request, 409, "Import preparation already in progress");
+      return;
+    }
+
     // Clean up any leftover import state.
     cleanup_import_state_();
+    s_import_ready = false;
 
     import_single_mode_ = single_mode;
     import_target_sensor_ = target_sensor;
 
-    if (single_mode) {
-      // Single-sensor mode: do NOT erase. Build epoch-to-slot map.
-      if (!build_import_epoch_map_()) {
-        cleanup_import_state_();
-        send_json_error_(request, 500, "Failed to build segment index for merge");
-        return;
-      }
-    } else {
+    if (!single_mode) {
       // Multi-sensor mode: erase all history (original behavior).
       bool ok = clear_persisted_history_();
       if (!ok) {
@@ -3122,27 +3162,40 @@ class HistoryWebHandler : public AsyncWebHandler {
     import_active_ = true;
     import_segments_written_ = 0;
 
-    auto *resp = request->beginResponseStream("application/json");
-    add_common_headers_(resp);
     if (single_mode) {
-      char msg[128];
-      snprintf(msg, sizeof(msg),
-               "{\"ok\":true,\"mode\":\"single\",\"sensor\":\"%s\","
-               "\"existing_segments\":%u,\"message\":\"Ready for single-sensor import\"}",
-               devices[target_sensor].id, (unsigned) import_epoch_map_size_);
-      resp->print(msg);
-      ESP_LOGI(TAG, "Import begun (single-sensor: %s) — %u existing segments indexed",
-               devices[target_sensor].id, (unsigned) import_epoch_map_size_);
+      import_prepare_active_ = true;
+      BaseType_t created = xTaskCreate(import_epoch_map_task_, "imp_epoch",
+                                       8192, (void*)this, 5, nullptr);
+      if (created != pdPASS) {
+        import_prepare_active_ = false;
+        cleanup_import_state_();
+        std::string err = "{\"ok\":false,\"message\":\"Failed to create import task\"}";
+        auto *resp = request->beginResponse(500, "application/json", err.c_str());
+        add_common_headers_(resp);
+        request->send(resp);
+        return;
+      }
+      ESP_LOGI(TAG, "Import begun (single-sensor: %s) - epoch map queued",
+               devices[target_sensor].id);
     } else {
-      resp->print("{\"ok\":true,\"mode\":\"multi\",\"message\":\"History cleared, ready for import\"}");
-      ESP_LOGI(TAG, "Import begun (multi) — history partition cleared");
+      s_import_ready = true;
+      ESP_LOGI(TAG, "Import begun (multi) - history partition cleared");
     }
+
+    std::string body = "{\"ok\":true,\"status\":\"queued\"}";
+    auto *resp = request->beginResponse(200, "application/json", body.c_str());
+    add_common_headers_(resp);
     request->send(resp);
   }
 
   void handle_import_data_(AsyncWebServerRequest *request,
                            const char *path_data, bool do_write) {
     if (!authenticate_management_(request)) return;
+
+    if (!s_import_ready) {
+      send_json_error_(request, 409, "Import not ready - poll /api/import/status");
+      return;
+    }
 
     if (!import_active_ || import_snapshot_ == nullptr) {
       send_json_error_(request, 409, "No import in progress. Call /api/import/begin first.");
@@ -3353,6 +3406,11 @@ class HistoryWebHandler : public AsyncWebHandler {
   void handle_import_finish_(AsyncWebServerRequest *request) {
     if (!authenticate_management_(request)) return;
 
+    if (import_prepare_active_) {
+      send_json_error_(request, 409, "Import preparation in progress - poll /api/import/status");
+      return;
+    }
+
     if (!import_active_) {
       send_json_error_(request, 409, "No import in progress");
       return;
@@ -3376,6 +3434,8 @@ class HistoryWebHandler : public AsyncWebHandler {
       import_active_ = false;
       import_single_mode_ = false;
       import_target_sensor_ = -1;
+      import_prepare_active_ = false;
+      s_import_ready = false;
       auto *resp = request->beginResponseStream("application/json");
       add_common_headers_(resp);
       resp->print("{\"ok\":true,\"segments_written\":0,\"message\":\"Import finished with no segments\"}");
@@ -3389,6 +3449,8 @@ class HistoryWebHandler : public AsyncWebHandler {
       import_active_ = false;
       import_single_mode_ = false;
       import_target_sensor_ = -1;
+      import_prepare_active_ = false;
+      s_import_ready = false;
       send_json_error_(request, 500, "Failed to open NVS to finalize metadata");
       return;
     }
@@ -3399,6 +3461,8 @@ class HistoryWebHandler : public AsyncWebHandler {
       import_active_ = false;
       import_single_mode_ = false;
       import_target_sensor_ = -1;
+      import_prepare_active_ = false;
+      s_import_ready = false;
       send_json_error_(request, 500, "Failed to write import metadata");
       return;
     }
@@ -3409,6 +3473,8 @@ class HistoryWebHandler : public AsyncWebHandler {
     import_active_ = false;
     import_single_mode_ = false;
     import_target_sensor_ = -1;
+    import_prepare_active_ = false;
+    s_import_ready = false;
 
     auto *resp = request->beginResponseStream("application/json");
     add_common_headers_(resp);

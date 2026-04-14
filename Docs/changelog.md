@@ -2,6 +2,16 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.7.1] - 2026-04-14 - Phase V V1-D: Import Crash Fix (Rule 40 Compliance)
+
+### Fixed
+- `handle_import_begin_()` now defers `build_import_epoch_map_()` to `xTaskCreate` (`imp_epoch`, 8192 stack) to avoid synchronous NVS work on the httpd task.
+- Replaced import-begin `beginResponseStream` usage with `beginResponse()` and immediate queued JSON response.
+
+### Added
+- `/api/import/status` endpoint (no auth) returning `{"ready":true|false}` for dashboard polling.
+- `s_import_ready` flag and readiness gate returning HTTP 409 on `/api/import/d/` and `/api/import/w/` until import prep completes.
+
 ## [v7.6.7.0] - 2026-04-14 - Phase V V1-A/B/C: Proxy Fix, NAS History Disable, Logger Level
 
 ### Fixed
