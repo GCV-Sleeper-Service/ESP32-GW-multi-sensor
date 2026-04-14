@@ -1,14 +1,28 @@
 # Session Handoff — v7.6.7.2: Version Badge + Dead Code Deletion + Import Comment
 
-_Date: 2026-04-12_
+_Date: 2026-04-12 (updated 2026-04-14 with v7.6.7.1 device test results)_
 _Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
-_Status: v7.6.7.1 COMPLETE. V1-D merged. Import crash fixed, deferred task pattern applied._
+_Status: v7.6.7.1 COMPLETE. V1-D merged (PR #177). Import crash fixed, deferred task pattern applied, `/api/import/status` endpoint live._
 
 ---
 
 ## Project State Summary
 
-**v7.6.7.1 is complete.** Import uses xTaskCreate with 8192 B stack. `/api/import/status` endpoint added. Rule 8 violation at line ~817 fixed.
+**v7.6.7.1 is complete.** Import uses `xTaskCreate` with 8192 B stack for `build_import_epoch_map_()`. `/api/import/status` public endpoint added. Rule 8 violation at `handle_import_begin_()` fixed (`beginResponse()` confirmed). Dashboard JS polls status on single-sensor path.
+
+### v7.6.7.1 Confirmed State (from device tests 2026-04-14)
+
+- Satellite `free_heap` after import begin (uptime 452 s): **70,568 bytes** — new heap baseline for v7.6.7.2 tracking (floor: **65 KB**).
+- `POST /api/import/begin` → `{"ok":true,"status":"queued"}` HTTP 200. No crash, no WDT reset. ✅
+- `GET /api/import/status` → `{"ready":true}` HTTP 200, no auth required. ✅
+- `POST /api/import/d/0` (while ready) → `{"ok":true,"accepted":0,"rejected":1}` HTTP 200. Correctly rejects invalid path data. ✅
+- Firmware version confirmed: `"version": "v7.6.7.1"` via `GET /api/status`. ✅
+- **No watchdog reset. No Guru Meditation. No task stack overflow.** ✅
+- `s_import_ready` is `static volatile bool` at file scope.
+- `/api/import/status` has NO auth guard — confirmed deliberate policy (boolean only, no sensitive data).
+- Multi-sensor import path still runs `clear_persisted_history_()` synchronously on httpd — pre-existing, not a regression; noted in consolidated audit for V2 backlog.
+- `assemble-sensor-history.sh --check` identity hash at v7.6.7.1 merge: confirm from session log.
+- `stream_snapshot_series_()` and `HistoryBuffer::stream_to()` remain present — V1-F (this step) deletes them.
 
 ---
 
@@ -37,13 +51,15 @@ _Status: v7.6.7.1 COMPLETE. V1-D merged. Import crash fixed, deferred task patte
 2. Populate badge from `App.version` in `app-shell.js` (V1-E)
 3. Add `dashboard_has_version_badge` preflight check (V1-E)
 4. Delete `stream_snapshot_series_()` and `HistoryBuffer::stream_to()` (V1-F)
-5. Add import session timeout documentation comment (V1-G)
+5. Add import session timeout documentation comment to `handle_import_begin_()` (V1-G)
 
 ### What this step does NOT do
 
 - Auth guards (V2)
 - Export/import logic changes (V3)
 - Direct edits to generated dashboard files (Rule 47)
+- Any modification to import handler logic — already completed in v7.6.7.1
+- Multi-sensor import deferred-task refactor — V2 backlog item, not this step
 
 ### Files modified
 
@@ -52,7 +68,15 @@ _Status: v7.6.7.1 COMPLETE. V1-D merged. Import crash fixed, deferred task patte
 - `scripts/preflight.sh` — badge check
 - `firmware/core/nvs-persistence.h` — delete `stream_snapshot_series_()`
 - `firmware/core/data-model.h` — delete `HistoryBuffer::stream_to()`
-- `firmware/core/web-handler.h` — import comment
+- `firmware/core/web-handler.h` — import comment at `handle_import_begin_()` header
+
+### Line number notice (v7.6.7.2 agent)
+
+The v7.6.7.2 agent prompt references `handle_import_begin_()` at line ~779. Due to v7.6.7.1 additions (deferred task, epoch map functions, status handler), the actual line number has shifted. **Always grep before editing:**
+```bash
+grep -n "void handle_import_begin_" firmware/core/web-handler.h
+```
+Use the grep result as the actual line number, not the ~779 estimate.
 
 ### Acceptance criteria
 
@@ -112,7 +136,8 @@ See `prompts/phaseV/v7.6.7.2-agent-prompt-gpt-codex.md` §6 for the full checkli
 | ESP32-S3-DevKitC1-N16R8 | `192.168.120.191` | Aggregator |
 
 - [ ] Version badge visible in dashboard footer
-- [ ] Badge appears before SSE connects
+- [ ] Badge shows correct version string before SSE connects
+- [ ] Badge appears in both light and dark mode
 
 **If any endpoint crashes the board:** capture serial log, use bug escalation prompt (`prompts/phaseV/phaseV-bug-escalation-to-claude.md`).
 
@@ -138,9 +163,14 @@ If any actual result from this step invalidates assumptions in the next step's h
 
 ## Context That Carries Forward to Next Step
 
-- V1 is now complete. Run the operator measurement protocol (Steps 1-7 from the plan) BEFORE starting V2.
+- V1 will be complete after v7.6.7.2. Run the operator measurement protocol (Steps 1-7 from the plan) BEFORE starting V2.
 - Record heap measurements — they gate V2-H/I/J decisions.
-- `stream_snapshot_series_()` and `HistoryBuffer::stream_to()` are deleted — no callers remain.
+- `stream_snapshot_series_()` and `HistoryBuffer::stream_to()` will be deleted in this step — confirm zero callers with grep first.
+- `s_import_ready` is `static volatile bool` — data endpoints gate on it.
+- `/api/import/status` is a live public GET endpoint on the satellite.
+- Heap floor for all v7.6.7.x steps: **65 KB** (confirmed by v7.6.7.1 device test: 70,568 bytes).
+- Multi-sensor import `clear_persisted_history_()` still runs synchronously on httpd — V2 backlog, not this step.
+- Pre-existing proxy route registration gap (device-level 404 on `/api/aggregator/proxy/…`) is not V1 scope.
 
 ---
 
