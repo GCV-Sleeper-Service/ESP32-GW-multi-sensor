@@ -927,7 +927,7 @@
     </div>
   </div>
 
-  <div class="footer"><span id="pointCount">0 data points</span><span id="lastUpdate">&mdash;</span></div>
+  <div class=footer><span id=pointCount>0 data points</span><span id=versionBadge style=opacity:0.55;font-size:.65rem></span><span id=lastUpdate>&mdash;</span></div>
   <div class="debug-panel">
     <div class="debug-toggle" data-action="toggle-debug">&#9654; event log <span id="evtCount" style="opacity:0.5">(0)</span></div>
     <div class="debug-log" id="debugLog"></div>
@@ -976,7 +976,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.6.7.1';
+App.version = 'v7.6.7.2';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -985,6 +985,17 @@ App.Transport = App.Transport || {};
 App.Render = App.Render || {};
 App.Charts = App.Charts || {};
 App.Boot = App.Boot || {};
+
+App.Boot.populateVersionBadge = function() {
+  var badge = document.getElementById('versionBadge');
+  if (badge) badge.textContent = App.version;
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', App.Boot.populateVersionBadge);
+} else {
+  App.Boot.populateVersionBadge();
+}
 App.Features = App.Features || (function() {
   var api = { plugins: [] };
 

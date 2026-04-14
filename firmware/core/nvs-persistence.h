@@ -378,40 +378,8 @@ static void append_snapshot_to_ram_(const SegmentSnapshot &snapshot) {
   }
 }
 
-static void stream_snapshot_series_(AsyncResponseStream *stream,
-                                    const SegmentSnapshot &snapshot,
-                                    int sensor_idx,
-                                    int series_kind) {
-  if (stream == nullptr || sensor_idx < 0 || sensor_idx >= NUM_SENSORS) return;
-
-  const HistEntry *entries = nullptr;
-  int count = 0;
-  if (series_kind == HISTORY_SERIES_TEMP) {
-    entries = snapshot.temp[sensor_idx];
-    count = snapshot.temp_counts[sensor_idx];
-  } else {
-    entries = snapshot.hum[sensor_idx];
-    count = snapshot.hum_counts[sensor_idx];
-  }
-
-  char line[48];
-  for (int i = 0; i < count; i++) {
-    const HistEntry &entry = entries[i];
-    if (entry.epoch == 0) continue;
-
-    int len;
-    if (std::isnan(entry.value)) {
-      len = snprintf(line, sizeof(line), "%u,\n", (unsigned) entry.epoch);
-    } else {
-      len = snprintf(line, sizeof(line), "%u,%.2f\n",
-                     (unsigned) entry.epoch, entry.value);
-    }
-    if (len > 0 && len < (int) sizeof(line)) stream->print(line);
-  }
-}
-
 // BUG-043 rev2: Append snapshot series CSV to pre-reserved std::string.
-// Same logic as stream_snapshot_series_ but writes to a string buffer
+// Writes to a string buffer
 // instead of an AsyncResponseStream — avoids the heap-killing reallocation
 // cascade of beginResponseStream for large history responses.
 static void append_snapshot_series_csv_(std::string &csv,
