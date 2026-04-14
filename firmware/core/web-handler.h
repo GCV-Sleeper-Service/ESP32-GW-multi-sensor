@@ -835,11 +835,11 @@ class HistoryWebHandler : public AsyncWebHandler {
     vTaskDelete(nullptr);
   }
 
-  // LESSON-OPS-NNN: import_snapshot_ (~6,710 B = sizeof(SegmentSnapshot)) is allocated
-  // on first call to handle_import_begin_() and held until cleanup_import_state_() is
-  // called. If the import session is abandoned (browser closed), this allocation is held
-  // until the next /api/import/begin call or a reboot. This is accepted behaviour —
-  // the allocation is bounded and a single session at a time is the expected pattern.
+  // import_snapshot_ (~6,710 B = sizeof(SegmentSnapshot)) is allocated on first call
+  // to handle_import_begin_() and held until cleanup_import_state_() is called. If the
+  // import session is abandoned (browser closed), this allocation is held until the
+  // next /api/import/begin call or a reboot. This is accepted behaviour — the
+  // allocation is bounded and a single session at a time is the expected pattern.
   // See Docs/decisions/SEC-ADR-001-residual-vulnerabilities.md RV-05 for rationale.
   void handle_import_begin_(AsyncWebServerRequest *request,
                             bool single_mode, int target_sensor) {
@@ -2109,4 +2109,3 @@ class HistoryWebHandler : public AsyncWebHandler {
   }
 #endif  // AGGREGATOR_ENABLED
 };
-
