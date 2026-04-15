@@ -1310,7 +1310,8 @@ class PingAdapter {
 
       // ── 5. Sleep 60s before next cycle ─────────────────────────
       // ── Stack watermark telemetry (v7.6.7.3) ──────────────────
-      g_ping_stack_watermark_bytes = (uint32_t)uxTaskGetStackHighWaterMark(nullptr);
+      g_ping_stack_watermark_bytes =
+          (uint32_t)(uxTaskGetStackHighWaterMark(nullptr) * sizeof(StackType_t));
       vTaskDelay(pdMS_TO_TICKS(60000));
     }
   }
@@ -3570,9 +3571,9 @@ class HistoryWebHandler : public AsyncWebHandler {
     uint32_t uptime_s = (uint32_t) (uptime_us / 1000000LL);
     uint32_t free_heap_internal = esp_get_free_internal_heap_size();
     uint32_t free_heap_total = esp_get_free_heap_size();
-	uint32_t min_free_heap = esp_get_minimum_free_heap_size();
+    uint32_t min_free_heap = esp_get_minimum_free_heap_size();
     UBaseType_t httpd_wm = uxTaskGetStackHighWaterMark(nullptr);
-    uint32_t httpd_wm_bytes = (uint32_t)httpd_wm;
+    uint32_t httpd_wm_bytes = (uint32_t) (httpd_wm * sizeof(StackType_t));
 
     // Keep each snprintf well under 64 bytes to avoid silent truncation.
     char num[96];

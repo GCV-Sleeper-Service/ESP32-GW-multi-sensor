@@ -968,12 +968,3 @@ interval:
             published = true;
           }
 
-  - interval: 5s
-    then:
-      - lambda: |-
-          static int count = 0;
-          count++;
-          ESP_LOGI("MEASURE", "=== HEAP SAMPLE #%d ===", count);
-          ESP_LOGI("MEASURE", "free_heap_total=%u", esp_get_free_heap_size());
-          ESP_LOGI("MEASURE", "free_heap_internal=%u", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-          ESP_LOGI("MEASURE", "min_free_heap=%u", esp_get_minimum_free_heap_size());
