@@ -294,6 +294,9 @@ function writeFixtureSet(targetDir, sensors, tag) {
     free_heap: 81920,
     free_heap_internal: 81920,
     free_heap_total: 81920,
+    min_free_heap: 65536,
+    httpd_stack_watermark_bytes: 260,
+    ping_stack_watermark_bytes: 2160,
   }, null, 2) + '\n');
   fs.writeFileSync(path.join(targetDir, 'storage-stats.json'), JSON.stringify({
     ok: true,
