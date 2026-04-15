@@ -1360,7 +1360,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     uint32_t uptime_s = (uint32_t) (esp_timer_get_time() / 1000000LL);
     uint32_t free_heap_internal = esp_get_free_internal_heap_size();
     uint32_t free_heap_total = esp_get_free_heap_size();
-    uint32_t min_free_heap = esp_get_minimum_free_heap_size();
+    uint32_t min_heap_bytes = esp_get_minimum_free_heap_size();
     UBaseType_t httpd_wm = uxTaskGetStackHighWaterMark(nullptr);
     uint32_t httpd_wm_bytes = (uint32_t) (httpd_wm * sizeof(StackType_t));
 
@@ -1417,7 +1417,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     json += num;
     snprintf(num, sizeof(num), R"("free_heap_total":%u,)", (unsigned) free_heap_total);
     json += num;
-    snprintf(num, sizeof(num), R"("min_free_heap":%u,)", (unsigned) min_free_heap);
+    snprintf(num, sizeof(num), R"("min_free_heap":%u,)", (unsigned) min_heap_bytes);
     json += num;
     snprintf(num, sizeof(num), R"("httpd_stack_watermark_bytes":%u,)", (unsigned) httpd_wm_bytes);
     json += num;
