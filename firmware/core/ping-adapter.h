@@ -148,7 +148,8 @@ class PingAdapter {
 
       // ── 5. Sleep 60s before next cycle ─────────────────────────
       // ── Stack watermark telemetry (v7.6.7.3) ──────────────────
-      g_ping_stack_watermark_bytes = (uint32_t)uxTaskGetStackHighWaterMark(nullptr);
+      g_ping_stack_watermark_bytes =
+          (uint32_t)(uxTaskGetStackHighWaterMark(nullptr) * sizeof(StackType_t));
       vTaskDelay(pdMS_TO_TICKS(60000));
     }
   }
