@@ -252,6 +252,27 @@ const server = http.createServer(function(req, res) {
     return json(res, loadFixtureJson('api-status.json', { ok: false }));
   }
 
+  if (pathname === '/api/status/full') {
+    const fallback = {
+      ok: true,
+      role: 'satellite',
+      id: 'gw-main',
+      version: 'v0.0.0',
+      uptime_seconds: 0,
+      sensor_count: 0,
+      sensors: [],
+      ram_history_points_per_series: 96,
+      persist_days: 45,
+      free_heap: 81920,
+      free_heap_internal: 81920,
+      free_heap_total: 81920,
+      min_free_heap: 65536,
+      httpd_stack_watermark_bytes: 260,
+      ping_stack_watermark_bytes: 2160,
+    };
+    return json(res, loadFixtureJson('api-status-full.json', fallback));
+  }
+
   if (pathname === '/api/reboot' || pathname === '/api/delete-data') {
     return json(res, { ok: true, stub: true });
   }

@@ -439,11 +439,19 @@ in v7.6.0.1. An attacker on the LAN could add a rogue satellite and redirect pol
 delete or corrupt existing data. This is an acceptable risk for a LAN-only device in the current
 deployment model.
 
+**[RESOLVED v7.6.8.0]:** add-satellite now requires authentication. The exception has been removed.
+
 **Required action before any internet-facing deployment:** Add auth to all runtime-management
 mutation endpoints (add/delete/test-satellite) in Phase E or a dedicated security hardening step.
 
 **Prevention:** Any future endpoint that mutates runtime/NVS state must explicitly declare in a
 code comment whether auth is required and why. If omitted, auth is assumed required.
+
+---
+
+## LESSON-SEC-001 - All write endpoints require authentication (v7.6.8.0)
+
+All write endpoints (ingest, import, add/delete satellite, reboot, delete-data) are auth-gated as of v7.6.8.0. External callers must include `Authorization: Basic <base64(user:pass)>` header. Read endpoints that expose sensitive data (gateways, status/full, history) are also auth-gated.
 
 ---
 
