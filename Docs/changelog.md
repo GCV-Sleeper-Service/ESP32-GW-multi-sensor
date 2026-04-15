@@ -7,8 +7,8 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 Added three permanent telemetry fields to `GET /api/status`:
 
 - `min_free_heap` — all-time lowest free heap since boot (bytes). Captures transient allocation spikes that point-in-time `free_heap` readings miss. Calls `esp_get_minimum_free_heap_size()`.
-- `httpd_stack_watermark_bytes` — minimum unused bytes on the httpd task stack since boot. Measured by `uxTaskGetStackHighWaterMark(nullptr)` called from within the httpd handler, so it reports the httpd task's own watermark. Used to determine safe stack right-sizing (V2-J gate).
-- `ping_stack_watermark_bytes` — minimum unused bytes on the ping_adapter task stack. Updated every 60s ping cycle. Reports 0 if `PING_DEVICE_INDEX` is not configured. Used to determine safe stack reduction (V2-I gate).
+- `httpd_stack_watermark_bytes` — minimum unused FreeRTOS stack words on the httpd task stack since boot. Measured by `uxTaskGetStackHighWaterMark(nullptr)` called from within the httpd handler, so it reports the httpd task's own watermark. Despite the legacy `_bytes` suffix in the field name, the current value is reported in stack words (no word→byte conversion). Used to determine safe stack right-sizing (V2-J gate).
+- `ping_stack_watermark_bytes` — minimum unused FreeRTOS stack words on the ping_adapter task stack. Updated every 60s ping cycle. Reports 0 if `PING_DEVICE_INDEX` is not configured. Despite the legacy `_bytes` suffix in the field name, the current value is reported in stack words (no word→byte conversion). Used to determine safe stack reduction (V2-I gate).
 
 **Files changed:**
 - `firmware/core/ping-adapter.h` — add `g_ping_stack_watermark_bytes` global, update in task loop
