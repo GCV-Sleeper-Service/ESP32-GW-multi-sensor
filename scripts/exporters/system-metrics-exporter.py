@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import time
 import urllib.request
+import base64
 import urllib.error
 
 
@@ -72,9 +73,11 @@ def get_uptime_hrs():
     return 0.0
 
 
-def push_metric(gateway, device, key, value):
+def push_metric(gateway, device, key, value, auth_header=None):
     url = f"{gateway}/api/ingest/{device}/{key}?val={value:.1f}"
     req = urllib.request.Request(url, method="POST")
+    if auth_header:
+        req.add_header("Authorization", auth_header)
     try:
         with urllib.request.urlopen(req, timeout=5):
             pass
@@ -87,8 +90,17 @@ def main():
     parser = argparse.ArgumentParser(description="Push system metrics to ESP32 gateway")
     parser.add_argument("--gateway", default="http://192.168.10.20")
     parser.add_argument("--device", default="nas01")
+    parser.add_argument("--username", default=os.environ.get("METRICS_USER", ""))
+    parser.add_argument("--password", default=os.environ.get("METRICS_PASS", ""))
     parser.add_argument("--interval", type=int, default=0, help="Repeat interval in seconds (0=run once)")
     args = parser.parse_args()
+
+    auth_header = None
+    if args.username and args.password:
+        token = base64.b64encode(f"{args.username}:{args.password}".encode("utf-8")).decode("ascii")
+        auth_header = f"Basic {token}"
+    else:
+        print("[WARN] No --username/--password (or METRICS_USER/METRICS_PASS); /api/ingest may return 401")
 
     while True:
         metrics = {
@@ -99,7 +111,7 @@ def main():
         }
         results = []
         for key, val in metrics.items():
-            ok = push_metric(args.gateway, args.device, key, val)
+            ok = push_metric(args.gateway, args.device, key, val, auth_header)
             results.append(f"{key}={val:.1f}{'✓' if ok else '✗'}")
 
         ts = time.strftime("%Y-%m-%d %H:%M:%S")

@@ -120,26 +120,36 @@ static void set_aggregator_poll_basic_auth_(const char *username,
   s_status_basic_auth_b64[0] = '\0';
   if (username == nullptr || password == nullptr) return;
   if (username[0] == '\0' || password[0] == '\0') return;
+  // Build user:pass in stack storage to avoid heap allocation in polling paths.
+  constexpr size_t kMaxUserInfoLen = 128;
+  char user_info[kMaxUserInfoLen];
+  size_t user_len = strlen(username);
+  size_t pass_len = strlen(password);
+  size_t user_info_len = user_len + 1 + pass_len;
+  if (user_info_len >= kMaxUserInfoLen) {
+    s_status_basic_auth_b64[0] = '\0';
+    return;
+  }
 
-  std::string creds(username);
-  creds += ":";
-  creds += password;
+  memcpy(user_info, username, user_len);
+  user_info[user_len] = ':';
+  memcpy(user_info + user_len + 1, password, pass_len);
 
   static constexpr char kBase64Table[] =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
   size_t out = 0;
-  for (size_t i = 0; i < creds.size(); i += 3) {
+  for (size_t i = 0; i < user_info_len; i += 3) {
     if (out + 4 >= sizeof(s_status_basic_auth_b64)) {
       s_status_basic_auth_b64[0] = '\0';
       return;
     }
-    uint32_t octet_a = static_cast<uint8_t>(creds[i]);
-    uint32_t octet_b = (i + 1 < creds.size()) ? static_cast<uint8_t>(creds[i + 1]) : 0;
-    uint32_t octet_c = (i + 2 < creds.size()) ? static_cast<uint8_t>(creds[i + 2]) : 0;
+    uint32_t octet_a = static_cast<uint8_t>(user_info[i]);
+    uint32_t octet_b = (i + 1 < user_info_len) ? static_cast<uint8_t>(user_info[i + 1]) : 0;
+    uint32_t octet_c = (i + 2 < user_info_len) ? static_cast<uint8_t>(user_info[i + 2]) : 0;
     uint32_t triple = (octet_a << 16) | (octet_b << 8) | octet_c;
 
-    size_t remain = creds.size() - i;
+    size_t remain = user_info_len - i;
     s_status_basic_auth_b64[out++] = kBase64Table[(triple >> 18) & 0x3F];
     s_status_basic_auth_b64[out++] = kBase64Table[(triple >> 12) & 0x3F];
     s_status_basic_auth_b64[out++] = (remain > 1) ? kBase64Table[(triple >> 6) & 0x3F] : '=';

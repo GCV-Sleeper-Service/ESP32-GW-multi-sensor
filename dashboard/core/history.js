@@ -113,8 +113,16 @@ function fetchDeviceHistory(sensor, manifest) {
   var results = [];
   var chain = Promise.resolve();
   historyMeasurements.forEach(function(m) {
+    var isAggregatorProxy = !!sensor._gwId;
     chain = chain.then(function() {
-      return fetch(ESP_HOST + m.url, {cache:'no-store'})
+      var req;
+      if (isAggregatorProxy && typeof _aggregatorFetch === 'function') {
+        req = _aggregatorFetch(m.url, {cache: 'no-store'});
+      } else {
+        req = fetch(ESP_HOST + m.url, {cache:'no-store'});
+      }
+
+      return req
         .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
         .then(function(raw) { results.push({key: m.key, raw: raw}); })
         .then(function() { return new Promise(function(res) { setTimeout(res, 300); }); });

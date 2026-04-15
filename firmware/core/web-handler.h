@@ -221,7 +221,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (strcmp(p, "/api/import/status") == 0) {
       const bool ready = import_active_ && s_import_ready && !import_prepare_active_;
       std::string body = ready ? "{\"ready\":true}" : "{\"ready\":false}";
-      auto *resp = request->beginResponse(200, "application/json", body.c_str());
+      auto *resp = request->beginResponse(200, "application/json", body);
       add_common_headers_(resp);
       request->send(resp);
       return;
@@ -1342,7 +1342,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     body += App.get_name().c_str();
     body += R"("})";
 
-    auto *resp = request->beginResponse(200, "application/json", body.c_str());
+    auto *resp = request->beginResponse(200, "application/json", body);
     resp->addHeader("Cache-Control", "no-store");
     add_common_headers_(resp);
     request->send(resp);
@@ -1425,9 +1425,7 @@ class HistoryWebHandler : public AsyncWebHandler {
              (unsigned) g_ping_stack_watermark_bytes);
     json += num;
 
-    auto *resp = request->beginResponse(
-        200, "application/json",
-        reinterpret_cast<const uint8_t *>(json.data()), json.size());
+    auto *resp = request->beginResponse(200, "application/json", json);
     resp->addHeader("Cache-Control", "no-store");
     add_common_headers_(resp);
     request->send(resp);
