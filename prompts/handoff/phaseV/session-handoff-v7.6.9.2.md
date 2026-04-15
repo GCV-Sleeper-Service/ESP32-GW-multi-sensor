@@ -19,6 +19,7 @@ _Status: v7.6.9.1 COMPLETE. Hostname/IP + CSV role column merged._
 | v7.6.7.0 | V1-A/B/C: Proxy fix + NAS disable + logger | ✅ Complete |
 | v7.6.7.1 | V1-D: Import crash fix | ✅ Complete |
 | v7.6.7.2 | V1-E/F/G: Badge + dead code + comment | ✅ Complete |
+| v7.6.7.3 | Operational telemetry in /api/status | ✅ Complete (PR #179) |
 | v7.6.8.0 | V2-A/B/C/D: Auth guards + status split | ✅ Complete |
 | v7.6.8.1 | V2-E/F/G: History auth + DoS + SEC-ADR | ✅ Complete |
 | v7.6.8.2 | V2-H/I/J: Gated optimisations | ✅ Complete |

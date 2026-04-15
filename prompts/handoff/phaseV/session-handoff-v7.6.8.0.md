@@ -1,28 +1,35 @@
 # Session Handoff — v7.6.8.0: Auth Guards on Ingest/Add-Satellite/Aggregator Reads + Status Split
 
-_Date: 2026-04-14 (updated from 2026-04-12 with v7.6.7.2 device test results and V1 operator measurements)_
+_Date: 2026-04-15 (updated with v7.6.7.3 telemetry and V1 measurement results)_
 _Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
-_Status: v7.6.7.2 COMPLETE. V1 complete. Operator measurements taken. Merged PR #178, tagged v7.6.7.2._
+_Status: v7.6.7.3 COMPLETE. V1 complete. Operator measurements taken. Merged PR #179, tagged v7.6.7.3._
 
 ---
 
 ## Project State Summary
 
-**v7.6.7.2 is complete.** All V1 fixes shipped. Heap baseline confirmed on physical hardware. Measurement results available for V2-H/I/J gate decisions.
+**v7.6.7.3 is complete.** All V1 fixes shipped. Permanent operational telemetry added to `/api/status`. Heap and stack watermark measurements taken on physical hardware. V2 gate decisions determined.
 
-### v7.6.7.2 Confirmed State (from device tests 2026-04-14)
+### v7.6.7.3 Confirmed State (from device tests 2026-04-15)
 
-- Firmware flashed via OTA: 1,464,144 bytes in 5.54 s. ESPHome 2026.2.1, ESP-IDF 5.5.2. ✅
-- API handshake: connected in 0.056 s, handshake 0.114 s. ✅
-- Version badge (`v7.6.7.2`) visible in dashboard footer before SSE connects. ✅
-- Badge visible in both light and dark mode. ✅
+- Firmware version: `v7.6.7.3` confirmed via `GET /api/status`. ✅
+- Three new telemetry fields in `/api/status`: `min_free_heap`, `httpd_stack_watermark_bytes`, `ping_stack_watermark_bytes`. ✅
 - No watchdog reset. No Guru Meditation. No task stack overflow. ✅
-- **Runtime RAM:** 16.5% used (54,128 / 327,680 B). Free: ~273,552 B.
-- **Flash:** 82.7% used (1,463,744 / 1,769,472 B).
-- **Heap floor for all V2 steps: 65 KB** (confirmed by v7.6.7.1 device test: 70,568 bytes free; v7.6.7.2 dead code deletion does not affect runtime heap materially).
-- `stream_snapshot_series_()` and `HistoryBuffer::stream_to()` confirmed deleted — zero tracked-source callers.
-- Import session lifetime comment present at `handle_import_begin_()`.
-- `assemble-sensor-history.sh --check` identity hash confirmed at v7.6.7.2 merge.
+- **Heap floor for all V2 steps: 65 KB** (v7.6.7.3 fresh boot: 72,324 B internal; min_free_heap under load: 60,420 B = 59 KB; still above 55 KB gate).
+- `assemble-sensor-history.sh --check` identity hash confirmed at v7.6.7.3 merge.
+
+### V1 Measurement Results (v7.6.7.3, C3 satellite at 192.168.120.189)
+
+| Measurement | Value | Gate Decision |
+|---|---|---|
+| Free heap at boot (internal) | 72,324 B (70.6 KB) | > 65 KB ✅ |
+| Free heap at boot (total) | 80,080 B (78.2 KB) | > 65 KB ✅ |
+| Min free heap (all endpoints exercised) | 60,420 B (59.0 KB) | > 55 KB ✅ |
+| httpd stack watermark | **260 B** unused of 16,384 B | V2-J: **BLOCKED** — no reduction possible |
+| ping stack watermark | **2,160 B** unused of 4,096 B | V2-I: **BLOCKED** — target 2048 leaves only 112 B headroom |
+| V2-H socket test (two-tab, 5 min) | No ENFILE errors | V2-H: **PASSED** — socket reduction 18→15 is safe |
+
+**V2 gate summary:** V2-H is the only surviving gated optimisation. V2-I and V2-J are blocked. v7.6.8.2 scope is significantly reduced.
 
 ---
 
@@ -32,10 +39,11 @@ _Status: v7.6.7.2 COMPLETE. V1 complete. Operator measurements taken. Merged PR 
 |---------|-------|--------|
 | v7.6.7.0 | V1-A/B/C: Proxy fix + NAS disable + logger | ✅ Complete |
 | v7.6.7.1 | V1-D: Import crash fix | ✅ Complete |
-| v7.6.7.2 | V1-E/F/G: Badge + dead code + comment | ✅ Complete (PR #178, 2026-04-14) |
+| v7.6.7.2 | V1-E/F/G: Badge + dead code + comment | ✅ Complete (PR #178) |
+| v7.6.7.3 | Operational telemetry in /api/status | ✅ Complete (PR #179) |
 | **v7.6.8.0** | **V2-A/B/C/D: Auth guards + status split** | **⬅️ Current** |
 | v7.6.8.1 | V2-E/F/G: History auth + DoS + SEC-ADR | Pending |
-| v7.6.8.2 | V2-H/I/J: Gated optimisations | Pending |
+| v7.6.8.2 | V2-H: Socket reduction (V2-I/J blocked) | Pending |
 | v7.6.9.0 | V3-A: Device card cleanup | Pending |
 | v7.6.9.1 | V3-B/C: Hostname/IP + CSV role | Pending |
 | v7.6.9.2 | V3-D/E: Manifest export + AGG-ADR | Pending |
@@ -50,7 +58,7 @@ _Status: v7.6.7.2 COMPLETE. V1 complete. Operator measurements taken. Merged PR 
 1. Auth guard on `/api/ingest/` (V2-A)
 2. Auth guard on `/api/aggregator/add-satellite` + remove LESSON-OPS-089 exception (V2-B)
 3. Auth guards on `/api/aggregator/gateways`, `/api/aggregator/live`, `/api/aggregator/proxy/` (V2-C)
-4. Strip sensitive fields from public `/api/status`; add auth-gated `/api/status/full` (V2-D)
+4. Strip `/api/status` to return only `{ok, role, id}`; add auth-gated `/api/status/full` with all current fields (V2-D)
 5. Add `basic_auth` parameter to `fetch_to_buffer()`; update aggregator polling to call `/api/status/full` (V2-D)
 
 ### What this step does NOT do
@@ -68,6 +76,37 @@ _Status: v7.6.7.2 COMPLETE. V1 complete. Operator measurements taken. Merged PR 
 - `firmware/core/aggregator-runtime.h` — `basic_auth` parameter + polling update
 - `Docs/lessons/build-pipeline.md` — LESSON-SEC-001 + LESSON-OPS-089 resolved
 - `Docs/changelog.md`
+
+### Current `/api/status` response fields (v7.6.7.3 — exhaustive)
+
+The agent must know every field currently in the response to correctly split them between public and full:
+
+```json
+{
+  "ok": true,
+  "version": "v7.6.7.3",
+  "uptime_seconds": 12345,
+  "sensor_count": 5,
+  "sensors": [ {"id":"office","name":"Office","category":"environmental","last_seen":1776213088,"temp_valid":true,"hum_valid":true}, ... ],
+  "ram_history_points_per_series": 96,
+  "persist_days": 45,
+  "free_heap": 69552,
+  "free_heap_internal": 69552,
+  "free_heap_total": 77308,
+  "min_free_heap": 62220,
+  "httpd_stack_watermark_bytes": 260,
+  "ping_stack_watermark_bytes": 2160
+}
+```
+
+**After V2-D:**
+- Public `/api/status` → `{"ok":true,"role":"satellite","id":"esp32-c3-multi"}` (3 fields only; `role` and `id` are NEW)
+- Auth-gated `/api/status/full` → all fields above PLUS `role` and `id`
+
+### Deriving `role` and `id`
+
+- `role`: compile-time from `AGGREGATOR_ENABLED` — `"aggregator"` if defined and non-zero, `"satellite"` otherwise
+- `id`: the ESPHome device name, accessible via `App.get_name().c_str()` (ESPHome global singleton, always available in component code)
 
 ### Acceptance criteria
 
@@ -92,7 +131,7 @@ See `prompts/phaseV/v7.6.8.0-agent-prompt-gpt-codex.md` §6 for the full checkli
 
 | # | Rule | Why Relevant |
 |---|------|-------------|
-| 8 | No new `beginResponseStream` | `/api/status/full` response must use pre-reserved string |
+| 8 | No new `beginResponseStream` | `/api/status/full` response must use pre-reserved string + `beginResponse`, NOT `beginResponseStream` |
 | 27 | `lwip_*` prefix for socket calls | Any new socket usage in fetch_to_buffer |
 | 58 | Edit fragments, run assembly | Two fragment files modified |
 | LESSON-OPS-110 | Auth decision comment in every handler code block | All V2 handlers require explicit auth comment |
@@ -109,17 +148,14 @@ The aggregator polling task fetches `/api/status` from satellites to get heap/ve
 
 ## Line Number Notice (v7.6.8.0 agent)
 
-The v7.6.8.0 agent prompt references several functions at approximate line numbers:
-- `handle_add_satellite_()` at line ~1657
-- `handle_aggregator_proxy_()` at line ~1556
-
-Due to v7.6.7.2 additions (dead code deletion actually *reduces* lines in web-handler.h), actual line numbers may have shifted. **Always grep before editing:**
+Due to v7.6.7.2 dead code deletions and v7.6.7.3 telemetry additions, line numbers have shifted from earlier estimates. **Always grep before editing:**
 ```bash
 grep -n "void handle_add_satellite_" firmware/core/web-handler.h
 grep -n "void handle_aggregator_proxy_" firmware/core/web-handler.h
 grep -n "void handle_api_ingest_" firmware/core/web-handler.h
+grep -n "void handle_status_" firmware/core/web-handler.h
 ```
-Use grep results as actual line numbers, not the ~estimates in the prompt.
+Use grep results as actual line numbers, not any estimates in prompts.
 
 ---
 
@@ -153,12 +189,12 @@ Use grep results as actual line numbers, not the ~estimates in the prompt.
 - [ ] Unauthenticated `POST /api/aggregator/add-satellite` returns 401
 - [ ] Unauthenticated `GET /api/aggregator/gateways` returns 401
 - [ ] Authenticated `GET /api/aggregator/gateways` returns 200 + JSON
-- [ ] Public `GET /api/status` returns ONLY `{ok, role, id}` (no `version`, `free_heap`, `uptime_s`)
+- [ ] Public `GET /api/status` returns ONLY `{"ok":true,"role":"...","id":"..."}` — no `version`, `free_heap`, `uptime_seconds`, `sensors`, `min_free_heap`, or any other field
 - [ ] `GET /api/status/full` without auth returns 401
-- [ ] `GET /api/status/full` with auth returns full JSON including `free_heap`, `version`, `uptime_s`
+- [ ] `GET /api/status/full` with auth returns full JSON including ALL current fields: `version`, `uptime_seconds`, `sensor_count`, `sensors[]`, `free_heap`, `free_heap_internal`, `free_heap_total`, `min_free_heap`, `httpd_stack_watermark_bytes`, `ping_stack_watermark_bytes`, `ram_history_points_per_series`, `persist_days`, plus new `role` and `id`
 - [ ] Aggregator dashboard still shows satellite heap/version (polling uses `/api/status/full` with credentials)
 
-**If any endpoint crashes the board:** capture serial log, use bug escalation prompt (`prompts/phaseV/phaseV-bug-escalation-to-claude.md`).
+**If any endpoint crashes the board:** capture serial log, use bug escalation prompt (`prompts/handoff/universal-bug-escalation-prompt.md`).
 
 ---
 
@@ -182,20 +218,24 @@ If any actual result from this step invalidates assumptions in the next step's h
 
 ## Context That Carries Forward to Next Step
 
+- v7.6.7.3 added `min_free_heap`, `httpd_stack_watermark_bytes`, `ping_stack_watermark_bytes` to `/api/status`. After V2-D, these live in `/api/status/full` only.
 - `fetch_to_buffer()` will have 7 parameters after v7.6.8.0 (adds `basic_auth` on top of V1-A changes). All callers in `aggregator-runtime.h` must pass the new parameter.
 - LESSON-OPS-089 exception is removed — `add-satellite` requires auth.
 - Public `/api/status` returns only `{ok, role, id}`. Full status at `/api/status/full` (auth required).
 - `/api/manifest` and `/sensors.json` remain public — accepted risk per SEC-ADR-001 RV-06.
 - `/api/v2/live` remains public — accepted risk per SEC-ADR-001 RV-07.
 - `/api/import/status` remains public — dashboard polls it; returns boolean only.
-- Heap floor for all V2 steps: **65 KB**. Flash at 82.7% — monitor growth.
+- Heap floor: min_free_heap under load = 60,420 B (59 KB). Above 55 KB gate but with limited margin. Monitor growth.
+- V2-I (ping stack) BLOCKED. V2-J (httpd stack) BLOCKED. V2-H (sockets) PASSED.
 - `stream_snapshot_series_()` and `HistoryBuffer::stream_to()` are gone — do not reference them.
 - Multi-sensor import `clear_persisted_history_()` still runs synchronously on httpd — V2 backlog.
 
-### Lessons from v7.6.7.2 relevant to v7.6.8.0 agent
+### Lessons from v7.6.7.x relevant to v7.6.8.0 agent
 
 - **LESSON-REVIEW-001:** `grep -rn` against `firmware/` will hit `.esphome/build/` artefacts. Always use `--exclude-dir=.esphome` or note that those hits are generated build output.
 - **LESSON-REVIEW-003:** `App.version` already includes the `v` prefix — do not use `'v' + App.version` in badge code.
+- **v7.6.7.3 learning:** `uxTaskGetStackHighWaterMark()` on ESP-IDF 5.x returns bytes (StackType_t is uint8_t). Use `* sizeof(StackType_t)` for portability, which is a no-op on current platform.
+- **v7.6.7.3 learning:** `bump-version.sh` does NOT run `assemble-sensor-history.sh`. Always run `bash scripts/provision.sh satellite` after version bump to get the full pipeline.
 
 ---
 

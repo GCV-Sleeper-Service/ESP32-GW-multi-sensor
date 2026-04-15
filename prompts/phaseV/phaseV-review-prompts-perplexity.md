@@ -284,15 +284,20 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 **Review gates to decide explicitly:**
 - `handle_api_ingest_()`: `authenticate_management_(request)` is the absolute first line (V2-A)
 - `handle_add_satellite_()`: `authenticate_management_(request)` is the absolute first line (V2-B)
-- `handle_add_satellite_()`: LESSON-OPS-089 exception comment is **removed** — not commented out, removed (V2-B)
 - `handle_aggregator_gateways_()`: `authenticate_management_(request)` is the absolute first line (V2-C)
 - `handle_aggregator_live_()`: `authenticate_management_(request)` is the absolute first line (V2-C)
 - `handle_aggregator_proxy_()`: `authenticate_management_(request)` is the absolute first line (V2-C)
-- Public `/api/status` returns ONLY `ok`, `role`, `id` — fields `version`, `free_heap`, `free_heap_internal`, `uptime_s`, `wifi_rssi`, `hardware` are absent (V2-D)
-- `/api/status/full` exists and requires auth; returns all fields including `free_heap_internal` separately from `free_heap_total` (Rule 24) (V2-D)
+- `handle_add_satellite_()`: LESSON-OPS-089 exception comment is **removed** — not commented out, removed (V2-B)
+- Public `/api/status` returns ONLY `ok`, `role`, `id` — fields `version`, `free_heap`, `uptime_seconds`, `sensors`, `min_free_heap`, `httpd_stack_watermark_bytes` are absent (V2-D)
+- `/api/status/full` exists and requires auth; returns all fields including `ok`, `role`, `id`, `version`, `uptime_seconds`, `sensor_count`, `sensors[]`, `ram_history_points_per_series`, `persist_days`, `free_heap`, `free_heap_internal`, `free_heap_total`, `min_free_heap`, `httpd_stack_watermark_bytes`, `ping_stack_watermark_bytes` (Rule 24) (V2-D)
+- `/api/status/full` does NOT use `beginResponseStream` (Rule 8)
 - `fetch_to_buffer()` has `basic_auth` parameter; aggregator poll task calls `/api/status/full` with credentials (V2-D)
 - Every modified handler has an explicit `// Auth: REQUIRED` or `// Auth: NOT REQUIRED — [rationale]` comment (LESSON-OPS-110)
 - `Docs/lessons/build-pipeline.md` has `LESSON-SEC-001` added and LESSON-OPS-089 marked resolved (V2-A/B)
+- No auth added to `/api/status`, `/api/manifest`, `/sensors.json`, `/api/v2/live`
+- Dashboard still handles 401 correctly (no JS changes needed)
+- Test fixtures updated for new public `/api/status` shape
+- All Playwright tests pass
 - No `beginResponseStream` in any modified handler (Rule 8)
 - `assemble-sensor-history.sh --write` was run after fragment edits; preflight passes
 
@@ -419,19 +424,20 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 - `prompts/phaseV/v7.6.8.2-agent-prompt-gpt-codex.md`
 
 **Turn 2 diff + evidence fetch:**
-- PR diff for `esp32-c3-multi-sensor.yaml`, `ping-adapter.h`, `web_server_idf.cpp`, `patch-esphome-httpd-stack.sh`, changelog, version/session log
+- PR diff for `esp32-c3-multi-sensor.yaml`, changelog, version/session log
+- Gate results table from PR description or session log
 - V1 Operator Measurement results table from PR description; 5-minute two-tab test log; watermark readings for httpd and ping_adapter
 
 **Review gates to decide explicitly:**
 - V1 Operator Measurement Protocol results are documented and present before any code change (prerequisite)
-- **OPT-04 (LWIP sockets):** If gate passed → `CONFIG_LWIP_MAX_SOCKETS` changed to 15; if gate failed → value is unchanged at 18; value is NEVER below 13 (LESSON-OPS-051)
-- **OPT-03 (ping_adapter stack):** If watermark headroom ≥ 512 B → `xTaskCreate` stack set to 2048; if < 512 B → unchanged at 4096
-- **OPT-01 (httpd stack):** New stack value matches the decision table exactly (≥6144 headroom→10240; ≥4096→12288; ≥2048→14336; <2048→no change)
+- **V2-H (LWIP sockets):** `CONFIG_LWIP_MAX_SOCKETS` is `"15"` (gate PASSED); value is NEVER below 13 (LESSON-OPS-051)
 - httpd stack is NEVER set below `measured_peak + 2048 B` regardless of table
-- `patch-esphome-httpd-stack.sh` updated with new patched value if httpd stack was changed
 - No-change paths: if a gate did NOT pass, the corresponding diff section must be absent (not commented out)
 - Measurement results documented in issues #164 and #165
-- `assemble-sensor-history.sh --write` run after fragment edit (ping-adapter); preflight passes
+- No firmware/core fragments modified (no assembly needed); preflight passes
+- `ping-adapter.h` is UNCHANGED at 4096 stack (V2-I BLOCKED)
+- `web_server_idf.cpp` is UNCHANGED at 16384 stack (V2-J BLOCKED)
+- `patch-esphome-httpd-stack.sh` is UNCHANGED
 
 **Turn 3 — Verdict + output**
 

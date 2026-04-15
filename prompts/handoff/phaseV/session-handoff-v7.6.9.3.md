@@ -19,6 +19,7 @@ _Status: v7.6.9.2 COMPLETE. Manifest-driven export merged. AGG-ADR committed._
 | v7.6.7.0 | V1-A/B/C: Proxy fix + NAS disable + logger | ✅ Complete |
 | v7.6.7.1 | V1-D: Import crash fix | ✅ Complete |
 | v7.6.7.2 | V1-E/F/G: Badge + dead code + comment | ✅ Complete |
+| v7.6.7.3 | Operational telemetry in /api/status | ✅ Complete (PR #179) |
 | v7.6.8.0 | V2-A/B/C/D: Auth guards + status split | ✅ Complete |
 | v7.6.8.1 | V2-E/F/G: History auth + DoS + SEC-ADR | ✅ Complete |
 | v7.6.8.2 | V2-H/I/J: Gated optimisations | ✅ Complete |
@@ -104,7 +105,7 @@ See `prompts/phaseV/v7.6.9.3-agent-prompt-gpt-codex.md` §6 for the full checkli
 
 - [ ] Heap measurement on C3
 
-**If any endpoint crashes the board:** capture serial log, use bug escalation prompt (`prompts/phaseV/phaseV-bug-escalation-to-claude.md`).
+**If any endpoint crashes the board:** capture serial log, use bug escalation prompt (`prompts/handoff/universal-bug-escalation-prompt.md`).
 
 ---
 
