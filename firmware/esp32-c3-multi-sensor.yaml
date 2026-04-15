@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.6.7.2
+# ESP32-C3 Multi-Sensor Gateway - v7.6.7.3
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -53,7 +53,7 @@ esphome:
       priority: -100
       then:
         - lambda: |-
-            register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.6.7.2");
+            register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.6.7.3");
             id(dashboard_link).publish_state(
               "Dashboard: /dashboard or /dashboard.html — Download: /dashboard-download");
     - # Priority 600: run after WiFi and SNTP are available.
@@ -967,3 +967,13 @@ interval:
               "Embedded dashboard with charts, CSV export/import, and device management.");
             published = true;
           }
+
+  - interval: 5s
+    then:
+      - lambda: |-
+          static int count = 0;
+          count++;
+          ESP_LOGI("MEASURE", "=== HEAP SAMPLE #%d ===", count);
+          ESP_LOGI("MEASURE", "free_heap_total=%u", esp_get_free_heap_size());
+          ESP_LOGI("MEASURE", "free_heap_internal=%u", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+          ESP_LOGI("MEASURE", "min_free_heap=%u", esp_get_minimum_free_heap_size());
