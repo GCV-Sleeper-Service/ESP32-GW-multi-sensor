@@ -1328,6 +1328,9 @@ class HistoryWebHandler : public AsyncWebHandler {
     uint32_t uptime_s = (uint32_t) (uptime_us / 1000000LL);
     uint32_t free_heap_internal = esp_get_free_internal_heap_size();
     uint32_t free_heap_total = esp_get_free_heap_size();
+    uint32_t min_free_heap = esp_get_minimum_free_heap_size();
+    UBaseType_t httpd_wm = uxTaskGetStackHighWaterMark(nullptr);
+    uint32_t httpd_wm_bytes = (uint32_t) (httpd_wm * sizeof(StackType_t));
 
     // Keep each snprintf well under 64 bytes to avoid silent truncation.
     char num[96];
@@ -1384,7 +1387,19 @@ class HistoryWebHandler : public AsyncWebHandler {
     resp->print(num);
     snprintf(num, sizeof(num), "\"free_heap_internal\":%u,", (unsigned) free_heap_internal);
     resp->print(num);
-    snprintf(num, sizeof(num), "\"free_heap_total\":%u}", (unsigned) free_heap_total);
+    snprintf(num, sizeof(num), "\"free_heap_total\":%u,", (unsigned) free_heap_total);
+    resp->print(num);
+
+    // v7.6.7.3: operational telemetry — heap floor + task stack watermarks.
+    // min_free_heap: lowest free heap since boot (catches transient spikes).
+    // httpd_stack_watermark_bytes: minimum unused httpd stack ever (called ON httpd task).
+    // ping_stack_watermark_bytes: minimum unused ping_adapter stack (updated every 60s cycle;
+    //   0 if PING_DEVICE_INDEX is not defined — no conditional needed).
+    snprintf(num, sizeof(num), "\"min_free_heap\":%u,", (unsigned) min_free_heap);
+    resp->print(num);
+    snprintf(num, sizeof(num), "\"httpd_stack_watermark_bytes\":%u,", (unsigned) httpd_wm_bytes);
+    resp->print(num);
+    snprintf(num, sizeof(num), "\"ping_stack_watermark_bytes\":%u}", (unsigned) g_ping_stack_watermark_bytes);
     resp->print(num);
 
     request->send(resp);

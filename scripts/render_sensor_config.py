@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_aggregator_config, load_board_profile, load_gateway_config, load_manifest, manifest_v2
 
-VERSION = "7.6.7.2"
+VERSION = "7.6.7.3"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"
@@ -1325,6 +1325,10 @@ def main() -> int:
             "free_heap": 81920,
             "free_heap_internal": 81920,
             "free_heap_total": 81920,
+            "min_free_heap": 65536,
+            "httpd_stack_watermark_bytes": 260,
+            "ping_stack_watermark_bytes": 2160,
+
         },
         indent=2,
     ) + "\n"

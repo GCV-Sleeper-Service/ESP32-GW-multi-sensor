@@ -1,3 +1,7 @@
+// Ping task stack watermark — updated every cycle, read by /api/status.
+// Declared outside #ifdef so web-handler.h can always reference it
+// (reads 0 when ping is not configured — no #ifdef needed in status handler).
+static volatile uint32_t g_ping_stack_watermark_bytes = 0;
 #ifdef PING_DEVICE_INDEX
 class PingAdapter {
  public:
@@ -143,6 +147,9 @@ class PingAdapter {
       devices[self->device_index_].mark_seen(::time(nullptr));
 
       // ── 5. Sleep 60s before next cycle ─────────────────────────
+      // ── Stack watermark telemetry (v7.6.7.3) ──────────────────
+      g_ping_stack_watermark_bytes =
+          (uint32_t)(uxTaskGetStackHighWaterMark(nullptr) * sizeof(StackType_t));
       vTaskDelay(pdMS_TO_TICKS(60000));
     }
   }
