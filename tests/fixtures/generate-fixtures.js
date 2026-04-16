@@ -12,7 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
-const VERSION = 'v7.6.7.3';
+const VERSION = 'v7.6.8.0';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },
@@ -281,22 +281,14 @@ function writeFixtureSet(targetDir, sensors, tag) {
   const v2Manifest = fixtureManifestV2(sensors, tag || 'mock');
   // env-only sensor count for storage-stats (BLE sensors with NVS persistence)
   const envCount = sensors.filter(s => !s.adapter || s.adapter === 'thermopro_ble').length;
+  const role = (tag || 'mock') === 'aggregator' ? 'aggregator' : 'satellite';
 
   fs.writeFileSync(path.join(targetDir, 'sensors.json'), JSON.stringify(legacyManifest, null, 2) + '\n');
   fs.writeFileSync(path.join(targetDir, 'manifest.json'), JSON.stringify(v2Manifest, null, 2) + '\n');
   fs.writeFileSync(path.join(targetDir, 'api-status.json'), JSON.stringify({
     ok: true,
-    version: VERSION,
-    sensor_count: sensors.length,
-    sensors: legacyManifest,
-    mode: tag || 'mock',
-    connected: true,
-    free_heap: 81920,
-    free_heap_internal: 81920,
-    free_heap_total: 81920,
-    min_free_heap: 65536,
-    httpd_stack_watermark_bytes: 260,
-    ping_stack_watermark_bytes: 2160,
+    role: role,
+    id: v2Manifest.gateway.id || 'gw-main',
   }, null, 2) + '\n');
   fs.writeFileSync(path.join(targetDir, 'storage-stats.json'), JSON.stringify({
     ok: true,

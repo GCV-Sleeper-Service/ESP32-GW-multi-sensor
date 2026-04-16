@@ -35,7 +35,7 @@ struct SatelliteCache {
   // Cached responses (statically allocated — no malloc)
   char manifest_json[AGG_MANIFEST_BUF_SIZE];  // cached /api/manifest response
   char live_json[2048];         // cached /api/v2/live response
-  char status_json[512];        // cached /api/status response
+  char status_json[2048];       // cached /api/status/full response
   uint16_t manifest_len;
   uint16_t live_len;
   uint16_t status_len;
@@ -113,6 +113,52 @@ static char s_fetch_tmp[AGG_MANIFEST_BUF_SIZE];
 static char s_proxy_tmp[32768];
 static uint16_t s_proxy_len = 0;
 
+static char s_status_basic_auth_b64[192] = {0};
+
+static void set_aggregator_poll_basic_auth_(const char *username,
+                                            const char *password) {
+  s_status_basic_auth_b64[0] = '\0';
+  if (username == nullptr || password == nullptr) return;
+  if (username[0] == '\0' || password[0] == '\0') return;
+  // Build user:pass in stack storage to avoid heap allocation in polling paths.
+  constexpr size_t kMaxUserInfoLen = 128;
+  char user_info[kMaxUserInfoLen];
+  size_t user_len = strlen(username);
+  size_t pass_len = strlen(password);
+  size_t user_info_len = user_len + 1 + pass_len;
+  if (user_info_len >= kMaxUserInfoLen) {
+    s_status_basic_auth_b64[0] = '\0';
+    return;
+  }
+
+  memcpy(user_info, username, user_len);
+  user_info[user_len] = ':';
+  memcpy(user_info + user_len + 1, password, pass_len);
+
+  static constexpr char kBase64Table[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+  size_t out = 0;
+  for (size_t i = 0; i < user_info_len; i += 3) {
+    if (out + 4 >= sizeof(s_status_basic_auth_b64)) {
+      s_status_basic_auth_b64[0] = '\0';
+      return;
+    }
+    uint32_t octet_a = static_cast<uint8_t>(user_info[i]);
+    uint32_t octet_b = (i + 1 < user_info_len) ? static_cast<uint8_t>(user_info[i + 1]) : 0;
+    uint32_t octet_c = (i + 2 < user_info_len) ? static_cast<uint8_t>(user_info[i + 2]) : 0;
+    uint32_t triple = (octet_a << 16) | (octet_b << 8) | octet_c;
+
+    size_t remain = user_info_len - i;
+    s_status_basic_auth_b64[out++] = kBase64Table[(triple >> 18) & 0x3F];
+    s_status_basic_auth_b64[out++] = kBase64Table[(triple >> 12) & 0x3F];
+    s_status_basic_auth_b64[out++] = (remain > 1) ? kBase64Table[(triple >> 6) & 0x3F] : '=';
+    s_status_basic_auth_b64[out++] = (remain > 2) ? kBase64Table[triple & 0x3F] : '=';
+  }
+
+  s_status_basic_auth_b64[out] = '\0';
+}
+
 // All socket operations use lwip_*() prefixed functions (not the BSD-compat
 // aliases socket()/connect()/send()/recv()/close()) to avoid namespace
 // collision with esphome::socket — see CI failure in PR #64.
@@ -122,7 +168,8 @@ static uint16_t s_proxy_len = 0;
 // Uses lwip/sockets.h and lwip/netdb.h (both already available).
 // Returns true and sets *out_len on HTTP 200; false otherwise.
 static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint16_t* out_len,
-                            int timeout_s = 5, int* out_http_status = nullptr) {
+                            int timeout_s = 5, int* out_http_status = nullptr,
+                            const char* basic_auth = nullptr) {
   *out_len = 0;
   if (out_http_status != nullptr) *out_http_status = 0;
 
@@ -182,9 +229,21 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   lwip_freeaddrinfo(res);
 
   // ── Send HTTP/1.0 GET (no chunked encoding) ────────────────────
-  char req[512];
+  char auth_header[320];
+  auth_header[0] = '\0';
+  if (basic_auth != nullptr && basic_auth[0] != '\0') {
+    int auth_len = snprintf(auth_header, sizeof(auth_header),
+                            "Authorization: Basic %s\r\n", basic_auth);
+    if (auth_len < 0 || (size_t)auth_len >= sizeof(auth_header)) {
+      lwip_close(sock);
+      return false;
+    }
+  }
+
+  char req[768];
   int req_len = snprintf(req, sizeof(req),
-      "GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", path, host);
+      "GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n%s\r\n",
+      path, host, auth_header);
   if (req_len < 0 || (size_t)req_len >= sizeof(req)) { lwip_close(sock); return false; }
   if (lwip_send(sock, req, (size_t)req_len, 0) < 0) { lwip_close(sock); return false; }
 
@@ -655,9 +714,12 @@ static void aggregator_poll_task(void* arg) {
       bool status_due = (sat_last_status == 0) ||
                         (uptime_s - sat_last_status >= effective_interval);
       if (status_due) {
-        snprintf(url_buf, sizeof(url_buf), "%s/api/status", sat_base_url);
+        const char *status_basic_auth =
+            (s_status_basic_auth_b64[0] != '\0') ? s_status_basic_auth_b64 : nullptr;
+        snprintf(url_buf, sizeof(url_buf), "%s/api/status/full", sat_base_url);
         tmp_len = 0;
-        if (fetch_to_buffer(url_buf, s_fetch_tmp, 512, &tmp_len)
+        if (fetch_to_buffer(url_buf, s_fetch_tmp, static_cast<uint16_t>(sizeof(satellite_caches[0].status_json)), &tmp_len,
+                            5, nullptr, status_basic_auth)
             && tmp_len > 0) {
           if (AGG_LOCK() == pdTRUE) {
             // Verify config unchanged and find satellite by ID

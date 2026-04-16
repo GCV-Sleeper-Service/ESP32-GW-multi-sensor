@@ -1,34 +1,5 @@
 {
   "ok": true,
-  "version": "v7.4.4.0",
-  "uptime_seconds": 86400,
-  "sensor_count": 3,
-  "sensors": [
-    {
-      "id": "office",
-      "name": "Office",
-      "last_seen": 1741694370,
-      "temp_valid": true,
-      "hum_valid": true
-    },
-    {
-      "id": "first_floor",
-      "name": "First Floor",
-      "last_seen": 1741694370,
-      "temp_valid": true,
-      "hum_valid": true
-    },
-    {
-      "id": "outside",
-      "name": "Outside",
-      "last_seen": 1741694370,
-      "temp_valid": true,
-      "hum_valid": true
-    }
-  ],
-  "ram_history_points_per_series": 96,
-  "persist_days": 45,
-  "free_heap": 81920,
-  "free_heap_internal": 81920,
-  "free_heap_total": 81920
+  "role": "satellite",
+  "id": "gw-main"
 }

@@ -5,7 +5,7 @@
  * Extracted from dashboard.spec.js during the v7.6.5.7 test spec split.
  *
  * Usage:
- *   const { loadDashboard, stopDashboardNetwork, waitForConnected, waitForAggregatorReady } = require('./test-helpers');
+ *   const { loadDashboard, stopDashboardNetwork, waitForConnected, waitForAggregatorReady, bootAggregatorDashboard } = require('./test-helpers');
  */
 
 'use strict';
@@ -70,10 +70,42 @@ async function waitForAggregatorReady(page) {
   await page.waitForFunction(() => window._aggregatorReady === true, { timeout: 15000 });
 }
 
+async function bootAggregatorDashboard(page, opts = {}) {
+  const timeout = opts.timeout || 20000;
+  const username = opts.username || 'admin';
+  const password = opts.password || 'mock';
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const ready = await page.evaluate(() => window._aggregatorReady === true).catch(() => false);
+    if (ready) return;
+
+    const modalVisible = await page.evaluate(() => {
+      const modal = document.getElementById('authModal');
+      if (!modal) return false;
+      const hidden = modal.classList.contains('hidden') || modal.getAttribute('aria-hidden') === 'true';
+      return !hidden;
+    }).catch(() => false);
+
+    if (modalVisible) {
+      await page.locator('#authUsername').fill(username);
+      await page.locator('#authPassword').fill(password);
+      await page.locator('#authSubmit').click();
+    }
+
+    await page.waitForTimeout(100);
+  }
+
+  await waitForAggregatorReady(page);
+}
+
 module.exports = {
   waitForDashboardReady,
   stopDashboardNetwork,
   loadDashboard,
   waitForConnected,
   waitForAggregatorReady,
+  bootAggregatorDashboard,
 };

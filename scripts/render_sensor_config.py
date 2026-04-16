@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_aggregator_config, load_board_profile, load_gateway_config, load_manifest, manifest_v2
 
-VERSION = "7.6.7.3"
+VERSION = "7.6.8.0"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"
@@ -1317,18 +1317,8 @@ def main() -> int:
     expected_fixture_status = json.dumps(
         {
             "ok": True,
-            "version": f"v{VERSION}",
-            "sensor_count": len(sensors),
-            "sensors": fixture_manifest(sensors),
-            "mode": "active-manifest",
-            "connected": True,
-            "free_heap": 81920,
-            "free_heap_internal": 81920,
-            "free_heap_total": 81920,
-            "min_free_heap": 65536,
-            "httpd_stack_watermark_bytes": 260,
-            "ping_stack_watermark_bytes": 2160,
-
+            "role": gw_role,
+            "id": gw_id,
         },
         indent=2,
     ) + "\n"

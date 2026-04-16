@@ -1,17 +1,46 @@
+var _aggregatorAuthHeader = '';
+
+function _setAggregatorAuthFromCreds(creds) {
+  if (!creds || !creds.username || !creds.password) return;
+  _aggregatorAuthHeader = 'Basic ' + btoa(creds.username + ':' + creds.password);
+}
+
+function _aggregatorFetch(path, init) {
+  var reqInit = Object.assign({}, init || {});
+  reqInit.cache = reqInit.cache || 'no-store';
+  var headers = Object.assign({}, reqInit.headers || {});
+  if (_aggregatorAuthHeader) headers.Authorization = _aggregatorAuthHeader;
+  reqInit.headers = headers;
+  return fetch(ESP_HOST + path, reqInit);
+}
+
 async function detectAggregatorMode() {
   try {
-    var r = await fetch(ESP_HOST + '/api/aggregator/gateways', {cache: 'no-store'});
-    if (r.ok) {
-      var data = await r.json();
-      if (data && Array.isArray(data.gateways) && data.gateways.length > 0) {
-        DASHBOARD_MODE = 'aggregator';
-        window._aggregatorGateways = data.gateways;
-        return true;
+    var statusResp = await fetch(ESP_HOST + '/api/status', {cache: 'no-store'});
+    if (!statusResp.ok) return false;
+
+    var status = await statusResp.json();
+    if (!status || status.role !== 'aggregator') return false;
+
+    DASHBOARD_MODE = 'aggregator';
+    window._aggregatorGateways = [];
+
+    var creds = await requestManagementCredentials('aggregator dashboard');
+    if (creds) {
+      _setAggregatorAuthFromCreds(creds);
+      var r = await _aggregatorFetch('/api/aggregator/gateways', {cache: 'no-store'});
+      if (r.ok) {
+        var data = await r.json();
+        if (data && Array.isArray(data.gateways)) {
+          window._aggregatorGateways = data.gateways;
+        }
       }
     }
-  } catch(e) { /* not aggregator — satellite mode */ }
+    return true;
+  } catch(e) { /* not aggregator ? satellite mode */ }
   return false;
 }
+
 
 function renderGatewaySelector(gateways) {
   var container = document.getElementById('gwSelectorContainer');
@@ -157,7 +186,7 @@ var _aggDeviceLiveInFlight = false;
 function _populateGatewayDeviceLive(gwId, gwSensors) {
   if (_aggDeviceLiveInFlight) return;
   _aggDeviceLiveInFlight = true;
-  fetch(ESP_HOST + '/api/aggregator/live', {cache: 'no-store'})
+  _aggregatorFetch('/api/aggregator/live', {cache: 'no-store'})
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(data) {
       if (!data || !data.gateways || !data.gateways[gwId]) return;
@@ -338,6 +367,7 @@ function _handleTestSatellite(urlInput, statusEl) {
         if (liveStatusEl) liveStatusEl.textContent = 'Test cancelled';
         return Promise.reject(new Error('AUTH_CANCELLED'));
       }
+      _setAggregatorAuthFromCreds(creds);
       if (liveStatusEl) liveStatusEl.textContent = 'Testing...';
       return fetch(ESP_HOST + '/api/aggregator/test-satellite?url=' + encodeURIComponent(capturedUrl), {
         method: 'POST',
@@ -376,14 +406,21 @@ function _handleAddSatellite(urlInput, nameInput, statusEl) {
     return;
   }
   _satAddInFlight = true;
-  if (statusEl) statusEl.textContent = 'Adding...';
-  var query = 'url=' + encodeURIComponent(url);
-  if (name) query += '&name=' + encodeURIComponent(name);
-  fetch(ESP_HOST + '/api/aggregator/add-satellite?' + query, {
-    method: 'POST',
-    cache: 'no-store',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'a=1'
+  if (statusEl) statusEl.textContent = 'Authenticating...';
+
+  requestManagementCredentials('satellite add')
+  .then(function(creds) {
+    if (!creds) throw new Error('AUTH_CANCELLED');
+    _setAggregatorAuthFromCreds(creds);
+    if (statusEl) statusEl.textContent = 'Adding...';
+    var query = 'url=' + encodeURIComponent(url);
+    if (name) query += '&name=' + encodeURIComponent(name);
+    return _aggregatorFetch('/api/aggregator/add-satellite?' + query, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'a=1'
+    });
   })
   .then(safeJsonResponse)
   .then(function() {
@@ -393,10 +430,16 @@ function _handleAddSatellite(urlInput, nameInput, statusEl) {
     _refreshSettingsPanel();
   })
   .catch(function(err) {
-    if (statusEl) statusEl.innerHTML = '\u2717 ' + escHtml(err.message || 'Add failed');
+    if (!statusEl) return;
+    if (err.message === 'AUTH_CANCELLED') {
+      statusEl.textContent = 'Add cancelled';
+    } else {
+      statusEl.innerHTML = '✗ ' + escHtml(err.message || 'Add failed');
+    }
   })
   .finally(function() { _satAddInFlight = false; });
 }
+
 
 var _satRemoveInFlight = false;
 function _handleRemoveSatellite(satId, satName, statusEl) {
@@ -410,6 +453,7 @@ function _handleRemoveSatellite(satId, satName, statusEl) {
         if (statusEl) statusEl.textContent = 'Remove cancelled';
         return null;
       }
+      _setAggregatorAuthFromCreds(creds);
       if (statusEl) statusEl.textContent = 'Removing...';
       return fetch(ESP_HOST + '/api/aggregator/satellite/' + encodeURIComponent(satId), {
         method: 'DELETE',
@@ -431,7 +475,7 @@ function _handleRemoveSatellite(satId, satName, statusEl) {
 }
 
 function _refreshSettingsPanel() {
-  fetch(ESP_HOST + '/api/aggregator/gateways', {cache: 'no-store'})
+  _aggregatorFetch('/api/aggregator/gateways', {cache: 'no-store'})
     .then(safeJsonResponse)
     .then(function(data) {
       if (data && data.gateways) {
@@ -466,7 +510,7 @@ var _aggLiveInFlight = false;
 function pollAggregatorLive() {
   if (_aggLiveInFlight) return;
   _aggLiveInFlight = true;
-  fetch(ESP_HOST + '/api/aggregator/gateways', {cache: 'no-store'})
+  _aggregatorFetch('/api/aggregator/gateways', {cache: 'no-store'})
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data && data.gateways) {

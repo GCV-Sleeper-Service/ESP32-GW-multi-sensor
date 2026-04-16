@@ -22,6 +22,10 @@ static void register_history_handler(
       firmware_version == nullptr ? std::string("unknown") : std::string(firmware_version));
   base->add_handler(handler);
 
+#if AGGREGATOR_ENABLED
+  set_aggregator_poll_basic_auth_(mgmt_username, mgmt_password);
+#endif
+
   ESP_LOGI(TAG,
            "handler registered (%d devices, %dh RAM, %d hourly slots in '%s', %d pts/segment)",
            NUM_DEVICES, HISTORY_HOURS, PERSIST_SLOTS,

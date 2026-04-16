@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "role": "satellite",
+  "id": "gw-main",
+  "version": "v7.6.8.0",
+  "uptime_seconds": 86400,
+  "sensor_count": 3,
+  "sensors": [
+    {
+      "id": "office",
+      "name": "Office",
+      "category": "environmental",
+      "last_seen": 1741694370,
+      "temp_valid": true,
+      "hum_valid": true
+    },
+    {
+      "id": "first_floor",
+      "name": "First Floor",
+      "category": "environmental",
+      "last_seen": 1741694370,
+      "temp_valid": true,
+      "hum_valid": true
+    },
+    {
+      "id": "outside",
+      "name": "Outside",
+      "category": "environmental",
+      "last_seen": 1741694370,
+      "temp_valid": true,
+      "hum_valid": true
+    }
+  ],
+  "ram_history_points_per_series": 96,
+  "persist_days": 45,
+  "free_heap": 81920,
+  "free_heap_internal": 81920,
+  "free_heap_total": 81920,
+  "min_free_heap": 65536,
+  "httpd_stack_watermark_bytes": 260,
+  "ping_stack_watermark_bytes": 2160
+}

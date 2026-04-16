@@ -46,6 +46,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (strcmp(p, "/dashboard.html") == 0) return true;
       if (strcmp(p, "/dashboard-download") == 0) return true;
       if (strcmp(p, "/api/storage-stats") == 0) return true;
+      if (strcmp(p, "/api/status/full") == 0) return true;
       if (strcmp(p, "/api/status") == 0) return true;
       if (strcmp(p, "/api/import/status") == 0) return true;
       if (strcmp(p, "/api/v2/live") == 0) return true;
@@ -209,6 +210,10 @@ class HistoryWebHandler : public AsyncWebHandler {
       handle_storage_stats_(request);
       return;
     }
+    if (strcmp(p, "/api/status/full") == 0) {
+      handle_status_full_(request);
+      return;
+    }
     if (strcmp(p, "/api/status") == 0) {
       handle_status_(request);
       return;
@@ -216,7 +221,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (strcmp(p, "/api/import/status") == 0) {
       const bool ready = import_active_ && s_import_ready && !import_prepare_active_;
       std::string body = ready ? "{\"ready\":true}" : "{\"ready\":false}";
-      auto *resp = request->beginResponse(200, "application/json", body.c_str());
+      auto *resp = request->beginResponse(200, "application/json", body);
       add_common_headers_(resp);
       request->send(resp);
       return;
@@ -562,6 +567,8 @@ class HistoryWebHandler : public AsyncWebHandler {
   }
 
   void handle_api_ingest_(AsyncWebServerRequest *request) const {
+    // Auth: REQUIRED - write endpoint, prevents unauthenticated data injection (SEC-01)
+    if (!authenticate_management_(request)) return;
     if (request->method() != HTTP_POST) {
       send_json_error_(request, 405, "Method not allowed");
       return;
@@ -1321,87 +1328,106 @@ class HistoryWebHandler : public AsyncWebHandler {
   }
 
   void handle_status_(AsyncWebServerRequest *request) const {
-    auto *resp = request->beginResponseStream("application/json");
-    resp->addHeader("Cache-Control", "no-store");
+    // Auth: NOT REQUIRED - public health check; sensitive fields moved to /api/status/full
+    const char *role = "satellite";
+#if AGGREGATOR_ENABLED
+    role = "aggregator";
+#endif
 
-    int64_t uptime_us = esp_timer_get_time();
-    uint32_t uptime_s = (uint32_t) (uptime_us / 1000000LL);
+    std::string body;
+    body.reserve(128);
+    body += R"({"ok":true,"role":")";
+    body += role;
+    body += R"(","id":")";
+    body += App.get_name().c_str();
+    body += R"("})";
+
+    auto *resp = request->beginResponse(200, "application/json", body);
+    resp->addHeader("Cache-Control", "no-store");
+    add_common_headers_(resp);
+    request->send(resp);
+  }
+
+  void handle_status_full_(AsyncWebServerRequest *request) const {
+    // Auth: REQUIRED - full status with heap, version, uptime, telemetry (SEC-04)
+    if (!authenticate_management_(request)) return;
+
+    const char *role = "satellite";
+#if AGGREGATOR_ENABLED
+    role = "aggregator";
+#endif
+
+    uint32_t uptime_s = (uint32_t) (esp_timer_get_time() / 1000000LL);
     uint32_t free_heap_internal = esp_get_free_internal_heap_size();
     uint32_t free_heap_total = esp_get_free_heap_size();
-    uint32_t min_free_heap = esp_get_minimum_free_heap_size();
+    uint32_t min_heap_bytes = esp_get_minimum_free_heap_size();
     UBaseType_t httpd_wm = uxTaskGetStackHighWaterMark(nullptr);
     uint32_t httpd_wm_bytes = (uint32_t) (httpd_wm * sizeof(StackType_t));
 
-    // Keep each snprintf well under 64 bytes to avoid silent truncation.
+    std::string json;
+    json.reserve(1024);
     char num[96];
 
-    resp->print("{\"ok\":true,\"version\":\"");
-    resp->print(firmware_version_.c_str());
-    resp->print("\",");
+    json += R"({"ok":true,"role":")";
+    json += role;
+    json += R"(","id":")";
+    json += App.get_name().c_str();
+    json += R"(","version":")";
+    json += firmware_version_;
+    json += R"(",)";
 
-    snprintf(num, sizeof(num), "\"uptime_seconds\":%u,\"sensor_count\":%d,",
+    snprintf(num, sizeof(num), R"("uptime_seconds":%u,"sensor_count":%d,)",
              (unsigned) uptime_s, NUM_DEVICES);
-    resp->print(num);
+    json += num;
 
-    resp->print("\"sensors\":[");
+    json += R"("sensors":[)";
     for (int i = 0; i < NUM_DEVICES; i++) {
-      if (i > 0) resp->print(",");
-      resp->print("{\"id\":\"");
-      resp->print(devices[i].id);
-      resp->print("\",\"name\":\"");
-      resp->print(devices[i].name);
-      // Category label
+      if (i > 0) json += ",";
+      json += R"({"id":")";
+      json += devices[i].id;
+      json += R"(","name":")";
+      json += devices[i].name;
       const char *cat = "unknown";
       if (devices[i].category_id == 0) cat = "environmental";
       else if (devices[i].category_id == 1) cat = "system";
       else if (devices[i].category_id == 2) cat = "network";
-      resp->print("\",\"category\":\"");
-      resp->print(cat);
-      snprintf(num, sizeof(num), "\",\"last_seen\":%u",
+      json += R"(","category":")";
+      json += cat;
+      snprintf(num, sizeof(num), R"(","last_seen":%u)",
                (unsigned) devices[i].last_seen_epoch);
-      resp->print(num);
-      // Category-specific validity fields
+      json += num;
       if (devices[i].category_id == 0) {
-        snprintf(num, sizeof(num), ",\"temp_valid\":%s,\"hum_valid\":%s",
+        snprintf(num, sizeof(num), R"(,"temp_valid":%s,"hum_valid":%s)",
                  devices[i].temp_valid ? "true" : "false",
                  devices[i].hum_valid ? "true" : "false");
-        resp->print(num);
+        json += num;
       }
-      resp->print("}");
+      json += "}";
     }
-    resp->print("],");
+    json += "],";
 
-    // Each field printed separately to stay within the 96-byte buffer.
-    snprintf(num, sizeof(num), "\"ram_history_points_per_series\":%d,",
+    snprintf(num, sizeof(num), R"("ram_history_points_per_series":%d,)",
              HISTORY_POINTS_PER_SERIES);
-    resp->print(num);
+    json += num;
+    snprintf(num, sizeof(num), R"("persist_days":%d,)", PERSIST_DAYS);
+    json += num;
+    snprintf(num, sizeof(num), R"("free_heap":%u,)", (unsigned) free_heap_internal);
+    json += num;
+    snprintf(num, sizeof(num), R"("free_heap_internal":%u,)", (unsigned) free_heap_internal);
+    json += num;
+    snprintf(num, sizeof(num), R"("free_heap_total":%u,)", (unsigned) free_heap_total);
+    json += num;
+    snprintf(num, sizeof(num), R"("min_free_heap":%u,)", (unsigned) min_heap_bytes);
+    json += num;
+    snprintf(num, sizeof(num), R"("httpd_stack_watermark_bytes":%u,)", (unsigned) httpd_wm_bytes);
+    json += num;
+    snprintf(num, sizeof(num), R"("ping_stack_watermark_bytes":%u})",
+             (unsigned) g_ping_stack_watermark_bytes);
+    json += num;
 
-    snprintf(num, sizeof(num), "\"persist_days\":%d,", PERSIST_DAYS);
-    resp->print(num);
-
-    // free_heap reports internal SRAM only for cross-board comparability (BUG-062).
-    // On C3 (no PSRAM), free_heap == free_heap_internal == free_heap_total.
-    // On S3 (PSRAM), free_heap_total includes ~8MB PSRAM which distorts monitoring.
-    // free_heap is kept as internal-only for backward compatibility.
-    snprintf(num, sizeof(num), "\"free_heap\":%u,", (unsigned) free_heap_internal);
-    resp->print(num);
-    snprintf(num, sizeof(num), "\"free_heap_internal\":%u,", (unsigned) free_heap_internal);
-    resp->print(num);
-    snprintf(num, sizeof(num), "\"free_heap_total\":%u,", (unsigned) free_heap_total);
-    resp->print(num);
-
-    // v7.6.7.3: operational telemetry — heap floor + task stack watermarks.
-    // min_free_heap: lowest free heap since boot (catches transient spikes).
-    // httpd_stack_watermark_bytes: minimum unused httpd stack ever (called ON httpd task).
-    // ping_stack_watermark_bytes: minimum unused ping_adapter stack (updated every 60s cycle;
-    //   0 if PING_DEVICE_INDEX is not defined — no conditional needed).
-    snprintf(num, sizeof(num), "\"min_free_heap\":%u,", (unsigned) min_free_heap);
-    resp->print(num);
-    snprintf(num, sizeof(num), "\"httpd_stack_watermark_bytes\":%u,", (unsigned) httpd_wm_bytes);
-    resp->print(num);
-    snprintf(num, sizeof(num), "\"ping_stack_watermark_bytes\":%u}", (unsigned) g_ping_stack_watermark_bytes);
-    resp->print(num);
-
+    auto *resp = request->beginResponse(200, "application/json", json);
+    resp->addHeader("Cache-Control", "no-store");
+    add_common_headers_(resp);
     request->send(resp);
   }
 
@@ -1534,6 +1560,8 @@ class HistoryWebHandler : public AsyncWebHandler {
   // ─────────────────────────────────────────────────────────────────
 
   void handle_aggregator_gateways_(AsyncWebServerRequest *request) const {
+    // Auth: REQUIRED - topology disclosure prevention (SEC-03)
+    if (!authenticate_management_(request)) return;
     if (xSemaphoreTake(s_cache_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
       request->send(503);
       return;
@@ -1626,6 +1654,8 @@ class HistoryWebHandler : public AsyncWebHandler {
   }
 
   void handle_aggregator_live_(AsyncWebServerRequest *request) const {
+    // Auth: REQUIRED - aggregator live sensor data protection (SEC-03)
+    if (!authenticate_management_(request)) return;
     if (xSemaphoreTake(s_cache_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
       request->send(503);
       return;
@@ -1660,6 +1690,8 @@ class HistoryWebHandler : public AsyncWebHandler {
 
   void handle_aggregator_proxy_(AsyncWebServerRequest *request,
                                 const char *rest) const {
+    // Auth: REQUIRED - proxy history data protection (SEC-03)
+    if (!authenticate_management_(request)) return;
     // rest = "{gw_id}/history/{device}/{metric}"
     // Extract gw_id (up to first '/')
     const char* slash1 = strchr(rest, '/');
@@ -1776,17 +1808,12 @@ class HistoryWebHandler : public AsyncWebHandler {
 
   // POST /api/aggregator/add-satellite (v7.6.0.1)
   void handle_add_satellite_(AsyncWebServerRequest *request) const {
+    // Auth: REQUIRED - topology-modifying write endpoint (SEC-02)
+    if (!authenticate_management_(request)) return;
     if (request->method() != HTTP_POST) {
       send_json_error_(request, 405, "Method not allowed");
       return;
     }
-
-    // NOTE: add-satellite intentionally does NOT require authenticate_management_().
-    // Rationale: adding a satellite is a low-risk constructive operation — it only
-    // adds a polling target and does not erase or modify existing data.
-    // Destructive endpoints (reset-satellites, reboot, delete-history) ARE auth-guarded.
-    // This exception is deliberate per v7.6.0.1 prompt contract.
-    // Security follow-up tracked in Docs/bugs-and-lessons-learned.md LESSON-OPS-089.
 
     // 1. Parse query params
     if (!request->hasParam("url")) {
