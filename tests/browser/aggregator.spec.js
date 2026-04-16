@@ -9,38 +9,11 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { stopDashboardNetwork, waitForAggregatorReady } = require('./test-helpers');
+const { stopDashboardNetwork, bootAggregatorDashboard } = require('./test-helpers');
 
 test.afterEach(async ({ page }) => {
   await stopDashboardNetwork(page);
 });
-
-async function bootAggregatorDashboard(page) {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-
-  const deadline = Date.now() + 20000;
-  while (Date.now() < deadline) {
-    const ready = await page.evaluate(() => window._aggregatorReady === true).catch(() => false);
-    if (ready) return;
-
-    const modalVisible = await page.evaluate(() => {
-      const modal = document.getElementById('authModal');
-      if (!modal) return false;
-      const hidden = modal.classList.contains('hidden') || modal.getAttribute('aria-hidden') === 'true';
-      return !hidden;
-    }).catch(() => false);
-
-    if (modalVisible) {
-      await page.locator('#authUsername').fill('admin');
-      await page.locator('#authPassword').fill('mock');
-      await page.locator('#authSubmit').click();
-    }
-
-    await page.waitForTimeout(100);
-  }
-
-  await waitForAggregatorReady(page);
-}
 
 // -- 19. Aggregator Mode (Phase 5 Step 4) -------------------------
 test.describe('19. Aggregator Mode', () => {

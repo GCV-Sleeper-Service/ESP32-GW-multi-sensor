@@ -44,3 +44,29 @@ PR: #180
 ## Notes
 - Public `/api/status` intentionally remains unauthenticated and minimal per LESSON-OPS-110 + SEC-ADR-001 constraints.
 - `/api/status/full` is the canonical authenticated endpoint for full telemetry in v7.6.8.0.
+
+## CI Remediation Follow-up (Post-Review)
+
+### Why CI was failing
+- `browser-tests (3sensor)` failed because BUG-043 test logic still expected `/api/manifest` to be the first non-gateway API request, but v7.6.8.0 boot now probes `/api/status` first via `detectAggregatorMode()`.
+- `browser-tests (aggregator)` initially failed because `tests/fixtures/variants/aggregator/api-status.json` still used legacy status fields and did not include `role: "aggregator"`, so aggregator mode was never detected.
+- After fixture correction, Firefox still showed intermittent aggregator timeouts because the new management auth modal could appear after initial page load and block `_aggregatorReady` in non-interactive test runs.
+
+### What was changed
+- Updated aggregator fixture status payload to:
+  - `{ "ok": true, "role": "aggregator", "id": "agg-s3-16m-1" }`
+- Updated BUG-043 request-order assertion to validate `/api/status` appears before `/api/manifest`.
+- Added shared helper `bootAggregatorDashboard()` to `tests/browser/test-helpers.js`.
+- Refactored `tests/browser/aggregator.spec.js` to use shared `bootAggregatorDashboard()` instead of local boot logic.
+- `bootAggregatorDashboard()` actively handles auth modal appearance in a bounded loop and submits test credentials (`admin` / `mock`) before waiting for `_aggregatorReady`.
+
+### Validation reruns
+- `FIXTURE_SET=aggregator npx playwright test tests/browser/aggregator.spec.js --project=chromium --project=firefox`
+  - Result: `22 passed`
+- `FIXTURE_SET=3sensor npx playwright test tests/browser/history-charts.spec.js --grep "manifest is first HTTP request at boot" --project=chromium --project=firefox`
+  - Result: `2 passed`
+
+### Scope and risk
+- Changes are test-only (fixtures + Playwright spec/assertions + shared test helper).
+- Firmware/runtime production behavior is unchanged.
+- CI stability is improved by removing auth-modal race conditions in headless aggregator tests.

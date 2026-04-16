@@ -23,6 +23,12 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 - Added LESSON-SEC-001 to `Docs/lessons/build-pipeline.md`.
 - Marked LESSON-OPS-089 as resolved.
 
+### CI Stabilization
+- Fixed aggregator fixture contract drift: `tests/fixtures/variants/aggregator/api-status.json` now returns `{ok, role, id}` so `detectAggregatorMode()` can enter aggregator mode in tests.
+- Updated BUG-043 request-order assertion in `tests/browser/history-charts.spec.js` to reflect v7.6.8.0 boot flow (`/api/status` probe precedes `/api/manifest`).
+- Added shared test helper `bootAggregatorDashboard()` in `tests/browser/test-helpers.js` and switched `tests/browser/aggregator.spec.js` to use it.
+- `bootAggregatorDashboard()` auto-handles the management auth modal in headless runs, removing intermittent Firefox timeouts where `_aggregatorReady` was never reached.
+
 ## [v7.6.7.3] — 2026-04-14 - Operational Telemetry in `/api/status`
 
 Added three permanent telemetry fields to `GET /api/status`:
