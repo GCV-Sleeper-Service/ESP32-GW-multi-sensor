@@ -2,6 +2,19 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.8.1] - 2026-04-15 - History Auth + Heap Cap + DoS Cooldown + SEC-ADR
+
+### Security
+- Added management authentication guards to GET /history/{id}/{series} and GET /api/v2/history/{device}/{metric}.
+- Added per-URL 60-second cooldown for failed POST /api/aggregator/add-satellite probes to reduce repeated probe abuse.
+
+### Changed
+- Capped history CSV pre-allocation with std::min(..., (size_t)60000) to bound heap spikes on large history responses.
+
+### Docs
+- Added Docs/decisions/README.md for ADR directory metadata.
+- Committed Docs/decisions/SEC-ADR-001-residual-vulnerabilities.md as Phase V V2-G deliverable.
+
 ## [v7.6.8.0] - 2026-04-15 - Auth Guards + Status Field Split
 
 ### Security
