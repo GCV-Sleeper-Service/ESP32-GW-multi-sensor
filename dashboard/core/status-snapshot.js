@@ -1,15 +1,24 @@
 // Device info + telemetry mapping
 var DEVICE_INFO_MAP = {
-  'text_sensor-chip': {el:'di-chip'}, 'text_sensor-features': {el:'di-features'},
-  'text_sensor-cores': {el:'di-cores'}, 'text_sensor-revision': {el:'di-revision'},
-  'text_sensor-cpu_frequency': {el:'di-cpu'}, 'text_sensor-framework': {el:'di-framework'},
-  'text_sensor-esphome_version': {el:'di-esphome'}, 'text_sensor-ip_address': {el:'di-ip'},
-  'text_sensor-mac_address': {el:'di-mac'}, 'text_sensor-reset_reason': {el:'di-reset'}
+  'text_sensor-chip': {el:'di-chip'},
+  'text_sensor-features': {el:'di-features'},
+  'text_sensor-cores': {el:'di-cores'},
+  'text_sensor-revision': {el:'di-revision'},
+  'text_sensor-cpu_frequency': {el:'di-cpu'},
+  'text_sensor-framework': {el:'di-framework'},
+  'text_sensor-esphome_version': {el:'di-esphome'},
+  'text_sensor-ip_address': {el:'di-ip'},
+  'text_sensor-flash_size': {el:'di-flash'},
+  'text_sensor-sram_size': {el:'di-sram'},
+  'text_sensor-psram': {el:'di-psram'},
+  'text_sensor-reset_reason': {el:'di-reset'},
+  'di-device-name': {el:'di-device-name'},
+  'di-firmware-version': {el:'di-firmware-version'}
 };
 var TELEMETRY_IDS = { heap:'sensor-free_heap', uptime:'sensor-uptime', wifi:'sensor-wifi_signal' };
 
 var POLL_SHARED = ['/text_sensor/Current%20Time', '/sensor/WiFi%20Signal'];
-var POLL_DEVICE = ['/text_sensor/Chip', '/text_sensor/Features', '/text_sensor/Cores', '/text_sensor/Revision', '/text_sensor/CPU%20Frequency', '/text_sensor/Framework', '/text_sensor/ESPHome%20Version', '/text_sensor/IP%20Address', '/text_sensor/MAC%20Address', '/text_sensor/Reset%20Reason'];
+var POLL_DEVICE = ['/text_sensor/Chip', '/text_sensor/Features', '/text_sensor/Cores', '/text_sensor/Revision', '/text_sensor/CPU%20Frequency', '/text_sensor/Framework', '/text_sensor/ESPHome%20Version', '/text_sensor/IP%20Address', '/text_sensor/Flash%20Size', '/text_sensor/SRAM%20Size', '/text_sensor/PSRAM', '/text_sensor/Reset%20Reason'];
 
 
 function formatUptimeSeconds(value) {
@@ -71,4 +80,3 @@ function loadStatusSnapshot() {
 
 var totalPoints = 0, historyPoints = 0, liveAvgPoints = 0;
 var lastAvgEpoch = {}, eventCount = 0, pollAvgLast = {};
-

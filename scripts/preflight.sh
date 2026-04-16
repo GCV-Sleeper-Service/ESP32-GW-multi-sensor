@@ -134,6 +134,10 @@ check_contains "gateway_manifest_yaml_includes" firmware/esp32-c3-multi-sensor.y
 # BUG-043: verify dashboard.html has inline favicon to prevent browser /favicon.ico request
 check_contains "dashboard_inline_favicon" dashboard/dashboard.html 'rel="icon" href="data:,'
 check_contains_regex "dashboard_has_version_badge" dashboard/dashboard.html 'id="?versionBadge"?'
+check_contains "device_card_has_device_name" dashboard/dashboard.html 'id="di-device-name"'
+check_contains "device_card_has_firmware_version" dashboard/dashboard.html 'id="di-firmware-version"'
+check_contains "device_card_has_flash" dashboard/dashboard.html 'id="di-flash"'
+check_contains "device_card_has_sram" dashboard/dashboard.html 'id="di-sram"'
 # BUG-043: verify firmware serves gzip with Content-Encoding header
 check_contains "firmware_gzip_content_encoding" dashboard/sensor_history_multi.h 'Content-Encoding", "gzip'
 

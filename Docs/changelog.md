@@ -2,6 +2,17 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.9.0] - 2026-04-16 - Phase V V3-A: Dashboard Device Card Cleanup
+
+### Changed
+- Device card now shows Device Name and Firmware rows and removes the MAC row (#144).
+- Device card now reads Flash/SRAM/PSRAM values from runtime text_sensor entities instead of hardcoded values (#136, #138).
+- C3 and WROOM profiles now expose PSRAM = None so non-PSRAM boards report explicitly.
+
+### Added
+- Added flash_size, sram_size, and psram_status template text_sensor entities in C3 and WROOM firmware YAMLs.
+- Added preflight checks for di-device-name, di-firmware-version, di-flash, and di-sram in generated dashboard output.
+
 ## [v7.6.8.2] - 2026-04-15 - Socket Reduction V2-H Only
 
 ### Changed
