@@ -2,14 +2,12 @@
 
 _Date: 2026-04-12_
 _Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
-_Status: v7.6.8.0 COMPLETE. Auth guards on ingest, add-satellite, aggregator reads. Status split done._
-
+_Status: v7.6.8.0 COMPLETE (PR #180, merged 2026-04-16). Auth guards on ingest, add-satellite, aggregator reads. Status split done. Git tag v7.6.8.0 pending._
 ---
 
 ## Project State Summary
 
-**v7.6.8.0 is complete.** All write endpoints and topology-disclosure endpoints auth-gated. `/api/status/full` added. Aggregator polling uses credentials.
-
+**v7.6.8.0 is complete (PR #180).** All write endpoints and topology-disclosure endpoints auth-gated. `/api/status/full` added with auth gate. Aggregator polling now calls `/api/status/full` with credentials via `_setAggregatorAuthFromCreds()`. `fetch_to_buffer()` has a new optional 7th parameter `basic_auth` (defaults to `nullptr` — all existing callers unaffected). `detectAggregatorMode()` now probes `/api/status` **before** `/api/manifest` — preserve this boot order in any v7.6.8.1 aggregator startup changes.
 ---
 
 ## Phase V Progress Table
@@ -73,8 +71,11 @@ See `prompts/phaseV/v7.6.8.1-agent-prompt-gpt-codex.md` §6 for the full checkli
 
 | # | Rule | Why Relevant |
 |---|------|-------------|
+| 8 | No new `beginResponseStream` | Any new response handlers |
 | 58 | Edit fragments, run assembly | Fragment edits |
-| LESSON-OPS-110 | Auth decision comments | History handler |
+| LESSON-OPS-088 | Instruction Compliance Output table **mandatory** in PR description | Absent from PR #180 — enforce here |
+| LESSON-OPS-110 | Auth decision comments on every modified handler | History handler |
+| LESSON-SEC-001 | All write endpoints require auth as absolute first line | History endpoints being added |
 
 ---
 
@@ -132,12 +133,18 @@ If any actual result from this step invalidates assumptions in the next step's h
 
 ---
 
-## Context That Carries Forward to Next Step
+## Context That Carries Forward from v7.6.8.0
 
-- All security hardening is now in place. Auth coverage table in SEC-ADR-001 is the reference.
-- History endpoints are auth-gated — affects any script or tool that fetches history.
-- DoS cooldown array is static — no heap allocation.
+- **`detectAggregatorMode()` boot order:** Now probes `/api/status` before `/api/manifest`. Any v7.6.8.1 change to aggregator startup must preserve this order.
+- **`fetch_to_buffer()` 7th param:** New optional `basic_auth` parameter defaults to `nullptr`. Existing callers are unaffected. New callers in v7.6.8.1 (if any) must pass `nullptr` explicitly or provide credentials.
+- **Dashboard JS auth wiring:** `_setAggregatorAuthFromCreds()` helper was added in v7.6.8.0 to send auth headers to aggregator endpoints. If v7.6.8.1 adds any new aggregator endpoint calls from the dashboard, this helper must be used.
+- **Instruction Compliance Output table:** PR #180 omitted this (OBS-1). It is **mandatory** in the v7.6.8.1 PR description. Add as a hard requirement to §9 of the agent prompt.
+- **External caller audit pending:** All scripts and ESPHome YAML sensors that POST to `/api/ingest/` must be updated with `Authorization` headers before deploying v7.6.8.0 firmware to live devices. This is an operator task, not agent scope.
+- **All security hardening now in place** for V2-A through V2-D. Auth coverage table in `Docs/decisions/SEC-ADR-001-residual-vulnerabilities.md` is the reference going forward.
+- **History endpoints are NOT yet auth-gated** — that is the primary task of v7.6.8.1 (V2-E).
+- **DoS cooldown on add-satellite is NOT yet implemented** — that is V2-F in v7.6.8.1.
 
 ---
 
 _End of session handoff document._
+
