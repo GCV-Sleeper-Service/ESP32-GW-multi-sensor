@@ -376,7 +376,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.8.1) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.8.2) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.

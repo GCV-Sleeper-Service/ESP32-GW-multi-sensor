@@ -12,7 +12,7 @@ const path = require('path');
 const FIXTURES_ROOT = path.join(__dirname);
 const VARIANTS_ROOT = path.join(FIXTURES_ROOT, 'variants');
 const ROOT = path.join(__dirname, '..', '..');
-const VERSION = 'v7.6.8.1';
+const VERSION = 'v7.6.8.2';
 
 const SENSOR_LIBRARY = [
   { id: 'office', name: 'Office', tempBase: 21.4, humBase: 44 },

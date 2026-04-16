@@ -2,6 +2,16 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.8.2] - 2026-04-15 - Socket Reduction V2-H Only
+
+### Changed
+- Reduced `CONFIG_LWIP_MAX_SOCKETS` from `18` to `15` in `firmware/esp32-c3-multi-sensor.yaml` for the ESP32-C3 satellite profile.
+- Left `firmware/core/ping-adapter.h` at 4096 bytes and `firmware/local_components/web_server_idf/web_server_idf.cpp` at 16384 bytes because V2-I and V2-J remain blocked by the v7.6.7.3 stack watermark measurements.
+
+### Validation
+- `bash scripts/preflight.sh` passed.
+- Playwright matrix passed for `3sensor` (chromium + firefox), `mixed` (chromium), `system` (chromium), and `aggregator` (chromium).
+
 ## [v7.6.8.1] - 2026-04-15 - History Auth + Heap Cap + DoS Cooldown + SEC-ADR
 
 ### Security

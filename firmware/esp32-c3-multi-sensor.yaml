@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.6.8.1
+# ESP32-C3 Multi-Sensor Gateway - v7.6.8.2
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -53,7 +53,7 @@ esphome:
       priority: -100
       then:
         - lambda: |-
-            register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.6.8.1");
+            register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.6.8.2");
             id(dashboard_link).publish_state(
               "Dashboard: /dashboard or /dashboard.html — Download: /dashboard-download");
     - # Priority 600: run after WiFi and SNTP are available.
@@ -85,8 +85,9 @@ esphome:
 #                     web listener + 1–2 misc
 #   Dashboard open (~5): SSE /events + /api/status + /api/storage-stats
 #                        + 2× history (Promise.all temp+hum per sensor)
-#   Peak total: ~13.  16 gives headroom so SNTP sync or a second browser
-#   tab doesn't trigger ENFILE (httpd_accept_conn error 23) and crash.
+#   Peak total: ~13.  15 keeps measured headroom while recovering lwIP RAM.
+#   v7.6.7.3 two-tab validation (SSE + polling, 5 min) passed with zero
+#   ENFILE/httpd_accept_conn(23) failures, so 15 is the approved V2-H cap.
 #   Cost: ~600 bytes of lwIP RAM per extra socket.
 #
 # httpd task stack (CONFIG_HTTPD_STACK_SIZE):
@@ -110,7 +111,7 @@ esp32:
   framework:
     type: esp-idf
     sdkconfig_options:
-      CONFIG_LWIP_MAX_SOCKETS: "18"
+      CONFIG_LWIP_MAX_SOCKETS: "15"
 
 
 logger:
