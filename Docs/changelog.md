@@ -2,6 +2,27 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.8.0] - 2026-04-15 - Auth Guards + Status Field Split
+
+### Security
+- Added management authentication guards to write and sensitive aggregator endpoints:
+  - `POST /api/ingest/...`
+  - `POST /api/aggregator/add-satellite`
+  - `GET /api/aggregator/gateways`
+  - `GET /api/aggregator/live`
+  - `GET /api/aggregator/proxy/...`
+- Added auth-gated `GET /api/status/full` for full operational telemetry access.
+
+### Changed
+- Public `GET /api/status` now returns only `{ok, role, id}` to keep health checks unauthenticated while stripping sensitive fields.
+- Added optional `basic_auth` parameter to `fetch_to_buffer()` and updated aggregator polling to fetch `/api/status/full` with credentials.
+- Preserved v7.6.7.3 telemetry fields (`min_free_heap`, `httpd_stack_watermark_bytes`, `ping_stack_watermark_bytes`) in `/api/status/full`.
+- Updated fixture generation and status fixtures to align with the new `/api/status` shape.
+
+### Docs
+- Added LESSON-SEC-001 to `Docs/lessons/build-pipeline.md`.
+- Marked LESSON-OPS-089 as resolved.
+
 ## [v7.6.7.3] — 2026-04-14 - Operational Telemetry in `/api/status`
 
 Added three permanent telemetry fields to `GET /api/status`:
