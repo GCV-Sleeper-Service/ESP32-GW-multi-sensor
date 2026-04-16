@@ -22,7 +22,7 @@ _Status: v7.6.8.2 COMPLETE. V2 complete. Gated optimisations applied (or documen
 | v7.6.7.3 | Operational telemetry in /api/status | ✅ Complete (PR #179) |
 | v7.6.8.0 | V2-A/B/C/D: Auth guards + status split | ✅ Complete |
 | v7.6.8.1 | V2-E/F/G: History auth + DoS + SEC-ADR | ✅ Complete |
-| v7.6.8.2 | V2-H/I/J: Gated optimisations | ✅ Complete |
+| v7.6.8.2 | V2-H/I/J: Gated optimisations | ✅ Complete (PR #182, merged 2026-04-15) |
 | **v7.6.9.0** | **V3-A: Device card cleanup** | **⬅️ Current** |
 | v7.6.9.1 | V3-B/C: Hostname/IP + CSV role | Pending |
 | v7.6.9.2 | V3-D/E: Manifest export + AGG-ADR | Pending |
@@ -48,7 +48,7 @@ _Status: v7.6.8.2 COMPLETE. V2 complete. Gated optimisations applied (or documen
 
 - `dashboard/core/status-snapshot.js` — DEVICE_INFO_MAP
 - `dashboard/core/manifest.js` — populate new fields
-- `dashboard/dashboard.tmpl.html` — new row IDs
+- `dashboard/components/device-info/template.html` — replace MAC row, add new rows
 - `firmware/esp32-c3-multi-sensor.yaml` — text_sensors
 
 ### Acceptance criteria
@@ -76,7 +76,8 @@ See `prompts/phaseV/v7.6.9.0-agent-prompt-gpt-codex.md` §6 for the full checkli
 |---|------|-------------|
 | 47 | No direct dashboard.js/html edits | Edit source modules |
 | 48 | Edit template source | Template is HTML source |
-
+| 58 | Never edit sensor_history_multi.h directly | Not in scope but guards generated file |
+| 62 | Do NOT reorganise fragment boundaries | Dashboard rebuild must not shift fragments |
 ---
 
 ## Risk: MEDIUM — three issues combined, dashboard rebuild required
@@ -137,6 +138,10 @@ If any actual result from this step invalidates assumptions in the next step's h
 ## Context That Carries Forward to Next Step
 
 - DEVICE_INFO_MAP updated. New text_sensor entities in YAML.
+- V2-I BLOCKED: ping stack at 4,096 B with 2,160 B unused (112 B margin). No change until margin ≥ 2,048 B.
+- V2-J BLOCKED: httpd stack at 16,384 B with 260 B unused. Reduction impossible at current peak usage.
+- Post-V2 heap: confirm `free_heap_internal` at boot on C3 after flash. If < 65 KB → V3-F (struct audit) triggered.
+- LESSON-OPS-052: Playwright fixture sets must run sequentially — parallel launch causes EADDRINUSE.
 
 ---
 
