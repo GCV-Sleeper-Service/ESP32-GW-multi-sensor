@@ -581,14 +581,14 @@ text_sensor:
     id: flash_size
     lambda: |-
       return std::string("4096 KB");
-    update_interval: never
+    update_interval: 60s
 
   - platform: template
     name: "SRAM Size"
     id: sram_size
     lambda: |-
       return std::string("400 KB");
-    update_interval: never
+    update_interval: 60s
 
   - platform: template
     name: "PSRAM"

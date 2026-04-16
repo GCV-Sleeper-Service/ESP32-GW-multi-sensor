@@ -1806,7 +1806,12 @@ function loadStatusSnapshot() {
   if (isImportActive()) return Promise.resolve(false);
   if (_statusInFlight) return Promise.resolve(false);
   _statusInFlight = true;
-  return fetch(ESP_HOST + '/api/status', {cache:'no-store'})
+  // /api/status returns only {ok, role, id} (SEC-ADR RV-03 strip in v7.6.8.0).
+  // The enriched payload with free_heap/uptime_seconds is on the authenticated full-status endpoint.
+  // Use 'same-origin' credentials so the browser carries the dashboard page's
+  // Basic Auth to this request. Same-origin is deliberately narrower than
+  // 'include' - we never want credentials sent to a cross-origin host.
+  return fetch(ESP_HOST + '/api/status/full', {cache:'no-store', credentials:'same-origin'})
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(status) { return applyStatusSnapshot(status); })
     .catch(function(err) {

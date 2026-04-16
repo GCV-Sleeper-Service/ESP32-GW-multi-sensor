@@ -112,3 +112,57 @@ _Operator fills this in after re-flashing both versions:_
 ### Decision
 
 _Operator records which row of the decision table applies and the chosen action._
+
+## Hotfix 2 - SRAM/Flash publish + /api/status/full polling
+
+### Pre-Implementation Verification Gate (updated checks)
+- `grep -cE '"free_heap"|"uptime_seconds"' firmware/core/web-handler.h` => `2`
+- `awk '/void handle_status_\(AsyncWebServerRequest/,/^  }$/' firmware/core/web-handler.h | grep -cE '"free_heap"|"uptime_seconds"'` => `0`
+- `bash scripts/preflight.sh` => PASS
+
+### Checkpoint A (Fix 1)
+- `grep -c '"    update_interval: never"' scripts/render_sensor_config.py` => `4` (this count includes unrelated existing `never` entries outside Flash/SRAM blocks)
+- `grep -B 6 '"    update_interval: 60s"' scripts/render_sensor_config.py | grep -c 'name: "Flash Size"'` => `1`
+- `grep -B 6 '"    update_interval: 60s"' scripts/render_sensor_config.py | grep -c 'name: "SRAM Size"'` => `1`
+- `grep -c 'heap_caps_get_total_size(MALLOC_CAP_SPIRAM)' scripts/render_sensor_config.py` => `1`
+
+### Checkpoint B (Fix 2)
+- `grep "fetch(ESP_HOST" dashboard/core/status-snapshot.js` => `return fetch(ESP_HOST + '/api/status/full', {cache:'no-store', credentials:'same-origin'})`
+- `grep -c "/api/status'" dashboard/core/status-snapshot.js` => `0`
+- `grep -c "/api/status/full" dashboard/core/status-snapshot.js` => `1`
+
+### Pipeline Outputs
+- `bash scripts/bundle-dashboard.sh --write` => PASS
+- `python3 scripts/render_sensor_config.py --write` => PASS
+- `node tests/fixtures/generate-fixtures.js` => PASS
+- `python3 scripts/render_sensor_config.py --write` => PASS
+- `bash scripts/build-dashboard.sh --write` => PASS
+- `bash scripts/minify-dashboard.sh` => PASS
+- `bash scripts/generate-header.sh` => PASS
+- `python3 scripts/render_sensor_config.py --check` => PASS
+- `bash scripts/preflight.sh` => PASS
+
+### Playwright Fixture Matrix (Hotfix 2)
+| Fixture set | Command | Result |
+|---|---|---|
+| 3sensor (chromium) | `FIXTURE_SET=3sensor npx playwright test --project=chromium` | 99 passed, 45 skipped |
+| 3sensor (firefox) | `FIXTURE_SET=3sensor npx playwright test --project=firefox` | 99 passed, 45 skipped |
+| mixed (chromium) | `FIXTURE_SET=mixed npx playwright test --grep "Mixed" --project=chromium` | 7 passed |
+| system (chromium) | `FIXTURE_SET=system npx playwright test --grep "System" --project=chromium` | 8 passed |
+| aggregator (chromium) | `FIXTURE_SET=aggregator npx playwright test --grep "Aggregator" --project=chromium` | 11 passed, 1 skipped |
+
+### Device Verification Table (operator fills after flashing)
+| Check | C3 (189) | WROOM (190) | S3 (191) |
+|---|---|---|---|
+| Dashboard SSE: SRAM shows 400 / 520 / 512 KB (not blank) | | | |
+| Dashboard SSE: Flash shows 4096 / 4096 / 16384 KB (not blank) | | | |
+| Dashboard SSE: PSRAM shows None / None / value | | | |
+| Dashboard SSE: Free Heap populates | | | |
+| Dashboard SSE: Uptime populates | | | |
+| Dashboard Polling: Free Heap populates within 30 s | | | |
+| Dashboard Polling: Uptime populates within 30 s | | | |
+| Dashboard Polling: no 500 errors in event log | | | |
+| Dashboard Polling: no new errors in browser console | | | |
+| `curl /api/status` returns only {ok,role,id} (SEC-ADR still honored) | | | |
+| `curl /api/status/full -u user:pass` returns enriched body | | | |
+| `curl /history/office/temp` (no auth) still returns 200 | | | WROOM: expected unstable - see #139 |

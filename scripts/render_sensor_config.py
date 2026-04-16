@@ -1075,7 +1075,7 @@ def generate_board_yaml(
     lines.append("    id: flash_size")
     lines.append("    lambda: |-")
     lines.append(f"      return std::string(\"{flash_kb_str}\");")
-    lines.append("    update_interval: never")
+    lines.append("    update_interval: 60s")
     lines.append("")
 
     # SRAM is a silicon constant per chip variant. Emit as a static string.
@@ -1090,7 +1090,7 @@ def generate_board_yaml(
     lines.append("    id: sram_size")
     lines.append("    lambda: |-")
     lines.append(f"      return std::string(\"{sram_kb_str}\");")
-    lines.append("    update_interval: never")
+    lines.append("    update_interval: 60s")
     lines.append("")
 
     lines.append("  - platform: template")

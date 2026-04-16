@@ -20,6 +20,10 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 - `firmware/esp_flash_compat.h` include removed from generated YAMLs (no longer needed).
 - PSRAM value kept as runtime measurement (capacity varies by board variant).
 
+### Fixed (hotfix 2, 2026-04-16)
+- Device card: SRAM and Flash fields now populate on all boards. Hotfix 1 emitted `update_interval: never` for these template text_sensors; ESPHome never evaluated their lambdas as a result, publishing an empty initial state. Restored `update_interval: 60s` to match the original v7.6.9.0 implementation. Lambda body is a constant string literal - the 60 s tick has negligible cost.
+- Polling mode: Free Heap and Uptime now populate within ~30 s. Client-side `loadStatusSnapshot()` now calls `/api/status/full` (where heap and uptime moved in v7.6.8.0 per SEC-ADR RV-03) with `credentials: 'same-origin'` so the browser carries the dashboard page's Basic Auth to the request. `/api/status` remains stripped - no server-side change, no SEC-ADR impact.
+
 ### Deferred for separate investigation
 - ESP32-C3 `httpd_stack_watermark_bytes` observed at 636 bytes on `/api/status/full`. Documented in `Docs/session-log-2026-04-16-v7.6.9.0-hotfix.md`. See that log for comparison against v7.6.8.2 baseline and decision on whether to block merge.
 
