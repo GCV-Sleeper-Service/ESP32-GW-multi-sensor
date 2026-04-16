@@ -43,6 +43,23 @@ Your training data and session memory may be **stale**. The project has a strict
 4. **Produce a resolution package** (format below).
 5. **Check downstream impact.** Does the fix or finding affect any remaining step's handoff, prompt, or plan document? If yes, produce the updates.
 
+### Branch context (mandatory)
+
+Before reading any source, determine which state of the code the problem is on:
+
+1. **Merged main** — `git checkout main && git pull` is sufficient
+2. **Open PR** — `git fetch origin pull/<N>/head:pr<N> && git checkout pr<N>` is required; reading main will give wrong answers
+3. **Local branch not yet pushed** — the operator must paste relevant `git diff main` output; the advisor cannot clone it
+
+Ask the operator to confirm branch context if the escalation fields are ambiguous. "I see an error on PR #XXX" means PR state; "I see an error after merging Y" means main state.
+
+### Device vs. source state
+
+For any device-runtime failure (category: `device-runtime`, `serial-log`), before recommending a fix:
+
+1. Ask the operator to paste `curl -s -u <user>:<pass> http://{ip}/api/status/full | jq '.version, .uptime_seconds'` for each affected board.
+2. Confirm the `version` string matches the git tag or PR branch the operator believes is running. If the board is running an older firmware than the diagnostic target, a source-level fix is premature — the first action is to reflash.
+
 ---
 
 ## Operator: Fill In These Fields
@@ -75,6 +92,9 @@ Error output / evidence:
  For device issues: include output of `curl -s http://{ip}/api/status | jq`>
 
 Agent used (if applicable): [ GPT / Codex / Claude / Copilot / N/A (operator action) ]
+
+Branch state (required):    [ main @ <tag> | PR #<N> @ <commit SHA> | local uncommitted ]
+Running firmware (from device /api/status/full .version): <string from curl>
 
 Hardware involved (if applicable):
 <Board, IP, role (satellite/aggregator), firmware version from /api/status>
@@ -115,6 +135,11 @@ Hardware involved (if applicable):
 15. **Handoff references stale line numbers** — Line numbers shift between steps. Always `grep -n` for the target function/variable before editing, never trust hardcoded line numbers.
 16. **Logger level suppresses expected output** — The C3 YAML has `logger: level: WARN`. Any `ESP_LOGI` or `ESP_LOGD` output will be silently suppressed. Use `ESP_LOGW` for temporary instrumentation. The WROOM board profile also has `logger: baud_rate: 0` which disables serial output entirely.
 
+### Network / Proxy
+
+17. **HTTPS/Cloudflare Tunnel mode serves 500 errors with empty status line** — Dashboard is loaded via Cloudflare Tunnel (transport=polling). Auth-gated endpoints like `/api/status/full` require Basic Auth credentials; browser has none cached because the dashboard page itself is public (`/dashboard` has no auth prompt). ESP32 returns 401; Cloudflare may rewrite bare reason-phrase 401s to `500 ()` at the proxy layer. Diagnose by running the same request via `curl` with explicit auth — if curl returns 200 and browser returns 500, it's the proxy/credentials mismatch, not an ESP32 fault. Fix class: either make the endpoint public for the fields the dashboard needs, or move the data to an already-public endpoint.
+18. **Browser shows 500 on endpoint that curl returns 200 for** — almost always (a) different URL (check same-origin vs. absolute), (b) credentials not forwarded, or (c) CORS preflight blocking. Never code-debug the ESP32 handler in this case before confirming the request reaches it; use ESP32 serial log at INFO level to see whether the request arrived.
+
 ---
 
 ## Resolution Package Format
@@ -127,6 +152,10 @@ Which failure mode (number from checklist, or new), which file, which line or fu
 ### 2. Fix
 Exact changes needed — file paths, code edits, script modifications, or documentation rewrites. For code: provide the edit against the CURRENT codebase (verify by reading the file, not from memory). For documentation gaps: provide the rewritten section.
 
+Additionally, for every Fix produced: enumerate a **scope guard list** — files, functions, or subsystems the fix must NOT touch even if they appear related. This prevents fix sprawl during agent execution. Example:
+  Fix modifies: `firmware/core/web-handler.h` lines 1518–1521
+  Fix must NOT touch: `handle_status_`, `handle_status_full_`, `authenticate_management_`, any file in `firmware/core/nvs-persistence.h` or `dashboard/sensor_history_multi.h`
+  
 ### 3. Verification
 Commands to confirm the fix works. Include expected output.
 

@@ -470,8 +470,10 @@ Allowed diff scope:
   dashboard/core/status-snapshot.js    — DEVICE_INFO_MAP updates (NOT in components/ subdirectory)
   dashboard/core/manifest.js           — populate di-device-name, di-firmware-version
   dashboard/dashboard.tmpl.html        — new device info row IDs
-  firmware/esp32-c3-multi-sensor.yaml  — flash/SRAM/PSRAM text_sensor entities
-  firmware/esp32-s3-multi-sensor.yaml  — PSRAM sensor entities
+  scripts/render_sensor_config.py      — flash/SRAM/PSRAM template text_sensors (all boards, keyed off chip_variant)
+  firmware/esp32-c3-multi-sensor.yaml  — regenerated output (C3)
+  firmware/esp32-wroom-32d-gw.yaml     — regenerated output (WROOM)
+  firmware/esp32-s3-devkitc1-n16r8-gw.yaml — regenerated output (S3)
   scripts/preflight.sh                 — presence checks for new IDs
   Generated artifacts: dashboard/dashboard.js · dashboard/dashboard.html · dashboard/dashboard.h
   Docs/changelog.md · version artifact · session log
@@ -503,15 +505,21 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 - `di-device-name` and `di-firmware-version` populated from `/api/manifest` gateway object in `dashboard/core/manifest.js`
 - `dashboard.tmpl.html` has new row IDs (`di-device-name`, `di-firmware-version`, `di-flash`, `di-sram`)
 - `firmware/esp32-c3-multi-sensor.yaml` has `text_sensor` entities for Flash and SRAM
-- `firmware/esp32-s3-multi-sensor.yaml` has sensor entities for PSRAM total and free
-- C3 PSRAM field shows `"None"` (no PSRAM hardware)
-- `di-psram-total` and `di-psram-free` in `DEVICE_INFO_MAP`
+- Generator emits a PSRAM `text_sensor` for all boards with a conditional lambda:
+  `"None"` when board profile has no PSRAM config, or runtime `heap_caps_get_total_size(MALLOC_CAP_SPIRAM)` formatted as `"NNNN KB"` when PSRAM is present
+- C3 PSRAM field shows `"None"`; WROOM shows `"None"`; S3 shows `"8192 KB"` (or similar runtime value)
+- `di-psram` (single entry) in `DEVICE_INFO_MAP`, mapping from `text_sensor-psram`
 - MAC address row is **removed** from device card (not just hidden)
 - `scripts/preflight.sh` has presence checks for new IDs
-- Four-command rebuild pipeline was run: `bundle-dashboard.sh --write` → `build-dashboard.sh` → `generate-header.sh` → `preflight.sh`
+- - Full regeneration pipeline was run in order: `bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `generate-fixtures.js` → `render_sensor_config.py --write` → `build-dashboard.sh --write` → `minify-dashboard.sh` → `generate-header.sh` → `render_sensor_config.py --check`
+- `scripts/preflight.sh` passes (48 checks)
 - No direct edits to `dashboard/dashboard.js` or `dashboard/dashboard.html` (Rule 47)
 - `dashboard.tmpl.html` edited as source file (Rule 48)
 - No Rule 58 violation
+- Flash Size and SRAM Size lambdas in generated YAMLs use `update_interval: 60s` (NOT `never`) — `never` causes ESPHome to publish empty initial state and dashboard fields render blank
+- Flash and SRAM values are static strings per chip_variant (4096/400 KB for C3; 4096/520 KB for WROOM; 16384/512 KB for S3), NOT runtime calls to `esp_flash_get_size()` or `heap_caps_get_total_size(MALLOC_CAP_INTERNAL)`. Runtime calls returned allocator-budget values (~255 KB on C3) which are correct-but-misleading relative to the "SRAM" label
+- `authenticate_management_()` is absent from `handle_history_()` and `handle_api_v2_history_()` — history endpoints are public GET by deliberate trade-off (Copilot-accepted; no SEC-ADR change because mutation paths still auth-gated)
+- `dashboard/core/status-snapshot.js` `loadStatusSnapshot()` calls `/api/status/full` with `credentials: 'same-origin'` (NOTE: known-failing over Cloudflare Tunnel — tracked for v7.6.9.6, documented as known limitation in release notes)
 - All existing Playwright tests pass; no regression in env/ping/system card rendering
 
 **Turn 3 — Verdict + output**
@@ -528,7 +536,8 @@ Generate a downloadable fix prompt in markdown that:
 - Create `prompts/phaseV/v7.6.9.0-PR<NN>-consolidated-audit-and-lessons.md`
 - Review and update `prompts/handoff/phaseV/session-handoff-v7.6.9.1.md`
 - Review and update `prompts/phaseV/v7.6.9.1-agent-prompt-gpt-codex.md`
-- Close issues #143 (version badge shipped in v7.6.7.2), #144, #136, #138 with PR references
+- Close issues #144, #136, #138 with PR references to #183
+- Confirm #143 was already closed at v7.6.7.2 (do NOT re-close — verify only)
 - Apply version tag `v7.6.9.0`
 
 ---
