@@ -138,6 +138,7 @@ check_contains "device_card_has_device_name" dashboard/dashboard.html 'id="di-de
 check_contains "device_card_has_firmware_version" dashboard/dashboard.html 'id="di-firmware-version"'
 check_contains "device_card_has_flash" dashboard/dashboard.html 'id="di-flash"'
 check_contains "device_card_has_sram" dashboard/dashboard.html 'id="di-sram"'
+check_contains "device_card_has_psram" dashboard/dashboard.html 'id="di-psram"'
 # BUG-043: verify firmware serves gzip with Content-Encoding header
 check_contains "firmware_gzip_content_encoding" dashboard/sensor_history_multi.h 'Content-Encoding", "gzip'
 

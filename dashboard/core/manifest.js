@@ -68,7 +68,11 @@ function populateGatewayCardInfo(gw) {
   }
 
   var aboutTitle = document.getElementById('aboutCardTitle');
-  if (aboutTitle && gw && gw.name) aboutTitle.textContent = gw.name + ' Gateway';
+  if (aboutTitle && gw && gw.name) {
+    var titleText = gw.name;
+    if (!/gateway\s*$/i.test(titleText)) titleText += ' Gateway';
+    aboutTitle.textContent = titleText;
+  }
 }
 
 function applyGatewayMeta(payload) {
