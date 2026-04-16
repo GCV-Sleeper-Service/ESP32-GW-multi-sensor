@@ -1,5 +1,11 @@
 static volatile bool s_import_ready = false;
 
+#if AGGREGATOR_ENABLED
+static constexpr int MAX_PROBE_COOLDOWN = MAX_SATELLITES;
+static uint32_t s_last_probe_fail_epoch[MAX_PROBE_COOLDOWN] = {};
+static char s_last_probe_fail_url[MAX_PROBE_COOLDOWN][128] = {};
+#endif
+
 class HistoryWebHandler : public AsyncWebHandler {
  public:
   HistoryWebHandler(std::string username, std::string password, std::string version)
@@ -508,6 +514,9 @@ class HistoryWebHandler : public AsyncWebHandler {
   }
 
   void handle_api_v2_history_(AsyncWebServerRequest *request, const char *rest) const {
+    // Auth: REQUIRED - large-allocation endpoint, prevents anonymous heap exhaustion (SEC-05)
+    if (!authenticate_management_(request)) return;
+
     // Parse: rest = "device_id/metric_key"
     const char *slash = strchr(rest, '/');
     if (slash == nullptr) {
@@ -555,8 +564,9 @@ class HistoryWebHandler : public AsyncWebHandler {
     HistoryBuffer *buf = devices[dev_idx].metric_states[metric_idx].history;
 
     // Use pre-reserved string pattern (LESSON-OPS-056)
+    size_t est_bytes = (size_t)buf->count() * 20 + 64;
     std::string csv;
-    csv.reserve(buf->count() * 20 + 64);
+    csv.reserve(std::min(est_bytes, (size_t)60000));
     buf->append_csv_to(csv);
 
     auto *resp = request->beginResponse(
@@ -1431,8 +1441,10 @@ class HistoryWebHandler : public AsyncWebHandler {
     request->send(resp);
   }
 
-  void handle_history_(AsyncWebServerRequest *request,
-                       const char *rest) const {
+  void handle_history_(AsyncWebServerRequest *request, const char *rest) const {
+    // Auth: REQUIRED - large-allocation endpoint, prevents anonymous heap exhaustion (SEC-05)
+    if (!authenticate_management_(request)) return;
+
     const char *slash = strchr(rest, '/');
     if (slash == nullptr) {
       request->send(404);
@@ -1507,7 +1519,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     size_t est_bytes  = est_points * 20 + 128;  // 20 bytes/line + margin
 
     std::string csv;
-    csv.reserve(est_bytes);
+    csv.reserve(std::min(est_bytes, (size_t)60000));
 
     // Read persisted NVS segments into the pre-reserved string
     SegmentSnapshot *snapshot = nullptr;
@@ -1763,11 +1775,14 @@ class HistoryWebHandler : public AsyncWebHandler {
     int satellite_http_status = 0;
     static_assert(sizeof(s_proxy_tmp) <= 65535,
                   "s_proxy_tmp size must fit into uint16_t for fetch_to_buffer");
+    const char *proxy_basic_auth =
+        (s_status_basic_auth_b64[0] != '\0') ? s_status_basic_auth_b64 : nullptr;
     if (!fetch_to_buffer(url, s_proxy_tmp,
                          static_cast<uint16_t>(sizeof(s_proxy_tmp)),
                          &s_proxy_len,
                          15,
-                         &satellite_http_status)) {
+                         &satellite_http_status,
+                         proxy_basic_auth)) {
       ESP_LOGW(TAG, "Proxy fetch failed for %s (HTTP %d)", url, satellite_http_status);
       std::string err_body = std::string("{\"error\":\"upstream_fetch_failed\",\"url\":\"") +
                              json_escape_(url) + "\",\"http_status\":" +
@@ -1835,11 +1850,52 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
+    // Per-URL probe cooldown: repeated failures for the same URL must wait 60s.
+    uint32_t now = (uint32_t)::time(nullptr);
+    for (int i = 0; i < MAX_PROBE_COOLDOWN; i++) {
+      if (s_last_probe_fail_url[i][0] == '\0') continue;
+      if (strcmp(s_last_probe_fail_url[i], url_str) != 0) continue;
+      uint32_t elapsed = now - s_last_probe_fail_epoch[i];
+      if (elapsed < 60) {
+        send_json_error_(request, 429,
+                         "Too many requests for this URL",
+                         static_cast<uint32_t>(60 - elapsed));
+        return;
+      }
+    }
+
     // 3. Probe the candidate
     char probe_id[32] = {0};
     char probe_name[64] = {0};
     if (!probe_satellite_manifest_(url_str, probe_id, sizeof(probe_id),
                                     probe_name, sizeof(probe_name))) {
+      int slot = -1;
+      int empty_slot = -1;
+      int oldest_slot = -1;
+      uint32_t oldest_epoch = 0xFFFFFFFFu;
+      for (int i = 0; i < MAX_PROBE_COOLDOWN; i++) {
+        if (s_last_probe_fail_url[i][0] != '\0' &&
+            strcmp(s_last_probe_fail_url[i], url_str) == 0) {
+          slot = i;
+          break;
+        }
+        if (s_last_probe_fail_url[i][0] == '\0') {
+          if (empty_slot < 0) empty_slot = i;
+          continue;
+        }
+        if (s_last_probe_fail_epoch[i] < oldest_epoch) {
+          oldest_epoch = s_last_probe_fail_epoch[i];
+          oldest_slot = i;
+        }
+      }
+      if (slot < 0) {
+        slot = (empty_slot >= 0) ? empty_slot : oldest_slot;
+      }
+      if (slot >= 0) {
+        s_last_probe_fail_epoch[slot] = now;
+        strncpy(s_last_probe_fail_url[slot], url_str, sizeof(s_last_probe_fail_url[slot]) - 1);
+        s_last_probe_fail_url[slot][sizeof(s_last_probe_fail_url[slot]) - 1] = '\0';
+      }
       send_json_error_(request, 400, "Satellite unreachable or invalid manifest");
       return;
     }
