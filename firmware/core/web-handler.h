@@ -1775,11 +1775,14 @@ class HistoryWebHandler : public AsyncWebHandler {
     int satellite_http_status = 0;
     static_assert(sizeof(s_proxy_tmp) <= 65535,
                   "s_proxy_tmp size must fit into uint16_t for fetch_to_buffer");
+    const char *proxy_basic_auth =
+        (s_status_basic_auth_b64[0] != '\0') ? s_status_basic_auth_b64 : nullptr;
     if (!fetch_to_buffer(url, s_proxy_tmp,
                          static_cast<uint16_t>(sizeof(s_proxy_tmp)),
                          &s_proxy_len,
                          15,
-                         &satellite_http_status)) {
+                         &satellite_http_status,
+                         proxy_basic_auth)) {
       ESP_LOGW(TAG, "Proxy fetch failed for %s (HTTP %d)", url, satellite_http_status);
       std::string err_body = std::string("{\"error\":\"upstream_fetch_failed\",\"url\":\"") +
                              json_escape_(url) + "\",\"http_status\":" +
@@ -1855,7 +1858,7 @@ class HistoryWebHandler : public AsyncWebHandler {
       uint32_t elapsed = now - s_last_probe_fail_epoch[i];
       if (elapsed < 60) {
         send_json_error_(request, 429,
-                         "Too many requests for this URL - retry after 60s",
+                         "Too many requests for this URL",
                          static_cast<uint32_t>(60 - elapsed));
         return;
       }
@@ -1867,16 +1870,26 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (!probe_satellite_manifest_(url_str, probe_id, sizeof(probe_id),
                                     probe_name, sizeof(probe_name))) {
       int slot = -1;
+      int empty_slot = -1;
+      int oldest_slot = -1;
       uint32_t oldest_epoch = 0xFFFFFFFFu;
       for (int i = 0; i < MAX_PROBE_COOLDOWN; i++) {
-        if (s_last_probe_fail_url[i][0] == '\0') {
+        if (s_last_probe_fail_url[i][0] != '\0' &&
+            strcmp(s_last_probe_fail_url[i], url_str) == 0) {
           slot = i;
           break;
         }
+        if (s_last_probe_fail_url[i][0] == '\0') {
+          if (empty_slot < 0) empty_slot = i;
+          continue;
+        }
         if (s_last_probe_fail_epoch[i] < oldest_epoch) {
           oldest_epoch = s_last_probe_fail_epoch[i];
-          slot = i;
+          oldest_slot = i;
         }
+      }
+      if (slot < 0) {
+        slot = (empty_slot >= 0) ? empty_slot : oldest_slot;
       }
       if (slot >= 0) {
         s_last_probe_fail_epoch[slot] = now;

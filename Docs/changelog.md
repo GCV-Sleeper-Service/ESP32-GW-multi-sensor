@@ -13,7 +13,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
 ### Docs
 - Added Docs/decisions/README.md for ADR directory metadata.
-- Committed Docs/decisions/SEC-ADR-001-residual-vulnerabilities.md as Phase V V2-G deliverable.
+- References existing Docs/decisions/SEC-ADR-001-residual-vulnerabilities.md as the Phase V V2-G ADR deliverable context.
 
 ## [v7.6.8.0] - 2026-04-15 - Auth Guards + Status Field Split
 
