@@ -39,7 +39,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.6.8.2';
+App.version = 'v7.6.9.0';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -647,7 +647,51 @@ function makeNetworkSensorConfig(meta, idx) {
   };
 }
 
-function applySensorMeta(meta) {
+function normalizeManifestGateway(payload) {
+  var gw = payload && payload.gateway;
+  if (!gw || typeof gw !== 'object') return null;
+  return {
+    id: String(gw.id || '').trim(),
+    name: String(gw.name || '').trim(),
+    hardware: String(gw.hardware || '').trim(),
+    version: String(gw.firmware_version || gw.version || '').trim(),
+    role: String(gw.role || '').trim()
+  };
+}
+
+function populateGatewayCardInfo(gw) {
+  var nameEl = document.getElementById('di-device-name');
+  if (nameEl) {
+    nameEl.textContent = (gw && gw.name) ? gw.name : '-';
+    nameEl.classList.remove('loading');
+  }
+
+  var versionEl = document.getElementById('di-firmware-version');
+  if (versionEl) {
+    var versionText = '-';
+    if (gw && gw.version) {
+      versionText = gw.version;
+      if (versionText.charAt(0) !== 'v') versionText = 'v' + versionText;
+    }
+    versionEl.textContent = versionText;
+    versionEl.classList.remove('loading');
+  }
+
+  var aboutTitle = document.getElementById('aboutCardTitle');
+  if (aboutTitle && gw && gw.name) {
+    var titleText = gw.name;
+    if (!/gateway\s*$/i.test(titleText)) titleText += ' Gateway';
+    aboutTitle.textContent = titleText;
+  }
+}
+
+function applyGatewayMeta(payload) {
+  var gw = normalizeManifestGateway(payload) || normalizeManifestGateway(window._manifest);
+  if (App.State && typeof App.State.set === 'function') App.State.set('gateway', gw || null);
+  populateGatewayCardInfo(gw);
+}
+
+function applySensorMeta(meta, payload) {
   if (!Array.isArray(meta) || !meta.length) meta = DEFAULT_SENSOR_META;
   App.State.setSensors(meta.map(function(m, idx) {
     var cat = m.category || 'environmental';
@@ -661,6 +705,7 @@ function applySensorMeta(meta) {
     var cat = s.category || 'environmental';
     s.chartIdx = (cat === 'environmental') ? chartIdx++ : -1;
   });
+  applyGatewayMeta(payload);
   try { App.Features.emit('onManifest', App.State.getSensors()); } catch(e) { logNonFatal('manifest hook emit', e); }
 }
 
@@ -687,7 +732,7 @@ function loadSensorManifest() {
     .then(function(payload) {
       var meta = normalizeManifestSensors(payload);
       if (!meta.length) throw new Error('empty manifest');
-      applySensorMeta(meta);
+      applySensorMeta(meta, payload);
       var schema = payload && payload.schema_version ? payload.schema_version : 'legacy';
       dlog('Manifest loaded from /api/manifest (schema ' + schema + ', ' + SENSORS.length + ' sensors)', 'ok');
     })
@@ -697,11 +742,11 @@ function loadSensorManifest() {
         .then(function(payload) {
           var meta = normalizeManifestSensors(payload);
           if (!meta.length) throw new Error('empty legacy manifest');
-          applySensorMeta(meta);
+          applySensorMeta(meta, payload);
           dlog('Manifest fallback loaded from /sensors.json (' + SENSORS.length + ' sensors); /api/manifest unavailable: ' + apiErr.message, 'err');
         })
         .catch(function(legacyErr) {
-          applySensorMeta(DEFAULT_SENSOR_META);
+          applySensorMeta(DEFAULT_SENSOR_META, autoPromoteV1ToV2(DEFAULT_SENSOR_META));
           dlog('Manifest unavailable, using built-in (' + DEFAULT_SENSOR_META.length + ' sensors): api=' + apiErr.message + '; legacy=' + legacyErr.message, 'err');
         });
     });
@@ -728,7 +773,7 @@ async function loadManifestV2() {
     var sensorsResp = await fetch(ESP_HOST + '/sensors.json', {cache: 'no-store'});
     if (sensorsResp.ok) {
       var sensors = await sensorsResp.json();
-      console.log('[manifest] Falling back to /sensors.json \u2192 auto-promote to v2');
+      console.log('[manifest] Falling back to /sensors.json -> auto-promote to v2');
       return autoPromoteV1ToV2(sensors);
     }
   } catch (e) {
@@ -759,19 +804,25 @@ function autoPromoteV1ToV2(sensorsArray) {
     })
   };
 }
-
 // Device info + telemetry mapping
 var DEVICE_INFO_MAP = {
-  'text_sensor-chip': {el:'di-chip'}, 'text_sensor-features': {el:'di-features'},
-  'text_sensor-cores': {el:'di-cores'}, 'text_sensor-revision': {el:'di-revision'},
-  'text_sensor-cpu_frequency': {el:'di-cpu'}, 'text_sensor-framework': {el:'di-framework'},
-  'text_sensor-esphome_version': {el:'di-esphome'}, 'text_sensor-ip_address': {el:'di-ip'},
-  'text_sensor-mac_address': {el:'di-mac'}, 'text_sensor-reset_reason': {el:'di-reset'}
+  'text_sensor-chip': {el:'di-chip'},
+  'text_sensor-features': {el:'di-features'},
+  'text_sensor-cores': {el:'di-cores'},
+  'text_sensor-revision': {el:'di-revision'},
+  'text_sensor-cpu_frequency': {el:'di-cpu'},
+  'text_sensor-framework': {el:'di-framework'},
+  'text_sensor-esphome_version': {el:'di-esphome'},
+  'text_sensor-ip_address': {el:'di-ip'},
+  'text_sensor-flash_size': {el:'di-flash'},
+  'text_sensor-sram_size': {el:'di-sram'},
+  'text_sensor-psram': {el:'di-psram'},
+  'text_sensor-reset_reason': {el:'di-reset'}
 };
 var TELEMETRY_IDS = { heap:'sensor-free_heap', uptime:'sensor-uptime', wifi:'sensor-wifi_signal' };
 
 var POLL_SHARED = ['/text_sensor/Current%20Time', '/sensor/WiFi%20Signal'];
-var POLL_DEVICE = ['/text_sensor/Chip', '/text_sensor/Features', '/text_sensor/Cores', '/text_sensor/Revision', '/text_sensor/CPU%20Frequency', '/text_sensor/Framework', '/text_sensor/ESPHome%20Version', '/text_sensor/IP%20Address', '/text_sensor/MAC%20Address', '/text_sensor/Reset%20Reason'];
+var POLL_DEVICE = ['/text_sensor/Chip', '/text_sensor/Features', '/text_sensor/Cores', '/text_sensor/Revision', '/text_sensor/CPU%20Frequency', '/text_sensor/Framework', '/text_sensor/ESPHome%20Version', '/text_sensor/IP%20Address', '/text_sensor/Flash%20Size', '/text_sensor/SRAM%20Size', '/text_sensor/PSRAM', '/text_sensor/Reset%20Reason'];
 
 
 function formatUptimeSeconds(value) {
@@ -816,7 +867,12 @@ function loadStatusSnapshot() {
   if (isImportActive()) return Promise.resolve(false);
   if (_statusInFlight) return Promise.resolve(false);
   _statusInFlight = true;
-  return fetch(ESP_HOST + '/api/status', {cache:'no-store'})
+  // /api/status returns only {ok, role, id} (SEC-ADR RV-03 strip in v7.6.8.0).
+  // The enriched payload with free_heap/uptime_seconds is on the authenticated full-status endpoint.
+  // Use 'same-origin' credentials so the browser carries the dashboard page's
+  // Basic Auth to this request. Same-origin is deliberately narrower than
+  // 'include' - we never want credentials sent to a cross-origin host.
+  return fetch(ESP_HOST + '/api/status/full', {cache:'no-store', credentials:'same-origin'})
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(status) { return applyStatusSnapshot(status); })
     .catch(function(err) {
@@ -833,7 +889,6 @@ function loadStatusSnapshot() {
 
 var totalPoints = 0, historyPoints = 0, liveAvgPoints = 0;
 var lastAvgEpoch = {}, eventCount = 0, pollAvgLast = {};
-
 function esc(s) { return s.replace(/[^a-zA-Z0-9]/g, '_'); }
 function escAttr(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
 function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }

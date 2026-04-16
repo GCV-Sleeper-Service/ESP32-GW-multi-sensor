@@ -37,7 +37,51 @@ function makeNetworkSensorConfig(meta, idx) {
   };
 }
 
-function applySensorMeta(meta) {
+function normalizeManifestGateway(payload) {
+  var gw = payload && payload.gateway;
+  if (!gw || typeof gw !== 'object') return null;
+  return {
+    id: String(gw.id || '').trim(),
+    name: String(gw.name || '').trim(),
+    hardware: String(gw.hardware || '').trim(),
+    version: String(gw.firmware_version || gw.version || '').trim(),
+    role: String(gw.role || '').trim()
+  };
+}
+
+function populateGatewayCardInfo(gw) {
+  var nameEl = document.getElementById('di-device-name');
+  if (nameEl) {
+    nameEl.textContent = (gw && gw.name) ? gw.name : '-';
+    nameEl.classList.remove('loading');
+  }
+
+  var versionEl = document.getElementById('di-firmware-version');
+  if (versionEl) {
+    var versionText = '-';
+    if (gw && gw.version) {
+      versionText = gw.version;
+      if (versionText.charAt(0) !== 'v') versionText = 'v' + versionText;
+    }
+    versionEl.textContent = versionText;
+    versionEl.classList.remove('loading');
+  }
+
+  var aboutTitle = document.getElementById('aboutCardTitle');
+  if (aboutTitle && gw && gw.name) {
+    var titleText = gw.name;
+    if (!/gateway\s*$/i.test(titleText)) titleText += ' Gateway';
+    aboutTitle.textContent = titleText;
+  }
+}
+
+function applyGatewayMeta(payload) {
+  var gw = normalizeManifestGateway(payload) || normalizeManifestGateway(window._manifest);
+  if (App.State && typeof App.State.set === 'function') App.State.set('gateway', gw || null);
+  populateGatewayCardInfo(gw);
+}
+
+function applySensorMeta(meta, payload) {
   if (!Array.isArray(meta) || !meta.length) meta = DEFAULT_SENSOR_META;
   App.State.setSensors(meta.map(function(m, idx) {
     var cat = m.category || 'environmental';
@@ -51,6 +95,7 @@ function applySensorMeta(meta) {
     var cat = s.category || 'environmental';
     s.chartIdx = (cat === 'environmental') ? chartIdx++ : -1;
   });
+  applyGatewayMeta(payload);
   try { App.Features.emit('onManifest', App.State.getSensors()); } catch(e) { logNonFatal('manifest hook emit', e); }
 }
 
@@ -77,7 +122,7 @@ function loadSensorManifest() {
     .then(function(payload) {
       var meta = normalizeManifestSensors(payload);
       if (!meta.length) throw new Error('empty manifest');
-      applySensorMeta(meta);
+      applySensorMeta(meta, payload);
       var schema = payload && payload.schema_version ? payload.schema_version : 'legacy';
       dlog('Manifest loaded from /api/manifest (schema ' + schema + ', ' + SENSORS.length + ' sensors)', 'ok');
     })
@@ -87,11 +132,11 @@ function loadSensorManifest() {
         .then(function(payload) {
           var meta = normalizeManifestSensors(payload);
           if (!meta.length) throw new Error('empty legacy manifest');
-          applySensorMeta(meta);
+          applySensorMeta(meta, payload);
           dlog('Manifest fallback loaded from /sensors.json (' + SENSORS.length + ' sensors); /api/manifest unavailable: ' + apiErr.message, 'err');
         })
         .catch(function(legacyErr) {
-          applySensorMeta(DEFAULT_SENSOR_META);
+          applySensorMeta(DEFAULT_SENSOR_META, autoPromoteV1ToV2(DEFAULT_SENSOR_META));
           dlog('Manifest unavailable, using built-in (' + DEFAULT_SENSOR_META.length + ' sensors): api=' + apiErr.message + '; legacy=' + legacyErr.message, 'err');
         });
     });
@@ -118,7 +163,7 @@ async function loadManifestV2() {
     var sensorsResp = await fetch(ESP_HOST + '/sensors.json', {cache: 'no-store'});
     if (sensorsResp.ok) {
       var sensors = await sensorsResp.json();
-      console.log('[manifest] Falling back to /sensors.json \u2192 auto-promote to v2');
+      console.log('[manifest] Falling back to /sensors.json -> auto-promote to v2');
       return autoPromoteV1ToV2(sensors);
     }
   } catch (e) {
@@ -149,4 +194,3 @@ function autoPromoteV1ToV2(sensorsArray) {
     })
   };
 }
-
