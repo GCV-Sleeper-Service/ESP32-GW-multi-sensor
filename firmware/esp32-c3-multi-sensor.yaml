@@ -594,7 +594,11 @@ text_sensor:
     name: "SRAM Size"
     id: sram_size
     lambda: |-
-      return std::string("400 KB");
+      size_t sram_bytes = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+      if (sram_bytes == 0) return std::string("Unknown");
+      char buf[32];
+      snprintf(buf, sizeof(buf), "%u KB", (unsigned) (sram_bytes / 1024));
+      return std::string(buf);
     update_interval: 60s
 
   - platform: template

@@ -2820,8 +2820,7 @@ class HistoryWebHandler : public AsyncWebHandler {
   }
 
   void handle_api_v2_history_(AsyncWebServerRequest *request, const char *rest) const {
-    // Auth: REQUIRED - large-allocation endpoint, prevents anonymous heap exhaustion (SEC-05)
-    if (!authenticate_management_(request)) return;
+    // Public history endpoint used by dashboard charts and aggregator proxy paths.
 
     // Parse: rest = "device_id/metric_key"
     const char *slash = strchr(rest, '/');
@@ -3748,8 +3747,7 @@ class HistoryWebHandler : public AsyncWebHandler {
   }
 
   void handle_history_(AsyncWebServerRequest *request, const char *rest) const {
-    // Auth: REQUIRED - large-allocation endpoint, prevents anonymous heap exhaustion (SEC-05)
-    if (!authenticate_management_(request)) return;
+    // Public history endpoint used by the embedded dashboard.
 
     const char *slash = strchr(rest, '/');
     if (slash == nullptr) {
