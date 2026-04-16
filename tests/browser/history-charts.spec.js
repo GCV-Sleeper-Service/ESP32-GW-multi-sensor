@@ -370,11 +370,16 @@ test.describe('16. BUG-043 Request Scheduling Regression', () => {
     await page.waitForTimeout(2000);
 
     expect(requests.length).toBeGreaterThan(0);
-    // v7.5.5.3: detectAggregatorMode() probes /api/aggregator/gateways first (404 on satellites).
-    // Filter it out to preserve the original BUG-043 intent: manifest before entity polling.
-    const apiRequests = requests.filter(r => r !== '/api/aggregator/gateways');
-    expect(apiRequests.length).toBeGreaterThan(0);
-    expect(apiRequests[0]).toBe('/api/manifest');
+    // v7.6.8.0: detectAggregatorMode() probes /api/status before manifest.
+    // Keep BUG-043 intent by validating status probe happens before manifest fetch.
+    const apiRequests = requests.filter(r => r !== "/api/aggregator/gateways");
+    expect(apiRequests.length).toBeGreaterThan(1);
+    expect(apiRequests[0]).toBe("/api/status");
+    expect(apiRequests).toContain("/api/manifest");
+    const statusIdx = apiRequests.indexOf("/api/status");
+    const manifestIdx = apiRequests.indexOf("/api/manifest");
+    expect(statusIdx).toBeGreaterThanOrEqual(0);
+    expect(manifestIdx).toBeGreaterThan(statusIdx);
   });
 
   // Test 8: loadStorageStats in-flight guard prevents concurrent calls
