@@ -85,8 +85,9 @@ esphome:
 #                     web listener + 1–2 misc
 #   Dashboard open (~5): SSE /events + /api/status + /api/storage-stats
 #                        + 2× history (Promise.all temp+hum per sensor)
-#   Peak total: ~13.  16 gives headroom so SNTP sync or a second browser
-#   tab doesn't trigger ENFILE (httpd_accept_conn error 23) and crash.
+#   Peak total: ~13.  15 keeps measured headroom while recovering lwIP RAM.
+#   v7.6.7.3 two-tab validation (SSE + polling, 5 min) passed with zero
+#   ENFILE/httpd_accept_conn(23) failures, so 15 is the approved V2-H cap.
 #   Cost: ~600 bytes of lwIP RAM per extra socket.
 #
 # httpd task stack (CONFIG_HTTPD_STACK_SIZE):
