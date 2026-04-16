@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// config-v7.6.8.1.h - hourly persistence with dedicated history NVS partition
+// config-v7.6.8.2.h - hourly persistence with dedicated history NVS partition
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
 //   other sensors' data. Multi-sensor import still replaces all history.
@@ -471,7 +471,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.8.1) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.8.2) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
