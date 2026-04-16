@@ -15,7 +15,7 @@ var DEVICE_INFO_MAP = {
 };
 var TELEMETRY_IDS = { heap:'sensor-free_heap', uptime:'sensor-uptime', wifi:'sensor-wifi_signal' };
 
-var POLL_SHARED = ['/text_sensor/Current%20Time', '/sensor/WiFi%20Signal', '/sensor/Free%20Heap', '/sensor/Uptime'];
+var POLL_SHARED = ['/text_sensor/Current%20Time', '/sensor/WiFi%20Signal'];
 var POLL_DEVICE = ['/text_sensor/Chip', '/text_sensor/Features', '/text_sensor/Cores', '/text_sensor/Revision', '/text_sensor/CPU%20Frequency', '/text_sensor/Framework', '/text_sensor/ESPHome%20Version', '/text_sensor/IP%20Address', '/text_sensor/Flash%20Size', '/text_sensor/SRAM%20Size', '/text_sensor/PSRAM', '/text_sensor/Reset%20Reason'];
 
 

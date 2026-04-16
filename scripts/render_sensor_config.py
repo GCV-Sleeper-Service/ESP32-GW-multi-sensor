@@ -52,6 +52,47 @@ class RenderError(Exception):
     pass
 
 
+# Physical internal SRAM per ESP32 chip variant (datasheet values, KB).
+# These are silicon constants - they do NOT vary at runtime.
+# Source: Espressif datasheets.
+#   ESP32    (WROOM/WROVER family) - 520 KB
+#   ESP32-C3                       - 400 KB
+#   ESP32-S3 (internal only; PSRAM reported separately) - 512 KB
+SRAM_KB_BY_CHIP = {
+    "esp32": "520 KB",
+    "esp32c3": "400 KB",
+    "esp32s3": "512 KB",
+}
+
+
+def _flash_size_to_kb_string(flash_size: str) -> str:
+    """Convert a board profile flash_size value (e.g. '4MB', '16MB') to a 'NNNN KB' string.
+
+    Used to emit the Flash Size text_sensor as a static per-chip value rather than
+    a runtime lambda. Flash capacity is a silicon property - it does not change
+    at runtime on any ESP32 variant we support.
+    """
+    s = flash_size.strip().upper()
+    if s.endswith("MB"):
+        return f"{int(s[:-2]) * 1024} KB"
+    if s.endswith("KB"):
+        return f"{int(s[:-2])} KB"
+    # Defensive fallback - if a new board profile format appears, fail loud.
+    raise ValueError(f"Unrecognised flash_size format: {flash_size!r}")
+
+
+def _sram_size_for_chip(chip_variant: str) -> str:
+    """Return the silicon SRAM size string for a given chip_variant."""
+    if chip_variant not in SRAM_KB_BY_CHIP:
+        # Defensive: if a new chip_variant is added to a board profile, fail loud
+        # rather than silently emit a misleading value.
+        raise ValueError(
+            f"No SRAM constant for chip_variant={chip_variant!r}. "
+            f"Add an entry to SRAM_KB_BY_CHIP."
+        )
+    return SRAM_KB_BY_CHIP[chip_variant]
+
+
 def replace_marker_block(text: str, begin: str, end: str, body: str) -> str:
     pattern = re.compile(re.escape(begin) + r".*?" + re.escape(end), flags=re.S)
     block = begin + "\n" + body.rstrip() + "\n" + end
@@ -713,7 +754,6 @@ def generate_board_yaml(
     lines.append("    - ../dashboard/sensor_history_multi.h")
     lines.append("    - ../src/gateway_manifest.h")
     lines.append("    - ../src/aggregator_config.h")
-    lines.append("    - esp_flash_compat.h")
     lines.append("  on_boot:")
 
     # Priority -100: register history handler
@@ -1026,28 +1066,31 @@ def generate_board_yaml(
     lines.append("")
 
 
+    # Flash Size is a silicon constant; emit as a static string from the board profile.
+    # board_profile['flash_size'] is e.g. "4MB" or "16MB" - convert to "KB" for consistency
+    # with the prior display format (operator expectations).
+    flash_kb_str = _flash_size_to_kb_string(flash_size)
     lines.append("  - platform: template")
     lines.append('    name: "Flash Size"')
     lines.append("    id: flash_size")
     lines.append("    lambda: |-")
-    lines.append("      uint32_t size_bytes = 0;")
-    lines.append("      if (esp_flash_get_size(NULL, &size_bytes) != ESP_OK || size_bytes == 0) return std::string(\"Unknown\");")
-    lines.append("      char buf[32];")
-    lines.append("      snprintf(buf, sizeof(buf), \"%u KB\", (unsigned) (size_bytes / 1024));")
-    lines.append("      return std::string(buf);")
-    lines.append("    update_interval: 60s")
+    lines.append(f"      return std::string(\"{flash_kb_str}\");")
+    lines.append("    update_interval: never")
     lines.append("")
 
+    # SRAM is a silicon constant per chip variant. Emit as a static string.
+    # These values are the physical internal SRAM on the die (datasheet values),
+    # NOT the heap allocator budget. A prior runtime call to
+    # heap_caps_get_total_size(...) returned the allocator's
+    # usable pool (~255 KB on C3), which is correct-but-misleading relative to
+    # the 'SRAM' label. Operators expect the die value.
+    sram_kb_str = _sram_size_for_chip(chip_variant)
     lines.append("  - platform: template")
     lines.append('    name: "SRAM Size"')
     lines.append("    id: sram_size")
     lines.append("    lambda: |-")
-    lines.append("      size_t sram_bytes = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);")
-    lines.append("      if (sram_bytes == 0) return std::string(\"Unknown\");")
-    lines.append("      char buf[32];")
-    lines.append("      snprintf(buf, sizeof(buf), \"%u KB\", (unsigned) (sram_bytes / 1024));")
-    lines.append("      return std::string(buf);")
-    lines.append("    update_interval: 60s")
+    lines.append(f"      return std::string(\"{sram_kb_str}\");")
+    lines.append("    update_interval: never")
     lines.append("")
 
     lines.append("  - platform: template")

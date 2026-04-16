@@ -13,6 +13,16 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 - Added flash_size, sram_size, and psram_status template text_sensor entities in C3 and WROOM firmware YAMLs.
 - Added preflight checks for di-device-name, di-firmware-version, di-flash, and di-sram in generated dashboard output.
 
+
+### Fixed (hotfix, 2026-04-16)
+- Polling mode: Free Heap and Uptime now populate correctly. Removed `/sensor/Free%20Heap` and `/sensor/Uptime` from `POLL_SHARED`; the existing `loadStatusSnapshot()` -> `/api/status` path already handles these fields via `applyStatusSnapshot()`, and is invoked both at boot and every 30 s in polling mode (`statusSnapshotIntervalId`).
+- Device card: Flash Size and SRAM Size now show silicon constants per chip variant (C3: 4096 KB / 400 KB; WROOM: 4096 KB / 520 KB; S3: 16384 KB / 512 KB). Previous runtime calls to `esp_flash_get_size()` and `heap_caps_get_total_size(MALLOC_CAP_INTERNAL)` returned allocator-budget values (~255 KB on C3) which were correct-but-misleading relative to the "SRAM" label operators expect.
+- `firmware/esp_flash_compat.h` include removed from generated YAMLs (no longer needed).
+- PSRAM value kept as runtime measurement (capacity varies by board variant).
+
+### Deferred for separate investigation
+- ESP32-C3 `httpd_stack_watermark_bytes` observed at 636 bytes on `/api/status/full`. Documented in `Docs/session-log-2026-04-16-v7.6.9.0-hotfix.md`. See that log for comparison against v7.6.8.2 baseline and decision on whether to block merge.
+
 ## [v7.6.8.2] - 2026-04-15 - Socket Reduction V2-H Only
 
 ### Changed

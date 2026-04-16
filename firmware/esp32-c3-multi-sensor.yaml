@@ -42,7 +42,6 @@ esphome:
     - ../dashboard/sensor_history_multi.h
     - ../src/gateway_manifest.h
     - ../src/aggregator_config.h
-    - esp_flash_compat.h
   on_boot:
     - # Priority -100: run after web server is fully initialized.
       # Registers custom /history/*, /sensors.json, /dashboard.html,
@@ -581,25 +580,15 @@ text_sensor:
     name: "Flash Size"
     id: flash_size
     lambda: |-
-      uint32_t size_bytes = 0;
-      if (esp_flash_get_size(NULL, &size_bytes) != ESP_OK || size_bytes == 0) {
-        return std::string("Unknown");
-      }
-      char buf[32];
-      snprintf(buf, sizeof(buf), "%u KB", (unsigned) (size_bytes / 1024));
-      return std::string(buf);
-    update_interval: 60s
+      return std::string("4096 KB");
+    update_interval: never
 
   - platform: template
     name: "SRAM Size"
     id: sram_size
     lambda: |-
-      size_t sram_bytes = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
-      if (sram_bytes == 0) return std::string("Unknown");
-      char buf[32];
-      snprintf(buf, sizeof(buf), "%u KB", (unsigned) (sram_bytes / 1024));
-      return std::string(buf);
-    update_interval: 60s
+      return std::string("400 KB");
+    update_interval: never
 
   - platform: template
     name: "PSRAM"
