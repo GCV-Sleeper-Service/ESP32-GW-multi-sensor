@@ -100,6 +100,37 @@ test.describe('7. Export controls', () => {
     expect(values[8]).not.toBe('');
   });
 
+  test('manifest fallback preserves derived environmental export columns', async ({ page }) => {
+    await loadDashboard(page);
+    const columns = await page.evaluate(() => getMetricColumnsForSensor({ id: 'office' }, null));
+    expect(columns).toEqual(['temp_c', 'temp_f', 'humidity_pct', 'dewpoint_c']);
+  });
+
+  test('manifest-driven column resolution keeps extra metrics alongside climate columns', async ({ page }) => {
+    await loadDashboard(page);
+    const columns = await page.evaluate(() => getMetricColumnsForSensor(
+      { id: 'hybrid' },
+      {
+        sensors: [{
+          id: 'hybrid',
+          measurements: [
+            { key: 'temp' },
+            { key: 'hum' },
+            { key: 'pressure_kpa' },
+            { key: 'battery_pct' }
+          ]
+        }],
+        metrics: [
+          { key: 'temp', history: true },
+          { key: 'hum', history: true },
+          { key: 'pressure_kpa', history: true },
+          { key: 'battery_pct', history: true }
+        ]
+      }
+    ));
+    expect(columns).toEqual(['temp_c', 'temp_f', 'humidity_pct', 'pressure_kpa', 'battery_pct', 'dewpoint_c']);
+  });
+
   test('Mixed export uses manifest-driven ping metrics when present', async ({ page }) => {
     await loadDashboard(page);
     await page.waitForFunction(() => {

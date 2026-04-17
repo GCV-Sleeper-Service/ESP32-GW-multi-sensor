@@ -11,7 +11,7 @@ var DEFAULT_SENSOR_META = [
 var GATEWAY_EXPORT_HOSTNAME_FALLBACK = 'esp32-c3-multi';
 var EXPORT_SHARED_COLUMNS = ['gateway_host', 'gateway_ip', 'role', 'timestamp', 'datetime_utc'];
 function getMetricColumnsForSensor(sensor, manifest) {
-  if (!manifest) return ['temp', 'hum'];
+  if (!manifest) return ['temp_c', 'temp_f', 'humidity_pct', 'dewpoint_c'];
   var sensors = manifest.sensors || [];
   var lookupId = (sensor && (sensor._deviceId || sensor.id)) || '';
   var sensorDef = null;
@@ -36,13 +36,18 @@ function getMetricColumnsForSensor(sensor, manifest) {
   }
   var hasTemp = metricKeys.indexOf('temp') >= 0;
   var hasHum = metricKeys.indexOf('hum') >= 0;
-  if (!hasTemp && !hasHum) return metricKeys;
   var cols = [];
-  if (hasTemp) {
-    cols.push('temp_c');
-    cols.push('temp_f');
+  for (var m = 0; m < metricKeys.length; m++) {
+    var key = metricKeys[m];
+    if (key === 'temp') {
+      cols.push('temp_c');
+      cols.push('temp_f');
+    } else if (key === 'hum') {
+      cols.push('humidity_pct');
+    } else {
+      cols.push(key);
+    }
   }
-  if (hasHum) cols.push('humidity_pct');
   if (hasTemp && hasHum) cols.push('dewpoint_c');
   return cols;
 }

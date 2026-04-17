@@ -215,7 +215,7 @@ var DEFAULT_SENSOR_META = [
 var GATEWAY_EXPORT_HOSTNAME_FALLBACK = 'esp32-c3-multi';
 var EXPORT_SHARED_COLUMNS = ['gateway_host', 'gateway_ip', 'role', 'timestamp', 'datetime_utc'];
 function getMetricColumnsForSensor(sensor, manifest) {
-  if (!manifest) return ['temp', 'hum'];
+  if (!manifest) return ['temp_c', 'temp_f', 'humidity_pct', 'dewpoint_c'];
   var sensors = manifest.sensors || [];
   var lookupId = (sensor && (sensor._deviceId || sensor.id)) || '';
   var sensorDef = null;
@@ -240,13 +240,18 @@ function getMetricColumnsForSensor(sensor, manifest) {
   }
   var hasTemp = metricKeys.indexOf('temp') >= 0;
   var hasHum = metricKeys.indexOf('hum') >= 0;
-  if (!hasTemp && !hasHum) return metricKeys;
   var cols = [];
-  if (hasTemp) {
-    cols.push('temp_c');
-    cols.push('temp_f');
+  for (var m = 0; m < metricKeys.length; m++) {
+    var key = metricKeys[m];
+    if (key === 'temp') {
+      cols.push('temp_c');
+      cols.push('temp_f');
+    } else if (key === 'hum') {
+      cols.push('humidity_pct');
+    } else {
+      cols.push(key);
+    }
   }
-  if (hasHum) cols.push('humidity_pct');
   if (hasTemp && hasHum) cols.push('dewpoint_c');
   return cols;
 }
@@ -465,13 +470,14 @@ function buildNormalizedSensorRows(series) {
   });
 
   timestamps.sort(function(a, b) { return a - b; });
+  var metricKeys = Object.keys(metricMaps);
 
   return timestamps.map(function(ts) {
     var row = {
       timestamp: ts,
       datetime_utc: formatUtcForExport(ts)
     };
-    Object.keys(metricMaps).forEach(function(key) {
+    metricKeys.forEach(function(key) {
       var value = metricMaps[key][ts];
       row[key] = (typeof value === 'number' && isFinite(value)) ? value : null;
     });
@@ -635,6 +641,9 @@ function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
     });
   });
 
+  var sensorMetricColumns = sensors.map(function(sensor) {
+    return getMetricColumnsForSensor(sensor, window._manifest);
+  });
   var timestamps = Object.keys(union)
     .map(function(k) { return parseInt(k, 10); })
     .filter(function(v) { return isFinite(v); })
@@ -652,7 +661,7 @@ function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
     ];
     sensors.forEach(function(sensor, idx) {
       var row = entry.sensorData[idx] || null;
-      var metricColumns = getMetricColumnsForSensor(sensor, window._manifest);
+      var metricColumns = sensorMetricColumns[idx];
       metricColumns.forEach(function(column) {
         rowOut.push(formatMetricNumber(row ? row[column] : null));
       });
