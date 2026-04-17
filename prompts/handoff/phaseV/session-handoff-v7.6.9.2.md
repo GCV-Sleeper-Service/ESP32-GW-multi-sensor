@@ -73,6 +73,7 @@ See `prompts/phaseV/v7.6.9.2-agent-prompt-gpt-codex.md` §6 for the full checkli
 | # | Rule | Why Relevant |
 |---|------|-------------|
 | 47 | No direct dashboard.js/html edits | Edit source modules |
+| — | Run `assemble-sensor-history.sh --write` BEFORE `bump-version.sh` | Version bump reads assembled header; skipping assemble will cause `history_header_version_matches` to fail |
 
 ---
 
@@ -86,7 +87,7 @@ See `prompts/phaseV/v7.6.9.2-agent-prompt-gpt-codex.md` §6 for the full checkli
 2. Open a NEW coding agent session and paste the GPT/Codex prompt (or use Claude two-step)
 3. Agent implements per §5 with ⛔ CHECKPOINT verification
 4. Agent runs pipeline, preflight, Playwright
-5. Review the PR — verify scope, acceptance criteria, Critical Rules
+5. Review the PR — verify scope, acceptance criteria, Critical Rules. Confirm EXPORT_SHARED_COLUMNS and role column logic are NOT changed (V3-C complete, locked)
 6. Send universal reviewer prompt + step-specific focus areas to external reviewers (Codex/GPT/Copilot)
    - Universal prompt: `prompts/phaseV/pr-audit-question-template-phaseV.md` (top section)
    - Step supplement: same file, lookup table at bottom for this version
