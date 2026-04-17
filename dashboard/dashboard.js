@@ -39,7 +39,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.6.9.1';
+App.version = 'v7.6.9.2';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -214,7 +214,47 @@ var DEFAULT_SENSOR_META = [
 
 var GATEWAY_EXPORT_HOSTNAME_FALLBACK = 'esp32-c3-multi';
 var EXPORT_SHARED_COLUMNS = ['gateway_host', 'gateway_ip', 'role', 'timestamp', 'datetime_utc'];
-var EXPORT_SENSOR_SUFFIXES = ['temp_c', 'temp_f', 'humidity_pct', 'dewpoint_c'];
+function getMetricColumnsForSensor(sensor, manifest) {
+  if (!manifest) return ['temp_c', 'temp_f', 'humidity_pct', 'dewpoint_c'];
+  var sensors = manifest.sensors || [];
+  var lookupId = (sensor && (sensor._deviceId || sensor.id)) || '';
+  var sensorDef = null;
+  for (var i = 0; i < sensors.length; i++) {
+    if (sensors[i].id === lookupId) { sensorDef = sensors[i]; break; }
+  }
+  if (!sensorDef || !sensorDef.measurements) return [];
+  var metricDefs = manifest.metrics || [];
+  var metricKeys = [];
+  for (var j = 0; j < sensorDef.measurements.length; j++) {
+    var measurement = sensorDef.measurements[j];
+    var hasHistory = measurement.history === true;
+    if (!hasHistory) {
+      for (var k = 0; k < metricDefs.length; k++) {
+        if (metricDefs[k].key === measurement.key) {
+          hasHistory = metricDefs[k].history === true;
+          break;
+        }
+      }
+    }
+    if (hasHistory) metricKeys.push(measurement.key);
+  }
+  var hasTemp = metricKeys.indexOf('temp') >= 0;
+  var hasHum = metricKeys.indexOf('hum') >= 0;
+  var cols = [];
+  for (var m = 0; m < metricKeys.length; m++) {
+    var key = metricKeys[m];
+    if (key === 'temp') {
+      cols.push('temp_c');
+      cols.push('temp_f');
+    } else if (key === 'hum') {
+      cols.push('humidity_pct');
+    } else {
+      cols.push(key);
+    }
+  }
+  if (hasTemp && hasHum) cols.push('dewpoint_c');
+  return cols;
+}
 
 function getExportRole(sensor, manifest) {
   if (!manifest || !manifest.gateway) return 'unknown';
@@ -292,7 +332,7 @@ function getExportSensorPrefix(sensor) {
 function getSingleSensorExportColumns(sensor) {
   var cols = EXPORT_SHARED_COLUMNS.slice();
   var prefix = getExportSensorPrefix(sensor);
-  EXPORT_SENSOR_SUFFIXES.forEach(function(suffix) {
+  getMetricColumnsForSensor(sensor, window._manifest).forEach(function(suffix) {
     cols.push(prefix + '_' + suffix);
   });
   return cols;
@@ -308,7 +348,7 @@ function getMergedExportColumns(sensors) {
       var satellitePrefix = sensorSlug((sensor && sensor._gwDisplayName) || (sensor && sensor._gwName) || (sensor && sensor._gwId) || 'gateway');
       prefix = satellitePrefix + '_' + prefix;
     }
-    EXPORT_SENSOR_SUFFIXES.forEach(function(suffix) {
+    getMetricColumnsForSensor(sensor, window._manifest).forEach(function(suffix) {
       cols.push(prefix + '_' + suffix);
     });
   });
@@ -414,38 +454,50 @@ function parseHistoryMetricLines(text) {
   return out;
 }
 
-function buildNormalizedSensorRows(tempText, humText) {
-  var tempMap = parseHistoryMetricLines(tempText);
-  var humMap = parseHistoryMetricLines(humText);
+function buildNormalizedSensorRows(series) {
+  var metricMaps = {};
   var seen = {};
   var timestamps = [];
-  Object.keys(tempMap).forEach(function(key) {
-    var ts = parseInt(key, 10);
-    if (isFinite(ts) && !seen[ts]) { seen[ts] = true; timestamps.push(ts); }
+
+  (series || []).forEach(function(metricSeries) {
+    if (!metricSeries || !metricSeries.key) return;
+    var metricMap = parseHistoryMetricLines(metricSeries.raw || '');
+    metricMaps[metricSeries.key] = metricMap;
+    Object.keys(metricMap).forEach(function(key) {
+      var ts = parseInt(key, 10);
+      if (isFinite(ts) && !seen[ts]) { seen[ts] = true; timestamps.push(ts); }
+    });
   });
-  Object.keys(humMap).forEach(function(key) {
-    var ts = parseInt(key, 10);
-    if (isFinite(ts) && !seen[ts]) { seen[ts] = true; timestamps.push(ts); }
-  });
+
   timestamps.sort(function(a, b) { return a - b; });
+  var metricKeys = Object.keys(metricMaps);
 
   return timestamps.map(function(ts) {
-    var tC = (typeof tempMap[ts] === 'number' && isFinite(tempMap[ts])) ? tempMap[ts] : null;
-    var hum = (typeof humMap[ts] === 'number' && isFinite(humMap[ts])) ? humMap[ts] : null;
-    var tF = tC !== null ? (tC * 9 / 5 + 32) : null;
-    var dp = null;
-    if (tC !== null && hum !== null) {
-      var dpv = calcDewPoint(tC, hum);
-      if (dpv !== null && isFinite(dpv)) dp = dpv;
-    }
-    return {
+    var row = {
       timestamp: ts,
-      datetime_utc: formatUtcForExport(ts),
-      temp_c: tC,
-      temp_f: tF,
-      humidity_pct: hum,
-      dewpoint_c: dp
+      datetime_utc: formatUtcForExport(ts)
     };
+    metricKeys.forEach(function(key) {
+      var value = metricMaps[key][ts];
+      row[key] = (typeof value === 'number' && isFinite(value)) ? value : null;
+    });
+
+    var tC = row.temp;
+    var hum = row.hum;
+    if (metricMaps.temp) {
+      row.temp_c = tC;
+      row.temp_f = tC !== null ? (tC * 9 / 5 + 32) : null;
+    }
+    if (metricMaps.hum) row.humidity_pct = hum;
+    if (metricMaps.temp && metricMaps.hum) {
+      var dp = null;
+      if (tC !== null && hum !== null) {
+        var dpv = calcDewPoint(tC, hum);
+        if (dpv !== null && isFinite(dpv)) dp = dpv;
+      }
+      row.dewpoint_c = dp;
+    }
+    return row;
   });
 }
 
@@ -530,12 +582,9 @@ function fetchDeviceHistory(sensor, manifest) {
 
 function fetchSensorHistoryRows(sensor) {
   return fetchDeviceHistory(sensor, window._manifest).then(function(series) {
-    var temp = '', hum = '';
-    series.forEach(function(s) {
-      if (s.key === 'temp') temp = s.raw;
-      else if (s.key === 'hum') hum = s.raw;
-    });
-    return buildNormalizedSensorRows(temp, hum);
+    var metricColumns = getMetricColumnsForSensor(sensor, window._manifest);
+    if (!metricColumns.length && (!series || !series.length)) return [];
+    return buildNormalizedSensorRows(series);
   });
 }
 
@@ -558,20 +607,21 @@ function fetchAllSensorHistoryRowsSequentially(sensors, onProgress) {
 }
 
 function buildSingleSensorCsv(meta, sensor, rows) {
+  var metricColumns = getMetricColumnsForSensor(sensor, window._manifest);
   var lines = [getSingleSensorExportColumns(sensor).join(',')];
   var role = getExportRole(sensor, window._manifest);
   rows.forEach(function(row) {
-    lines.push([
+    var rowOut = [
       csvEscape(meta.gatewayHost),
       csvEscape(meta.gatewayIp),
       csvEscape(role),
       row.timestamp,
-      csvEscape(row.datetime_utc),
-      formatMetricNumber(row.temp_c),
-      formatMetricNumber(row.temp_f),
-      formatMetricNumber(row.humidity_pct),
-      formatMetricNumber(row.dewpoint_c)
-    ].join(','));
+      csvEscape(row.datetime_utc)
+    ];
+    metricColumns.forEach(function(column) {
+      rowOut.push(formatMetricNumber(row ? row[column] : null));
+    });
+    lines.push(rowOut.join(','));
   });
   return lines.join('\n') + '\n';
 }
@@ -591,6 +641,9 @@ function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
     });
   });
 
+  var sensorMetricColumns = sensors.map(function(sensor) {
+    return getMetricColumnsForSensor(sensor, window._manifest);
+  });
   var timestamps = Object.keys(union)
     .map(function(k) { return parseInt(k, 10); })
     .filter(function(v) { return isFinite(v); })
@@ -606,12 +659,12 @@ function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
       ts,
       csvEscape(entry.datetime_utc || formatUtcForExport(ts))
     ];
-    sensors.forEach(function(_sensor, idx) {
+    sensors.forEach(function(sensor, idx) {
       var row = entry.sensorData[idx] || null;
-      rowOut.push(formatMetricNumber(row ? row.temp_c : null));
-      rowOut.push(formatMetricNumber(row ? row.temp_f : null));
-      rowOut.push(formatMetricNumber(row ? row.humidity_pct : null));
-      rowOut.push(formatMetricNumber(row ? row.dewpoint_c : null));
+      var metricColumns = sensorMetricColumns[idx];
+      metricColumns.forEach(function(column) {
+        rowOut.push(formatMetricNumber(row ? row[column] : null));
+      });
     });
     lines.push(rowOut.join(','));
   });

@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// config-v7.6.9.1.h - hourly persistence with dedicated history NVS partition
+// config-v7.6.9.2.h - hourly persistence with dedicated history NVS partition
 // Source fragment: firmware/core/config.h. Assembled output: dashboard/sensor_history_multi.h.
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing

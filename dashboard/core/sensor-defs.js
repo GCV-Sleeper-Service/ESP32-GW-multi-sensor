@@ -10,7 +10,47 @@ var DEFAULT_SENSOR_META = [
 
 var GATEWAY_EXPORT_HOSTNAME_FALLBACK = 'esp32-c3-multi';
 var EXPORT_SHARED_COLUMNS = ['gateway_host', 'gateway_ip', 'role', 'timestamp', 'datetime_utc'];
-var EXPORT_SENSOR_SUFFIXES = ['temp_c', 'temp_f', 'humidity_pct', 'dewpoint_c'];
+function getMetricColumnsForSensor(sensor, manifest) {
+  if (!manifest) return ['temp_c', 'temp_f', 'humidity_pct', 'dewpoint_c'];
+  var sensors = manifest.sensors || [];
+  var lookupId = (sensor && (sensor._deviceId || sensor.id)) || '';
+  var sensorDef = null;
+  for (var i = 0; i < sensors.length; i++) {
+    if (sensors[i].id === lookupId) { sensorDef = sensors[i]; break; }
+  }
+  if (!sensorDef || !sensorDef.measurements) return [];
+  var metricDefs = manifest.metrics || [];
+  var metricKeys = [];
+  for (var j = 0; j < sensorDef.measurements.length; j++) {
+    var measurement = sensorDef.measurements[j];
+    var hasHistory = measurement.history === true;
+    if (!hasHistory) {
+      for (var k = 0; k < metricDefs.length; k++) {
+        if (metricDefs[k].key === measurement.key) {
+          hasHistory = metricDefs[k].history === true;
+          break;
+        }
+      }
+    }
+    if (hasHistory) metricKeys.push(measurement.key);
+  }
+  var hasTemp = metricKeys.indexOf('temp') >= 0;
+  var hasHum = metricKeys.indexOf('hum') >= 0;
+  var cols = [];
+  for (var m = 0; m < metricKeys.length; m++) {
+    var key = metricKeys[m];
+    if (key === 'temp') {
+      cols.push('temp_c');
+      cols.push('temp_f');
+    } else if (key === 'hum') {
+      cols.push('humidity_pct');
+    } else {
+      cols.push(key);
+    }
+  }
+  if (hasTemp && hasHum) cols.push('dewpoint_c');
+  return cols;
+}
 
 function getExportRole(sensor, manifest) {
   if (!manifest || !manifest.gateway) return 'unknown';
@@ -88,7 +128,7 @@ function getExportSensorPrefix(sensor) {
 function getSingleSensorExportColumns(sensor) {
   var cols = EXPORT_SHARED_COLUMNS.slice();
   var prefix = getExportSensorPrefix(sensor);
-  EXPORT_SENSOR_SUFFIXES.forEach(function(suffix) {
+  getMetricColumnsForSensor(sensor, window._manifest).forEach(function(suffix) {
     cols.push(prefix + '_' + suffix);
   });
   return cols;
@@ -104,7 +144,7 @@ function getMergedExportColumns(sensors) {
       var satellitePrefix = sensorSlug((sensor && sensor._gwDisplayName) || (sensor && sensor._gwName) || (sensor && sensor._gwId) || 'gateway');
       prefix = satellitePrefix + '_' + prefix;
     }
-    EXPORT_SENSOR_SUFFIXES.forEach(function(suffix) {
+    getMetricColumnsForSensor(sensor, window._manifest).forEach(function(suffix) {
       cols.push(prefix + '_' + suffix);
     });
   });
