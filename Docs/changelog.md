@@ -2,6 +2,19 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.9.1] - 2026-04-16 - Phase V V3-B/C: Satellite Hostname/IP + CSV Role Column
+
+### Added
+- Satellite hostname and IP fields in `/api/aggregator/gateways` JSON response (#170).
+- Dashboard gateway cards and settings cards now show satellite hostname and IP address (#170).
+- CSV export `role` column at position 3 (breaking change for positional parsers) (#166).
+- Satellite-prefixed merged export column names in the format `{sat_slug}_{sensor_id}_{metric_key}` (#166).
+- `getExportRole()` helper for manifest-driven role resolution.
+
+### Changed
+- Gateway selector tabs and gateway summary cards now prefer `hostname` with `name` fallback.
+- Version bump to `7.6.9.1` with regenerated dashboard, firmware header, manifest, and fixtures.
+
 ## [v7.6.9.0] - 2026-04-16 - Phase V V3-A: Dashboard Device Card Cleanup
 
 ### Changed

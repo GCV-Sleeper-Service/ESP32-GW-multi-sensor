@@ -1589,8 +1589,35 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (i > 0) out += ",";
       const SatelliteCache& sat = satellite_caches[i];
       char tmp[128];
+      char hostname[64] = "";
+      char ip[48] = "";
+      const char* gw_obj = strstr(sat.manifest_json, "\"gateway\":{");
+      if (gw_obj) {
+        const char* gw_end = strchr(gw_obj, '}');
+        const char* name_key = strstr(gw_obj, "\"name\":\"");
+        if (name_key && (!gw_end || name_key < gw_end)) {
+          name_key += 8;
+          const char* name_end = strchr(name_key, '"');
+          if (name_end && (!gw_end || name_end <= gw_end) &&
+              (name_end - name_key) < static_cast<ptrdiff_t>(sizeof(hostname))) {
+            memcpy(hostname, name_key, static_cast<size_t>(name_end - name_key));
+            hostname[name_end - name_key] = '\0';
+          }
+        }
+      }
+      if (strncmp(sat.base_url, "http://", 7) == 0) {
+        const char* host_start = sat.base_url + 7;
+        const char* host_end = strpbrk(host_start, ":/");
+        size_t ip_len = host_end ? static_cast<size_t>(host_end - host_start) : strlen(host_start);
+        if (ip_len < sizeof(ip)) {
+          memcpy(ip, host_start, ip_len);
+          ip[ip_len] = '\0';
+        }
+      }
       out += "{\"id\":\"";   out += sat.id;
       out += "\",\"name\":\""; out += sat.name;
+      out += "\",\"hostname\":\""; out += json_escape_(hostname);
+      out += "\",\"ip\":\""; out += json_escape_(ip);
       out += "\",\"reachable\":";
       out += sat.reachable ? "true" : "false";
       snprintf(tmp, sizeof(tmp), ",\"last_seen\":%u,\"consecutive_failures\":%u",

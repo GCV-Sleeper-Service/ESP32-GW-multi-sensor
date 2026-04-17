@@ -9,8 +9,13 @@ var DEFAULT_SENSOR_META = [
 // <<< SENSOR_MANIFEST:DEFAULT_SENSOR_META_END >>>
 
 var GATEWAY_EXPORT_HOSTNAME_FALLBACK = 'esp32-c3-multi';
-var EXPORT_SHARED_COLUMNS = ['gateway_host', 'gateway_ip', 'timestamp', 'datetime_utc'];
+var EXPORT_SHARED_COLUMNS = ['gateway_host', 'gateway_ip', 'role', 'timestamp', 'datetime_utc'];
 var EXPORT_SENSOR_SUFFIXES = ['temp_c', 'temp_f', 'humidity_pct', 'dewpoint_c'];
+
+function getExportRole(sensor, manifest) {
+  if (!manifest || !manifest.gateway) return 'unknown';
+  return manifest.gateway.role || 'satellite';
+}
 
 function sensorSlug(value) {
   return String(value || '')
@@ -91,7 +96,8 @@ function getSingleSensorExportColumns(sensor) {
 function getMergedExportColumns(sensors) {
   var cols = EXPORT_SHARED_COLUMNS.slice();
   sensors.forEach(function(sensor) {
-    var prefix = getExportSensorPrefix(sensor);
+    var satellitePrefix = sensorSlug((sensor && sensor._gwDisplayName) || (sensor && sensor._gwName) || (sensor && sensor._gwId) || 'gateway');
+    var prefix = satellitePrefix + '_' + getExportSensorPrefix(sensor);
     EXPORT_SENSOR_SUFFIXES.forEach(function(suffix) {
       cols.push(prefix + '_' + suffix);
     });

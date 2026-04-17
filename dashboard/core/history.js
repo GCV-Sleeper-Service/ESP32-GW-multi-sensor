@@ -162,10 +162,12 @@ function fetchAllSensorHistoryRowsSequentially(sensors, onProgress) {
 
 function buildSingleSensorCsv(meta, sensor, rows) {
   var lines = [getSingleSensorExportColumns(sensor).join(',')];
+  var role = getExportRole(sensor, window._manifest);
   rows.forEach(function(row) {
     lines.push([
       csvEscape(meta.gatewayHost),
       csvEscape(meta.gatewayIp),
+      csvEscape(role),
       row.timestamp,
       csvEscape(row.datetime_utc),
       formatMetricNumber(row.temp_c),
@@ -179,6 +181,7 @@ function buildSingleSensorCsv(meta, sensor, rows) {
 
 function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
   var header = getMergedExportColumns(sensors);
+  var mergedRole = getExportRole(null, window._manifest);
   var union = {};
   sensorRowsList.forEach(function(rows, idx) {
     if (!rows) return; // BUG-046: guard against undefined/null entries (empty [] iterates safely)
@@ -202,6 +205,7 @@ function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
     var rowOut = [
       csvEscape(meta.gatewayHost),
       csvEscape(meta.gatewayIp),
+      csvEscape(mergedRole),
       ts,
       csvEscape(entry.datetime_utc || formatUtcForExport(ts))
     ];
