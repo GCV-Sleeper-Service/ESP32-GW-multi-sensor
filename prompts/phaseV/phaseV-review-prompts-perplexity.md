@@ -78,7 +78,9 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 
 **Turn 3 — Verdict + output**
 
-Post findings as a PR comment on PR #<PR_NUMBER> using the standard Turn 3 format.
+Do this FIRST: Format findings as a PR comment on #<PR_NUMBER> using the standard Turn 3 format. 
+Once ready, post it as inline markdown text in the chat session. 
+Ask operator for approval. After approval, post it as a comment to PR.
 
 **Fix prompt (if NEEDS-FIX or BLOCKED)**
 Generate a downloadable fix prompt in markdown that:
@@ -86,10 +88,12 @@ Generate a downloadable fix prompt in markdown that:
 - Includes a Do-NOT list covering already-passing gates to prevent regressions
 - Uses `prompts/phaseV/v7.6.7.0-agent-prompt-gpt-codex.md` as style reference
 
+If PR is ready to merge, ask for approval and merge it.
+
 **Post-merge deliverables (if MERGE-READY)**
-- Create `prompts/phaseV/v7.6.7.0-PR<NN>-consolidated-audit-and-lessons.md`
-- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.7.1.md`
-- Review and update `prompts/phaseV/v7.6.7.1-agent-prompt-gpt-codex.md`
+- Create `prompts/phaseV/v7.6.7.0-PR<NN>-consolidated-audit-and-lessons.md`. Provide the file as inline markdown text in the chat session for review. Once operator reviews it, you can push it to repo.
+- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.7.1.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
+- Review and update `prompts/phaseV/v7.6.7.1-agent-prompt-gpt-codex.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
 - Apply version tag `v7.6.7.0`
 - Operator device tests to include in consolidated audit: proxy 502+JSON when satellite disconnected · proxy 200+empty when no history · NAS history endpoint returns 404 · free heap increased ~2.3 KB vs baseline
 
@@ -146,7 +150,9 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 
 **Turn 3 — Verdict + output**
 
-Post findings as a PR comment on PR #<PR_NUMBER> using the standard Turn 3 format.
+Do this FIRST: Format findings as a PR comment on #<PR_NUMBER> using the standard Turn 3 format. 
+Once ready, post it as inline markdown text in the chat session. 
+Ask operator for approval. After approval, post it as a comment to PR.
 
 **Fix prompt (if NEEDS-FIX or BLOCKED)**
 Generate a downloadable fix prompt in markdown that:
@@ -154,10 +160,12 @@ Generate a downloadable fix prompt in markdown that:
 - Includes a Do-NOT list covering already-passing gates to prevent regressions
 - Uses `prompts/phaseV/v7.6.7.1-agent-prompt-gpt-codex.md` as style reference
 
+If PR is ready to merge, ask for approval and merge it.
+
 **Post-merge deliverables when MERGE-READY:**
-- Create `prompts/phaseV/v7.6.7.1-PR<NN>-consolidated-audit-and-lessons.md`
-- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.7.2.md`
-- Review and update `prompts/phaseV/v7.6.7.2-agent-prompt-gpt-codex.md`
+- Create `prompts/phaseV/v7.6.7.1-PR<NN>-consolidated-audit-and-lessons.md`. Provide the file as inline markdown text in the chat session for review. Once operator reviews it, you can push it to repo.
+- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.7.2.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
+- Review and update `prompts/phaseV/v7.6.7.2-agent-prompt-gpt-codex.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
 - Apply version tag `v7.6.7.1`
 - Operator device test to include in consolidated audit: full import sequence (begin → poll status → d/ × N → finish) completes on C3 without watchdog reset; free heap before/after import begin does not drop below 65 KB
 
@@ -224,7 +232,9 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 
 **Turn 3 — Verdict + output**
 
-Post findings as a PR comment on PR #<PR_NUMBER> using the standard Turn 3 format.
+Do this FIRST: Format findings as a PR comment on #<PR_NUMBER> using the standard Turn 3 format. 
+Once ready, post it as inline markdown text in the chat session. 
+Ask operator for approval. After approval, post it as a comment to PR.
 
 **Fix prompt (if NEEDS-FIX or BLOCKED)**
 Generate a downloadable fix prompt in markdown that:
@@ -232,10 +242,12 @@ Generate a downloadable fix prompt in markdown that:
 - Includes a Do-NOT list covering already-passing gates to prevent regressions
 - Uses `prompts/phaseV/v7.6.7.2-agent-prompt-gpt-codex.md` as style reference
 
+If PR is ready to merge, ask for approval and merge it.
+
 **Post-merge deliverables when MERGE-READY:**
-- Create `prompts/phaseV/v7.6.7.2-PR<NN>-consolidated-audit-and-lessons.md`
-- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.8.0.md`
-- Review and update `prompts/phaseV/v7.6.8.0-agent-prompt-gpt-codex.md`
+- Create `prompts/phaseV/v7.6.7.2-PR<NN>-consolidated-audit-and-lessons.md`. Provide the file as inline markdown text in the chat session for review. Once operator reviews it, you can push it to repo.
+- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.8.0.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
+- Review and update `prompts/phaseV/v7.6.8.0-agent-prompt-gpt-codex.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
 - Apply version tag `v7.6.7.2`
 - Complete V1 Operator Measurement Protocol (Steps 1–7) on physical C3 running v7.6.7.2; record results in consolidated audit before starting V2
 
@@ -303,7 +315,9 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 
 **Turn 3 — Verdict + output**
 
-Post findings as a PR comment on PR #<PR_NUMBER> using the standard Turn 3 format.
+Do this FIRST: Format findings as a PR comment on #<PR_NUMBER> using the standard Turn 3 format. 
+Once ready, post it as inline markdown text in the chat session. 
+Ask operator for approval. After approval, post it as a comment to PR.
 
 **Fix prompt (if NEEDS-FIX or BLOCKED)**
 Generate a downloadable fix prompt in markdown that:
@@ -311,10 +325,12 @@ Generate a downloadable fix prompt in markdown that:
 - Includes a Do-NOT list covering already-passing gates to prevent regressions
 - Uses `prompts/phaseV/v7.6.8.0-agent-prompt-gpt-codex.md` as style reference
 
+If PR is ready to merge, ask for approval and merge it.
+
 **Post-merge deliverables when MERGE-READY:**
-- Create `prompts/phaseV/v7.6.8.0-PR<NN>-consolidated-audit-and-lessons.md`
-- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.8.1.md`
-- Review and update `prompts/phaseV/v7.6.8.1-agent-prompt-gpt-codex.md`
+- Create `prompts/phaseV/v7.6.8.0-PR<NN>-consolidated-audit-and-lessons.md`. Provide the file as inline markdown text in the chat session for review. Once operator reviews it, you can push it to repo.
+- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.8.1.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
+- Review and update `prompts/phaseV/v7.6.8.1-agent-prompt-gpt-codex.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
 - Apply version tag `v7.6.8.0`
 - Verify all external push scripts and ESPHome sensors that POST to `/api/ingest/` have been updated with auth headers; document in consolidated audit
 
@@ -370,7 +386,9 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 
 **Turn 3 — Verdict + output**
 
-Post findings as a PR comment on PR #<PR_NUMBER> using the standard Turn 3 format.
+Do this FIRST: Format findings as a PR comment on #<PR_NUMBER> using the standard Turn 3 format. 
+Once ready, post it as inline markdown text in the chat session. 
+Ask operator for approval. After approval, post it as a comment to PR.
 
 **Fix prompt (if NEEDS-FIX or BLOCKED)**
 Generate a downloadable fix prompt in markdown that:
@@ -378,10 +396,12 @@ Generate a downloadable fix prompt in markdown that:
 - Includes a Do-NOT list covering already-passing gates to prevent regressions
 - Uses `prompts/phaseV/v7.6.8.1-agent-prompt-gpt-codex.md` as style reference
 
+If PR is ready to merge, ask for approval and merge it.
+
 **Post-merge deliverables when MERGE-READY:**
-- Create `prompts/phaseV/v7.6.8.1-PR<NN>-consolidated-audit-and-lessons.md`
-- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.8.2.md`
-- Review and update `prompts/phaseV/v7.6.8.2-agent-prompt-gpt-codex.md`
+- Create `prompts/phaseV/v7.6.8.1-PR<NN>-consolidated-audit-and-lessons.md`. Provide the file as inline markdown text in the chat session for review. Once operator reviews it, you can push it to repo.
+- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.8.2.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
+- Review and update `prompts/phaseV/v7.6.8.2-agent-prompt-gpt-codex.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
 - Apply version tag `v7.6.8.1`
 - Note: V2-H/I/J (v7.6.8.2) are GATED — do not begin until V1 Operator Measurement Protocol results are confirmed and recorded
 
@@ -441,7 +461,9 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 
 **Turn 3 — Verdict + output**
 
-Post findings as a PR comment on PR #<PR_NUMBER> using the standard Turn 3 format.
+Do this FIRST: Format findings as a PR comment on #<PR_NUMBER> using the standard Turn 3 format. 
+Once ready, post it as inline markdown text in the chat session. 
+Ask operator for approval. After approval, post it as a comment to PR.
 
 **Fix prompt (if NEEDS-FIX or BLOCKED)**
 Generate a downloadable fix prompt in markdown that:
@@ -449,10 +471,12 @@ Generate a downloadable fix prompt in markdown that:
 - Includes a Do-NOT list covering already-passing gates to prevent regressions
 - Uses `prompts/phaseV/v7.6.8.2-agent-prompt-gpt-codex.md` as style reference
 
+If PR is ready to merge, ask for approval and merge it.
+
 **Post-merge deliverables when MERGE-READY:**
-- Create `prompts/phaseV/v7.6.8.2-PR<NN>-consolidated-audit-and-lessons.md`
-- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.9.0.md`
-- Review and update `prompts/phaseV/v7.6.9.0-agent-prompt-gpt-codex.md`
+- Create `prompts/phaseV/v7.6.8.2-PR<NN>-consolidated-audit-and-lessons.md`. Provide the file as inline markdown text in the chat session for review. Once operator reviews it, you can push it to repo.
+- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.9.0.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
+- Review and update `prompts/phaseV/v7.6.9.0-agent-prompt-gpt-codex.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
 - Apply version tag `v7.6.8.2`
 - Post-V2 heap measurement: confirm `free_heap_internal` at boot on C3; record value to determine if V3-F (struct audit) gate is triggered (< 65 KB triggers V3-F)
 
@@ -511,7 +535,7 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 - `di-psram` (single entry) in `DEVICE_INFO_MAP`, mapping from `text_sensor-psram`
 - MAC address row is **removed** from device card (not just hidden)
 - `scripts/preflight.sh` has presence checks for new IDs
-- - Full regeneration pipeline was run in order: `bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `generate-fixtures.js` → `render_sensor_config.py --write` → `build-dashboard.sh --write` → `minify-dashboard.sh` → `generate-header.sh` → `render_sensor_config.py --check`
+- Full regeneration pipeline was run in order: `bundle-dashboard.sh --write` → `render_sensor_config.py --write` → `generate-fixtures.js` → `render_sensor_config.py --write` → `build-dashboard.sh --write` → `minify-dashboard.sh` → `generate-header.sh` → `render_sensor_config.py --check`
 - `scripts/preflight.sh` passes (48 checks)
 - No direct edits to `dashboard/dashboard.js` or `dashboard/dashboard.html` (Rule 47)
 - `dashboard.tmpl.html` edited as source file (Rule 48)
@@ -524,21 +548,20 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 
 **Turn 3 — Verdict + output**
 
-Post findings as a PR comment on PR #<PR_NUMBER> using the standard Turn 3 format.
+Do this FIRST: Format findings as a PR comment on #<PR_NUMBER> using the standard Turn 3 format. 
+Once ready, post it as inline markdown text in the chat session. 
+Ask operator for approval. After approval, post it as a comment to PR.
 
-**Fix prompt (if NEEDS-FIX or BLOCKED)**
-Generate a downloadable fix prompt in markdown that:
-- Addresses ONLY the remaining failing/unclear gates
-- Includes a Do-NOT list covering already-passing gates to prevent regressions
-- Uses `prompts/phaseV/v7.6.9.0-agent-prompt-gpt-codex.md` as style reference
 
-**Post-merge deliverables when MERGE-READY:**
-- Create `prompts/phaseV/v7.6.9.0-PR<NN>-consolidated-audit-and-lessons.md`
-- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.9.1.md`
-- Review and update `prompts/phaseV/v7.6.9.1-agent-prompt-gpt-codex.md`
+If PR is ready to merge, ask for approval and merge it.
+
+**Post-merge deliverables:**
+- Create `prompts/phaseV/v7.6.9.0-PR<NN>-consolidated-audit-and-lessons.md`. Provide the file as inline markdown text in the chat session for review. Once operator reviews it, you can push it to repo.
+- Review and determine if there is need for update for `prompts/handoff/phaseV/session-handoff-v7.6.9.1.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
+- Review and determine if there is need for update for `prompts/phaseV/v7.6.9.1-agent-prompt-gpt-codex.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
 - Close issues #144, #136, #138 with PR references to #183
 - Confirm #143 was already closed at v7.6.7.2 (do NOT re-close — verify only)
-- Apply version tag `v7.6.9.0`
+- Confirm version tag `v7.6.9.0` is already present on merge commit (verify with `git tag -l v7.6.9.0`)
 
 ---
 
@@ -600,7 +623,9 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 
 **Turn 3 — Verdict + output**
 
-Post findings as a PR comment on PR #<PR_NUMBER> using the standard Turn 3 format.
+Do this FIRST: Format findings as a PR comment on #<PR_NUMBER> using the standard Turn 3 format. 
+Once ready, post it as inline markdown text in the chat session. 
+Ask operator for approval. After approval, post it as a comment to PR.
 
 **Fix prompt (if NEEDS-FIX or BLOCKED)**
 Generate a downloadable fix prompt in markdown that:
@@ -608,10 +633,12 @@ Generate a downloadable fix prompt in markdown that:
 - Includes a Do-NOT list covering already-passing gates to prevent regressions
 - Uses `prompts/phaseV/v7.6.9.1-agent-prompt-gpt-codex.md` as style reference
 
+If PR is ready to merge, ask for approval and merge it.
+
 **Post-merge deliverables when MERGE-READY:**
-- Create `prompts/phaseV/v7.6.9.1-PR<NN>-consolidated-audit-and-lessons.md`
-- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.9.2.md`
-- Review and update `prompts/phaseV/v7.6.9.2-agent-prompt-gpt-codex.md`
+- Create `prompts/phaseV/v7.6.9.1-PR<NN>-consolidated-audit-and-lessons.md.` Provide the file as inline markdown text in the chat session for review. Once operator reviews it, you can push it to repo.
+- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.9.2.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo. 
+- Review and update `prompts/phaseV/v7.6.9.2-agent-prompt-gpt-codex.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
 - Close issues #170 and #166 (partial) with PR reference
 - Apply version tag `v7.6.9.1`
 
@@ -672,7 +699,9 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 
 **Turn 3 — Verdict + output**
 
-Post findings as a PR comment on PR #<PR_NUMBER> using the standard Turn 3 format.
+Do this FIRST: Format findings as a PR comment on #<PR_NUMBER> using the standard Turn 3 format. 
+Once ready, post it as inline markdown text in the chat session. 
+Ask operator for approval. After approval, post it as a comment to PR.
 
 **Fix prompt (if NEEDS-FIX or BLOCKED)**
 Generate a downloadable fix prompt in markdown that:
@@ -680,10 +709,12 @@ Generate a downloadable fix prompt in markdown that:
 - Includes a Do-NOT list covering already-passing gates to prevent regressions
 - Uses `prompts/phaseV/v7.6.9.2-agent-prompt-gpt-codex.md` as style reference
 
+If PR is ready to merge, ask for approval and merge it.
+
 **Post-merge deliverables when MERGE-READY:**
-- Create `prompts/phaseV/v7.6.9.2-PR<NN>-consolidated-audit-and-lessons.md`
-- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.9.3.md`
-- Review and update `prompts/phaseV/v7.6.9.3-agent-prompt-gpt-codex.md`
+- Create `prompts/phaseV/v7.6.9.2-PR<NN>-consolidated-audit-and-lessons.md`. Provide the file as inline markdown text in the chat session for review. Once operator reviews it, you can push it to repo.
+- Review and update `prompts/handoff/phaseV/session-handoff-v7.6.9.3.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
+- Review and update `prompts/phaseV/v7.6.9.3-agent-prompt-gpt-codex.md`. If update is needed, provide detailed list of edits - what to replace and where on what in the chat, once approved you can push updated file to repo.
 - Apply version tag `v7.6.9.2`
 - Confirm post-V2 `free_heap_internal` at boot on C3: if < 65 KB → V3-F is triggered; if ≥ 65 KB → V3-F is skipped and closed with no-change note
 
@@ -740,7 +771,9 @@ Use the Shared Perplexity Review Session Protocol from that file throughout this
 
 **Turn 3 — Verdict + output**
 
-Post findings as a PR comment on PR #<PR_NUMBER> using the standard Turn 3 format.
+Do this FIRST: Format findings as a PR comment on #<PR_NUMBER> using the standard Turn 3 format. 
+Once ready, post it as inline markdown text in the chat session. 
+Ask operator for approval. After approval, post it as a comment to PR.
 
 **Fix prompt (if NEEDS-FIX or BLOCKED)**
 Generate a downloadable fix prompt in markdown that:
@@ -748,9 +781,10 @@ Generate a downloadable fix prompt in markdown that:
 - Includes a Do-NOT list covering already-passing gates to prevent regressions
 - Uses `prompts/phaseV/v7.6.9.3-agent-prompt-gpt-codex.md` as style reference
 
+If PR is ready to merge, ask for approval and merge it.
+
 **Post-merge deliverables when MERGE-READY:**
-- Create `prompts/phaseV/v7.6.9.3-PR<NN>-consolidated-audit-and-lessons.md`
-- Create `prompts/handoff/phaseV-results.md` (Phase V completion handoff to Phase 7)
+- Create `prompts/phaseV/v7.6.9.3-PR<NN>-consolidated-audit-and-lessons.md`. Provide the file as inline markdown text in the chat session for review. Once operator reviews it, you can push it to repo.
 - Apply version tag `v7.6.9.3`
 - Confirm all Phase V issues (#161, #162, #163, #164, #165, #166, #170, #171, #136, #137, #138, #139, #143, #144) have been closed or explicitly deferred with notes
 - Confirm `Docs/v7.7-implementation-plan.md` and `Docs/v7.7-v7.8-persistence-architecture.md` are the correct starting documents for Phase 7 planning
