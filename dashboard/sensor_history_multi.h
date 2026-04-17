@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// config-v7.6.9.0.h - hourly persistence with dedicated history NVS partition
+// config-v7.6.9.1.h - hourly persistence with dedicated history NVS partition
 // Source fragment: firmware/core/config.h. Assembled output: dashboard/sensor_history_multi.h.
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
@@ -472,7 +472,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.9.0) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.9.1) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -3895,8 +3895,45 @@ class HistoryWebHandler : public AsyncWebHandler {
       if (i > 0) out += ",";
       const SatelliteCache& sat = satellite_caches[i];
       char tmp[128];
+      char hostname[64] = "";
+      char ip[48] = "";
+      const char* gw_obj = strstr(sat.manifest_json, "\"gateway\"");
+      if (gw_obj) {
+        const char* gw_end = strchr(gw_obj + 9, '}');
+        if (!gw_end) gw_end = sat.manifest_json + sat.manifest_len;
+
+        const char* id_key = strstr(gw_obj, "\"id\"");
+        if (id_key && id_key < gw_end) {
+          const char* p = id_key + 4;
+          while (p < gw_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+          if (p < gw_end && *p == ':') {
+            ++p;
+            while (p < gw_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+            if (p < gw_end && *p == '"') {
+              const char* id_val = p + 1;
+              const char* id_end = strchr(id_val, '"');
+              if (id_end && id_end <= gw_end &&
+                  (id_end - id_val) < static_cast<ptrdiff_t>(sizeof(hostname))) {
+                memcpy(hostname, id_val, static_cast<size_t>(id_end - id_val));
+                hostname[id_end - id_val] = '\0';
+              }
+            }
+          }
+        }
+      }
+      if (strncmp(sat.base_url, "http://", 7) == 0) {
+        const char* host_start = sat.base_url + 7;
+        const char* host_end = strpbrk(host_start, ":/");
+        size_t ip_len = host_end ? static_cast<size_t>(host_end - host_start) : strlen(host_start);
+        if (ip_len < sizeof(ip)) {
+          memcpy(ip, host_start, ip_len);
+          ip[ip_len] = '\0';
+        }
+      }
       out += "{\"id\":\"";   out += sat.id;
       out += "\",\"name\":\""; out += sat.name;
+      out += "\",\"hostname\":\""; out += json_escape_(hostname);
+      out += "\",\"ip\":\""; out += json_escape_(ip);
       out += "\",\"reachable\":";
       out += sat.reachable ? "true" : "false";
       snprintf(tmp, sizeof(tmp), ",\"last_seen\":%u,\"consecutive_failures\":%u",

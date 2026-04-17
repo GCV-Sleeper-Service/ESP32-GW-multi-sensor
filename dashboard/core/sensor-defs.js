@@ -9,8 +9,14 @@ var DEFAULT_SENSOR_META = [
 // <<< SENSOR_MANIFEST:DEFAULT_SENSOR_META_END >>>
 
 var GATEWAY_EXPORT_HOSTNAME_FALLBACK = 'esp32-c3-multi';
-var EXPORT_SHARED_COLUMNS = ['gateway_host', 'gateway_ip', 'timestamp', 'datetime_utc'];
+var EXPORT_SHARED_COLUMNS = ['gateway_host', 'gateway_ip', 'role', 'timestamp', 'datetime_utc'];
 var EXPORT_SENSOR_SUFFIXES = ['temp_c', 'temp_f', 'humidity_pct', 'dewpoint_c'];
+
+function getExportRole(sensor, manifest) {
+  if (!manifest || !manifest.gateway) return 'unknown';
+  if (sensor && sensor._gwId && sensor._gwId !== manifest.gateway.id) return 'satellite';
+  return manifest.gateway.role || 'satellite';
+}
 
 function sensorSlug(value) {
   return String(value || '')
@@ -92,6 +98,12 @@ function getMergedExportColumns(sensors) {
   var cols = EXPORT_SHARED_COLUMNS.slice();
   sensors.forEach(function(sensor) {
     var prefix = getExportSensorPrefix(sensor);
+    var isSatellite = sensor && sensor._gwId && window._manifest && window._manifest.gateway &&
+      sensor._gwId !== window._manifest.gateway.id;
+    if (isSatellite) {
+      var satellitePrefix = sensorSlug((sensor && sensor._gwDisplayName) || (sensor && sensor._gwName) || (sensor && sensor._gwId) || 'gateway');
+      prefix = satellitePrefix + '_' + prefix;
+    }
     EXPORT_SENSOR_SUFFIXES.forEach(function(suffix) {
       cols.push(prefix + '_' + suffix);
     });

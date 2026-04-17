@@ -48,9 +48,10 @@ function renderGatewaySelector(gateways) {
     '<button class="gw-tab active" data-gw="all">All Gateways</button>';
   gateways.forEach(function(gw) {
     var statusClass = gw.reachable ? 'gw-online' : 'gw-offline';
+    var displayName = gw.hostname || gw.name;
     // escAttr for attribute value; escHtml for button text content
     selectorHtml += '<button class="gw-tab ' + statusClass + '" data-gw="' + escAttr(gw.id) + '">' +
-      escHtml(gw.name) + '</button>';
+      escHtml(displayName) + '</button>';
   });
   // Settings tab — always last
   selectorHtml += '<button class="gw-tab gw-settings-tab" data-gw="settings">&#9881; Settings</button>';
@@ -86,15 +87,18 @@ function renderAllGatewaysSummary(gateways) {
   gateways.forEach(function(gw) {
     var statusClass = gw.reachable ? 'gw-status-online' : 'gw-status-offline';
     var statusText = gw.reachable ? '&#127002; Online' : '&#128308; Unreachable';
+    var displayName = gw.hostname || gw.name;
+    var ipAddress = gw.ip || '\u2014';
     var lastSeenStr = gw.last_seen ? new Date(gw.last_seen * 1000).toLocaleString() : '\u2014';
     var fwVersion = gw.firmware_version || '\u2014';
     var deviceCount = (gw.sensor_count !== undefined) ? gw.sensor_count :
       (gw.device_count !== undefined ? gw.device_count : '\u2014');
     html += '<div class="gw-summary-card' + (gw.reachable ? '' : ' gw-stale') + '">';
     html += '<div class="gw-summary-header"><span class="' + statusClass + '">' + statusText + '</span>' +
-      ' <strong>' + escHtml(gw.name) + '</strong>' +
+      ' <strong>' + escHtml(displayName) + '</strong>' +
       ' <span class="gw-summary-id">(' + escHtml(gw.id) + ')</span></div>';
     html += '<div class="gw-summary-details">';
+    html += '<div><span class="gw-detail-label">IP:</span> ' + escHtml(ipAddress) + '</div>';
     html += '<div><span class="gw-detail-label">Last seen:</span> ' + escHtml(lastSeenStr) + '</div>';
     html += '<div><span class="gw-detail-label">Firmware:</span> ' + escHtml(fwVersion) + '</div>';
     html += '<div><span class="gw-detail-label">Devices:</span> ' + escHtml(String(deviceCount)) + '</div>';
@@ -150,6 +154,8 @@ function renderGatewayDevices(gwId) {
     }
     // Store originals for proxy history routing and API lookups
     cfg._gwId = gwId;
+    cfg._gwName = gw.name;
+    cfg._gwDisplayName = gw.hostname || gw.name;
     cfg._deviceId = s.id;
     cfg._namespacedId = nsId; // kept for clarity
     gwSensors.push({ cfg: cfg, entry: s });
@@ -283,6 +289,9 @@ function renderSettingsPanel(gateways) {
   } else {
     gateways.forEach(function(gw) {
       var statusDot = gw.reachable ? '\uD83D\uDFE2' : '\uD83D\uDD34';
+      var displayName = gw.hostname || gw.name;
+      var hostname = gw.hostname || '\u2014';
+      var ipAddress = gw.ip || '\u2014';
       var fwVersion = '\u2014';
       var deviceCount = '\u2014';
       if (gw.firmware_version) fwVersion = gw.firmware_version;
@@ -291,9 +300,11 @@ function renderSettingsPanel(gateways) {
       var lastSeenStr = (gw.last_seen !== undefined && gw.last_seen !== null)
         ? new Date(gw.last_seen * 1000).toLocaleString() : '\u2014';
       html += '<div class="settings-satellite-card">';
-      html += '<div class="settings-sat-header">' + statusDot + ' ' + escHtml(gw.name) +
+      html += '<div class="settings-sat-header">' + statusDot + ' ' + escHtml(displayName) +
         ' <span class="settings-sat-id">(' + escHtml(gw.id) + ')</span></div>';
       html += '<div class="settings-sat-details">';
+      html += '<div>Hostname: ' + escHtml(hostname) + '</div>';
+      html += '<div>IP: ' + escHtml(ipAddress) + '</div>';
       html += '<div>URL: <code>' + escHtml(gw.base_url || '\u2014') + '</code></div>';
       html += '<div>Firmware: ' + escHtml(fwVersion) + '</div>';
       html += '<div>Devices: ' + escHtml(deviceCount) + '</div>';
@@ -303,7 +314,7 @@ function renderSettingsPanel(gateways) {
         html += '<div class="settings-warning">Failures: ' + escHtml(String(gw.consecutive_failures)) + '</div>';
       }
       html += '</div>';
-      html += '<button class="settings-btn settings-btn-remove" data-sat-id="' + escAttr(gw.id) + '" data-sat-name="' + escAttr(gw.name) + '">Remove</button>';
+      html += '<button class="settings-btn settings-btn-remove" data-sat-id="' + escAttr(gw.id) + '" data-sat-name="' + escAttr(displayName) + '">Remove</button>';
       html += '<div class="settings-status" id="sat-status-' + escAttr(gw.id) + '"></div>';
       html += '</div>';
     });
