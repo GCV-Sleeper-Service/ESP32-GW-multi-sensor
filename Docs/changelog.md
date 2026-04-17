@@ -2,6 +2,16 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.9.3] - 2026-04-17 - Phase V V3-F: Struct Audit / Phase V Closure
+
+### Changed
+- Bumped version to `7.6.9.3` for the Phase V closure release.
+
+### Decision
+- Measured `free_heap_internal` on the ESP32-C3 at boot: `70952` bytes (`69.3 KiB`), which is above the `65 KiB` floor, so V3-F struct-padding changes were skipped.
+- Reviewed `firmware/core/nvs-persistence.h` before considering any struct change; persistence shims map temp/hum history per field through `SegmentSnapshot` rather than serializing `SensorEntity` blobs directly.
+- Phase V therefore closes with no `SensorEntity` layout change in v7.6.9.3.
+
 ## [v7.6.9.2] - 2026-04-16 - Phase V V3-D/E: Manifest-Driven Export + AGG-ADR
 
 ### Changed
