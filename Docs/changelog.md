@@ -2,6 +2,18 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.9.2] - 2026-04-16 - Phase V V3-D/E: Manifest-Driven Export + AGG-ADR
+
+### Changed
+- Replaced the static export suffix list with `getMetricColumnsForSensor()` so CSV export columns now follow the active manifest instead of a hardcoded climate-only array (#166).
+- `fetchSensorHistoryRows()` now builds export rows from manifest-driven metric history series rather than special-casing `temp` and `hum` (#166, #171).
+- Single-sensor and merged CSV builders now emit only the metric columns enabled by manifest history flags; environmental exports keep their derived temperature/dewpoint columns, ping exports now include populated history columns, and non-history system metrics remain absent instead of appearing as blank export fields (#166).
+- Version bump to `7.6.9.2` with regenerated dashboard, firmware header, manifest, and fixtures.
+
+### Added
+- Playwright export assertions covering environmental derived columns, manifest-driven ping export columns, and system export header behaviour under manifest history flags.
+- AGG-ADR-001 is now confirmed on `main` as the accepted Phase V decision record for proxy-based satellite history in v7.6.x (#162).
+
 ## [v7.6.9.1] - 2026-04-16 - Phase V V3-B/C: Satellite Hostname/IP + CSV Role Column
 
 ### Added

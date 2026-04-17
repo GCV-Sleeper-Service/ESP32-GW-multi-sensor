@@ -77,9 +77,71 @@ test.describe('7. Export controls', () => {
     await page.waitForTimeout(1000);
     expect(pageError).toBeNull();
   });
+
+  test('single-sensor export keeps environmental derived columns populated', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => {
+      const el = document.getElementById('pointCount');
+      return el && el.textContent.includes('data points') && !el.textContent.startsWith('0');
+    }, { timeout: 12000 });
+    const csv = await page.evaluate(async () => {
+      const sensor = window.SENSORS.find(s => s.id === 'office');
+      const meta = await getGatewayExportMeta();
+      const rows = await fetchSensorHistoryRows(sensor);
+      return buildSingleSensorCsv(meta, sensor, rows);
+    });
+
+    expect(csv.split('\n')[0]).toContain('office_temp_c');
+    expect(csv.split('\n')[0]).toContain('office_dewpoint_c');
+    const firstDataLine = csv.trim().split('\n')[1];
+    expect(firstDataLine).toBeTruthy();
+    const values = firstDataLine.split(',');
+    expect(values[5]).not.toBe('');
+    expect(values[8]).not.toBe('');
+  });
+
+  test('Mixed export uses manifest-driven ping metrics when present', async ({ page }) => {
+    await loadDashboard(page);
+    await page.waitForFunction(() => {
+      const el = document.getElementById('pointCount');
+      return el && el.textContent.includes('data points') && !el.textContent.startsWith('0');
+    }, { timeout: 12000 });
+    const hasPing = await page.evaluate(() => window.SENSORS.some(s => s.id === 'wan_ping'));
+    test.skip(!hasPing, 'fixture set has no ping sensor');
+
+    const csv = await page.evaluate(async () => {
+      const sensor = window.SENSORS.find(s => s.id === 'wan_ping');
+      const meta = await getGatewayExportMeta();
+      const rows = await fetchSensorHistoryRows(sensor);
+      return buildSingleSensorCsv(meta, sensor, rows);
+    });
+
+    const lines = csv.trim().split('\n');
+    test.skip(lines.length < 2, 'fixture set has no ping history rows');
+    expect(lines[0]).toContain('wan_ping_ping_ms');
+    expect(lines[0]).toContain('wan_ping_success_pct');
+    const values = lines[1].split(',');
+    expect(values[5]).not.toBe('');
+    expect(values[6]).not.toBe('');
+  });
+
+  test('System export respects manifest history flags', async ({ page }) => {
+    await loadDashboard(page);
+    const hasSystem = await page.evaluate(() => window.SENSORS.some(s => s.id === 'nas01'));
+    test.skip(!hasSystem, 'fixture set has no system sensor');
+
+    const header = await page.evaluate(() => {
+      const sensor = window.SENSORS.find(s => s.id === 'nas01');
+      return getSingleSensorExportColumns(sensor).join(',');
+    });
+
+    expect(header).not.toContain('nas01_cpu_pct');
+    expect(header).not.toContain('nas01_ram_pct');
+    expect(header).not.toContain('nas01_disk_pct');
+  });
 });
 
-// ── 8. Console error guard ────────────────────────────────────────
+// 8. Console error guard
 
 test.describe('8. Console error guard', () => {
   test('no unexpected JS errors during normal session startup', async ({ page }) => {

@@ -17,38 +17,49 @@ function parseHistoryMetricLines(text) {
   return out;
 }
 
-function buildNormalizedSensorRows(tempText, humText) {
-  var tempMap = parseHistoryMetricLines(tempText);
-  var humMap = parseHistoryMetricLines(humText);
+function buildNormalizedSensorRows(series) {
+  var metricMaps = {};
   var seen = {};
   var timestamps = [];
-  Object.keys(tempMap).forEach(function(key) {
-    var ts = parseInt(key, 10);
-    if (isFinite(ts) && !seen[ts]) { seen[ts] = true; timestamps.push(ts); }
+
+  (series || []).forEach(function(metricSeries) {
+    if (!metricSeries || !metricSeries.key) return;
+    var metricMap = parseHistoryMetricLines(metricSeries.raw || '');
+    metricMaps[metricSeries.key] = metricMap;
+    Object.keys(metricMap).forEach(function(key) {
+      var ts = parseInt(key, 10);
+      if (isFinite(ts) && !seen[ts]) { seen[ts] = true; timestamps.push(ts); }
+    });
   });
-  Object.keys(humMap).forEach(function(key) {
-    var ts = parseInt(key, 10);
-    if (isFinite(ts) && !seen[ts]) { seen[ts] = true; timestamps.push(ts); }
-  });
+
   timestamps.sort(function(a, b) { return a - b; });
 
   return timestamps.map(function(ts) {
-    var tC = (typeof tempMap[ts] === 'number' && isFinite(tempMap[ts])) ? tempMap[ts] : null;
-    var hum = (typeof humMap[ts] === 'number' && isFinite(humMap[ts])) ? humMap[ts] : null;
-    var tF = tC !== null ? (tC * 9 / 5 + 32) : null;
-    var dp = null;
-    if (tC !== null && hum !== null) {
-      var dpv = calcDewPoint(tC, hum);
-      if (dpv !== null && isFinite(dpv)) dp = dpv;
-    }
-    return {
+    var row = {
       timestamp: ts,
-      datetime_utc: formatUtcForExport(ts),
-      temp_c: tC,
-      temp_f: tF,
-      humidity_pct: hum,
-      dewpoint_c: dp
+      datetime_utc: formatUtcForExport(ts)
     };
+    Object.keys(metricMaps).forEach(function(key) {
+      var value = metricMaps[key][ts];
+      row[key] = (typeof value === 'number' && isFinite(value)) ? value : null;
+    });
+
+    var tC = row.temp;
+    var hum = row.hum;
+    if (metricMaps.temp) {
+      row.temp_c = tC;
+      row.temp_f = tC !== null ? (tC * 9 / 5 + 32) : null;
+    }
+    if (metricMaps.hum) row.humidity_pct = hum;
+    if (metricMaps.temp && metricMaps.hum) {
+      var dp = null;
+      if (tC !== null && hum !== null) {
+        var dpv = calcDewPoint(tC, hum);
+        if (dpv !== null && isFinite(dpv)) dp = dpv;
+      }
+      row.dewpoint_c = dp;
+    }
+    return row;
   });
 }
 
@@ -133,12 +144,9 @@ function fetchDeviceHistory(sensor, manifest) {
 
 function fetchSensorHistoryRows(sensor) {
   return fetchDeviceHistory(sensor, window._manifest).then(function(series) {
-    var temp = '', hum = '';
-    series.forEach(function(s) {
-      if (s.key === 'temp') temp = s.raw;
-      else if (s.key === 'hum') hum = s.raw;
-    });
-    return buildNormalizedSensorRows(temp, hum);
+    var metricColumns = getMetricColumnsForSensor(sensor, window._manifest);
+    if (!metricColumns.length && (!series || !series.length)) return [];
+    return buildNormalizedSensorRows(series);
   });
 }
 
@@ -161,20 +169,21 @@ function fetchAllSensorHistoryRowsSequentially(sensors, onProgress) {
 }
 
 function buildSingleSensorCsv(meta, sensor, rows) {
+  var metricColumns = getMetricColumnsForSensor(sensor, window._manifest);
   var lines = [getSingleSensorExportColumns(sensor).join(',')];
   var role = getExportRole(sensor, window._manifest);
   rows.forEach(function(row) {
-    lines.push([
+    var rowOut = [
       csvEscape(meta.gatewayHost),
       csvEscape(meta.gatewayIp),
       csvEscape(role),
       row.timestamp,
-      csvEscape(row.datetime_utc),
-      formatMetricNumber(row.temp_c),
-      formatMetricNumber(row.temp_f),
-      formatMetricNumber(row.humidity_pct),
-      formatMetricNumber(row.dewpoint_c)
-    ].join(','));
+      csvEscape(row.datetime_utc)
+    ];
+    metricColumns.forEach(function(column) {
+      rowOut.push(formatMetricNumber(row ? row[column] : null));
+    });
+    lines.push(rowOut.join(','));
   });
   return lines.join('\n') + '\n';
 }
@@ -209,12 +218,12 @@ function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
       ts,
       csvEscape(entry.datetime_utc || formatUtcForExport(ts))
     ];
-    sensors.forEach(function(_sensor, idx) {
+    sensors.forEach(function(sensor, idx) {
       var row = entry.sensorData[idx] || null;
-      rowOut.push(formatMetricNumber(row ? row.temp_c : null));
-      rowOut.push(formatMetricNumber(row ? row.temp_f : null));
-      rowOut.push(formatMetricNumber(row ? row.humidity_pct : null));
-      rowOut.push(formatMetricNumber(row ? row.dewpoint_c : null));
+      var metricColumns = getMetricColumnsForSensor(sensor, window._manifest);
+      metricColumns.forEach(function(column) {
+        rowOut.push(formatMetricNumber(row ? row[column] : null));
+      });
     });
     lines.push(rowOut.join(','));
   });
