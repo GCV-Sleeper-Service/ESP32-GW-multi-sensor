@@ -181,7 +181,7 @@ function buildSingleSensorCsv(meta, sensor, rows) {
 
 function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
   var header = getMergedExportColumns(sensors);
-  var mergedRole = getExportRole(null, window._manifest);
+  var mergedRole = sensors.some(function(sensor) { return sensor && sensor._gwId && window._manifest && window._manifest.gateway && sensor._gwId !== window._manifest.gateway.id; }) ? 'satellite' : getExportRole(null, window._manifest);
   var union = {};
   sensorRowsList.forEach(function(rows, idx) {
     if (!rows) return; // BUG-046: guard against undefined/null entries (empty [] iterates safely)

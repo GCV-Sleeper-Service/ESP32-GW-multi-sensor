@@ -14,6 +14,7 @@ var EXPORT_SENSOR_SUFFIXES = ['temp_c', 'temp_f', 'humidity_pct', 'dewpoint_c'];
 
 function getExportRole(sensor, manifest) {
   if (!manifest || !manifest.gateway) return 'unknown';
+  if (sensor && sensor._gwId && sensor._gwId !== manifest.gateway.id) return 'satellite';
   return manifest.gateway.role || 'satellite';
 }
 
@@ -96,8 +97,13 @@ function getSingleSensorExportColumns(sensor) {
 function getMergedExportColumns(sensors) {
   var cols = EXPORT_SHARED_COLUMNS.slice();
   sensors.forEach(function(sensor) {
-    var satellitePrefix = sensorSlug((sensor && sensor._gwDisplayName) || (sensor && sensor._gwName) || (sensor && sensor._gwId) || 'gateway');
-    var prefix = satellitePrefix + '_' + getExportSensorPrefix(sensor);
+    var prefix = getExportSensorPrefix(sensor);
+    var isSatellite = sensor && sensor._gwId && window._manifest && window._manifest.gateway &&
+      sensor._gwId !== window._manifest.gateway.id;
+    if (isSatellite) {
+      var satellitePrefix = sensorSlug((sensor && sensor._gwDisplayName) || (sensor && sensor._gwName) || (sensor && sensor._gwId) || 'gateway');
+      prefix = satellitePrefix + '_' + prefix;
+    }
     EXPORT_SENSOR_SUFFIXES.forEach(function(suffix) {
       cols.push(prefix + '_' + suffix);
     });

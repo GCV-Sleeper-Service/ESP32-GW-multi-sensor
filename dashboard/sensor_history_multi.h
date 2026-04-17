@@ -3897,17 +3897,27 @@ class HistoryWebHandler : public AsyncWebHandler {
       char tmp[128];
       char hostname[64] = "";
       char ip[48] = "";
-      const char* gw_obj = strstr(sat.manifest_json, "\"gateway\":{");
+      const char* gw_obj = strstr(sat.manifest_json, "\"gateway\"");
       if (gw_obj) {
-        const char* gw_end = strchr(gw_obj, '}');
-        const char* name_key = strstr(gw_obj, "\"name\":\"");
-        if (name_key && (!gw_end || name_key < gw_end)) {
-          name_key += 8;
-          const char* name_end = strchr(name_key, '"');
-          if (name_end && (!gw_end || name_end <= gw_end) &&
-              (name_end - name_key) < static_cast<ptrdiff_t>(sizeof(hostname))) {
-            memcpy(hostname, name_key, static_cast<size_t>(name_end - name_key));
-            hostname[name_end - name_key] = '\0';
+        const char* gw_end = strchr(gw_obj + 9, '}');
+        if (!gw_end) gw_end = sat.manifest_json + sat.manifest_len;
+
+        const char* id_key = strstr(gw_obj, "\"id\"");
+        if (id_key && id_key < gw_end) {
+          const char* p = id_key + 4;
+          while (p < gw_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+          if (p < gw_end && *p == ':') {
+            ++p;
+            while (p < gw_end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p;
+            if (p < gw_end && *p == '"') {
+              const char* id_val = p + 1;
+              const char* id_end = strchr(id_val, '"');
+              if (id_end && id_end <= gw_end &&
+                  (id_end - id_val) < static_cast<ptrdiff_t>(sizeof(hostname))) {
+                memcpy(hostname, id_val, static_cast<size_t>(id_end - id_val));
+                hostname[id_end - id_val] = '\0';
+              }
+            }
           }
         }
       }
