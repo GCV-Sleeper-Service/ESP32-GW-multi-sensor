@@ -8,7 +8,7 @@ _Status: v7.6.9.0 COMPLETE. Device card cleanup merged._
 
 ## Project State Summary
 
-**v7.6.9.0 is complete.** Device card shows runtime flash/SRAM/PSRAM. MAC removed. Name and firmware version displayed.
+**v7.6.9.0 is complete** (PR #183, merged 2026-04-16). V3-A dashboard device card cleanup complete. Starting V3-B satellite gateway card.
 
 ---
 
@@ -23,7 +23,7 @@ _Status: v7.6.9.0 COMPLETE. Device card cleanup merged._
 | v7.6.8.0 | V2-A/B/C/D: Auth guards + status split | ✅ Complete |
 | v7.6.8.1 | V2-E/F/G: History auth + DoS + SEC-ADR | ✅ Complete |
 | v7.6.8.2 | V2-H/I/J: Gated optimisations | ✅ Complete |
-| v7.6.9.0 | V3-A: Device card cleanup | ✅ Complete |
+| v7.6.9.0 | V3-A: Device card cleanup | ✅ Complete (PR #183, merged 2026-04-16) |
 | **v7.6.9.1** | **V3-B/C: Hostname/IP + CSV role** | **⬅️ Current** |
 | v7.6.9.2 | V3-D/E: Manifest export + AGG-ADR | Pending |
 | v7.6.9.3 | V3-F: Struct audit (conditional) | Pending |
@@ -137,7 +137,12 @@ If any actual result from this step invalidates assumptions in the next step's h
 
 - CSV format now includes `role` column at position 3. Breaking change.
 - Gateways JSON includes `hostname` and `ip` fields.
-
+- DEVICE_INFO_MAP entries: di-device-name, di-firmware-version, di-flash, di-sram, di-psram now present in status-snapshot.js
+- Flash/SRAM display: static strings in YAML text_sensors with update_interval: 60s (NOT never)
+- PSRAM: single di-psram element; board-profile conditional lambda in generator
+- Known limitation: loadStatusSnapshot() credentials: 'same-origin' fails over Cloudflare Tunnel — tracked v7.6.9.6
+- LESSON-V769-01: text_sensors returning static values must use update_interval: 60s, not never
+- LESSON-V769-02: SRAM label must use datasheet static strings, not heap_caps allocator APIs
 ---
 
 _End of session handoff document._
