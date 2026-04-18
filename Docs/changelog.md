@@ -17,6 +17,12 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 - Checkpoint A passed: both reserve sites now use `adaptive_cap`, the fixed `60000` reserve pattern is gone, and no other firmware file changed before the client edit.
 - Checkpoint B passed under the updated prompt assertions from `origin/main`; the new history bootstrap gate, fallback timer binding, and old 10 s binding removal are all present.
 
+### Known Limitation (documented 2026-04-18)
+
+- The adaptive `csv.reserve()` cap does not truncate CSV output - the NVS scan loop grows the string past the cap through unbounded appending. WROOM boards with ~34 KB free heap and large NVS history (500+ segments) will still crash on `/history/{id}/{series}` and on dashboard boot history load. Full fix deferred to Phase 7 chunked HTTP streaming. See BUG-082.
+
+- Raw NVS partition backup extracted via `esptool read_flash 0x370000 0x80000` for offline parsing.
+
 ## [v7.6.9.3] - 2026-04-17 - Phase V V3-F: Struct Audit / Phase V Closure
 
 ### Changed
