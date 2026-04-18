@@ -83,3 +83,24 @@ Related: BUG-061
 **Rule:** `provision.sh` is the single entry point for board switching AND pipeline execution (Critical Rule 49, updated).
 
 ---
+
+---
+
+### LESSON-OPS-126: Checkpoint grep assertions must be validated against the actual replacement block in the same prompt (2026-04-17)
+
+**Context:** v7.6.9.4 Checkpoint B contained two grep assertions that were inconsistent with the replacement block defined in the same §5 Step 2 of the prompt. The agent correctly stopped and escalated instead of silently proceeding.
+
+**Defect 1 - symbol-count mismatch:**
+The prompt expected `grep -c _v7_9_4_historyKicked` = 2, but the replacement block it specified necessarily produces 3 occurrences (declaration + guard read + assignment). The expected value was likely written against an earlier draft of the replacement block, or the author confused the two versioned symbol names (`_historyKicked` vs `_kickHistoryOnce`).
+
+**Defect 2 - multiline diff grep:**
+The prompt's removal check was `git diff ... | grep -c '^-.*historyBootstrapTimerId.*10000'`. The old block being removed is a 4-line `setTimeout` call where `historyBootstrapTimerId` appears on line 1 and `10000` appears on line 4 of the diff hunk. A single-line grep anchored to `^-` can never match both tokens from different lines.
+
+**Rule:** When writing a checkpoint grep against a replacement block defined in the same prompt, count occurrences in the block directly before writing the expected value. For removal checks against multiline constructs, split into separate greps - one per token - rather than combining tokens from different lines into a single pattern.
+
+**Anti-pattern to avoid:** Writing checkpoint greps from memory of what the code should look like rather than mechanically counting from the actual block pasted into the prompt.
+
+**Critical Rule:** Checkpoint grep counts must be mechanically derived from the replacement block in the same prompt, not estimated from memory.
+
+Before finalising any checkpoint assertion of the form `grep -c SYMBOL FILE - expected: N`, count the literal occurrences of `SYMBOL` in the replacement or removal block defined in the same prompt document. If the block spans multiple lines, verify that the grep pattern can match across a single line; if the verification requires detecting a token removed from one line and another token removed from a different line, use separate single-token greps rather than a combined pattern. A wrong expected count is an instruction inconsistency that forces correct agent implementations to stop and escalate.
+

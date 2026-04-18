@@ -39,7 +39,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.6.9.3';
+App.version = 'v7.6.9.4';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -4171,14 +4171,27 @@ App.Boot.start = function() {
         }, 30000);
       }
 
-      // BUG-043-cont (PR2) Fix E: History deferred from 8s to 10s — the sequential initial
-      // poll (batch=1, 200ms gap, ~30 paths) takes roughly 7-8s on a loaded device. Adding
-      // 2s headroom prevents NVS-heavy history scans from overlapping with poll tail or
-      // storage stats (t+5s), keeping the startup window clean.
-      historyBootstrapTimerId = setTimeout(function() {
-        if (isImportActive()) return;
-        loadHistory();
-      }, 10000);
+      // v7.6.9.4 (#139 partial): gate initial history load on first status snapshot.
+      // Fixed 10 s timer was a worst-case estimate. Gating on loadStatusSnapshot()
+      // gives a live signal the board is (a) responsive, (b) at post-boot heap,
+      // (c) past the BLE/WiFi settle window. Preserves a 15 s fallback in case
+      // /api/status/full is unreachable (auth mismatch, network drop).
+      // loadHistory() is idempotent via _historyInFlight guard, so both triggers
+      // firing is safe.
+      var _v7_9_4_historyKicked = false;
+      function _v7_9_4_kickHistoryOnce() {
+        if (_v7_9_4_historyKicked || isImportActive()) return;
+        _v7_9_4_historyKicked = true;
+        Promise.resolve(loadHistory()).catch(function(){});
+      }
+      // Primary trigger: fire 1 s after the first status snapshot resolves.
+      // loadStatusSnapshot() is already called elsewhere in boot.js — chain off it.
+      loadStatusSnapshot().then(function() {
+        setTimeout(_v7_9_4_kickHistoryOnce, 1000);
+      }).catch(function(){});
+      // Safety fallback: always fire by 15 s so the user sees charts even if
+      // /api/status/full never returns.
+      historyBootstrapTimerId = setTimeout(_v7_9_4_kickHistoryOnce, 15000);
 
       // Aggregator overlay: if this device is an aggregator, show the Gateways section
       // and start the aggregator polling loop. Local sensors are already running above.

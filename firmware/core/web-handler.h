@@ -564,8 +564,19 @@ class HistoryWebHandler : public AsyncWebHandler {
 
     // Use pre-reserved string pattern (LESSON-OPS-056)
     size_t est_bytes = (size_t)buf->count() * 20 + 64;
+    // v7.6.9.4 (#139 partial): heap-adaptive cap replaces fixed 60 KB.
+    // Fixed cap (v7.6.8.1 V2-E) was sized for C3 ~68 KB free heap budget.
+    // On WROOM with ~30-40 KB free, a 60 KB reserve exceeds running heap and
+    // crashes the board. Clamp to free_heap/3 with a 12 KB floor and the
+    // original 60 KB ceiling preserved for healthy boards. Dashboard tolerates
+    // truncated CSV gracefully (parseCompactHistory processes line-by-line).
+    size_t free_now = esp_get_free_heap_size();
+    size_t adaptive_cap = free_now / 3;
+    if (adaptive_cap < 12000) adaptive_cap = 12000;
+    if (adaptive_cap > 60000) adaptive_cap = 60000;
+
     std::string csv;
-    csv.reserve(std::min(est_bytes, (size_t)60000));
+    csv.reserve(std::min(est_bytes, adaptive_cap));
     buf->append_csv_to(csv);
 
     auto *resp = request->beginResponse(
@@ -1515,9 +1526,19 @@ class HistoryWebHandler : public AsyncWebHandler {
     size_t est_points = (size_t)nvs_segments * PERSIST_POINTS_PER_SEGMENT
                       + (size_t)buf->count();
     size_t est_bytes  = est_points * 20 + 128;  // 20 bytes/line + margin
+    // v7.6.9.4 (#139 partial): heap-adaptive cap replaces fixed 60 KB.
+    // Fixed cap (v7.6.8.1 V2-E) was sized for C3 ~68 KB free heap budget.
+    // On WROOM with ~30-40 KB free, a 60 KB reserve exceeds running heap and
+    // crashes the board. Clamp to free_heap/3 with a 12 KB floor and the
+    // original 60 KB ceiling preserved for healthy boards. Dashboard tolerates
+    // truncated CSV gracefully (parseCompactHistory processes line-by-line).
+    size_t free_now = esp_get_free_heap_size();
+    size_t adaptive_cap = free_now / 3;
+    if (adaptive_cap < 12000) adaptive_cap = 12000;
+    if (adaptive_cap > 60000) adaptive_cap = 60000;
 
     std::string csv;
-    csv.reserve(std::min(est_bytes, (size_t)60000));
+    csv.reserve(std::min(est_bytes, adaptive_cap));
 
     // Read persisted NVS segments into the pre-reserved string
     SegmentSnapshot *snapshot = nullptr;

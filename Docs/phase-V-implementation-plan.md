@@ -41,7 +41,7 @@ The following 14 open issues must have their titles updated before or during Pha
 | 136 | Hardcoded C3 values in dashboard | `Tech-debt: Hardcoded C3 SRAM/flash values in dashboard template` | `tech-debt`, `dashboard`, `esp32-c3` | v7.6.9.x |
 | 137 | Generate SVG files for each board type | `Feature: Board-type SVG diagrams for documentation and device-info card` | `feature`, `dashboard` | Deferred (Phase 7+) |
 | 138 | The gateway card does not show actual information about PSRAM or flash size | `Enhancement: Gateway card PSRAM and flash size from runtime sensors` | `enhancement`, `dashboard` | v7.6.9.x |
-| 139 | History loading serialization for C3 boards | `Bug: History loading heap exhaustion on ESP32-C3 (v7.5.x)` | `bug`, `memory`, `esp32-c3` | Partial v7.6.8.x (auth cap), full fix Phase 7 |
+| 139 | History loading serialization for C3 boards | `Bug: History loading heap exhaustion on ESP32-C3 (v7.5.x)` | `bug`, `memory`, `esp32-c3` | Partial v7.6.8.x (auth cap), partial v7.6.9.4 (adaptive cap + boot sequencing), full fix Phase 7 |
 | 143 | No visible version badge on dashboard page | `Enhancement: Version badge in dashboard footer` | `enhancement`, `dashboard` | v7.6.7.x |
 | 144 | Update gateway card | `Enhancement: Gateway card — device name, firmware version, MAC removal` | `enhancement`, `dashboard` | v7.6.9.x |
 | 161 | Bug: Aggregator history proxy silently returns 502 — no diagnostic (v7.6.6.6) | Already correct ✓ | `bug` | v7.6.7.x |
@@ -802,7 +802,7 @@ size_t est_bytes = /* existing estimate */;
 csv.reserve(std::min(est_bytes, (size_t)60000));
 ```
 
-Note: 60,000 B is chosen as it fits within C3's safe heap margin (55–65 KB free) with ~5 KB remaining for other allocations. This is a safety net — the full fix (chunked streaming) is tracked in #139 for Phase 7.
+Note: 60,000 B is chosen as it fits within C3's safe heap margin (55–65 KB free) with ~5 KB remaining for other allocations. This is a safety net — the full fix (chunked streaming) is tracked in #139 for Phase 7. v7.6.9.4 adds a second partial mitigation layer via a heap-adaptive cap and status-gated history boot sequencing, preserving the same 60 KB ceiling on healthy boards while reducing WROOM crash risk.
 
 **Acceptance criteria:**
 - `curl http://{sat_ip}/api/v2/history/office/temp` returns `401`
@@ -1220,7 +1220,7 @@ The following 7 prompt artefacts are to be produced by a **subsequent agent** af
 - [x] The capacity study produces partition size recommendations for 4 MB, 8 MB, 16 MB boards
 - [x] The binary sensor event log recommendation is present — see capacity study §6
 - [x] V1, V2, V3 version sequences are specified (v7.6.7.x, v7.6.8.x, v7.6.9.x)
-- [x] No Phase 7 work is scheduled in Phase V
+- [x] No Phase 7 work is scheduled in Phase V (explicit v7.6.9.4 carve-out: OTA-safe adaptive-cap and boot-sequencing mitigations only; no storage-engine, NVS-format, or response-framing changes)
 - [x] No fragment boundary changes (Rule 62) are in scope
 - [x] No `sensor_history_multi.h` direct edits (Rule 58) are in scope
 - [x] All dashboard changes go through `bundle-dashboard.sh --write` → `build-dashboard.sh` → `generate-header.sh` → `preflight.sh`
@@ -1239,6 +1239,7 @@ The following 7 prompt artefacts are to be produced by a **subsequent agent** af
 | **Phase V — V1** | **v7.6.7.0–v7.6.7.2** | **Critical fixes + zero-gate optimisations** |
 | **Phase V — V2** | **v7.6.8.0–v7.6.8.2** | **Security hardening** |
 | **Phase V — V3** | **v7.6.9.0–v7.6.9.3** | **Dashboard enhancements + export/import** |
+| **Phase V — V4** | **v7.6.9.4** | **Heap-adaptive history cap + boot sequencing (#139 partial)** |
 | Phase 7 | v7.7.0.0–v7.7.2.3 | Per-device persistence engine |
 | Phase E | v8.0.x | Captive portal setup + WiFi config |
 

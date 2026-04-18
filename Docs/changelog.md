@@ -2,6 +2,21 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.9.4] - 2026-04-17 - Phase V V4: Heap-Adaptive History Cap + Boot Sequencing
+
+### Changed
+- Replaced the fixed 60 KB history CSV reserve cap with an inline heap-adaptive cap at both history handlers: `clamp(esp_get_free_heap_size()/3, 12000, 60000)` (#139 partial).
+- Gated the initial dashboard `loadHistory()` boot fetch on the first `loadStatusSnapshot()` resolution, while preserving a 15 s fallback so charts still appear if the status request never resolves (#139 partial).
+- Bumped version to `7.6.9.4` and regenerated dashboard, assembled history header, manifest, fixture, and firmware artifacts.
+
+### Docs
+- Updated the Phase V implementation plan with the v7.6.9.4 carve-out, issue-table annotation, V2-E mitigation note, and version-table row.
+- Added a checkpoint-authoring lesson covering mechanically derived grep assertions for prompt checkpoints.
+
+### Validation
+- Checkpoint A passed: both reserve sites now use `adaptive_cap`, the fixed `60000` reserve pattern is gone, and no other firmware file changed before the client edit.
+- Checkpoint B passed under the updated prompt assertions from `origin/main`; the new history bootstrap gate, fallback timer binding, and old 10 s binding removal are all present.
+
 ## [v7.6.9.3] - 2026-04-17 - Phase V V3-F: Struct Audit / Phase V Closure
 
 ### Changed

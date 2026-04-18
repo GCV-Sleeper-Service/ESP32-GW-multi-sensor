@@ -10,3 +10,8 @@ _See `Docs/lessons/index.md` for the complete cross-reference._
 | Build Pipeline | `Docs/lessons/build-pipeline.md` |
 | Testing | `Docs/lessons/testing.md` |
 | Operations | `Docs/lessons/operations.md` |
+
+## Latest Operational Addendum
+
+- `LESSON-OPS-126` moved into `Docs/lessons/operations.md`: checkpoint grep assertions must be validated against the actual replacement block in the same prompt.
+- Critical Rule: checkpoint grep counts must be mechanically derived from the replacement block in the same prompt, not estimated from memory.

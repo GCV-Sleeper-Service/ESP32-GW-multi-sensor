@@ -1,7 +1,7 @@
 # Phase V — Results and Handoff to Phase 7
 
 _Fill in during Phase V execution. Each row completed when the step merges._
-_Last updated: ____
+_Last updated: 2026-04-17_
 
 ---
 
@@ -44,6 +44,7 @@ _Last updated: ____
 | v7.6.9.1 | V3-B/C | #___ | | | | |
 | v7.6.9.2 | V3-D/E | #___ | | | | |
 | v7.6.9.3 | V3-F | #___ | | | | |
+| v7.6.9.4 | V4 | #193 | In progress | 0 | Codex | Heap-adaptive history reserve cap at both handlers and status-gated initial history boot with 15 s fallback |
 
 ---
 
@@ -51,12 +52,12 @@ _Last updated: ____
 
 | Fixture Set | Tests | Pass | Fail | Skip |
 |---|---|---|---|---|
-| 3sensor (chromium) | | | | |
-| 3sensor (firefox) | | | | |
-| mixed | | | | |
-| system | | | | |
-| aggregator | | | | |
-| **Total** | | | | |
+| 3sensor (chromium) | 149 | 102 | 0 | 47 |
+| 3sensor (firefox) | 149 | 102 | 0 | 47 |
+| mixed | 8 | 8 | 0 | 0 |
+| system | 9 | 9 | 0 | 0 |
+| aggregator | 12 | 11 | 0 | 1 |
+| **Total** | 327 | 232 | 0 | 95 |
 
 ---
 
@@ -66,21 +67,21 @@ _Last updated: ____
 
 | Test | Result | Heap Before | Heap After |
 |---|---|---|---|
-| Boot and stabilise | | | |
-| Dashboard open (SSE) | | | |
-| Import begin (no crash) | | | |
-| History fetch | | | |
-| Auth on ingest (401) | | | |
-| Status field strip | | | |
+| Boot and stabilise | Skipped by operator request | | |
+| Dashboard open (SSE) | Skipped by operator request | | |
+| Import begin (no crash) | Not run | | |
+| History fetch | Not run | | |
+| Auth on ingest (401) | Not run | | |
+| Status field strip | Not run | | |
 
 ### S3 Aggregator (192.168.120.191)
 
 | Test | Result | Notes |
 |---|---|---|
-| Proxy history (satellite online) | | |
-| Proxy history (satellite offline) | | |
-| Gateways auth (401/200) | | |
-| Satellite hostname/IP display | | |
+| Proxy history (satellite online) | Skipped by operator request | Device flashing/test gate not run |
+| Proxy history (satellite offline) | Skipped by operator request | Device flashing/test gate not run |
+| Gateways auth (401/200) | Not run | Device flashing/test gate not run |
+| Satellite hostname/IP display | Not run | Device flashing/test gate not run |
 
 ---
 
@@ -139,14 +140,14 @@ _Last updated: ____
 
 | # | Rule | Source |
 |---|---|---|
-| | | |
+| Rule | Checkpoint grep counts must be mechanically derived from the replacement block in the same prompt, not estimated from memory. | v7.6.9.4 |
 
 ### New Lessons from Phase V
 
 | # | Lesson | Source |
 |---|---|---|
 | LESSON-SEC-001 | All write endpoints require auth | v7.6.8.0 |
-| | | |
+| LESSON-OPS-126 | Checkpoint grep assertions must be validated against the actual replacement block in the same prompt | v7.6.9.4 |
 
 ---
 
