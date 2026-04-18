@@ -223,3 +223,14 @@ When this addendum merges:
 ---
 
 _End of Phase V plan addendum for v7.6.9.4._
+
+## Post-Merge Correction (2026-04-18)
+
+The adaptive cap as implemented controls only `std::string::reserve()` - an allocation hint. It does **not** enforce a hard truncation limit on the CSV data appended by the NVS scan loop. The string grows unbounded past the reserved capacity through `.append()` calls, and on the WROOM with 556 NVS segments (~40 KB CSV vs ~34 KB free heap), the reallocation spike crashes the board.
+
+Both GitHub Copilot and OpenAI Codex automated PR reviews independently identified this defect.
+
+**Decision:** Merge as-is, defer the fix to Phase 7. Chunked HTTP streaming (the Phase 7 transport fix) eliminates single-response CSV building entirely, making the truncation guard unnecessary. A truncation guard alone would cap history display on all boards as NVS fills - an undesirable universal behavioral change.
+
+**Data safety:** NVS data is intact on flash. Raw partition dump (`esptool read_flash 0x370000 0x80000`) extracted 2026-04-18 and parsed offline via `scripts/parse_nvs_history.py`.
+

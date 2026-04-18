@@ -104,3 +104,23 @@ The prompt's removal check was `git diff ... | grep -c '^-.*historyBootstrapTime
 
 Before finalising any checkpoint assertion of the form `grep -c SYMBOL FILE - expected: N`, count the literal occurrences of `SYMBOL` in the replacement or removal block defined in the same prompt document. If the block spans multiple lines, verify that the grep pattern can match across a single line; if the verification requires detecting a token removed from one line and another token removed from a different line, use separate single-token greps rather than a combined pattern. A wrong expected count is an instruction inconsistency that forces correct agent implementations to stop and escalate.
 
+### LESSON-OPS-127: std::string::reserve() is an allocation hint, not a size constraint (2026-04-18)
+
+`std::string::reserve(N)` pre-allocates capacity for N bytes but does not prevent the string from growing past N through `.append()` or `+=` calls. On heap-constrained ESP32 boards, this distinction is critical: the initial `reserve()` may fit in free heap, but unbounded appending triggers reallocations that temporarily require 2x the current string size (old + new buffer), which can exceed available memory.
+
+**Pattern for heap-safe string building in loops:**
+
+```cpp
+size_t cap = compute_safe_cap(esp_get_free_heap_size());
+std::string csv;
+csv.reserve(std::min(est_bytes, cap));
+for (each_item) {
+    if (csv.size() >= cap) break;   // MANDATORY truncation guard
+    append_data(csv, item);
+}
+```
+
+Without the break guard, the reserve() cap is cosmetic - the string grows unbounded and the board crashes during reallocation.
+
+Context: BUG-082 (v7.6.9.4). Both GitHub Copilot and OpenAI Codex automated reviews independently identified this defect. The fix is deferred to Phase 7 (chunked HTTP streaming replaces single-response CSV building entirely).
+
