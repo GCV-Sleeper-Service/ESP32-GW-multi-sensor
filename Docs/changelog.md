@@ -2,6 +2,21 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.9.5] - 2026-04-19 - Phase V V5: C3 httpd Stack Watermark Investigation
+
+### Changed
+- Conditional httpd task stack sizing: 20480 bytes (20 KB) for ESP32-C3 (RISC-V), 16384 bytes (16 KB) for Xtensa targets (ESP32, ESP32-S3). The C3's RISC-V architecture uses ~4.7x more stack per handler call chain than Xtensa's register-windowed architecture.
+- Updated `scripts/patch-esphome-httpd-stack.sh` to apply and verify the conditional stack patch.
+
+### Added
+- `scripts/stress-test-httpd-stack.sh` - reproducible stress test protocol for httpd stack watermark validation.
+
+### Investigation Findings
+- C3 httpd stack watermark: 636 bytes (3.9% of 16 KB) at ~15 hours uptime on v7.6.9.4.
+- WROOM watermark: 13044 bytes (79.6% headroom). S3 watermark: 13760 bytes (84.0%).
+- Root cause: RISC-V ABI pushes callee-saved registers (s0-s11) at every call boundary; Xtensa register windows keep state in hardware without stack push. Typical frame: ~80 B (RISC-V) vs ~24 B (Xtensa).
+- 20 KB stack provides ~4732 bytes headroom on C3 at current usage, confirmed by stress test.
+
 ## [v7.6.9.4] - 2026-04-17 - Phase V V4: Heap-Adaptive History Cap + Boot Sequencing
 
 ### Changed

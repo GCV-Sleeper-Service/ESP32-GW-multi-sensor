@@ -3,15 +3,15 @@
 ## What
 Two patches to `web_server_idf.cpp`, method `AsyncWebServer::begin()`:
 
-**Patch 1 — Stack size (BUG-076):** `config.stack_size = 16384` after `HTTPD_DEFAULT_CONFIG()`
+**Patch 1 - Stack size (BUG-076 + v7.6.9.5):** Conditional `config.stack_size` after `HTTPD_DEFAULT_CONFIG()`: 20480 for ESP32-C3 (RISC-V), 16384 for Xtensa targets (ESP32, ESP32-S3). RISC-V stack frames are ~4x larger than Xtensa due to register window differences.
 
-**Patch 2 — DELETE handler (BUG-079):** Register an `HTTP_DELETE` URI handler so
+**Patch 2 - DELETE handler (BUG-079):** Register an `HTTP_DELETE` URI handler so
 ESP-IDF httpd routes DELETE requests to the AsyncWebServer handler chain instead
 of returning a plain-text 405 "Specified method is invalid for this resource".
 
 ## Why
 
-### Patch 1 — Stack size
+### Patch 1 - Stack size
 ESP-IDF's `HTTPD_DEFAULT_CONFIG()` hardcodes `.stack_size = 4096`.
 ESPHome never overrides it. 4 KB is insufficient for any handler that
 performs authentication + HTTP response formatting. Stack overflow crashes
@@ -19,7 +19,13 @@ with `StoreProhibited` in `vPortYieldFromInt`.
 
 `CONFIG_HTTPD_STACK_SIZE` in `sdkconfig_options` has zero runtime effect.
 
-### Patch 2 — DELETE handler
+v7.6.9.5 investigation found that the ESP32-C3 (RISC-V) uses ~15748 B of
+httpd stack (watermark 636 B on 16 KB) while Xtensa boards use only ~3340 B
+(watermark 13044 B). The RISC-V ABI pushes callee-saved registers per call
+frame; Xtensa register windows keep them in hardware. Conditional sizing
+avoids wasting 4 KB on heap-constrained Xtensa boards.
+
+### Patch 2 - DELETE handler
 Stock ESPHome's `AsyncWebServer::begin()` registers only GET, POST, and OPTIONS
 URI handlers. When a DELETE request arrives, ESP-IDF httpd finds no registered
 handler for that method and immediately returns its built-in plain-text 405,

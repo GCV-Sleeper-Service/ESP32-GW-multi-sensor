@@ -81,13 +81,19 @@ struct SensorEntity:
 
 ### Task stack costs (one-time, not per metric)
 
-| Task | Current stack | Post-optimisation (post-OPT-01/03) | Notes |
-|---|---|---|---|
-| httpd task | 16,384 B | 10,240–14,336 B (gated) | Patched from ESPHome default 4,096 B (BUG-076) |
-| ping_adapter task | 4,096 B | 2,048 B (gated on Step 7 watermark) | OPT-03 gate |
-| agg_poll task | 10,240 B | 10,240 B (no change) | AGGREGATOR_ENABLED only |
-| hist_delete task | 8,192 B | 8,192 B | On-demand, transient |
-| import deferred task | 8,192 B | 8,192 B | V1-D, created only during import |
+| Task | Stack (RISC-V: C3/C6/C5) | Stack (Xtensa: ESP32/S3) | Measured peak (v7.6.9.5) | Notes |
+|---|---|---|---|---|
+| httpd task | 20,480 B | 16,384 B | ~15,748 B (C3) / ~3,340 B (WROOM) | BUG-076 patch, architecture-conditional since v7.6.9.5 |
+| ping_adapter task | 4,096 B | 4,096 B | Watermark TBD | Same across architectures (simple task) |
+| agg_poll task | 10,240 B | 10,240 B | Watermark TBD | AGGREGATOR_ENABLED only |
+| hist_delete task | 8,192 B | 8,192 B | Watermark TBD | On-demand, transient |
+| import deferred task | 8,192 B | 8,192 B | Watermark TBD | V1-D, created only during import |
+
+**v7.6.9.5 finding:** RISC-V chips use ~4.7x more httpd stack than Xtensa for
+identical firmware (conventional ABI vs register windows). The httpd stack is now
+architecture-conditional via `#ifdef CONFIG_IDF_TARGET_ARCH_RISCV` in the local
+component override. Future RISC-V boards (C6, C5, H2) inherit the 20 KB allocation
+automatically. See LESSON-OPS-128 for full analysis.
 
 ### NVS flash per metric per segment
 

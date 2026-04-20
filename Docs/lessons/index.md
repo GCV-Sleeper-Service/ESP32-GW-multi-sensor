@@ -213,3 +213,6 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-125 | firmware.md |
 | LESSON-OPS-126 | operations.md |
 | LESSON-OPS-127 | operations.md |
+| LESSON-OPS-128 | firmware.md |
+
+Latest firmware lesson: LESSON-OPS-128 - RISC-V vs Xtensa httpd stack sizing (`firmware.md`).

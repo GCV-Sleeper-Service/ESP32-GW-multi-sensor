@@ -1227,3 +1227,28 @@ Do not accept inline code suggestions from reviewer bots for fragment files with
 **See also:** Critical Rules 58, 62 (fragment architecture guardrails), LESSON-OPS-122 (fragment architecture).
 
 ---
+
+### LESSON-OPS-128: RISC-V (ESP32-C3) httpd stack usage is ~4.7x higher than Xtensa (ESP32/S3) (2026-04-19)
+
+Context: v7.6.9.5 stack watermark investigation. On identical v7.6.9.4 firmware
+at ~15 hours uptime, the ESP32-C3 showed `httpd_stack_watermark_bytes` = 636
+(peak usage ~15748 B on a 16 KB stack) while the ESP32-WROOM-32D showed 13044
+(peak ~3340 B) and the ESP32-S3 showed 13760 (peak ~2624 B).
+
+**Root cause:** architecture difference, not firmware or data differences.
+- **Xtensa (ESP32, ESP32-S3):** register window mechanism rotates through
+  64 physical registers. Function arguments and locals stay in registers
+  without pushing to stack. Stack spills only occur at deep nesting.
+- **RISC-V (ESP32-C3):** 32 general-purpose registers with conventional ABI.
+  Callee-saved registers (s0-s11) are pushed to stack at every call boundary.
+  Typical stack frame: 48-96 bytes vs 16-32 bytes on Xtensa.
+
+**Fix:** conditional stack sizing via `#ifdef CONFIG_IDF_TARGET_ARCH_RISCV` in
+the local component override (`firmware/local_components/web_server_idf/`):
+20480 bytes for C3, 16384 bytes for Xtensa targets. A uniform bump wastes
+4 KB on the WROOM (which has only ~13 KB min_free_heap - BUG-082 territory).
+
+**Rule:** multi-target ESP32 firmware must account for architecture-dependent
+stack frame sizes. Do not assume stack usage is constant across chip families.
+
+---

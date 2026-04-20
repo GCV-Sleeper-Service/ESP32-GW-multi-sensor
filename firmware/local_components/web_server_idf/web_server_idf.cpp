@@ -121,7 +121,13 @@ void AsyncWebServer::begin() {
     this->end();
   }
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-  config.stack_size = 16384;  // PATCHED: BUG-076 — ESPHome default 4KB overflows with any non-trivial handler
+  // PATCHED: BUG-076 + v7.6.9.5 ? RISC-V (C3/C6/C5) needs larger stack frames than Xtensa (ESP32/S3)
+  // C3 peak usage ~15748 B (watermark 636 B on 16 KB) vs Xtensa ~3340 B (watermark 13044 B)
+#if defined(CONFIG_IDF_TARGET_ARCH_RISCV)
+  config.stack_size = 20480;   // 20 KB ? RISC-V: conventional ABI, ~80 B per frame (C3, C6, C5, H2)
+#else
+  config.stack_size = 16384;   // 16 KB ? Xtensa: register windows, ~24 B per frame (ESP32, S2, S3)
+#endif
   config.server_port = this->port_;
   config.uri_match_fn = [](const char * /*unused*/, const char * /*unused*/, size_t /*unused*/) { return true; };
   // Always enable LRU purging to handle socket exhaustion gracefully.
