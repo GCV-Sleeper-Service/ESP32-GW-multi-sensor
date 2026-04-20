@@ -296,6 +296,28 @@ if [[ "$FAIL_COUNT" -gt 0 ]]; then
   exit 1
 fi
 
+# -- external_components guard (v7.6.9.5: prevent missing httpd stack override) --
+echo "Checking external_components in board YAMLs..."
+EC_FAIL=0
+if ! grep -q 'external_components' firmware/esp32-c3-multi-sensor.yaml; then
+    echo "FAIL: firmware/esp32-c3-multi-sensor.yaml missing external_components"
+    EC_FAIL=1
+fi
+for gw_yaml in firmware/*-gw.yaml; do
+    [ -f "$gw_yaml" ] || continue
+    if ! grep -q 'external_components' "$gw_yaml"; then
+        echo "FAIL: $gw_yaml missing external_components"
+        EC_FAIL=1
+    fi
+done
+if [ "$EC_FAIL" -eq 0 ]; then
+    echo "OK: all board YAMLs have external_components"
+else
+    echo "ERROR: Board YAML(s) missing external_components ? httpd stack override will not compile in."
+    echo "       Add the external_components block referencing local_components/web_server_idf."
+    exit 1
+fi
+
 python3 scripts/render_sensor_config.py --check
 node tests/fixtures/generate-fixtures.js --manifest config/sensors.json --overwrite-baseline >/dev/null
 check_contains "fixture_baseline_manifest_regenerated" tests/fixtures/manifest.json '"schema_version": 2'

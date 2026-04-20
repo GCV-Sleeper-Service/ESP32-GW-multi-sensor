@@ -81,13 +81,14 @@ struct SensorEntity:
 
 ### Task stack costs (one-time, not per metric)
 
-| Task | Current stack | Post-optimisation (post-OPT-01/03) | Notes |
+| Task | Stack size | Measured peak (v7.6.9.5) | Notes |
 |---|---|---|---|
-| httpd task | 16,384 B | 10,240–14,336 B (gated) | Patched from ESPHome default 4,096 B (BUG-076) |
-| ping_adapter task | 4,096 B | 2,048 B (gated on Step 7 watermark) | OPT-03 gate |
-| agg_poll task | 10,240 B | 10,240 B (no change) | AGGREGATOR_ENABLED only |
-| hist_delete task | 8,192 B | 8,192 B | On-demand, transient |
-| import deferred task | 8,192 B | 8,192 B | V1-D, created only during import |
+| httpd task | 16,384 B | ~3,460 B (C3), ~3,340 B (WROOM) | BUG-076 patch via local component override. C3 was missing override pre-v7.6.9.5 (ran on stock 4 KB). |
+| ping_adapter task | 4,096 B | TBD | |
+
+**v7.6.9.5 finding:** Peak httpd stack usage is ~3,400 B across both RISC-V (C3)
+and Xtensa (WROOM/S3) architectures. The 16 KB allocation provides ~12,900 B
+headroom (79%). No architecture-conditional sizing is needed.
 
 ### NVS flash per metric per segment
 
