@@ -21,10 +21,24 @@
 set -euo pipefail
 
 TARGET="${1:-192.168.120.189}"
-AUTH="ESPadmin:ESPpass100"
+AUTH="${ESP_AUTH:-ESPadmin:ESPpass100}"
 BASE="http://${TARGET}"
 WAVES=5
 MIN_WM=999999
+
+cleanup() {
+    local jobs
+    jobs="$(jobs -p)" || return 0
+    if [[ -n "$jobs" ]]; then
+        kill $jobs 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
+
+run_wave_request() {
+    curl -sf -u "$AUTH" "${BASE}/$1" -o /dev/null &
+    WAVE_PIDS+=($!)
+}
 
 echo "-----------------------------------------------------------"
 echo "  httpd Stack Watermark Stress Test"
@@ -48,22 +62,31 @@ fi
 for wave in $(seq 1 "$WAVES"); do
     echo "-- Wave ${wave}/${WAVES} --"
 
-    curl -sf -u "$AUTH" "${BASE}/history/office/temp" -o /dev/null &
-    curl -sf -u "$AUTH" "${BASE}/history/office/hum" -o /dev/null &
-    curl -sf -u "$AUTH" "${BASE}/history/office/temp" -o /dev/null &
-    curl -sf -u "$AUTH" "${BASE}/api/status/full" -o /dev/null &
-    curl -sf -u "$AUTH" "${BASE}/api/status/full" -o /dev/null &
-    curl -sf -u "$AUTH" "${BASE}/api/storage-stats" -o /dev/null &
-    curl -sf -u "$AUTH" "${BASE}/api/storage-stats" -o /dev/null &
-    curl -sf -u "$AUTH" "${BASE}/api/storage-stats" -o /dev/null &
+    WAVE_PIDS=()
+    run_wave_request "history/office/temp"
+    run_wave_request "history/office/hum"
+    run_wave_request "history/office/temp"
+    run_wave_request "api/status/full"
+    run_wave_request "api/status/full"
+    run_wave_request "api/storage-stats"
+    run_wave_request "api/storage-stats"
+    run_wave_request "api/storage-stats"
 
-    wait
+    for pid in "${WAVE_PIDS[@]}"; do
+        wait "$pid"
+    done
     sleep 2
 
     POST=$(curl -sf -u "$AUTH" "${BASE}/api/status/full")
     WM=$(echo "$POST" | jq '.httpd_stack_watermark_bytes')
     FH=$(echo "$POST" | jq '.free_heap')
     MFH=$(echo "$POST" | jq '.min_free_heap')
+
+    if [[ "$WM" == "null" || -z "$WM" ]]; then
+        echo "ERROR: Could not read httpd_stack_watermark_bytes after wave ${wave}"
+        exit 1
+    fi
+
     echo "  watermark=${WM}  free_heap=${FH}  min_free_heap=${MFH}"
 
     if [[ "$WM" -lt "$MIN_WM" ]]; then
@@ -88,5 +111,6 @@ if [[ "$MIN_WM" -ge 10000 ]]; then
 else
     echo "  FAIL - minimum watermark ${MIN_WM} < 10000 bytes"
     echo "         If this is still ~636, the local override is not active."
+    exit 1
 fi
 echo "-----------------------------------------------------------"

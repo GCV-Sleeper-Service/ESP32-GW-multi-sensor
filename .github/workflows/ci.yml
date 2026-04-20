@@ -33,7 +33,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          pip install esphome
+          pip install esphome==2026.2.1
           npm install -g html-minifier-terser
           echo "node=$(node --version) npm=$(npm --version) python=$(python --version) esphome=$(esphome version)" >> "$GITHUB_STEP_SUMMARY"
 
