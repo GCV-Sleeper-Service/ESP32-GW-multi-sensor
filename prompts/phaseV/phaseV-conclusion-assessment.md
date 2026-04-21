@@ -39,6 +39,12 @@ _Fill in after Phase V completes (all V1/V2/V3 steps merged or explicitly deferr
 | v7.6.9.2 (V3-D/E) | | |
 | v7.6.9.3 (V3-F) | | |
 
+### V4/V5 
+| Step | Outcome | Notes |
+|---|---|---|
+| v7.6.9.4 (V4) | | |
+| v7.6.9.5 (V5) | | |
+
 ---
 
 ## What Was Deferred
@@ -46,7 +52,7 @@ _Fill in after Phase V completes (all V1/V2/V3 steps merged or explicitly deferr
 | Item | Reason | Target |
 |---|---|---|
 | | | |
-
+v7.6.9.6 |(Cloudflare polling fix) — Dropped| issue self-resolved (BUG-078 fixed 401→500 in v7.6.0.1). Auth UX deferred to Phase VX v7.6.10.4.
 ---
 
 ## What Phase 7 Inherits

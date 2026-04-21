@@ -211,6 +211,8 @@ Phase V is likely to have surfaced:
 - v7.6.9.0 C3 `httpd_stack_watermark_bytes: 644` (near-overflow risk)
 - v7.6.9.0 WROOM history endpoint OOM on large history
 - v7.6.9.x pre-existing regression from v7.6.8.0 SEC-04 field split (heap/uptime on /api/status stripped, polling mode silently broken)
+- v7.6.9.5 C3 template YAML missing `external_components` — httpd stack override inactive since v7.6.8.0 (BUG-083)
+- v7.6.9.6 originally planned (Cloudflare polling fix + SEC-ADR amendment) but dropped — issue self-resolved after BUG-078 fix in v7.6.0.1 eliminated the 401→500 HTTP status mapping
 
 Capture each. Note which were caught by pre-merge review vs post-merge device testing vs in-production operator reporting.
 

@@ -45,8 +45,10 @@ _Last updated: 2026-04-17_
 | v7.6.9.2 | V3-D/E | #___ | | | | |
 | v7.6.9.3 | V3-F | #___ | | | | |
 | v7.6.9.4 | V4 | #193 | In progress | 0 | Codex | Heap-adaptive history reserve cap at both handlers and status-gated initial history boot with 15 s fallback |
-
+| v7.6.9.5 | V5 | #195 | Complete | 1 (rework) | GPT/Codex | C3 httpd stack override fix (BUG-083) |
 ---
+
+v7.6.9.6 was originally planned (Cloudflare polling fix + SEC-ADR amendment) but dropped after the issue self-resolved.
 
 ## Test Results (Final State)
 
@@ -127,6 +129,8 @@ _Last updated: 2026-04-17_
 5. **Import deferred task:** `handle_import_begin_()` uses `xTaskCreate` for `build_import_epoch_map_()`. New `/api/import/status` endpoint for readiness polling.
 
 6. **Capacity study:** `Docs/phase-V-capacity-study.md` — C3 max 8 persistent metrics, partition recommendations for Phase 7.
+
+7. **Include BUG-083** finding and dashboard auth refactor deferral
 
 ### What Phase 7 Must Do
 
