@@ -481,7 +481,7 @@ void AsyncEventSource::handleRequest(AsyncWebServerRequest *request) {
   this->sessions_.push_back(rsp);
 }
 
-bool AsyncEventSource::loop() {
+void AsyncEventSource::loop() {
   // Clean up dead sessions safely
   // This follows the ESP-IDF pattern where free_ctx marks resources as dead
   // and the main loop handles the actual cleanup to avoid race conditions
@@ -499,7 +499,6 @@ bool AsyncEventSource::loop() {
       ++i;
     }
   }
-  return !this->empty();
 }
 
 void AsyncEventSource::try_send_nodefer(const char *message, const char *event, uint32_t id, uint32_t reconnect) {
@@ -604,7 +603,7 @@ void AsyncEventSourceResponse::deq_push_back_with_dedup_(void *source, message_g
 void AsyncEventSourceResponse::process_deferred_queue_() {
   while (!deferred_queue_.empty()) {
     DeferredEvent &de = deferred_queue_.front();
-    auto message = de.message_generator_(web_server_, de.source_);
+    std::string message = de.message_generator_(web_server_, de.source_);
     if (this->try_send_nodefer(message.c_str(), "state")) {
       // O(n) but memory efficiency is more important than speed here which is why std::vector was chosen
       deferred_queue_.erase(deferred_queue_.begin());
@@ -841,7 +840,7 @@ void AsyncEventSourceResponse::deferrable_send_state(void *source, const char *e
     // trying to send first
     deq_push_back_with_dedup_(source, message_generator);
   } else {
-    auto message = message_generator(web_server_, source);
+    std::string message = message_generator(web_server_, source);
     if (!this->try_send_nodefer(message.c_str(), "state")) {
       deq_push_back_with_dedup_(source, message_generator);
     }

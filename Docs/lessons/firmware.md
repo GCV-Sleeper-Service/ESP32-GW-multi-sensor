@@ -1258,3 +1258,32 @@ but wrong - actual peak usage is ~3,400 B on both architectures. The gap was
 entirely caused by different stack sizes. See LESSON-OPS-128.
 
 ---
+
+
+### LESSON-OPS-128: Verify configuration equivalence before theorizing about measurement discrepancies (2026-04-20)
+
+Context: BUG-083 (v7.6.9.5). The C3 showed httpd_stack_watermark_bytes = 636
+while the WROOM showed 13,044. The initial diagnosis attributed this to RISC-V vs
+Xtensa architecture differences (register windows reduce per-frame stack usage).
+This was technically plausible but wrong.
+
+The real cause: the C3 was running on a 4 KB stack while WROOM/S3 had 16 KB.
+Peak usage was ~3,400 B on both architectures. A single verification command
+would have caught this:
+
+    grep -c 'external_components' firmware/esp32-c3-multi-sensor.yaml
+    # Returns 0 -> override not compiled in
+
+**Rule: when two boards show different measurements for the same metric, check the
+mundane explanations first:**
+1. Are both boards running the same firmware version? (`/api/status/full` -> version)
+2. Are both boards compiled with the same configuration? (grep for key config blocks)
+3. Are both boards using the same component overrides? (check `external_components`)
+4. Only after configuration equivalence is confirmed should architectural or
+   data-driven explanations be considered.
+
+This rule applies to any diagnostic session - stack watermark, heap usage, timing,
+sensor accuracy. The exotic explanation is more interesting but the configuration
+mismatch is more likely.
+
+---
