@@ -1227,3 +1227,63 @@ Do not accept inline code suggestions from reviewer bots for fragment files with
 **See also:** Critical Rules 58, 62 (fragment architecture guardrails), LESSON-OPS-122 (fragment architecture).
 
 ---
+
+### BUG-083: C3 template YAML missing external_components - httpd stack override inactive since v7.6.8.0 (2026-04-20)
+
+The `firmware/local_components/web_server_idf/` override that patches the httpd task
+stack from 4 KB to 16 KB (BUG-076 fix) was never compiled into the C3 firmware.
+The C3 template YAML (`firmware/esp32-c3-multi-sensor.yaml`) lacked the
+`external_components` block that directs ESPHome to use the local override.
+
+**Root cause:** `render_sensor_config.py` has two code paths:
+- With `gateway.json` (WROOM, S3): `generate_board_yaml()` reads the board profile
+  and emits `external_components`. Override active.
+- Without `gateway.json` (C3 default): `render_yaml_file()` does in-place marker
+  substitution only. `external_components` from the board profile is never read.
+
+The board profile (`firmware/boards/esp32-c3-supermini.yaml`) has always had the
+correct `external_components` entry. The C3 simply never goes through the code path
+that uses it.
+
+**Impact:** The C3 ran with 636 bytes of stack headroom (on a 4 KB stack) for 3+
+months of Phase V. Any slightly deeper handler call chain could have caused a stack
+overflow crash. WROOM and S3 had 13,000+ bytes headroom on 16 KB.
+
+**Fix:** Add `external_components` block directly to the C3 template YAML. Add a
+preflight guard to prevent recurrence.
+
+**Diagnostic error:** The initial v7.6.9.5 analysis attributed the 20x watermark gap
+to RISC-V vs Xtensa architecture differences (register windows). This was plausible
+but wrong - actual peak usage is ~3,400 B on both architectures. The gap was
+entirely caused by different stack sizes. See LESSON-OPS-128.
+
+---
+
+
+### LESSON-OPS-128: Verify configuration equivalence before theorizing about measurement discrepancies (2026-04-20)
+
+Context: BUG-083 (v7.6.9.5). The C3 showed httpd_stack_watermark_bytes = 636
+while the WROOM showed 13,044. The initial diagnosis attributed this to RISC-V vs
+Xtensa architecture differences (register windows reduce per-frame stack usage).
+This was technically plausible but wrong.
+
+The real cause: the C3 was running on a 4 KB stack while WROOM/S3 had 16 KB.
+Peak usage was ~3,400 B on both architectures. A single verification command
+would have caught this:
+
+    grep -c 'external_components' firmware/esp32-c3-multi-sensor.yaml
+    # Returns 0 -> override not compiled in
+
+**Rule: when two boards show different measurements for the same metric, check the
+mundane explanations first:**
+1. Are both boards running the same firmware version? (`/api/status/full` -> version)
+2. Are both boards compiled with the same configuration? (grep for key config blocks)
+3. Are both boards using the same component overrides? (check `external_components`)
+4. Only after configuration equivalence is confirmed should architectural or
+   data-driven explanations be considered.
+
+This rule applies to any diagnostic session - stack watermark, heap usage, timing,
+sensor accuracy. The exotic explanation is more interesting but the configuration
+mismatch is more likely.
+
+---

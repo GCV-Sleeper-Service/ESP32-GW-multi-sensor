@@ -2,6 +2,21 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.9.5] - 2026-04-20 - Phase V V5: C3 httpd Stack Override Fix
+
+### Fixed
+- Added missing `external_components` block to the C3 template YAML (`firmware/esp32-c3-multi-sensor.yaml`). The local component override (`firmware/local_components/web_server_idf/`) with `config.stack_size = 16384` was created in v7.6.8.0 (BUG-076) but never compiled into C3 firmware - the C3 has been running on ESPHome's stock 4 KB httpd stack throughout Phase V. WROOM and S3 boards were unaffected (their generated YAMLs included the override).
+
+### Added
+- `scripts/stress-test-httpd-stack.sh` - reproducible stress test protocol for httpd stack watermark.
+- Preflight guard in `scripts/preflight.sh` checking all board YAMLs for `external_components` reference.
+
+### Investigation Findings
+- C3 httpd stack watermark: 636 bytes on a **4 KB** stock stack (not the expected 16 KB). Peak usage ~3,460 B.
+- WROOM watermark: 13,044 bytes on a 16 KB stack. Peak usage ~3,340 B.
+- Peak stack usage is nearly identical across RISC-V (C3) and Xtensa (WROOM/S3) - the 20x watermark gap was caused by different stack sizes, not architecture differences.
+- Root cause: `render_sensor_config.py` has two code paths - the C3's in-place path (`render_yaml_file()`) never reads `external_components` from the board profile.
+
 ## [v7.6.9.4] - 2026-04-17 - Phase V V4: Heap-Adaptive History Cap + Boot Sequencing
 
 ### Changed

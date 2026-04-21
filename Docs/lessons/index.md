@@ -89,6 +89,7 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | BUG-080 | dashboard.md |
 | BUG-081 | dashboard.md |
 | BUG-082 | firmware.md |
+| BUG-083 | firmware.md |
 | LESSON-OPS-001 | build-pipeline.md |
 | LESSON-OPS-002 | build-pipeline.md |
 | LESSON-OPS-003 | testing.md |
@@ -213,3 +214,4 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-125 | firmware.md |
 | LESSON-OPS-126 | operations.md |
 | LESSON-OPS-127 | operations.md |
+| LESSON-OPS-128 | firmware.md |
