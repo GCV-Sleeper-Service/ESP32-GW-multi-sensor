@@ -6,7 +6,8 @@ secrets/*.yaml
 build-logs/
 artifacts/
 firmware/.esphome/
-.vscode/
+.vscode
+.vscode/extensions.json
 # Minification build artifact — do not commit
 dashboard/dashboard.min.html
 # node_modules (Playwright / minification tools if installed locally)
