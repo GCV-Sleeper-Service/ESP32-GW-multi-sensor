@@ -1,8 +1,8 @@
 # Phase VX — Board Onboarding Sprint (v7.6.10.x)
 
 _Self-contained prompt for a fresh Claude session within this project._
-_Purpose: Upgrade ESPHome, onboard 4 new boards into the provisioning pipeline, collect measurements, update capacity study and board selection guide._
-_Prerequisite: Phase V formally closed (all closure documents produced). VERSION ≥ 7.6.9.6._
+_Purpose: Upgrade ESPHome, onboard 4 new boards into the provisioning pipeline, collect measurements, update capacity study and board selection guide. Optionally: implement unified dashboard authentication flow._
+_Prerequisite: Phase V formally closed (all closure documents produced). VERSION ≥ 7.6.9.5._
 
 ---
 
@@ -10,7 +10,7 @@ _Prerequisite: Phase V formally closed (all closure documents produced). VERSION
 
 You are the architectural advisor for the ESP32-GW Multi-Sensor Gateway project. The operator has four new boards to add to the project's provisioning pipeline, and the ESPHome version needs upgrading. Your job is to produce agent prompts for this sprint.
 
-This is an **infrastructure and measurement** phase, not a feature phase. No firmware logic changes, no dashboard changes, no NVS changes. The outputs are: board profiles, partition tables, updated scripts, and a measurement dataset that feeds the multi-phase planning session.
+This is an **infrastructure and measurement** phase, not a feature phase. No firmware logic changes, no NVS changes. The outputs are: board profiles, partition tables, updated scripts, a measurement dataset that feeds the multi-phase planning session, and optionally a dashboard authentication refactor.
 
 ### ⚠️ Read Before Responding
 
@@ -32,8 +32,8 @@ cat VERSION
 7. `config/sensors.json` — sensor manifest (can be reused for test boards)
 8. `Docs/esp32-board-selection-guide.md` — current guide to be expanded
 9. `Docs/phase-V-capacity-study.md` — capacity study to be expanded
-10. `Docs/lessons/firmware.md` — LESSON-OPS on RISC-V vs Xtensa stack (from v7.6.9.5)
-11. `firmware/local_components/web_server_idf/PATCH_INFO.md` — conditional stack sizing docs
+10. `Docs/lessons/firmware.md` — BUG-083 (C3 missing external_components), LESSON-OPS-128 (verify config before theorizing)
+11. `firmware/local_components/web_server_idf/PATCH_INFO.md` — stack override docs
 
 ### Hardware Inventory
 
@@ -60,15 +60,15 @@ cat VERSION
 
 ### v7.6.10.0 — ESPHome Upgrade (2026.2.1 → 2026.4.0)
 
-**Why:** ESPHome 2026.4.0 provides mature C6/C5 support, better RISC-V crash diagnostics, performance improvements, and custom partition table support. The upgrade must happen before onboarding C6/C5 boards.
+**Why:** ESPHome 2026.4.0 provides mature C6/C5 support, better crash diagnostics, performance improvements, and custom partition table support. The upgrade must happen before onboarding C6/C5 boards.
 
 **Scope:**
 - Upgrade ESPHome installation from 2026.2.1 to 2026.4.0
 - Re-run `scripts/patch-esphome-httpd-stack.sh` (upstream `web_server_idf.cpp` changes with each version)
-- Verify the conditional stack patch (20 KB RISC-V / 16 KB Xtensa) applies cleanly
+- Verify the 16 KB stack patch applies cleanly (uniform across all boards — no architecture-conditional sizing needed)
 - Verify the HTTP_DELETE handler patch (Patch 2) applies cleanly
 - Clean build + flash all three existing boards
-- Run `stress-test-httpd-stack.sh` on C3 — confirm watermark not regressed
+- Run `stress-test-httpd-stack.sh` on at least one board per architecture — confirm watermark not regressed
 - Smoke test all three boards: `/api/status/full`, history fetch, dashboard load
 
 **Breaking changes to watch for (from ESPHome 2026.4.0 release notes):**
@@ -80,7 +80,7 @@ cat VERSION
 - `esphome version` shows 2026.4.0
 - `bash scripts/patch-esphome-httpd-stack.sh --check` passes
 - All three boards compile, flash, and serve dashboard
-- C3 stress test watermark ≥ 2000 bytes (v7.6.9.5 baseline preserved)
+- Stress test watermark ≥ 2000 bytes on all tested boards (v7.6.9.5 baseline: ~12,600 B on all three boards)
 - Playwright green (all fixture sets)
 
 **Risk:** MEDIUM — ESPHome upgrades can introduce build failures if the local component override API changed. The patch script has a verification step that catches this. If the patch fails, manual inspection of the new upstream `web_server_idf.cpp` is needed.
@@ -119,6 +119,8 @@ external_components:
     components: [web_server_idf]
 ```
 
+**Critical: every board profile MUST include the `external_components` block** (BUG-083 / Critical Rule 42). Without it, the httpd task runs at ESPHome's stock 4 KB stack and POST handlers will crash. The preflight check added in v7.6.9.5 catches missing entries — run `bash scripts/preflight.sh` after creating each profile.
+
 **Partition tables:**
 - 4 MB flash boards: base on `esp32-c3-multi-partitions.csv` (known to work with 4 MB)
 - 16 MB flash boards: base on `esp32-s3-multi-partitions.csv` (known to work with 16 MB)
@@ -136,6 +138,7 @@ external_components:
 - Generated YAML is well-formed
 - `provision.sh <target>` switches config correctly
 - `provision.sh status` reports the new board
+- `bash scripts/preflight.sh` passes (external_components check)
 
 **If a board fails to compile:** Document the error. Do NOT spend time debugging ESPHome internals. Flag it as "compilation blocked" and exclude from measurement. The board can be revisited when ESPHome support matures.
 
@@ -167,14 +170,16 @@ For each board that compiled successfully in v7.6.10.1:
 ```markdown
 | Board | Chip | Arch | SRAM | PSRAM | Flash | free_heap | min_free_heap | httpd_stack_wm | Stress min_wm | Compiles | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| C3 SuperMini | ESP32-C3 | RISC-V | 400K | None | 4M | 69896 | 52592 | 636→[new] | [stress] | ✅ | Existing baseline |
+| C3 SuperMini | ESP32-C3 | RISC-V | 400K | None | 4M | 57268 | 29668 | 12768 | [stress] | ✅ | v7.6.9.5 baseline |
 | WROOM-32D | ESP32 | Xtensa | 520K | None | 4M | 37032 | 13616 | 13044 | [stress] | ✅ | Existing baseline |
-| S3 DevKitC N16R8 | ESP32-S3 | Xtensa | 512K | 8M | 16M | 52460 | 8434304 | 13760 | [stress] | ✅ | Existing (aggregator) |
+| S3 DevKitC N16R8 | ESP32-S3 | Xtensa | 512K | 8M | 16M | 52792 | [internal] | 12528 | [stress] | ✅ | Existing (aggregator) |
 | S3 SuperMini | ESP32-S3 | Xtensa | 512K | 2M | 4M | | | | | | NEW |
 | C6 SuperMini | ESP32-C6 | RISC-V | 512K | None | 4M | | | | | | NEW — first C6 |
 | C6 DevKitC-1 | ESP32-C6 | RISC-V | 512K | None | 16M | | | | | | NEW |
 | C5 | ESP32-C5 | RISC-V | 384K | TBD | 4M | | | | | | NEW — dual-band WiFi |
 ```
+
+**Note on baselines:** The C3 baseline is post-BUG-083 fix (v7.6.9.5) — the C3 now runs with the 16 KB stack override active. Previous measurements showing C3 watermark of 636 B were on stock 4 KB stack. The S3 `min_free_heap` value of ~8.4 MB includes PSRAM — record `min_free_heap` and note whether it includes PSRAM for boards that have it.
 
 ### v7.6.10.3 — Capacity Study and Board Selection Guide Update
 
@@ -183,12 +188,11 @@ For each board that compiled successfully in v7.6.10.1:
 **Capacity study updates (`Docs/phase-V-capacity-study.md`):**
 - Expand the executive summary table with all 7 boards
 - Update the SRAM breakdown section with per-board figures
-- Add a new subsection "§X — Architecture-Dependent Task Stack Sizing" with the full measurement dataset
+- Add a new subsection "§X — Per-Board Stack and Heap Measurements" with the full dataset
 - Revise the "Max persistent metrics (safe heap)" column based on actual free_heap measurements
 - Add PSRAM scaling observations (S3 SuperMini 2MB vs S3 DevKitC 8MB)
 
 **Board selection guide updates (`Docs/esp32-board-selection-guide.md`):**
-- Add a new section "Architecture-Dependent Stack Sizing" documenting the RISC-V vs Xtensa finding
 - Expand §1 chip family table with measured stack/heap data
 - Add a comprehensive use-case matrix:
 
@@ -202,6 +206,18 @@ For each board that compiled successfully in v7.6.10.1:
   - Which RISC-V boards (C6, C5) match the C3's satellite role? With what constraints?
 
 - Update the "Summary Decision Matrix" with new boards
+
+### v7.6.10.4 — Dashboard Authentication Refactor (Optional — see issue template)
+
+**Why:** Phase V exposed a UX issue: the browser shows native HTTP Basic Auth dialogs mid-operation when cached credentials expire. Both SSE and polling modes trigger these dialogs for auth-gated endpoints (`/api/status/full`, `/api/gateways`, `/storage-stats`). The aggregator also has a custom JS-level auth dialog that fires separately from the browser dialog, creating a two-dialog experience.
+
+**Scope:** See `prompts/handoff/dashboard-auth-refactor-issue.md` for the full issue description and design requirements. This step is optional for Phase VX — it can also be deferred to early Phase 7.
+
+**If included in Phase VX:**
+- Add this as the final step, after board measurements are complete
+- Requires dashboard module changes (not firmware changes)
+- Must run the full dashboard pipeline after completion
+- Playwright tests must pass
 
 ---
 
@@ -224,12 +240,15 @@ The advisor should produce:
 **For v7.6.10.3 (documentation):**
 - Claude advisory session instructions (not an agent prompt): produce capacity study and board guide updates as zip deliverables
 
+**For v7.6.10.4 (auth refactor, if included):**
+- Agent prompt: `prompts/phaseVX/v7.6.10.4-dashboard-auth-refactor-prompt.md`
+- Design spec: derived from `prompts/handoff/dashboard-auth-refactor-issue.md`
+
 ---
 
 ## Scope Guards
 
-- Do NOT modify any firmware handler code (`firmware/core/*.h`) — infrastructure only
-- Do NOT modify dashboard source files
+- Do NOT modify any firmware handler code (`firmware/core/*.h`) — infrastructure only (exception: v7.6.10.4 auth refactor if included)
 - Do NOT modify NVS format, storage engine, or partition layout of existing boards
 - Do NOT change the provisioning pipeline's existing board behavior — only add new targets
 - Do NOT upgrade to ESP-IDF 6.0 independently — let ESPHome manage its IDF version

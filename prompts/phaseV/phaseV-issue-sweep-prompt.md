@@ -1,13 +1,13 @@
 # Phase V — Issue Sweep Prompt
 
-_Run this prompt in a fresh Claude session AFTER v7.6.9.6 merges, BEFORE running `phaseV-closure-analysis-prompt.md`._
+_Run this prompt in a fresh Claude session AFTER v7.6.9.5 merges, BEFORE running `phaseV-closure-analysis-prompt.md`._
 _Purpose: walk every open GitHub issue, determine whether Phase V addressed it, produce a per-issue closure verdict with a ready-to-paste GitHub comment or a "keep open" rationale with specific remaining work._
 
 ---
 
 ## When to Use
 
-Run this prompt after all Phase V steps (v7.6.7.0 through v7.6.9.6) have merged to `main`. The sweep produces the data that feeds `phaseV-closure-analysis-prompt.md`'s Q5 (Outstanding Issues) section and that populates `prompts/handoff/phaseV/phaseV-results.md`'s "Issues Resolved" table.
+Run this prompt after all Phase V steps (v7.6.7.0 through v7.6.9.5) have merged to `main`. The sweep produces the data that feeds `phaseV-closure-analysis-prompt.md`'s Q5 (Outstanding Issues) section and that populates `prompts/handoff/phaseV/phaseV-results.md`'s "Issues Resolved" table.
 
 Do NOT run this prompt while Phase V steps are still in flight — the sweep's verdicts depend on the full delivery being observable on `main`.
 
@@ -19,8 +19,8 @@ Do NOT run this prompt before checking that GitHub API rate limits are not exhau
 
 Before starting, the operator must confirm:
 
-- [ ] v7.6.9.6 has been merged to `main` and tagged
-- [ ] `Docs/changelog.md` contains entries for every Phase V step (v7.6.7.0 through v7.6.9.6)
+- [ ] v7.6.9.5 has been merged to `main` and tagged
+- [ ] `Docs/changelog.md` contains entries for every Phase V step (v7.6.7.0 through v7.6.9.5)
 - [ ] All Phase V PR numbers are known (operator has them in `phaseV-results.md` or in notes)
 - [ ] GitHub authentication is available (either gh CLI token or the session has an MCP GitHub connector)
 - [ ] No Phase 7 work has started yet — main is at the Phase V closure state, not later
@@ -33,7 +33,7 @@ Before starting, the operator must confirm:
 
 **Phase V Issue Sweep**
 
-You are performing an issue-closure audit for Phase V (v7.6.7.0 through v7.6.9.6) of the ESP32-GW Multi-Sensor Gateway project.
+You are performing an issue-closure audit for Phase V (v7.6.7.0 through v7.6.9.5) of the ESP32-GW Multi-Sensor Gateway project.
 
 Repo: `https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor`
 
@@ -51,11 +51,11 @@ Your training data may be stale. You MUST read the actual current state of the r
    cd ESP32-GW-multi-sensor
    git checkout main
    git pull
-   cat VERSION   # must be 7.6.9.6
-   git tag -l | grep v7.6.9   # must include v7.6.9.0 through v7.6.9.6
+   cat VERSION   # must be 7.6.9.5
+   git tag -l | grep v7.6.9   # must include v7.6.9.0 through v7.6.9.5
    ```
 
-2. **Read the full Phase V changelog:** `Docs/changelog.md` — from the first v7.6.7.0 entry through the v7.6.9.6 entry. Note every issue number cited in "Fixed", "Added", "Changed", or "Related" sub-sections.
+2. **Read the full Phase V changelog:** `Docs/changelog.md` — from the first v7.6.7.0 entry through the v7.6.9.5 entry. Note every issue number cited in "Fixed", "Added", "Changed", or "Related" sub-sections.
 
 3. **Read the Phase V plan and the addendum:**
    - `Docs/phase-V-implementation-plan.md` — Part 0 issue table at line ~39 lists the 14 originally-tracked issues with their planned disposition and milestones
@@ -132,7 +132,7 @@ Pick ONE classification from this list:
 | OUT_OF_SCOPE | Issue is real but not what Phase V was designed to address. Keep open with a target phase recommendation. |
 | STALE | Symptom no longer reproduces; root cause not actually fixed by Phase V, but the bug appears to have resolved itself (e.g. dependency update). Close with a verify-on-next-release comment. |
 
-If the issue body mentions a specific reproducer, run it against current `main` where possible (for firmware issues: correlate with v7.6.9.6 device test results in session logs). Do not mark FIXED_FULLY without evidence the reproducer no longer triggers.
+If the issue body mentions a specific reproducer, run it against current `main` where possible (for firmware issues: correlate with v7.6.9.5 device test results in session logs). Do not mark FIXED_FULLY without evidence the reproducer no longer triggers.
 
 **Step 6 — Draft the closure or keep-open comment**
 
@@ -181,7 +181,7 @@ Leaving open.
 
 For STALE:
 ```
-Symptom no longer reproduces as of v7.6.9.6 (verified <date>) via <specific command or test>.
+Symptom no longer reproduces as of v7.6.9.5 (verified <date>) via <specific command or test>.
 
 Root cause was not explicitly fixed by Phase V; the failure mode appears to have resolved via <dependency update / configuration change / side effect of unrelated work>.
 

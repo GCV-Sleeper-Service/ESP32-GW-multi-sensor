@@ -1,14 +1,14 @@
 # Phase V — Closure Analysis Prompt
 
 _Run this prompt in a fresh Claude session AFTER `phaseV-issue-sweep-prompt.md` has been executed and its output exists at `prompts/handoff/phaseV/phaseV-issue-sweep-results.md`._
-_Purpose: produce a deep, quantitative closure analysis of Phase V (v7.6.7.0 through v7.6.9.6) modelled on Phase Y's closure analysis (`prompts/handoff/phaseY/phaseY-closure-analysis.md`)._
+_Purpose: produce a deep, quantitative closure analysis of Phase V (v7.6.7.0 through v7.6.9.5) modelled on Phase Y's closure analysis (`prompts/handoff/phaseY/phaseY-closure-analysis.md`)._
 
 ---
 
 ## When to Use
 
 Run this prompt after:
-1. v7.6.9.6 merged to `main` and tagged
+1. v7.6.9.5 merged to `main` and tagged
 2. `prompts/handoff/phaseV/phaseV-issue-sweep-results.md` exists and has been reviewed by the operator
 3. Any issue closures / label updates recommended by the sweep have been applied
 4. `prompts/handoff/phaseV/phaseV-results.md` may still be EMPTY — this closure analysis feeds it, not the other way around
@@ -23,9 +23,9 @@ Do NOT run this prompt before Phase 7 planning starts — this analysis IS the i
 
 Before starting, the operator must confirm:
 
-- [ ] v7.6.9.6 merged and tagged on `main`
-- [ ] `prompts/handoff/phaseV/phaseV-issue-sweep-results.md` exists and is dated after v7.6.9.6 merge
-- [ ] All Phase V consolidated audits exist: `prompts/phaseV/v7.6.7.0-PR<NN>-consolidated-audit-and-lessons.md` through v7.6.9.6 (one per step; v7.6.8.3 telemetry step had no consolidated audit — that's expected)
+- [ ] v7.6.9.5 merged and tagged on `main`
+- [ ] `prompts/handoff/phaseV/phaseV-issue-sweep-results.md` exists and is dated after v7.6.9.5 merge
+- [ ] All Phase V consolidated audits exist: `prompts/phaseV/v7.6.7.0-PR<NN>-consolidated-audit-and-lessons.md` through v7.6.9.5 (one per step; v7.6.8.3 telemetry step had no consolidated audit — that's expected)
 - [ ] All Phase V session logs exist in `Docs/`: `session-log-*-v7.6.7.*.md` through `session-log-*-v7.6.9.*.md`
 - [ ] Phase Y closure analysis (`prompts/handoff/phaseY/phaseY-closure-analysis.md`) is readable as the structural template
 
@@ -37,7 +37,7 @@ Before starting, the operator must confirm:
 
 **Phase V Closure Analysis**
 
-You are producing a comprehensive closure analysis for Phase V (v7.6.7.0 through v7.6.9.6) of the ESP32-GW Multi-Sensor Gateway project.
+You are producing a comprehensive closure analysis for Phase V (v7.6.7.0 through v7.6.9.5) of the ESP32-GW Multi-Sensor Gateway project.
 
 Repo: `https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor`
 
@@ -52,7 +52,7 @@ Your training data is stale on specifics. You MUST read actual current files. Re
    git clone https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
    cd ESP32-GW-multi-sensor
    git checkout main && git pull
-   cat VERSION   # 7.6.9.6
+   cat VERSION   # 7.6.9.5
    ```
 
 2. **Read in this order (mandatory — do not skip):**
@@ -96,7 +96,7 @@ Then produce:
 | Planned version | Sub-phase | Actual merge SHA | Merge date | PR # | Match? |
 |---|---|---|---|---|---|
 
-Include every Phase V version from v7.6.7.0 to v7.6.9.6. Mark any deviations with ⚠️ in the Match column and explain immediately below the table. Examples of deviations: versions skipped, versions merged out of order, scope creep in a given version, partial deliveries.
+Include every Phase V version from v7.6.7.0 to v7.6.9.5. Mark any deviations with ⚠️ in the Match column and explain immediately below the table. Examples of deviations: versions skipped, versions merged out of order, scope creep in a given version, partial deliveries.
 
 ### Sub-phase deliverable tables
 For each of V1/V2/V3/V4/V5/V6, produce:
@@ -109,7 +109,7 @@ For each of V1/V2/V3/V4/V5/V6, produce:
 Use the same prose-followed-by-table pattern Phase Y uses at lines 10–69.
 
 ### Addendum fidelity
-A full paragraph on `Docs/phase-V-implementation-plan-addendum-v7.6.9.4.md`. Did v7.6.9.4 stay within the addendum's narrow scope? Did the two new carve-outs (v7.6.9.5 stack investigation, v7.6.9.6 SEC-ADR amendment) emerge cleanly from the v7.6.9.4 device testing or did they drift in scope? Quote the addendum's "What this does NOT deliver" section and check whether any of that leaked into Phase V anyway.
+A full paragraph on `Docs/phase-V-implementation-plan-addendum-v7.6.9.4.md`. Did v7.6.9.4 stay within the addendum's narrow scope? Did the two new carve-outs (v7.6.9.5 stack investigation, v7.6.9.5 SEC-ADR amendment) emerge cleanly from the v7.6.9.4 device testing or did they drift in scope? Quote the addendum's "What this does NOT deliver" section and check whether any of that leaked into Phase V anyway.
 
 ### Closure deliverables table
 Modelled on Phase Y closure analysis lines 55–68:
@@ -133,7 +133,7 @@ A paragraph tracing the mitigation timeline for issue #139:
 - v7.6.9.4: adaptive cap + boot sequencing
 - Full fix deferred to Phase 7
 
-Evaluate whether each step was additive (no regression) or whether any step unwound a previous mitigation. The v7.6.9.0 auth removal is the sensitive one — did v7.6.9.4 restore auth? Did v7.6.9.6 change it again? If the current state differs from what SEC-ADR-001 and SEC-ADR-002 (if created) describe, flag it as a documentation bug.
+Evaluate whether each step was additive (no regression) or whether any step unwound a previous mitigation. The v7.6.9.0 auth removal is the sensitive one — did v7.6.9.4 restore auth? Did v7.6.9.5 change it again? If the current state differs from what SEC-ADR-001 and SEC-ADR-002 (if created) describe, flag it as a documentation bug.
 
 ### Dashboard pipeline fidelity
 Phase V made heavy use of the dashboard regeneration pipeline. For every step that modified dashboard sources, verify:
@@ -175,7 +175,7 @@ Every Phase V step SHOULD have a consolidated audit except v7.6.8.3 (single-step
 Same pattern as audits. Phase Y closure analysis flagged a missing v7.6.6.8 session log as blocking. Check every Phase V version has one.
 
 ### Changelog quality
-Pull the raw v7.6.7.0–v7.6.9.6 entries from `Docs/changelog.md`. For each version:
+Pull the raw v7.6.7.0–v7.6.9.5 entries from `Docs/changelog.md`. For each version:
 - Is there a Fixed / Changed / Added / Deprecated section?
 - Is every issue number cited?
 - Is every behavioural change visible to end-users noted?
@@ -271,7 +271,7 @@ Enumerate 5–10 specific lessons drawn from Phase V execution. For each:
 Candidate lesson domains to consider:
 - Hotfix cycle discipline (v7.6.9.0 went through two hotfixes)
 - Pre-merge device testing (v7.6.9.4 made device testing a pre-merge gate — how did that work?)
-- ADR amendments vs new ADRs (SEC-ADR-001 was amended by v7.6.9.6 rather than having SEC-ADR-002 created — was that the right call?)
+- ADR amendments vs new ADRs (SEC-ADR-001 was amended by v7.6.9.5 rather than having SEC-ADR-002 created — was that the right call?)
 - Plan addendum pattern (the v7.6.9.4 addendum was a novel artifact — did it work?)
 - Multi-LLM scope discipline (did the v7.6.9.4 prompt's "no Phase 7 work" invariant hold?)
 - Issue #139 incremental mitigation (cap → auth-remove → adaptive cap across three versions — did this layering pattern work or did it confuse reviewers?)

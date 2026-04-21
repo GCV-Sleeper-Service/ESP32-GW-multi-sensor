@@ -1,8 +1,8 @@
 # Multi-Phase Planning Session — Supplement from Phase V Mitigation Steps
 
 _Append this supplement to `prompts/handoff/multi-phase-planning-prompt.md` before running the multi-phase planning session._
-_Source: v7.6.9.4–v7.6.9.6 mitigation sequence + Phase VX board onboarding sprint findings._
-_Date: 2026-04-19_
+_Source: v7.6.9.4–v7.6.9.5 mitigation sequence + Phase VX board onboarding sprint findings._
+_Date: 2026-04-20 (revised: BUG-083 corrected RISC-V stack analysis)_
 
 ---
 
@@ -10,11 +10,11 @@ _Date: 2026-04-19_
 
 Add these to the **Layer 4 — Constraint Context** reading list:
 
-18. `Docs/phase-V-capacity-study.md` — UPDATED with architecture-dependent task stack sizing (v7.6.9.5)
+18. `Docs/phase-V-capacity-study.md` — includes task stack sizing table (corrected v7.6.9.5)
 19. `Docs/phase-V-implementation-plan-addendum-v7.6.9.4.md` — why three extra mitigation steps were needed
 20. `Docs/board-measurement-log-v7.6.10.md` — if Phase VX completed: real telemetry from all 7 boards
-21. `Docs/esp32-board-selection-guide.md` — UPDATED with RISC-V stack depth findings and (if VX completed) use-case matrix
-22. `Docs/lessons/firmware.md` — read BUG-082, LESSON-OPS-127, and the RISC-V vs Xtensa stack LESSON-OPS
+21. `Docs/esp32-board-selection-guide.md` — if Phase VX completed: expanded use-case matrix
+22. `Docs/lessons/firmware.md` — read BUG-082, BUG-083, LESSON-OPS-127, LESSON-OPS-128
 23. `scripts/stress-test-httpd-stack.sh` — the httpd stack stress test protocol (must be referenced in Phase 7)
 
 ---
@@ -25,14 +25,16 @@ The original prompt asks 5 questions about Phase 7 readiness. Add these:
 
 **6. Does the Phase 7 plan include httpd stack watermark validation after adding new handlers?**
 
-Phase 7 adds at least 3 new HTTP handlers (`DELETE /api/v2/history/{device_id}`, `POST /api/v2/import/{device_id}`, storage stats v2). Each runs on the httpd task stack. v7.6.9.5 found the C3 (RISC-V) uses ~15748 B of its 20 KB httpd stack for existing handlers — only ~4700 B headroom. New handlers that increase call chain depth could overflow the C3 stack.
+Phase 7 adds at least 3 new HTTP handlers (`DELETE /api/v2/history/{device_id}`, `POST /api/v2/import/{device_id}`, storage stats v2). Each runs on the httpd task stack. v7.6.9.5 measured peak usage at ~3,400 B across all three production boards — with a 16 KB stack that leaves ~12,600 B headroom. New handlers that increase call chain depth should not approach the stack ceiling, but validation is cheap and should be mandatory.
 
 **Required addition to Phase 7:** After the step that adds the last new handler, add a mandatory device gate:
 ```
-Run `bash scripts/stress-test-httpd-stack.sh` on the C3 board.
+Run `bash scripts/stress-test-httpd-stack.sh` on at least one board per architecture.
 Acceptance: minimum watermark ≥ 2000 bytes.
-If watermark < 2000: bump RISC-V stack to 24576 (24 KB) before merging.
+If watermark < 2000: investigate handler call depth before merging.
 ```
+
+This gate is lightweight — the stress test runs in under 30 seconds. The 2000 B threshold is conservative; current headroom is ~12,600 B. The purpose is detecting unexpected regressions, not tuning.
 
 **7. Does the Phase 7 plan include chunked HTTP streaming for history responses?**
 
@@ -52,31 +54,33 @@ This step depends on v7.7.0.x (per-device persistence engine) being complete, si
 
 The capacity study (`Docs/phase-V-capacity-study.md`) was produced at v7.6.6.8. Since then:
 - v7.6.9.4 added heap-adaptive history cap (changes runtime memory profile)
-- v7.6.9.5 changed httpd stack from 16 KB uniform to 20 KB (RISC-V) / 16 KB (Xtensa) — 4 KB more static allocation on C3
+- v7.6.9.5 fixed BUG-083: the C3 was running on stock 4 KB httpd stack, not the intended 16 KB. With the fix applied, the C3 now allocates 12 KB more stack — meaning ~12 KB less free heap at boot than the capacity study assumed.
 - BUG-082 means the CSV reserve cap is not actually enforced — real peak memory usage during history fetch is higher than the capacity study assumed
 
 If Phase VX completed, the `board-measurement-log-v7.6.10.md` has real measurements from 7 boards. Use those instead of the capacity study's estimates where they differ.
 
-**9. Does the Phase 7 plan account for multi-architecture stack sizing?**
+**9. Does the Phase 7 plan account for the httpd stack stress test gate?**
 
-All future boards (C6, C5, H2) are RISC-V. Phase 7 adds new FreeRTOS tasks (e.g., `agg_hist_sync` suggested in the capacity study line 467). Each new task needs architecture-conditional stack sizing just like the httpd task. The Phase 7 plan should include a convention: all `xTaskCreate` calls use a macro or constant that expands to RISC-V or Xtensa values based on `CONFIG_IDF_TARGET_ARCH_RISCV`.
+All boards now run with the same 16 KB httpd stack — there is no architecture-conditional sizing. Peak usage is ~3,400 B on both RISC-V (C3) and Xtensa (WROOM, S3). However, Phase 7 adds new FreeRTOS tasks (e.g., `agg_hist_sync` suggested in the capacity study line 467). Each new task needs appropriate stack sizing based on its workload, validated with `uxTaskGetStackHighWaterMark()` during device testing.
+
+The lesson from BUG-083 (LESSON-OPS-128): verify configuration equivalence before theorizing about measurement discrepancies. When a new board shows unexpected watermark values, check that the local component override is actually compiled in (`grep external_components` in the board's YAML) before investigating deeper causes.
 
 ---
 
 ## Phase 10 Review — Additional Context
 
-The original prompt asks about a "standalone" board role. v7.6.9.5's RISC-V vs Xtensa finding adds a dimension:
+The original prompt asks about a "standalone" board role. v7.6.9.5's findings add a dimension:
 
 **Standalone on C3 (RISC-V, 400 KB SRAM, no PSRAM):**
-- Free heap at boot: ~70 KB
-- httpd stack: 20 KB (4 KB more than Xtensa boards)
-- min_free_heap under load: ~52 KB
+- Free heap at boot: ~57 KB (after BUG-083 fix — 16 KB stack now properly allocated)
+- httpd stack: 16 KB (uniform across all boards)
+- min_free_heap under load: ~29 KB (from v7.6.9.5 stress test)
 - Removing aggregator code (disabled via `AGGREGATOR_ENABLED` guard) saves: measure with Phase VX data
 - Key question: does removing aggregator code free enough heap to make the C3 comfortable as a standalone, or is PSRAM still needed for non-trivial sensor counts?
 
 **Standalone on C6 (RISC-V, 512 KB SRAM, no PSRAM):**
 - 512 KB SRAM vs C3's 400 KB → ~112 KB more SRAM
-- But RISC-V overhead (stack, WiFi 6 driver) eats some of that gain
+- Peak httpd stack usage will be similar to C3 (~3,400 B) since both are RISC-V — no architecture penalty
 - Phase VX measurements will show actual free_heap — compare C6 standalone to S3 satellite
 
 The board selection guide's use-case matrix should include a "Standalone" column populated with Phase VX measurements.
@@ -118,12 +122,13 @@ The multi-phase planning session should produce or commission an expanded board 
 
 The original prompt asks the advisor to produce a "Current State Summary." Add these items:
 
-- **Architecture split:** RISC-V (C3, C6, C5) vs Xtensa (ESP32/WROOM, S3). RISC-V uses ~4.7× more httpd stack.
-- **httpd stack is architecture-conditional:** 20 KB (RISC-V) / 16 KB (Xtensa) since v7.6.9.5
+- **Uniform httpd stack:** All boards run 16 KB httpd stack via local component override. Peak usage is ~3,400 B on both RISC-V and Xtensa architectures (BUG-083 corrected the false RISC-V vs Xtensa divergence).
 - **BUG-082 is open:** csv.reserve≠truncate, WROOM history crash with large NVS, deferred to Phase 7
+- **BUG-083 is closed:** C3 template missing external_components, fixed in v7.6.9.5
 - **ESPHome version:** 2026.4.0 (if VX completed upgrade) or 2026.2.1 (if not yet upgraded)
 - **Board fleet:** 3 production + up to 4 test boards (if VX completed onboarding)
-- **Phase V closed with 6 additional mitigation steps** beyond the original plan (v7.6.9.1–v7.6.9.6)
+- **Phase V closed with 5 additional mitigation steps** beyond the original plan (v7.6.9.1–v7.6.9.5). v7.6.9.6 was originally planned but dropped after the Cloudflare polling issue self-resolved (BUG-078 fix in v7.6.0.1 eliminated the 401→500 mapping; browser native auth dialog handles credentials).
+- **Dashboard auth UX:** Browser shows native Basic Auth dialog when polling auth-gated endpoints. A unified proactive auth flow is planned for Phase VX as a final step before Phase 7.
 
 ---
 
