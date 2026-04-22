@@ -64,15 +64,15 @@ Leaving open.
 **Classification:** FIXED_PARTIALLY
 
 **Planned in:** Plan Part 0 table — milestone `Partial v7.6.8.x (auth cap), partial v7.6.9.4 (adaptive cap + boot sequencing), full fix Phase 7` (plan line 44). Sub-phase V2-E (v7.6.8.1 safety net) and V4 (v7.6.9.4 addendum).
-**Actually touched by:** PR #181 (v7.6.8.1), PR #193 (v7.6.9.4), PR #194 (v7.6.9.4 post-merge correction doc)
-**Changelog references:** v7.6.8.1 (`std::min(..., (size_t)60000)` cap on `csv.reserve()`), v7.6.9.4 (`clamp(esp_get_free_heap_size()/3, 12000, 60000)` adaptive cap, #139 partial ×2)
+**Actually touched by:** PR #181 (v7.6.8.1), PR #193 (v7.6.9.4), plus the v7.6.9.4 post-merge documentation addendum and BUG-082 lesson entry
+**Changelog references:** v7.6.8.1 (`std::min(..., (size_t)60000)` cap on `csv.reserve()`), v7.6.9.4 (`clamp(esp_get_free_heap_size()/3, 12000, 60000)` adaptive cap, #139 partial ×2, plus the Known Limitation documenting BUG-082)
 
 **Analysis:**
 Phase V delivered two successive mitigations. PR #181 (v7.6.8.1, V2-E) added a fixed 60 KB pre-allocation cap — adequate for the C3's ~68 KB free heap but sized before the WROOM crash case was discovered. PR #193 (v7.6.9.4) replaced the fixed cap with a heap-adaptive formula (`clamp(free_heap/3, 12000, 60000)`) and gated the dashboard's initial `loadHistory()` call on the first successful `loadStatusSnapshot()` with a 15 s fallback.
 
-Post-merge, PR #194 documented BUG-082: `csv.reserve()` is only an allocation hint; the NVS scan loop appends without a hard truncation limit, so WROOM boards with ≥ 500 NVS segments (~40 KB CSV vs ~34 KB free heap) still crash via reallocation spike. The addendum (`Docs/phase-V-implementation-plan-addendum-v7.6.9.4.md`) and BUG-082 both confirm the full fix — chunked HTTP streaming — is deferred to Phase 7.
+Post-merge documentation for v7.6.9.4 recorded BUG-082 as a known remaining limitation: `csv.reserve()` is only an allocation hint; the NVS scan loop appends without a hard truncation limit, so WROOM boards with ≥ 500 NVS segments (~40 KB CSV vs ~34 KB free heap) still crash via reallocation spike. The addendum (`Docs/phase-V-implementation-plan-addendum-v7.6.9.4.md`), the v7.6.9.4 changelog Known Limitation, and the BUG-082 lesson entry all confirm the full fix — chunked HTTP streaming — is deferred to Phase 7.
 
-The owner's issue comment (2026-04-17) pre-dates v7.6.9.4 and incorrectly describes the issue state; the changelog and PR record are authoritative.
+The owner's issue comment (2026-04-17) pre-dates v7.6.9.4 and incorrectly describes the issue state; the changelog and in-repo documentation record are authoritative.
 
 **Recommended GitHub action:**
 - [ ] Keep open with comment below
