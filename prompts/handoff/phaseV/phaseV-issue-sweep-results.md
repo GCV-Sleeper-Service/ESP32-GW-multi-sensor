@@ -244,32 +244,87 @@ Leaving open.
 
 Actions for the operator to execute AFTER reviewing this document:
 
-**Execution status as of 2026-04-22:** Actions 3 and 4 are complete (automated). Actions 1 and 2 require manual execution — the Copilot agent token does not have issue-write permissions (labels, milestones, comments require `issues: write` scope beyond the token's `contents: write` scope).
+**Execution status as of 2026-04-22:**
+- Actions 1 and 2 require **manual execution by the repository owner** — the Copilot agent token is scoped to `contents:write` only; the GitHub Issues API endpoints for labels, milestones, and comments return HTTP 403 for this token.
+- Actions 3, 4, and 5 are ✅ complete (automated in this session).
 
-1. **Apply recommended label/milestone updates (6 issues):** ⚠️ MANUAL — token lacks `issues: write`
-   - #137: add `feature`, `dashboard`; set milestone `Phase 7 (v7.7.x.x)`. Note: `feature` and `memory` labels do not yet exist in the repo — create them first.
-   - #139: add `bug`, `memory`, `esp32-c3`; set milestone `Phase 7 (v7.7.x.x)`. Note: `memory` and `esp32-c3` labels do not yet exist — create them first.
-   - #166: add `enhancement`, `dashboard`; set milestone `Phase 7 (v7.7.x.x)`
-   - #171: add `bug`, `esp32-c3`; set milestone `Phase 7 (v7.7.x.x)`. Note: `esp32-c3` label does not yet exist — create it first.
-   - #190: add `enhancement`, `dashboard`; set milestone `Phase VX (v7.6.10.x)`
-   - #196: labels already set (`enhancement`, `dashboard`, `ux`, `security`); milestone already set (`Phase VX (v7.6.10.x)`) — no action needed
+---
 
-2. **Post keep-open comments (6 issues):** ⚠️ MANUAL — token lacks `issues: write`. Paste each comment from the per-issue sections above, verbatim. All six issues remain open after the comment.
+### Action 1 — Apply label/milestone updates ⚠️ MANUAL
 
-3. **Input for phaseV-closure-analysis-prompt.md Q5 (What Phase 7 inherits):** ✅ COMPLETE — captured in this document.
-   - **#139 FIXED_PARTIALLY:** server-side chunked/windowed history response protocol; dashboard paged loader; per-device NVS storage; hard truncation limit in NVS scan loop (BUG-082).
-   - **#166 FIXED_PARTIALLY:** per-device CSV export with `# device_id:` / `# metrics:` headers (v7.7.2.0); multi-device bundle export (v7.7.2.2).
-   - **#171 FIXED_PARTIALLY:** per-device CSV export (v7.7.2.0); per-device CSV import v2 (v7.7.2.1); multi-device bundle export (v7.7.2.2).
-   - **#137 DEFERRED_INTENTIONAL:** SVG board diagrams for WROOM-32D and S3-DevKitC1-N16R8 (documentation task, no code dependency).
-   - **#190 OUT_OF_SCOPE:** Framework/ESPHome/MAC relocation to Eventlog (Phase VX).
-   - **#196 OUT_OF_SCOPE:** Unified dashboard authentication / authFetch() pattern (Phase VX v7.6.10.x).
+The following labels do not yet exist in the repo — create them first:
 
-4. **Input for phaseV-results.md "Issues Resolved" and "Deferred" tables:** ✅ COMPLETE — `prompts/handoff/phaseV/phaseV-results.md` updated in this PR.
-   - **FIXED_PARTIALLY** (#139, #166, #171): updated in "Issues Resolved" table with `(partial)` notation, PR numbers, and Phase 7 remainder notes.
-   - **DEFERRED_INTENTIONAL** (#137): already present in "Deferred" table (no change needed).
-   - **OUT_OF_SCOPE** (#190, #196): added to "Deferred" table with Phase VX target.
+```bash
+gh label create "feature"      --color "#a2eeef" --description "New feature request"
+gh label create "memory"       --color "#e4e669" --description "Heap / SRAM related"
+gh label create "esp32-c3"     --color "#c2e0c6" --description "ESP32-C3 specific"
+gh label create "optimization" --color "#f9d0c4" --description "Performance / size reduction"
+```
 
-5. **Note re: erroneous owner comments on #166 and #171:** the owner's comment posted at v7.6.9.3 closure (2026-04-17T16:34:58Z on #166; 2026-04-17T16:35:05Z on #171) incorrectly states "no Phase V work was scoped to implement this." The changelog and PR record show otherwise. The recommended keep-open comments above supersede those earlier comments and provide the accurate record.
+Then apply labels and milestones:
+
+```bash
+# #137 — DEFERRED_INTENTIONAL
+gh issue edit 137 --add-label "feature,dashboard" --milestone "Phase 7 (v7.7.x)"
+
+# #139 — FIXED_PARTIALLY
+gh issue edit 139 --add-label "bug,memory,esp32-c3" --milestone "Phase 7 (v7.7.x)"
+
+# #166 — FIXED_PARTIALLY
+gh issue edit 166 --add-label "enhancement,dashboard" --milestone "Phase 7 (v7.7.x)"
+
+# #171 — FIXED_PARTIALLY
+gh issue edit 171 --add-label "bug,esp32-c3" --milestone "Phase 7 (v7.7.x)"
+
+# #190 — OUT_OF_SCOPE
+gh issue edit 190 --add-label "enhancement,dashboard" --milestone "Phase VX (v7.6.10.x)"
+
+# #196 — labels already set; milestone already set — no action needed
+```
+
+---
+
+### Action 2 — Post keep-open comments ⚠️ MANUAL
+
+Post the exact comment text from each per-issue "Recommended comment" section above to the corresponding GitHub issue. Copy the text verbatim — do not paraphrase.
+
+```bash
+# Example (write comment text to temp files then post):
+gh issue comment 137 --body-file /tmp/comment_137.md
+gh issue comment 139 --body-file /tmp/comment_139.md
+gh issue comment 166 --body-file /tmp/comment_166.md
+gh issue comment 171 --body-file /tmp/comment_171.md
+gh issue comment 190 --body-file /tmp/comment_190.md
+gh issue comment 196 --body-file /tmp/comment_196.md
+```
+
+---
+
+### Action 3 — Q5 input for phaseV-closure-analysis-prompt.md ✅ COMPLETE
+
+Captured in this document (per-issue sections above):
+- **#139 FIXED_PARTIALLY:** server-side chunked/windowed history response protocol; dashboard paged loader; per-device NVS storage; hard truncation limit in NVS scan loop (BUG-082).
+- **#166 FIXED_PARTIALLY:** per-device CSV export with `# device_id:` / `# metrics:` headers (v7.7.2.0); multi-device bundle export (v7.7.2.2).
+- **#171 FIXED_PARTIALLY:** per-device CSV export (v7.7.2.0); per-device CSV import v2 (v7.7.2.1); multi-device bundle export (v7.7.2.2).
+- **#137 DEFERRED_INTENTIONAL:** SVG board diagrams for WROOM-32D and S3-DevKitC1-N16R8 (documentation task, no code dependency).
+- **#190 OUT_OF_SCOPE:** Framework/ESPHome/MAC relocation to Eventlog (Phase VX).
+- **#196 OUT_OF_SCOPE:** Unified dashboard authentication / authFetch() pattern (Phase VX v7.6.10.x).
+
+---
+
+### Action 4 — phaseV-results.md issues and delivery record ✅ COMPLETE
+
+`prompts/handoff/phaseV/phaseV-results.md` rebuilt in this session:
+- Delivery Record tables (V1/V2/V3): all `#___` placeholders filled in with actual PR numbers (#176–#195), Status set to Complete for all rows, Fix Cycles and Key Outcome filled in from audit files.
+- Operator measurement results filled in from v7.6.8.2 audit.
+- Issues Resolved table: rebuilt with Status, Classification, and Notes columns; all 13 issues covered.
+- Deferred table: rebuilt with Classification and Rationale columns; all 6 open issues covered.
+
+---
+
+### Action 5 — Note re: erroneous owner comments ✅ COMPLETE (documented)
+
+The owner's comments posted at v7.6.9.3 closure (2026-04-17T16:34:58Z on #166; 2026-04-17T16:35:05Z on #171) incorrectly state "no Phase V work was scoped to implement this." The changelog and PR record show otherwise. The recommended keep-open comments (Action 2 above) supersede those earlier comments and provide the accurate record.
 
 ---
 
@@ -287,5 +342,7 @@ Actions for the operator to execute AFTER reviewing this document:
 - [x] Known PR number discrepancy acknowledged: v7.6.9.4 primary code PR is #193; PR #194 is the post-merge correction documentation PR (BUG-082); both merged on 2026-04-18
 
 ---
+
+_Post-sweep actions executed: 2026-04-22 by GitHub Copilot Coding Agent. Actions 3, 4, and 5 are complete. Actions 1 (labels/milestones) and 2 (keep-open comments) require manual execution by the repository owner — see Action 1 and Action 2 sections above for exact commands._
 
 _End of Phase V Issue Sweep Results._
