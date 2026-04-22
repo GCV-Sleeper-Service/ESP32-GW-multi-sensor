@@ -1,6 +1,6 @@
 # Phase V — Results and Handoff to Phase 7
 
-_Last updated: 2026-04-22_
+_Last updated: 2026-04-22 (updated by closure analysis)_
 
 ---
 
@@ -131,7 +131,7 @@ All boards running with 16 KB httpd stack override. Uniform peak usage ~3,400 B 
 
 6. **Capacity study:** `Docs/phase-V-capacity-study.md` — C3 max 8 persistent metrics, partition recommendations for Phase 7.
 
-7. **Include BUG-083** finding and dashboard auth refactor deferral
+7. **BUG-083 fixed (v7.6.9.5):** C3 `external_components` block was missing from `firmware/esp32-c3-multi-sensor.yaml` since v7.6.8.0, meaning the 16 KB httpd stack override was inactive on C3. Added in v7.6.9.5 (PR #195). All three boards now run 16 KB stack with uniform watermark ~12.8 KB.
 
 ### What Phase 7 Must Do
 
@@ -140,11 +140,13 @@ All boards running with 16 KB httpd stack override. Uniform peak usage ~3,400 B 
 3. Implement aggregator history pull (Option 2 from AGG-ADR-001) — v7.7.1.x
 4. Implement binary sensor EventLog type (from capacity study §6)
 5. Honour C3 8-metric ceiling in persistence config
+6. Resolve SEC-ADR-001 history auth mismatch — ADR states `/history/` and `/api/v2/history/` are auth-gated; code does not enforce this. First PR touching `web-handler.h` in Phase 7 must either restore auth or amend the ADR with rationale.
 
 ### New Critical Rules from Phase V
 
 | # | Rule | Source |
 |---|---|---|
+| 63 | Session log is a pre-merge acceptance criterion (§6), not a post-merge deliverable (§9). Required sections: ESPHome output, Playwright fixture table, evidence summary. | Phase Y closure analysis → Phase V |
 | 64 | Checkpoint grep assertions in agent prompts must be mechanically derived from the replacement block in the same prompt — never estimated from memory or a prior session. | LESSON-OPS-126 / v7.6.9.4 |
 
 ### New Lessons from Phase V
