@@ -1240,6 +1240,8 @@ The following 7 prompt artefacts are to be produced by a **subsequent agent** af
 | **Phase V — V2** | **v7.6.8.0–v7.6.8.2** | **Security hardening** |
 | **Phase V — V3** | **v7.6.9.0–v7.6.9.3** | **Dashboard enhancements + export/import** |
 | **Phase V — V4** | **v7.6.9.4** | **Heap-adaptive history cap + boot sequencing (#139 partial)** |
+| **Phase V — V5** | **v7.6.9.5** | **C3 httpd stack override fix (BUG-083) — C3 template missing `external_components`** |
+| ~~Phase V — V6~~ | ~~v7.6.9.6~~ | ~~Dropped — Cloudflare polling issue self-resolved (BUG-078 fixed 401→500 in v7.6.0.1); auth UX deferred to Phase VX~~ |
 | Phase 7 | v7.7.0.0–v7.7.2.3 | Per-device persistence engine |
 | Phase E | v8.0.x | Captive portal setup + WiFi config |
 

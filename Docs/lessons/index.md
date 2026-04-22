@@ -1,6 +1,6 @@
 # Bugs Fixed & Lessons Learned
 
-_Last updated: 2026-04-08 — Documentation reorganization (Issue #140)._
+_Last updated: 2026-04-22 — Phase V closure cleanup._
 
 This file tracks significant bugs, root causes, fixes, and operational lessons.
 It is also the place where project guardrails are recorded so they are not re-learned in later sessions.
@@ -215,3 +215,4 @@ This index lists every BUG and LESSON-OPS entry and its domain file location.
 | LESSON-OPS-126 | operations.md |
 | LESSON-OPS-127 | operations.md |
 | LESSON-OPS-128 | firmware.md |
+| LESSON-SEC-001 | build-pipeline.md |

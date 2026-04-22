@@ -66,25 +66,21 @@ v7.6.9.6 was originally planned (Cloudflare polling fix + SEC-ADR amendment) but
 
 ## Device Test Results
 
-### C3 Satellite (192.168.120.189)
+### v7.6.9.4 Device Tests — SKIPPED
 
-| Test | Result | Heap Before | Heap After |
-|---|---|---|---|
-| Boot and stabilise | Skipped by operator request | | |
-| Dashboard open (SSE) | Skipped by operator request | | |
-| Import begin (no crash) | Not run | | |
-| History fetch | Not run | | |
-| Auth on ingest (401) | Not run | | |
-| Status field strip | Not run | | |
+Hardware flashing and device testing were skipped by operator request during the v7.6.9.4 session. OTA flashing was attempted but interrupted. See `Docs/session-log-2026-04-17-v7.6.9.4.md` for details.
 
-### S3 Aggregator (192.168.120.191)
+### v7.6.9.5 Final Device State (Phase V closure baseline)
 
-| Test | Result | Notes |
-|---|---|---|
-| Proxy history (satellite online) | Skipped by operator request | Device flashing/test gate not run |
-| Proxy history (satellite offline) | Skipped by operator request | Device flashing/test gate not run |
-| Gateways auth (401/200) | Not run | Device flashing/test gate not run |
-| Satellite hostname/IP display | Not run | Device flashing/test gate not run |
+| Board | httpd_stack_watermark_bytes | free_heap | external_components | /api/status shape |
+|---|---|---|---|---|
+| C3 (192.168.120.189) | 12,768 | 57,144 | PASS (added to template) | PASS |
+| WROOM (192.168.120.190) | 12,964 | 36,244 | PASS (existing) | PASS |
+| S3 (192.168.120.191) | 12,944 | 54,420 | PASS (existing) | PASS |
+
+Stress test minimum watermark (C3, 5-wave): 12,768 B (threshold: >= 10,000 B) — PASS.
+
+All boards running with 16 KB httpd stack override. Uniform peak usage ~3,400 B across RISC-V and Xtensa architectures.
 
 ---
 
@@ -149,7 +145,7 @@ v7.6.9.6 was originally planned (Cloudflare polling fix + SEC-ADR amendment) but
 
 | # | Rule | Source |
 |---|---|---|
-| Rule | Checkpoint grep counts must be mechanically derived from the replacement block in the same prompt, not estimated from memory. | v7.6.9.4 |
+| 64 | Checkpoint grep assertions in agent prompts must be mechanically derived from the replacement block in the same prompt — never estimated from memory or a prior session. | LESSON-OPS-126 / v7.6.9.4 |
 
 ### New Lessons from Phase V
 
@@ -157,6 +153,8 @@ v7.6.9.6 was originally planned (Cloudflare polling fix + SEC-ADR amendment) but
 |---|---|---|
 | LESSON-SEC-001 | All write endpoints require auth | v7.6.8.0 |
 | LESSON-OPS-126 | Checkpoint grep assertions must be validated against the actual replacement block in the same prompt | v7.6.9.4 |
+| LESSON-OPS-127 | `std::string::reserve()` is an allocation hint, not a size constraint — does not prevent unbounded `.append()` growth | v7.6.9.4 / BUG-082 |
+| LESSON-OPS-128 | Verify configuration equivalence before theorizing about measurement discrepancies | v7.6.9.5 / BUG-083 |
 
 ---
 

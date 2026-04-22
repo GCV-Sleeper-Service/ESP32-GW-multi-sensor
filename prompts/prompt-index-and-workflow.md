@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-12 — Phase Y closure (v7.6.6.8). Phase Y complete. Critical Rules 58–63 added. Current Phase: **Phase V** (pending)._
+_Last updated: 2026-04-22 — Phase V closure (v7.6.9.5). Phase V complete. Critical Rule 64 added. Current Phase: **Phase VX** (pending)._
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -168,9 +168,37 @@ Phase Y complete (v7.6.6.0–v7.6.6.8, 2026-04-10 to 2026-04-12). Firmware monol
 | v7.6.6.7 | Full endpoint smoke test (all 21 handlers) | `prompts/phaseY/v7.6.6.7-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.7.md` | ✅ Complete |
 | v7.6.6.8 | Closure: preflight + docs + Critical Rules 58–62 | `prompts/phaseY/v7.6.6.8-implementation-instructions-for-coding-agent.md` | `prompts/handoff/phaseY/session-handoff-v7.6.6.8.md` | ✅ Complete |
 
-### Phase 7 — Per-Device Persistence Engine — After Phase Y
+### Phase V — Bug Fixing, Optimization & Security Hardening (v7.6.7.0–v7.6.9.5) ✅ COMPLETE
 
-**`main` is at v7.6.5.8. Phase 7 starts at v7.7.0.0.**
+Phase V complete (v7.6.7.0–v7.6.9.5, 2026-04-13 to 2026-04-20). Security hardening (auth guards on all write endpoints, SEC-ADR-001), dashboard enhancements (device cards, CSV export, manifest), heap-adaptive history cap (#139 partial), C3 stack override fix (BUG-083). 2 bugs fixed (BUG-082, BUG-083), 3 new LESSON-OPS entries (126–128), 1 LESSON-SEC entry (LESSON-SEC-001), Critical Rule 64 added. Results: `prompts/handoff/phaseV/phaseV-results.md`. Plan: `Docs/phase-V-implementation-plan.md`. Prompts: `prompts/phaseV/`.
+
+Phase V used a different prompt methodology from Phases D/X/Y: Claude advisory sessions producing agent prompts (two-step pattern), Kiro/GPT/Codex executing those prompts, Perplexity three-turn PR review. Prompts follow the naming pattern `v7.6.X.Y-agent-prompt-gpt-codex.md` and `v7.6.X.Y-claude-two-step.md` rather than the standard `implementation-instructions-for-coding-agent.md` convention.
+
+**Version range:** v7.6.7.0–v7.6.9.5 (13 version-step PRs: #176–#184, #191–#193, #195; plus #194 docs, #197 issue sweep)
+**Plan:** `Docs/phase-V-implementation-plan.md`
+**Addendum:** `Docs/phase-V-implementation-plan-addendum-v7.6.9.4.md`
+**Capacity study:** `Docs/phase-V-capacity-study.md`
+**Audit Template:** `prompts/phaseV/consolidated-audit-template-phaseV.md`
+
+| Version | Scope | Prompt File | Handoff | Status |
+|---------|-------|-------------|---------|--------|
+| v7.6.7.0 | V1-A/B/C: Proxy fix, NAS history disable, logger level | `prompts/phaseV/v7.6.7.0-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.7.0.md` | ✅ Complete |
+| v7.6.7.1 | V1-D: Import crash fix (Rule 40) | `prompts/phaseV/v7.6.7.1-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.7.1.md` | ✅ Complete |
+| v7.6.7.2 | V1-E/F/G: Version badge, dead code, import comment | `prompts/phaseV/v7.6.7.2-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.7.2.md` | ✅ Complete |
+| v7.6.7.3 | Operational telemetry in /api/status | _(operator-directed, no formal prompt)_ | _(no handoff — V1 measurement protocol)_ | ✅ Complete |
+| v7.6.8.0 | V2-A/B/C/D: Auth guards + status field split | `prompts/phaseV/v7.6.8.0-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.8.0.md` | ✅ Complete |
+| v7.6.8.1 | V2-E/F/G: History auth + heap cap + DoS cooldown + SEC-ADR | `prompts/phaseV/v7.6.8.1-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.8.1.md` | ✅ Complete |
+| v7.6.8.2 | V2-H: Socket reduction (V2-I/J blocked) | `prompts/phaseV/v7.6.8.2-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.8.2.md` | ✅ Complete |
+| v7.6.9.0 | V3-A: Dashboard device card cleanup | `prompts/phaseV/v7.6.9.0-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.9.0.md` | ✅ Complete |
+| v7.6.9.1 | V3-B/C: Satellite hostname/IP + CSV role column | `prompts/phaseV/v7.6.9.1-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.9.1.md` | ✅ Complete |
+| v7.6.9.2 | V3-D/E: Manifest-driven export + AGG-ADR | `prompts/phaseV/v7.6.9.2-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.9.2.md` | ✅ Complete |
+| v7.6.9.3 | V3-F: Struct audit / Phase V preliminary closure | `prompts/phaseV/v7.6.9.3-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.9.3.md` | ✅ Complete |
+| v7.6.9.4 | V4: Heap-adaptive history cap + boot sequencing | `prompts/phaseV/v7.6.9.4-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.9.4.md` | ✅ Complete |
+| v7.6.9.5 | V5: C3 httpd stack override fix (BUG-083) | `prompts/phaseV/v7.6.9.5-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.9.5.md` | ✅ Complete |
+
+### Phase 7 — Per-Device Persistence Engine — After Phase V
+
+**`main` is at v7.6.9.5. Phase VX (v7.6.10.x) runs first, then Phase VY planning, then Phase 7 starts at v7.7.0.0.**
 
 Before starting Phase 7, read `prompts/handoff/phaseD/phaseD-results.md` for the active lessons and API contracts that Phase 7 must remain compatible with. Also read `prompts/handoff/session-handoff-v7.7.0.0.md` for the full Phase 7 entry context.
 
@@ -281,6 +309,7 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 61 | `maybe_yield_nvs_scan_()` is defined once in `firmware/core/nvs-persistence.h`. Call it in every NVS scan loop. | Phase Y v7.6.6.5 |
 | 62 | The assembly fragment order in `assemble-sensor-history.sh` is the dependency order. Never reorder fragments. | Phase Y v7.6.6.1 |
 | 63 | Session log is a **pre-merge acceptance criterion** (§6), not a post-merge deliverable (§9). Required sections: ESPHome output (or documented absence), Playwright fixture table, evidence summary. Agents treat §9 as optional — placing the session log there caused 4/9 Phase Y steps to ship without it. | Phase Y closure analysis — 44% omission rate when in §9 |
+| 64 | Checkpoint grep assertions in agent prompts must be mechanically derived from the replacement block in the same prompt — never estimated from memory or a prior session. Mismatched counts cause agents to loop on phantom failures or silently accept wrong state. | LESSON-OPS-126 / v7.6.9.4 |
 
 ---
 

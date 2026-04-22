@@ -102,6 +102,8 @@ This is the core concern you raised. Here's what actually happens with the gatew
 
 **Mitigation on C3:** Keep sensor count to 3 or fewer. Use `beginResponse()` not `beginResponseStream()` (pre-reserves a known buffer). The project already uses pre-reserved string patterns for CSV responses (LESSON-OPS-056).
 
+**httpd stack sizing (v7.6.9.5 finding):** Peak httpd stack usage is ~3,400 B across all tested architectures — RISC-V (C3) and Xtensa (WROOM/S3). The 16 KB httpd stack override (`firmware/local_components/web_server_idf/`) is uniform across all boards. No architecture-dependent sizing is needed. See `Docs/phase-V-capacity-study.md` for the full task stack table.
+
 ### ESP32-S3 N16R8 (512 KB SRAM + 8 MB PSRAM)
 
 The S3 with PSRAM changes the calculus entirely:

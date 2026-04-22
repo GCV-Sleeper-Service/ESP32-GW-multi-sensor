@@ -77,6 +77,9 @@ The public `/api/status` response is stripped to include only `{"ok":true,"role"
 **Residual exposure:**  
 `role` and `id` still identify the device as an ESP32 firmware node. The `id` field may disclose the satellite's hostname. This is accepted risk for a LAN deployment; for internet exposure, operators should use Cloudflare Access or similar to gate all `/api/` paths behind SSO.
 
+**Post-Phase V update (2026-04-20):**  
+BUG-078 (v7.6.0.1) fixed the `init_response_()` HTTP status code mapping that was returning 500 instead of 401 for unauthenticated requests. The browser now receives a proper 401 and shows its native Basic Auth dialog. Dashboard successfully polls all auth-gated endpoints through Cloudflare Tunnel after the user enters credentials. The remaining issue — random mid-session auth re-prompt dialogs — is a UX enhancement, not a security vulnerability. It is tracked as #196 and deferred to Phase VX (v7.6.10.4). The originally planned v7.6.9.6 (narrow `/api/status` un-strip + SEC-ADR amendment) was dropped because the underlying issue self-resolved.
+
 ---
 
 ### RV-04 — History Endpoint: First-Pass Mitigation Only
