@@ -146,7 +146,7 @@ All boards running with 16 KB httpd stack override. Uniform peak usage ~3,400 B 
 
 | # | Rule | Source |
 |---|---|---|
-| 63 | Session log is a pre-merge acceptance criterion (§6), not a post-merge deliverable (§9). Required sections: ESPHome output, Playwright fixture table, evidence summary. | Phase Y closure analysis → Phase V |
+| 63 | Session log is a pre-merge acceptance criterion (§6), not a post-merge deliverable (§9). Required sections: ESPHome output (or documented absence), Playwright fixture table, evidence summary. | Phase Y closure analysis → Phase V |
 | 64 | Checkpoint grep assertions in agent prompts must be mechanically derived from the replacement block in the same prompt — never estimated from memory or a prior session. | LESSON-OPS-126 / v7.6.9.4 |
 
 ### New Lessons from Phase V

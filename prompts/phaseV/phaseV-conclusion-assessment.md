@@ -43,7 +43,7 @@ _Fill in after Phase V completes (all V1/V2/V3 steps merged or explicitly deferr
 | v7.6.9.2 (V3-D/E) | ✅ Complete | `getMetricColumnsForSensor()` manifest-driven; `EXPORT_SENSOR_SUFFIXES` removed; `AGG-ADR-001` committed. 0 fix cycles. |
 | v7.6.9.3 (V3-F) | ✅ Complete | Struct audit — no-code-change path: heap 70,952 B ≥ 65 KB gate. Preliminary Phase V closure. 0 fix cycles. |
 
-### V4/V5
+### V4–V6
 | Step | Outcome | Notes |
 |---|---|---|
 | v7.6.9.4 (V4) | ⚠️ Partial | Heap-adaptive cap `clamp(free_heap/3, 12000, 60000)` delivered. BUG-082: `csv.reserve()` does not truncate — WROOM OOM crash not fixed; deferred to Phase 7 chunked streaming. 1 fix cycle (PR #193 code + PR #194 docs). Device gate skipped by operator. |
@@ -96,7 +96,7 @@ _Fill in after Phase V completes (all V1/V2/V3 steps merged or explicitly deferr
 ### New Critical Rules Added
 | # | Rule | Source |
 |---|---|---|
-| 63 | Session log is a pre-merge acceptance criterion (§6), not a post-merge deliverable (§9). Required sections: ESPHome output, Playwright fixture table, evidence summary. | Phase Y closure analysis → Phase V Rule 63 |
+| 63 | Session log is a pre-merge acceptance criterion (§6), not a post-merge deliverable (§9). Required sections: ESPHome output (or documented absence), Playwright fixture table, evidence summary. | Phase Y closure analysis → Phase V Rule 63 |
 | 64 | Checkpoint grep assertions in agent prompts must be mechanically derived from the replacement block in the same prompt — never estimated from memory or a prior session. | LESSON-OPS-126 / v7.6.9.4 |
 
 ### New LESSON-OPS Entries
