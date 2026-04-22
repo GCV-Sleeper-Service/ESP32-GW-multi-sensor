@@ -44,19 +44,6 @@ The plan normalised this issue's title to `Feature: Board-type SVG diagrams for 
 - [ ] Keep open, update labels: add `feature`, `dashboard`
 - [ ] Keep open, update milestone: `Deferred (Phase 7+)`
 
-**Recommended comment (copy-paste ready):**
-```
-Deferred from Phase V per plan (`Docs/phase-V-implementation-plan.md`, Part 0 table, line 42).
-
-Reason: design task with no firmware or JS dependencies; does not block Phase V delivery; SVG production requires an SVG editor or board-datasheet workflow.
-
-Target phase: Phase 7+ (standalone documentation task, no dependency on v7.7.x architecture).
-
-Will be addressed in: whenever documentation bandwidth is available post-Phase 7 planning.
-
-Leaving open.
-```
-
 ---
 
 ### #139 — History loading serialization for C3 boards
@@ -79,27 +66,6 @@ The owner's issue comment (2026-04-17) pre-dates v7.6.9.4 and incorrectly descri
 - [ ] Keep open, update labels: add `bug`, `memory`, `esp32-c3`
 - [ ] Keep open, update milestone: `Phase 7 (v7.7.x)` (Phase V partial mitigations complete)
 
-**Recommended comment (copy-paste ready):**
-```
-Partial fix landed in Phase V V2-E (v7.6.8.1, PR #181) and Phase V V4 (v7.6.9.4, PR #193).
-
-What was addressed:
-- v7.6.8.1: added fixed 60 KB `csv.reserve()` cap to bound heap spike on large history responses.
-- v7.6.9.4: replaced the fixed cap with a heap-adaptive formula (`clamp(esp_get_free_heap_size()/3, 12000, 60000)`) at both `handle_history_()` and `handle_api_v2_history_()` call sites.
-- v7.6.9.4: gated initial dashboard `loadHistory()` on first `loadStatusSnapshot()` resolution, with a 15 s fallback timer (boot.js).
-
-What remains:
-- [ ] Server-side time-windowed chunked history response protocol (Phase 7 — requires response framing changes; `reserve()` hint does not prevent unbounded append growth past the cap — BUG-082)
-- [ ] Dashboard paged history loader (Phase 7 — client stays with single full-CSV fetch per sensor in Phase V)
-- [ ] Per-device NVS storage (Phase 7 — architectural rewrite v7.7.0.x)
-
-Known limitation as of v7.6.9.4 (BUG-082, documented 2026-04-18): WROOM boards with ≥ 500 NVS segments (~40 KB CSV vs ~34 KB free heap) can still crash via reallocation past the reserved capacity. Raw NVS backup extracted 2026-04-18 via `esptool read_flash 0x370000 0x80000`. The Phase 7 chunked-streaming transport eliminates single-response CSV building entirely, making the truncation guard unnecessary.
-
-Target for full fix: Phase 7 (v7.7.x).
-
-Leaving open.
-```
-
 ---
 
 ### #166 — Fix data export format from boards
@@ -117,23 +83,6 @@ All three Phase V deliverables for this issue shipped. PR #184 (v7.6.9.1) added 
 - [ ] Keep open with comment below
 - [ ] Keep open, update labels: add `enhancement`, `dashboard`
 - [ ] Keep open, update milestone: `Phase 7 (v7.7.x)`
-
-**Recommended comment (copy-paste ready):**
-```
-Partial fix landed in Phase V V3-B/C (v7.6.9.1, PR #184) and Phase V V3-D/E (v7.6.9.2, PR #191).
-
-What was addressed:
-- v7.6.9.1 (PR #184): `role` column added at CSV position 3; `getExportRole()` helper returns `satellite`, `aggregator`, or `standalone`; satellite sensor columns in merged aggregator exports now use the `{sat_slug}_{sensor_id}_{metric_key}` prefix format.
-- v7.6.9.2 (PR #191): static `EXPORT_SENSOR_SUFFIXES` array replaced with manifest-driven `getMetricColumnsForSensor()`; `fetchSensorHistoryRows()` now iterates all manifest metrics with `history: true` instead of hardcoding `temp`/`hum`; ping and system metrics now appear with populated columns in exports.
-
-What remains:
-- [ ] Per-device CSV export with `# device_id:` / `# metrics:` comment headers (Phase 7 v7.7.2.0)
-- [ ] Multi-device bundle export with per-device section separators (Phase 7 v7.7.2.2)
-
-Target for full fix: Phase 7 (v7.7.x).
-
-Leaving open.
-```
 
 ---
 
@@ -156,24 +105,6 @@ Remaining open items are Phase 7 scope: per-device export, per-device import v2,
 - [ ] Keep open with comment below
 - [ ] Keep open, update labels: add `bug`, `esp32-c3`
 - [ ] Keep open, update milestone: `Phase 7 (v7.7.x)`
-
-**Recommended comment (copy-paste ready):**
-```
-Partial fix landed in Phase V V1-D (v7.6.7.1, PR #177) and Phase V V3-D/E (v7.6.9.2, PR #191).
-
-What was addressed:
-- v7.6.7.1 (PR #177): `handle_import_begin_()` now defers `build_import_epoch_map_()` to `xTaskCreate` (worker `imp_epoch`, 8192 B stack) — Rule 40 compliant. Import POST endpoints no longer crash the C3. `/api/import/status` endpoint added for readiness polling; 409 gate on `/api/import/d/` and `/api/import/w/` until prep completes.
-- v7.6.9.2 (PR #191): `fetchSensorHistoryRows()` is now manifest-driven for all metric types (ping, system, environmental) — gap 3 (non-env sensors in export) resolved.
-
-What remains:
-- [ ] Per-device CSV export with `# device_id:` / `# metrics:` comment headers (Phase 7 v7.7.2.0)
-- [ ] Per-device CSV import v2 (Phase 7 v7.7.2.1)
-- [ ] Multi-device bundle export (Phase 7 v7.7.2.2)
-
-Target for full fix: Phase 7 (v7.7.x).
-
-Leaving open.
-```
 
 ---
 
@@ -199,17 +130,6 @@ This issue requests moving the Framework (ESP-IDF version), ESPHome version, and
 - [ ] Keep open, update labels: add `enhancement`, `dashboard`
 - [ ] Keep open, update milestone: `Phase VX (v7.6.10.x)`
 
-**Recommended comment (copy-paste ready):**
-```
-Outside Phase V scope — opened during the Phase V mitigation window (2026-04-17) after the plan was finalised.
-
-Phase V V3-A (v7.6.9.0, PR #183) addressed gateway card layout (Device Name and Firmware rows added, MAC row removed) but did not scope the Framework/ESPHome/MAC-to-Eventlog relocation.
-
-This is a dashboard-only UX enhancement with no firmware dependency. Queuing for Phase VX (v7.6.10.x).
-
-Leaving open.
-```
-
 ---
 
 ### #196 — Enhancement: Unified dashboard authentication — eliminate mid-session browser auth dialogs
@@ -227,80 +147,11 @@ This issue was opened on the morning of the sweep date (2026-04-22) and explicit
 - [ ] Keep open with comment below (milestone already correct; labels should be confirmed)
 - [ ] Keep open, update labels: verify `enhancement`, `dashboard`, `ux`, `security` are set (issue shows these labels — already correct)
 
-**Recommended comment (copy-paste ready):**
-```
-Outside Phase V scope — opened on the Phase V sweep date (2026-04-22) and milestoned Phase VX (v7.6.10.x) at creation.
-
-Phase V (v7.6.8.0 V2-A through v7.6.9.5 V5) deliberately moved sensitive fields behind auth-gated endpoints per SEC-ADR-001 RV-03. The mid-session browser dialog issue is a documented consequence of that decision, not a Phase V defect. Phase V's auth posture is correct and intentional.
-
-This enhancement — application-level credential management to eliminate browser-native auth dialogs — is the appropriate Phase VX follow-on. The design in the issue body (authFetch(), session-scoped _authHeader, custom re-auth dialog, 401-during-operation recovery) is well-specified and ready for Phase VX scoping.
-
-Leaving open.
-```
-
 ---
 
 ## Post-Sweep Actions
 
-Actions for the operator to execute AFTER reviewing this document:
-
-**Execution status as of 2026-04-22:**
-- Actions 1 and 2 require **manual execution by the repository owner** — the Copilot agent token is scoped to `contents:write` only; the GitHub Issues API endpoints for labels, milestones, and comments return HTTP 403 for this token.
-- Actions 3, 4, and 5 are ✅ complete (automated in this session).
-
----
-
-### Action 1 — Apply label/milestone updates ⚠️ MANUAL
-
-The following labels do not yet exist in the repo — create them first:
-
-```bash
-gh label create "feature"      --color "#a2eeef" --description "New feature request"
-gh label create "memory"       --color "#e4e669" --description "Heap / SRAM related"
-gh label create "esp32-c3"     --color "#c2e0c6" --description "ESP32-C3 specific"
-gh label create "optimization" --color "#f9d0c4" --description "Performance / size reduction"
-```
-
-Then apply labels and milestones:
-
-```bash
-# #137 — DEFERRED_INTENTIONAL
-gh issue edit 137 --add-label "feature,dashboard" --milestone "Phase 7 (v7.7.x)"
-
-# #139 — FIXED_PARTIALLY
-gh issue edit 139 --add-label "bug,memory,esp32-c3" --milestone "Phase 7 (v7.7.x)"
-
-# #166 — FIXED_PARTIALLY
-gh issue edit 166 --add-label "enhancement,dashboard" --milestone "Phase 7 (v7.7.x)"
-
-# #171 — FIXED_PARTIALLY
-gh issue edit 171 --add-label "bug,esp32-c3" --milestone "Phase 7 (v7.7.x)"
-
-# #190 — OUT_OF_SCOPE
-gh issue edit 190 --add-label "enhancement,dashboard" --milestone "Phase VX (v7.6.10.x)"
-
-# #196 — labels already set; milestone already set — no action needed
-```
-
----
-
-### Action 2 — Post keep-open comments ⚠️ MANUAL
-
-Post the exact comment text from each per-issue "Recommended comment" section above to the corresponding GitHub issue. Copy the text verbatim — do not paraphrase.
-
-```bash
-# Example (write comment text to temp files then post):
-gh issue comment 137 --body-file /tmp/comment_137.md
-gh issue comment 139 --body-file /tmp/comment_139.md
-gh issue comment 166 --body-file /tmp/comment_166.md
-gh issue comment 171 --body-file /tmp/comment_171.md
-gh issue comment 190 --body-file /tmp/comment_190.md
-gh issue comment 196 --body-file /tmp/comment_196.md
-```
-
----
-
-### Action 3 — Q5 input for phaseV-closure-analysis-prompt.md ✅ COMPLETE
+### Action 1 — Q5 input for phaseV-closure-analysis-prompt.md ✅ COMPLETE
 
 Captured in this document (per-issue sections above):
 - **#139 FIXED_PARTIALLY:** server-side chunked/windowed history response protocol; dashboard paged loader; per-device NVS storage; hard truncation limit in NVS scan loop (BUG-082).
@@ -312,7 +163,7 @@ Captured in this document (per-issue sections above):
 
 ---
 
-### Action 4 — phaseV-results.md issues and delivery record ✅ COMPLETE
+### Action 2 — phaseV-results.md issues and delivery record ✅ COMPLETE
 
 `prompts/handoff/phaseV/phaseV-results.md` rebuilt in this session:
 - Delivery Record tables (V1/V2/V3): all `#___` placeholders filled in with actual PR numbers (#176–#195), Status set to Complete for all rows, Fix Cycles and Key Outcome filled in from audit files.
@@ -322,7 +173,7 @@ Captured in this document (per-issue sections above):
 
 ---
 
-### Action 5 — Note re: erroneous owner comments ✅ COMPLETE (documented)
+### Action 3 — Note re: erroneous owner comments ✅ COMPLETE (documented)
 
 The owner's comments posted at v7.6.9.3 closure (2026-04-17T16:34:58Z on #166; 2026-04-17T16:35:05Z on #171) incorrectly state "no Phase V work was scoped to implement this." The changelog and PR record show otherwise. The recommended keep-open comments (Action 2 above) supersede those earlier comments and provide the accurate record.
 
@@ -343,6 +194,6 @@ The owner's comments posted at v7.6.9.3 closure (2026-04-17T16:34:58Z on #166; 2
 
 ---
 
-_Post-sweep actions executed: 2026-04-22 by GitHub Copilot Coding Agent. Actions 3, 4, and 5 are complete. Actions 1 (labels/milestones) and 2 (keep-open comments) require manual execution by the repository owner — see Action 1 and Action 2 sections above for exact commands._
+_Post-sweep actions executed: 2026-04-22 by GitHub Copilot Coding Agent. Actions 1, 2, and 3 are complete. 
 
 _End of Phase V Issue Sweep Results._
