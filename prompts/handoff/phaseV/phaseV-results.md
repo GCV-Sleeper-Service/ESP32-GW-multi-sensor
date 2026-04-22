@@ -93,7 +93,7 @@ v7.6.9.6 was originally planned (Cloudflare polling fix + SEC-ADR amendment) but
 |---|---|---|---|
 | #136 | Tech-debt: Hardcoded C3 values | #___ | |
 | #138 | Enhancement: Gateway card PSRAM/flash | #___ | |
-| #139 | Bug: History heap exhaustion | #___ (partial) | Full fix Phase 7 |
+| #139 | Bug: History heap exhaustion | #181, #193 (partial) | Adaptive heap cap shipped; full chunked-streaming fix Phase 7 |
 | #143 | Enhancement: Version badge | #___ | |
 | #144 | Enhancement: Gateway card cleanup | #___ | |
 | #161 | Bug: Proxy 502 | #___ | |
@@ -101,16 +101,18 @@ v7.6.9.6 was originally planned (Cloudflare polling fix + SEC-ADR amendment) but
 | #163 | Feature: Security hardening | #___ | |
 | #164 | Bug: C3 heap regression | #___ | Measurements taken |
 | #165 | Tech-debt: SRAM optimisations | #___ | Multiple steps |
-| #166 | Enhancement: CSV export | #___ | |
+| #166 | Enhancement: CSV export | #184, #191 (partial) | role column + manifest-driven columns shipped; per-device headers Phase 7 (v7.7.2.x) |
 | #170 | Enhancement: Satellite gateway card | #___ | |
-| #171 | Bug: Import crash | #___ | |
+| #171 | Bug: Import crash | #177, #191 (partial) | Rule 40 crash fixed + manifest-driven export; per-device import/export Phase 7 (v7.7.2.x) |
 
 ### Deferred
 
 | Issue | Reason | Target |
 |---|---|---|
 | #137 | SVG generation — scope too large for Phase V | Phase 7+ |
-| #139 | Full chunked streaming fix | Phase 7 |
+| #139 | Full chunked streaming fix (BUG-082) | Phase 7 |
+| #190 | Framework/ESPHome/MAC-to-Eventlog relocation — post-plan UX enhancement | Phase VX (v7.6.10.x) |
+| #196 | Unified dashboard auth / authFetch() — post-plan, milestoned at creation | Phase VX (v7.6.10.x) |
 
 ---
 

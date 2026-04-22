@@ -244,17 +244,19 @@ Leaving open.
 
 Actions for the operator to execute AFTER reviewing this document:
 
-1. **Apply recommended label/milestone updates (6 issues):**
-   - #137: add `feature`, `dashboard`; set milestone `Deferred (Phase 7+)`
-   - #139: add `bug`, `memory`, `esp32-c3`; set milestone `Phase 7 (v7.7.x)`
-   - #166: add `enhancement`, `dashboard`; set milestone `Phase 7 (v7.7.x)`
-   - #171: add `bug`, `esp32-c3`; set milestone `Phase 7 (v7.7.x)`
+**Execution status as of 2026-04-22:** Actions 3 and 4 are complete (automated). Actions 1 and 2 require manual execution — the Copilot agent token does not have issue-write permissions (labels, milestones, comments require `issues: write` scope beyond the token's `contents: write` scope).
+
+1. **Apply recommended label/milestone updates (6 issues):** ⚠️ MANUAL — token lacks `issues: write`
+   - #137: add `feature`, `dashboard`; set milestone `Phase 7 (v7.7.x.x)`. Note: `feature` and `memory` labels do not yet exist in the repo — create them first.
+   - #139: add `bug`, `memory`, `esp32-c3`; set milestone `Phase 7 (v7.7.x.x)`. Note: `memory` and `esp32-c3` labels do not yet exist — create them first.
+   - #166: add `enhancement`, `dashboard`; set milestone `Phase 7 (v7.7.x.x)`
+   - #171: add `bug`, `esp32-c3`; set milestone `Phase 7 (v7.7.x.x)`. Note: `esp32-c3` label does not yet exist — create it first.
    - #190: add `enhancement`, `dashboard`; set milestone `Phase VX (v7.6.10.x)`
    - #196: labels already set (`enhancement`, `dashboard`, `ux`, `security`); milestone already set (`Phase VX (v7.6.10.x)`) — no action needed
 
-2. **Post keep-open comments (6 issues):** paste each comment from the per-issue sections above, verbatim. All six issues remain open after the comment.
+2. **Post keep-open comments (6 issues):** ⚠️ MANUAL — token lacks `issues: write`. Paste each comment from the per-issue sections above, verbatim. All six issues remain open after the comment.
 
-3. **Input for phaseV-closure-analysis-prompt.md Q5 (What Phase 7 inherits):**
+3. **Input for phaseV-closure-analysis-prompt.md Q5 (What Phase 7 inherits):** ✅ COMPLETE — captured in this document.
    - **#139 FIXED_PARTIALLY:** server-side chunked/windowed history response protocol; dashboard paged loader; per-device NVS storage; hard truncation limit in NVS scan loop (BUG-082).
    - **#166 FIXED_PARTIALLY:** per-device CSV export with `# device_id:` / `# metrics:` headers (v7.7.2.0); multi-device bundle export (v7.7.2.2).
    - **#171 FIXED_PARTIALLY:** per-device CSV export (v7.7.2.0); per-device CSV import v2 (v7.7.2.1); multi-device bundle export (v7.7.2.2).
@@ -262,10 +264,10 @@ Actions for the operator to execute AFTER reviewing this document:
    - **#190 OUT_OF_SCOPE:** Framework/ESPHome/MAC relocation to Eventlog (Phase VX).
    - **#196 OUT_OF_SCOPE:** Unified dashboard authentication / authFetch() pattern (Phase VX v7.6.10.x).
 
-4. **Input for phaseV-results.md "Issues Resolved" and "Deferred" tables:**
-   - **FIXED_PARTIALLY** (#139, #166, #171): add to "Issues Resolved" table with `(partial)` notation and Phase 7 remainder note.
-   - **DEFERRED_INTENTIONAL** (#137): add to "Deferred" table.
-   - **OUT_OF_SCOPE** (#190, #196): add to "Deferred" table with Phase VX target.
+4. **Input for phaseV-results.md "Issues Resolved" and "Deferred" tables:** ✅ COMPLETE — `prompts/handoff/phaseV/phaseV-results.md` updated in this PR.
+   - **FIXED_PARTIALLY** (#139, #166, #171): updated in "Issues Resolved" table with `(partial)` notation, PR numbers, and Phase 7 remainder notes.
+   - **DEFERRED_INTENTIONAL** (#137): already present in "Deferred" table (no change needed).
+   - **OUT_OF_SCOPE** (#190, #196): added to "Deferred" table with Phase VX target.
 
 5. **Note re: erroneous owner comments on #166 and #171:** the owner's comment posted at v7.6.9.3 closure (2026-04-17T16:34:58Z on #166; 2026-04-17T16:35:05Z on #171) incorrectly states "no Phase V work was scoped to implement this." The changelog and PR record show otherwise. The recommended keep-open comments above supersede those earlier comments and provide the accurate record.
 
