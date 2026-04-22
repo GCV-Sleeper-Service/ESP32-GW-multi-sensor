@@ -202,9 +202,9 @@ Cross-referencing `firmware/core/web-handler.h` `handleRequest()` routing (lines
 | `/api/v2/live` | GET | ❌ Public (intentional, RV-07) | ❌ Public | ✅ |
 | `/api/manifest` | GET | ❌ Public (intentional, RV-06) | ❌ Public | ✅ |
 | `/sensors.json` | GET | ❌ Public (intentional, RV-06) | ❌ Public | ✅ |
-| `/api/system/reboot` | POST | ✅ Yes (pre-existing) | ✅ Yes (line 665) | ✅ |
-| `/api/system/delete-data` | POST | ✅ Yes (pre-existing) | ✅ Yes (line 674) | ✅ |
-| `/api/system/storage-stats` | GET | ✅ Yes (pre-existing) | ✅ Yes | ✅ |
+| `/api/reboot` | POST | ✅ Yes (pre-existing) | ✅ Yes (line 665) | ✅ |
+| `/api/delete-data` | POST | ✅ Yes (pre-existing) | ✅ Yes (line 674) | ✅ |
+| `/api/storage-stats` | GET | ✅ Yes (pre-existing) | ✅ Yes | ✅ |
 
 **Two mismatches on history endpoints.** SEC-ADR-001 (committed in v7.6.8.1 as V2-G) states both history endpoints are auth-gated. The v7.6.8.1 audit confirms auth was added. The v7.6.9.0 PR #183 audit (FINDING-V769-04) documents that the auth was subsequently removed — "deliberate decision — read-only history is exposed publicly for operational convenience" — and explicitly notes "SEC-ADR not updated." The current code confirms no auth guard on either handler. Phase 7 must either restore auth (with dashboard credential wiring per issue #196) or formally update `SEC-ADR-001` to document the revised posture.
 
