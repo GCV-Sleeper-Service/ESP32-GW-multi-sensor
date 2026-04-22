@@ -9,6 +9,7 @@ firmware/.esphome/
 .vscode/
 .vscode/extensions.json
 .codex
+.github/copilot/
 # Minification build artifact — do not commit
 dashboard/dashboard.min.html
 # node_modules (Playwright / minification tools if installed locally)
