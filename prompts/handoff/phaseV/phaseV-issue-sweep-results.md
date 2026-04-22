@@ -68,7 +68,11 @@ Leaving open.
 **Changelog references:** v7.6.8.1 (`std::min(..., (size_t)60000)` cap on `csv.reserve()`), v7.6.9.4 (`clamp(esp_get_free_heap_size()/3, 12000, 60000)` adaptive cap, #139 partial ×2)
 
 **Analysis:**
-Phase V delivered two successive mitigations. PR #181 (v7.6.8.1, V2-E) added a fixed 60 KB pre-allocation cap — adequate for the C3's ~68 KB free heap but sized before the WROOM crash case was discovered. PR #193 (v7.6.9.4) replaced the fixed cap with a heap-adaptive formula (`clamp(free_heap/3, 12000, 60000)`) and gated the dashboard's initial `loadHistory()` call on the first successful `loadStatusSnapshot()` with a 15 s fallback. However, PR #194 documented BUG-082: `csv.reserve()` is only an allocation hint; the NVS scan loop appends without a hard truncation limit, so WROOM boards with ≥ 500 NVS segments (~40 KB CSV vs ~34 KB free heap) still crash via reallocation spike. The addendum (`Docs/phase-V-implementation-plan-addendum-v7.6.9.4.md`) and BUG-082 both confirm the full fix — chunked HTTP streaming — is deferred to Phase 7. The owner's issue comment (2026-04-17) pre-dates v7.6.9.4 and incorrectly describes the state; the changelog and PR record are authoritative.
+Phase V delivered two successive mitigations. PR #181 (v7.6.8.1, V2-E) added a fixed 60 KB pre-allocation cap — adequate for the C3's ~68 KB free heap but sized before the WROOM crash case was discovered. PR #193 (v7.6.9.4) replaced the fixed cap with a heap-adaptive formula (`clamp(free_heap/3, 12000, 60000)`) and gated the dashboard's initial `loadHistory()` call on the first successful `loadStatusSnapshot()` with a 15 s fallback.
+
+Post-merge, PR #194 documented BUG-082: `csv.reserve()` is only an allocation hint; the NVS scan loop appends without a hard truncation limit, so WROOM boards with ≥ 500 NVS segments (~40 KB CSV vs ~34 KB free heap) still crash via reallocation spike. The addendum (`Docs/phase-V-implementation-plan-addendum-v7.6.9.4.md`) and BUG-082 both confirm the full fix — chunked HTTP streaming — is deferred to Phase 7.
+
+The owner's issue comment (2026-04-17) pre-dates v7.6.9.4 and incorrectly describes the issue state; the changelog and PR record are authoritative.
 
 **Recommended GitHub action:**
 - [ ] Keep open with comment below
@@ -142,7 +146,11 @@ Leaving open.
 **Changelog references:** v7.6.7.1 (`handle_import_begin_()` deferred to `xTaskCreate` — Rule 40 compliance; `/api/import/status` endpoint; 409 readiness gate on data endpoints); v7.6.9.2 (`fetchSensorHistoryRows()` manifest-driven, #166 #171)
 
 **Analysis:**
-Phase V delivered both planned sub-scope items. PR #177 (v7.6.7.1, V1-D) moved `build_import_epoch_map_()` off the httpd task to an `xTaskCreate` worker (`imp_epoch`, 8192 B stack), fixing the Rule 40 crash on C3, and added the `/api/import/status` readiness endpoint and a 409 gate on data endpoints until import prep completes. PR #191 (v7.6.9.2, V3-D) made `fetchSensorHistoryRows()` manifest-driven for all metric types, addressing gap 3 (non-environmental metrics in export). The owner's issue comment (2026-04-17, at v7.6.9.3 closure) incorrectly states the import crash fix is "tracked for v7.6.7.x or equivalent standalone PR" and "no Phase V work was scoped" — the timeline (v7.6.7.1 merged 2026-04-14, comment written 2026-04-17) shows this is an oversight; the PR record is authoritative. Remaining open items are Phase 7 scope: per-device export, per-device import v2, and multi-device bundle.
+Phase V delivered both planned sub-scope items. PR #177 (v7.6.7.1, V1-D) moved `build_import_epoch_map_()` off the httpd task to an `xTaskCreate` worker (`imp_epoch`, 8192 B stack), fixing the Rule 40 crash on C3. It also added the `/api/import/status` readiness endpoint and a 409 gate on data endpoints until import prep completes. PR #191 (v7.6.9.2, V3-D) made `fetchSensorHistoryRows()` manifest-driven for all metric types, addressing gap 3 (non-environmental metrics in export).
+
+The owner's issue comment (2026-04-17, posted at v7.6.9.3 closure) incorrectly states the import crash fix is "tracked for v7.6.7.x or equivalent standalone PR" and "no Phase V work was scoped." The timeline (v7.6.7.1 merged 2026-04-14, comment written 2026-04-17) indicates this is an oversight; the PR record is authoritative.
+
+Remaining open items are Phase 7 scope: per-device export, per-device import v2, and multi-device bundle.
 
 **Recommended GitHub action:**
 - [ ] Keep open with comment below
