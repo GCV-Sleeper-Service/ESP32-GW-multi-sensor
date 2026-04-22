@@ -30,7 +30,7 @@ Your job as the human operator is to:
 | Bugs & Lessons Learned | `Docs/lessons/index.md` | Project guardrails and failure history (split by domain at v7.6.4.0) |
 | **Prompt Writing Guide** | `Docs/writing-guide/methodology.md` | How to create and audit prompts (split into methodology + gap catalog at v7.6.4.0) |
 | **Phase D Results and Summary** | `prompts/handoff/phaseD/phaseD-results.md` | Phase D delivery record, lessons, API contracts |
-| **Phase X Results and Summary** | `prompts/handoff/phaseX-results.md` | Phase X delivery record, lessons, metrics |
+| **Phase X Results and Summary** | `prompts/handoff/phaseX/phaseX-results.md` | Phase X delivery record, lessons, metrics |
 | Phase X Architecture Plan | `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` | Dashboard refactor design (methodology reference) |
 | Phase X Audit Template | `prompts/phaseX/pr-audit-question-template.md` | Stable core + level-specific PR audit questions |
 | Archived plans (Phases 3–6) | `Docs/archive/completed-phases/` | Historical implementation plans |
@@ -143,11 +143,11 @@ Open Item OI-001: fix inaccurate parallelism comment in `tests/mock-server/serve
 
 ### Phase X — Dashboard Architecture Refactor (v7.6.4.0–v7.6.5.8) ✅ COMPLETE
 
-Phase X complete (v7.6.4.0 + v7.6.5.0–v7.6.5.8, 2026-04-05 to 2026-04-08). Dashboard monolith (3,955 lines) refactored into modular component architecture with three-pass build pipeline. Context reduced 6x–8x (55K→8K tokens). LESSON-OPS-043 structurally resolved. 11 new Critical Rules (47–57). 402/0 tests maintained throughout. Results: `prompts/handoff/phaseX-results.md`. Quality check: `prompts/handoff/phaseX-results-quality-check.md`. Plan: `Docs/phase-X-architecture-and-refactor-plan-dashboard.md`. Prompts: `prompts/phaseX/`.
+Phase X complete (v7.6.4.0 + v7.6.5.0–v7.6.5.8, 2026-04-05 to 2026-04-08). Dashboard monolith (3,955 lines) refactored into modular component architecture with three-pass build pipeline. Context reduced 6x–8x (55K→8K tokens). LESSON-OPS-043 structurally resolved. 11 new Critical Rules (47–57). 402/0 tests maintained throughout. Results: `prompts/handoff/phaseX/phaseX-results.md`. Quality check: `prompts/handoff/phaseX/phaseX-results-quality-check.md`. Plan: `Docs/phase-X-architecture-and-refactor-plan-dashboard.md`. Prompts: `prompts/phaseX/`.
 
 ### Phase Y — Firmware Refactor: sensor_history_multi.h ✅ COMPLETE
 
-Phase Y complete (v7.6.6.0–v7.6.6.8, 2026-04-10 to 2026-04-12). Firmware monolith (4,325 lines) decomposed into 8 source fragments in `firmware/core/`, assembled by `scripts/assemble-sensor-history.sh`. Option B (assembled artifact) — zero generator changes, zero YAML changes, SHA-256 identity gate. Context reduced 3.6×–9× per task. 5 new Critical Rules (58–62) added. 402/0 Playwright tests maintained throughout. Device tests passed on both C3 and S3 hardware. Results: `prompts/handoff/phaseY-results.md`. Plan: `Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md`. Prompts: `prompts/phaseY/`.
+Phase Y complete (v7.6.6.0–v7.6.6.8, 2026-04-10 to 2026-04-12). Firmware monolith (4,325 lines) decomposed into 8 source fragments in `firmware/core/`, assembled by `scripts/assemble-sensor-history.sh`. Option B (assembled artifact) — zero generator changes, zero YAML changes, SHA-256 identity gate. Context reduced 3.6×–9× per task. 5 new Critical Rules (58–62) added. 402/0 Playwright tests maintained throughout. Device tests passed on both C3 and S3 hardware. Results: `prompts/handoff/phaseY/phaseY-results.md`. Plan: `Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md`. Prompts: `prompts/phaseY/`.
 
 **Version range:** v7.6.6.0–v7.6.6.8
 **Plan:** `Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md`
@@ -400,11 +400,11 @@ After each step completes:
 
 ### 2026-04-12 — Phase Y Closure (v7.6.6.8)
 
-Phase Y complete. All 9 steps delivered. Critical Rules 58–62 added. 6 new preflight checks added (68 total). Phase Y results document produced (`prompts/handoff/phaseY-results.md`).
+Phase Y complete. All 9 steps delivered. Critical Rules 58–62 added. 6 new preflight checks added (68 total). Phase Y results document produced (`prompts/handoff/phaseY/phaseY-results.md`).
 
 ### 2026-04-10 through 2026-04-11 — Phase Y Execution (v7.6.6.0–v7.6.6.7)
 
-Per-step revision entries condensed. Delivery details preserved in Phase Y results (`prompts/handoff/phaseY-results.md`) and individual consolidated audits (`prompts/phaseY/v7.6.6.x-PRxxx-consolidated-audit-and-lessons.md`).
+Per-step revision entries condensed. Delivery details preserved in Phase Y results (`prompts/handoff/phaseY/phaseY-results.md`) and individual consolidated audits (`prompts/phaseY/v7.6.6.x-PRxxx-consolidated-audit-and-lessons.md`).
 
 ### 2026-04-08 — Phase X Closure (v7.6.5.8)
 
@@ -413,7 +413,7 @@ Phase X complete. All 10 steps delivered. Critical Rules 47–57 added. Board pr
 
 ### 2026-04-06 through 2026-04-08 — Phase X Execution (v7.6.5.0–v7.6.5.7)
 
-Per-step revision entries for each Phase X step have been condensed. Detailed delivery summaries are preserved in the Phase X results document (`prompts/handoff/phaseX-results.md`) and in individual consolidated audits (`prompts/phaseX/v7.6.5.x-PRxxx-consolidated-audit-and-lessons.md`).
+Per-step revision entries for each Phase X step have been condensed. Detailed delivery summaries are preserved in the Phase X results document (`prompts/handoff/phaseX/phaseX-results.md`) and in individual consolidated audits (`prompts/phaseX/v7.6.5.x-PRxxx-consolidated-audit-and-lessons.md`).
 
 ### 2026-04-04 — Phase D Closure (v7.6.0.5)
 
