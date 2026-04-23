@@ -12,7 +12,7 @@ You are the architectural advisor for the **ESP32-GW Multi-Sensor Gateway** proj
 
 ### ⚠️ CRITICAL: Read the Codebase First
 
-Your training data and session memory are **stale**. The project has gone through Phases X, Y, V, and possibly more since your last session. You MUST clone the repo and read the actual current state before producing any planning output.
+Your training data and session memory are **stale**. The project has gone through Phases X, Y, V, VX, and possibly more since your last session. You MUST clone the repo and read the actual current state before producing any planning output.
 
 ```
 git clone https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
@@ -49,8 +49,10 @@ cd ESP32-GW-multi-sensor
 **Layer 4 — Constraint Context:**
 
 17. `prompts/prompt-index-and-workflow.md` — Critical Rules (these constrain all future phases)
-18. `Docs/phase-V-capacity-study.md` — if it exists, read for memory/flash budget analysis
+18. `Docs/phase-V-capacity-study.md` — memory/flash budget analysis (produced at v7.6.6.8; updated context in v7.6.9.5 supplement)
 19. `partitions/` — read all partition table CSVs to understand flash layout constraints
+20. `Docs/phase-V-closure-analysis.md` — Phase V retrospective: plan-vs-delivery, review findings, handoff items for Phase 7
+21. `prompts/handoff/phaseV/phaseV-results.md` — Phase V delivery record, device test baselines, deferred items, new Critical Rules and lessons
 
 ### After Reading
 
@@ -81,7 +83,7 @@ This summary proves you read the codebase and catches any misunderstanding befor
    - The status split (`/api/status` is now public with `{ok, role, id}`; `/api/status/full` is auth-gated)
    - The `provision.sh` pipeline (replaces the old manual multi-step pipeline)
 4. Are the v7.7.x prompts (if they exist in `prompts/`) still valid, or do they reference stale file paths and APIs?
-5. What is the recommended execution order: Phase 7 first, or Phase V V3 first, or interleaved?
+5. Phase V is closed (v7.6.9.5). Phase VX (board onboarding, v7.6.10.x) may or may not have completed before this session. What adjustments does Phase 7 need based on Phase VX outcomes (or their absence)?
 
 **Output:** A review document with findings, corrections needed, and a go/no-go recommendation for starting Phase 7.
 
@@ -187,9 +189,11 @@ For each deliverable, produce:
 
 After producing all four deliverables, provide a recommended execution order considering:
 
-- Phase V is nearly complete (V2 in progress, V3 pending)
+- Phase V closed at v7.6.9.5 (2026-04-20). Results: `prompts/handoff/phaseV/phaseV-results.md`
+- Phase VX (board onboarding sprint, v7.6.10.x) may have completed — check for `Docs/board-measurement-log-v7.6.10.md`
 - Phase 7 has detailed plans but hasn't started
-- Memory is tight on C3 (min_free_heap ~57KB, httpd stack at 260B headroom)
+- Memory is tight on C3 (free_heap ~57 KB at boot with 16 KB httpd stack; min_free_heap ~29 KB under stress)
+- BUG-082 (WROOM history OOM) is open and deferred to Phase 7 chunked streaming — no step for this exists in the current Phase 7 plan
 - The operator wants to minimize complexity and avoid scope creep
 - Some phases may enable or block others (e.g., captive portal benefits from per-device persistence; cloud needs TLS which needs heap headroom)
 
