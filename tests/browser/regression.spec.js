@@ -31,6 +31,7 @@ test.afterEach(async ({ page }) => {
 test.describe('14. Phase 2 Closure — Full Regression', () => {
   // Scenario 1: full v2 manifest → correct rendering
   test('scenario 1: sensor cards render correctly when /api/manifest returns full v2 manifest', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === '3sensor', '3sensor fixture has 4 cards (3 env + 1 network) and no system device; the 5-card assertion is active-manifest-specific.');
     test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (5) and Outside name are active-manifest-specific; mixed fixture has 4 sensors including nas01, so these assertions do not apply.');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator manifest has 0 sensors; loadSensorManifest() falls back to DEFAULT_SENSOR_META (source=auto-promoted). Satellite-manifest rendering verified in other groups.');
     test.skip(process.env.FIXTURE_SET === 'system', 'System fixture has 2 env sensors (no Outside); sensor name assertions are 3sensor-specific.');
@@ -105,6 +106,7 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
 
   // Scenario 4: environmental card renderer dispatches correctly
   test('scenario 4: environmental card renderer dispatches correctly for all sensors', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === '3sensor', '3sensor fixture has 4 total sensors; expectedSensorCount(5) is only valid for the active default manifest.');
     test.skip(process.env.FIXTURE_SET === 'mixed', 'expectedSensorCount (5) and envSensors.length (3) are active-manifest-specific; mixed fixture has 2 env + 1 network + 1 system (nas01) = 4 total.');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator fixture uses DEFAULT_SENSOR_META fallback (3 env, no network); expectedSensorCount(5) and envSensors.length(3) assertions are satellite-specific.');
     test.skip(process.env.FIXTURE_SET === 'system', 'System fixture has 2 env sensors (not 3); envSensors.length(3) assertion is 3sensor-specific.');
@@ -328,6 +330,7 @@ test.describe('15. Phase 3 Closure — v2 API Regression', () => {
 
   // Test 6: Dashboard renders identically with new endpoints
   test('dashboard renders identically with new endpoints', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === '3sensor', '3sensor fixture has 4 cards and no system device; the 5-card active-manifest assertion does not apply.');
     test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (5) and Outside name are active-manifest-specific; mixed fixture has 4 sensors (includes nas01; layout/names differ).');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator uses DEFAULT_SENSOR_META fallback (3 env-only); card count (5) and wan_ping network card are satellite-specific.');
     test.skip(process.env.FIXTURE_SET === 'system', 'System fixture has 2 env sensors (no Outside); Outside name assertion is 3sensor-specific.');

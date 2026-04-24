@@ -121,8 +121,7 @@ void AsyncWebServer::begin() {
   if (this->server_) {
     this->end();
   }
-  // Default httpd stack is defined by ESP-IDF. Increase to accommodate SerializationBuffer's
-  // 640-byte stack buffer used by web_server JSON request handlers.
+  // Default httpd stack is defined by ESP-IDF. Increase it to cover the web_server JSON handlers.
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.stack_size = 16384;  // PATCHED: BUG-076 — ESPHome default 4KB overflows with any non-trivial handler
   config.server_port = this->port_;
@@ -283,17 +282,56 @@ void AsyncWebServerRequest::redirect(const std::string &url) {
 }
 
 void AsyncWebServerRequest::init_response_(AsyncWebServerResponse *rsp, int code, const char *content_type) {
-  // Set status code - use constants for common codes, default to 500 for unknown codes
+  // Use stable string literals/ESP-IDF constants because httpd_resp_set_status() keeps the pointer.
   const char *status;
   switch (code) {
     case 200:
       status = HTTPD_200;
       break;
+    case 204:
+      status = "204 No Content";
+      break;
+    case 301:
+      status = "301 Moved Permanently";
+      break;
+    case 302:
+      status = "302 Found";
+      break;
+    case 400:
+      status = HTTPD_400;
+      break;
+    case 401:
+      status = "401 Unauthorized";
+      break;
+    case 403:
+      status = "403 Forbidden";
+      break;
     case 404:
       status = HTTPD_404;
       break;
+    case 405:
+      status = "405 Method Not Allowed";
+      break;
+    case 408:
+      status = "408 Request Timeout";
+      break;
     case 409:
       status = HTTPD_409;
+      break;
+    case 414:
+      status = "414 URI Too Long";
+      break;
+    case 429:
+      status = "429 Too Many Requests";
+      break;
+    case 500:
+      status = HTTPD_500;
+      break;
+    case 501:
+      status = "501 Not Implemented";
+      break;
+    case 503:
+      status = "503 Service Unavailable";
       break;
     default:
       status = HTTPD_500;

@@ -22,6 +22,7 @@ test.afterEach(async ({ page }) => {
 
 test.describe('2. Sensor cards', () => {
   test('five sensor cards are rendered (3 environmental + 1 network + 1 system)', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === '3sensor', '3sensor fixture has 3 environmental + 1 network = 4 cards; no system device.');
     test.skip(process.env.FIXTURE_SET === 'mixed', 'Card count (5) is active-manifest-specific; mixed fixture has 4 sensors (2 env + 1 network + 1 system/nas01).');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator fixture has 0 sensors in manifest; DEFAULT_SENSOR_META fallback yields 3 env-only cards (no network wan_ping).');
     await loadDashboard(page);
@@ -79,6 +80,7 @@ test.describe('11. Card renderer registry', () => {
   });
 
   test('environmental renderer dispatches correctly and produces sensor cards', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === '3sensor', '3sensor fixture has 4 cards total; the 5-card assertion is active-manifest-specific.');
     test.skip(process.env.FIXTURE_SET === 'mixed', 'Post-buildDeviceCards card count (5) is active-manifest-specific; mixed fixture has 4 sensors (2 env + 1 network + 1 system/nas01).');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator manifest has 0 sensors; DEFAULT_SENSOR_META fallback yields 3 env-only cards (not 5). Card count assertion (5) is satellite-specific.');
     await loadDashboard(page);
@@ -240,6 +242,7 @@ test.describe('17. Phase 4 Step 2 — Network Card Renderer', () => {
   });
 
   test('SENSORS includes network device (wan_ping) after manifest load', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === '3sensor', '3sensor fixture has 4 sensors total (3 env + 1 network); the 5-sensor assertion is active-manifest-specific.');
     test.skip(process.env.FIXTURE_SET === 'mixed', 'Total sensor count (5) is active-manifest-specific; mixed fixture has 4 sensors total (2 env + 1 network + 1 system/nas01).');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator DEFAULT_SENSOR_META has no wan_ping; SENSORS.length is 3 (env-only). Network device verified in aggregator gwGrid cards (Group 19).');
     await loadDashboard(page);

@@ -4,6 +4,7 @@
 #include "esphome/core/defines.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/string_ref.h"
+#include "esphome/core/version.h"
 #include <esp_http_server.h>
 
 #include <atomic>
@@ -260,7 +261,11 @@ class AsyncWebHandler {
 class AsyncEventSource;
 class AsyncEventSourceResponse;
 
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 4, 0)
 using message_generator_t = json::SerializationBuffer<>(esphome::web_server::WebServer *, void *);
+#else
+using message_generator_t = std::string(esphome::web_server::WebServer *, void *);
+#endif
 
 /*
   This class holds a pointer to the source component that wants to publish a state event, and a pointer to a function
