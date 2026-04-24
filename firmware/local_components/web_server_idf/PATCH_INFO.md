@@ -35,9 +35,10 @@ same `request_handler` path as GET (no body to read).
 - LESSON-OPS-108, LESSON-OPS-109 (DELETE handler)
 
 ## Upstream source
-- ESPHome version: Version: 2026.2.1
+- ESPHome version: Version: 2026.4.1
+- ESP-IDF version: 5.5.4
 - Source path: /opt/esphome/.venv/lib/python3.12/site-packages/esphome/components/web_server_idf
-- Copied: 2026-03-31T00:00:05-07:00
+- Copied: 2026-04-23T16:53:02-07:00
 
 ## After ESPHome upgrade
 Re-run: `bash scripts/patch-esphome-httpd-stack.sh`

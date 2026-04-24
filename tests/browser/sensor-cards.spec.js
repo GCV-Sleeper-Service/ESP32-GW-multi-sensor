@@ -21,11 +21,11 @@ test.afterEach(async ({ page }) => {
 // ── 2. Sensor cards ───────────────────────────────────────────────
 
 test.describe('2. Sensor cards', () => {
-  test('four sensor cards are rendered (3 environmental + 1 network)', async ({ page }) => {
-    test.skip(process.env.FIXTURE_SET === 'mixed', 'Card count (4) is 3sensor-specific; mixed fixture has 4 sensors (2 env + 1 network + 1 system/nas01).');
+  test('five sensor cards are rendered (3 environmental + 1 network + 1 system)', async ({ page }) => {
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Card count (5) is active-manifest-specific; mixed fixture has 4 sensors (2 env + 1 network + 1 system/nas01).');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator fixture has 0 sensors in manifest; DEFAULT_SENSOR_META fallback yields 3 env-only cards (no network wan_ping).');
     await loadDashboard(page);
-    await expect(page.locator('.sensor-card')).toHaveCount(4);
+    await expect(page.locator('.sensor-card')).toHaveCount(5);
   });
 
   test('sensor card headers contain expected sensor names', async ({ page }) => {
@@ -42,7 +42,7 @@ test.describe('2. Sensor cards', () => {
 
   test('each environmental sensor card contains value display elements', async ({ page }) => {
     await loadDashboard(page);
-    const cards = page.locator('.sensor-card:not(.network-card)');
+    const cards = page.locator('.sensor-card:not(.network-card):not(.system-card)');
     const count = await cards.count();
     for (let i = 0; i < count; i++) {
       expect(await cards.nth(i).locator('[id^="val-"]').count()).toBeGreaterThan(0);
@@ -79,8 +79,8 @@ test.describe('11. Card renderer registry', () => {
   });
 
   test('environmental renderer dispatches correctly and produces sensor cards', async ({ page }) => {
-    test.skip(process.env.FIXTURE_SET === 'mixed', 'Post-buildDeviceCards card count (4) is 3sensor-specific; mixed fixture has 4 sensors (2 env + 1 network + 1 system/nas01).');
-    test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator manifest has 0 sensors; DEFAULT_SENSOR_META fallback yields 3 env-only cards (not 4). Card count assertion (4) is satellite-specific.');
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Post-buildDeviceCards card count (5) is active-manifest-specific; mixed fixture has 4 sensors (2 env + 1 network + 1 system/nas01).');
+    test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator manifest has 0 sensors; DEFAULT_SENSOR_META fallback yields 3 env-only cards (not 5). Card count assertion (5) is satellite-specific.');
     await loadDashboard(page);
     // Wait for manifest and cards
     await page.waitForFunction(() => window._manifest && window._manifest.sensors, { timeout: 10000 });
@@ -89,8 +89,8 @@ test.describe('11. Card renderer registry', () => {
     page.on('pageerror', err => { pageError = err; });
     await page.evaluate(() => buildDeviceCards());
     await page.locator('.sensor-card').first().waitFor({ state: 'visible', timeout: 5000 });
-    // 3 environmental + 1 network = 4 total
-    await expect(page.locator('.sensor-card')).toHaveCount(4);
+    // 3 environmental + 1 network + 1 system = 5 total
+    await expect(page.locator('.sensor-card')).toHaveCount(5);
     expect(pageError).toBeNull();
   });
 
@@ -175,7 +175,7 @@ test.describe('17. Phase 4 Step 2 — Network Card Renderer', () => {
     test.skip(process.env.FIXTURE_SET === 'system', 'System fixture has 2 env + 1 system card; .sensor-card:not(.network-card) includes the system card which lacks .sensor-env-grid.');
     await loadDashboard(page);
     await page.waitForFunction(() => window._manifest && window._manifest.sensors, { timeout: 10000 });
-    const envCards = page.locator('.sensor-card:not(.network-card)');
+    const envCards = page.locator('.sensor-card:not(.network-card):not(.system-card)');
     const count = await envCards.count();
     expect(count).toBe(3);
     for (let i = 0; i < count; i++) {
@@ -240,12 +240,12 @@ test.describe('17. Phase 4 Step 2 — Network Card Renderer', () => {
   });
 
   test('SENSORS includes network device (wan_ping) after manifest load', async ({ page }) => {
-    test.skip(process.env.FIXTURE_SET === 'mixed', 'Total sensor count (4) is 3sensor-specific; mixed fixture has 4 sensors total (2 env + 1 network + 1 system/nas01).');
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Total sensor count (5) is active-manifest-specific; mixed fixture has 4 sensors total (2 env + 1 network + 1 system/nas01).');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator DEFAULT_SENSOR_META has no wan_ping; SENSORS.length is 3 (env-only). Network device verified in aggregator gwGrid cards (Group 19).');
     await loadDashboard(page);
     const sensorIds = await page.evaluate(() => App.State.getSensors().map(s => s.id));
     expect(sensorIds).toContain('wan_ping');
-    expect(sensorIds.length).toBe(4);
+    expect(sensorIds.length).toBe(5);
   });
 
   test('updateNetworkCards populates ping values from live data', async ({ page }) => {
