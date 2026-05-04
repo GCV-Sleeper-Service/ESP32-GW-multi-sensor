@@ -47,11 +47,11 @@ Phase VX uses the same prompt methodology as Phase V: Claude advisory sessions p
 
 **New boards onboarded:**
 
-| board_id | Chip | Flash | PSRAM | IP | Compiled? |
-|----------|------|-------|-------|-----|-----------|
-| esp32-s3-supermini-4m | ESP32-S3 | 4 MB | 2 MB quad | 192.168.120.192 | ___ |
-| esp32-c6-supermini-4m | ESP32-C6 | 4 MB | None | 192.168.120.196 | ___ |
-| esp32-c5-wroom1u-8m | ESP32-C5 | 8 MB | 8 MB quad | 192.168.120.195 | ___ |
+| board_id | Name | Chip | Flash | PSRAM | IP | Compiled? |
+|----------|------|------|-------|-------|----|-----------|
+| esp32-s3-supermini-4m | sat-s3-4m-173 | ESP32-S3 | 4 MB | 2 MB quad | 192.168.120.173 | ___ |
+| esp32-c5-wroom1u-8m | sat-c5-8m-180 | ESP32-C5 | 8 MB | 8 MB quad | 192.168.120.180 | ___ |
+| esp32-c6-supermini-4m | sat-c6-4m-182 | ESP32-C6 | 4 MB | None | 192.168.120.182 | ___ |
 ```
 
 ### 3. Update step status as each step completes

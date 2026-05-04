@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-22 — Phase V closure (v7.6.9.5). Phase V complete. Critical Rule 64 added. Current Phase: **Phase VX** (pending)._
+_Last updated: 2026-04-XX — Phase VX in progress (v7.6.10.X). Current Phase: **Phase VX** (board onboarding sprint)._
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -195,6 +195,37 @@ Phase V used a different prompt methodology from Phases D/X/Y: Claude advisory s
 | v7.6.9.3 | V3-F: Struct audit / Phase V preliminary closure | `prompts/phaseV/v7.6.9.3-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.9.3.md` | ✅ Complete |
 | v7.6.9.4 | V4: Heap-adaptive history cap + boot sequencing | `prompts/phaseV/v7.6.9.4-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.9.4.md` | ✅ Complete |
 | v7.6.9.5 | V5: C3 httpd stack override fix (BUG-083) | `prompts/phaseV/v7.6.9.5-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseV/session-handoff-v7.6.9.5.md` | ✅ Complete |
+
+### Phase VX — Board Onboarding Sprint (v7.6.10.0–v7.6.10.3+)
+
+Phase VX is an infrastructure sprint between Phase V closure and Phase 7. ESPHome upgraded from 2026.2.1 to 2026.4.1 (ESP-IDF 5.5.4). Up to 3 new boards (S3 SuperMini, C6 SuperMini, C5 WROOM-1U) onboarded into the provisioning pipeline. Measurement dataset produced for multi-phase planning.
+
+Phase VX uses the same prompt methodology as Phase V: Claude advisory sessions producing agent prompts (two-step pattern), Kiro/GPT/Codex executing those prompts, Perplexity three-turn PR review.
+
+**Version range:** v7.6.10.0–v7.6.10.3 (+ optional v7.6.10.4)
+**Sprint prompt:** `prompts/handoff/phaseVX/phaseVX-board-onboarding-sprint-prompt.md`
+**Sprint assessment:** `prompts/handoff/phaseVX/phaseVX-sprint-assessment.md`
+**Audit Template:** `prompts/phaseVX/consolidated-audit-template-phaseVX.md`
+**Measurement Protocol:** `Docs/board-measurement-protocol-v7.6.10.md`
+**Measurement Log:** `Docs/board-measurement-log-v7.6.10.md`
+
+| Version | Scope | Prompt File | Handoff | Status |
+|---------|-------|-------------|---------|--------|
+| v7.6.10.0 | ESPHome 2026.4.1 upgrade verification + local component re-patch | `prompts/phaseVX/v7.6.10.0-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.0.md` | 🔜 Queued |
+| v7.6.10.1 | Board profiles + partition tables for 3 new boards | `prompts/phaseVX/v7.6.10.1-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.1.md` | 🔜 Queued |
+| v7.6.10.2 | Flash, measure, document | _(operator-driven, see measurement protocol)_ | _(no agent handoff)_ | 🔜 Queued |
+| v7.6.10.3 | Capacity study + board selection guide update | _(Claude advisory session)_ | _(no agent handoff)_ | 🔜 Queued |
+| v7.6.10.4 | Dashboard auth refactor (optional) | _(TBD if included)_ | _(TBD)_ | 🔜 Optional |
+
+
+**New boards onboarded:**
+
+| board_id | Name | Chip | Flash | PSRAM | IP | Compiled? |
+|----------|------|------|-------|-------|----|-----------|
+| esp32-s3-supermini-4m | sat-s3-4m-173 | ESP32-S3 | 4 MB | 2 MB quad | 192.168.120.173 | ___ |
+| esp32-c5-wroom1u-8m | sat-c5-8m-180 | ESP32-C5 | 8 MB | 8 MB quad | 192.168.120.180 | ___ |
+| esp32-c6-supermini-4m | sat-c6-4m-182 | ESP32-C6 | 4 MB | None | 192.168.120.182 | ___ |
+
 
 ### Phase 7 — Per-Device Persistence Engine — After Phase V
 

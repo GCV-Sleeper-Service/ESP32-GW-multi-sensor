@@ -1,6 +1,6 @@
 {
   "board": "esp32-wroom-32d",
-  "esphome_name": "sat-esp32-4m-190",
+  "esphome_name": "sat-esp32-4m-170",
   "friendly_name": "Second satellite - esp32 wroom 4mb flash",
-  "wifi_address": "192.168.120.190"
+  "wifi_address": "192.168.120.170"
 }
