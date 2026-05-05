@@ -1,0 +1,27 @@
+# ESP32-C5-WROOM-1U (MCN8R8) — Board Profile
+# First C5 in fleet. RISC-V single core 240 MHz, WiFi 6 dual-band (2.4 + 5 GHz),
+# BLE 5.0, 802.15.4 (Zigbee/Thread). 8 MB flash, 8 MB PSRAM.
+board_id: "esp32-c5-wroom1u-8m"
+chip_variant: "esp32c5"
+esphome_board: "esp32-c5-devkitc-1"
+flash_size: "8MB"
+partitions: "../partitions/esp32-c5-multi-partitions.csv"
+framework:
+  type: "esp-idf"
+sdkconfig_options:
+  CONFIG_LWIP_MAX_SOCKETS: "15"
+  CONFIG_XTAL_FREQ_48: "y"
+psram:
+  mode: "quad"
+  speed: "80MHz"
+capabilities:
+  ble: true
+  psram: true
+  dual_core: false
+  ram_kb: 384
+external_components:
+  - source:
+      type: local
+      path: local_components
+    components: [web_server_idf]
+notes: "First C5 satellite. Dual-band WiFi 6 + Zigbee/Thread. 8MB PSRAM, 8MB flash. CONFIG_XTAL_FREQ_48 required for this board's 48 MHz crystal."

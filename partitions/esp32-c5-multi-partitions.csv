@@ -1,0 +1,13 @@
+# esp32-c5-multi-partitions.csv
+# Partition layout for ESP32-C5 with 8MB flash.
+# Larger OTA slots (3MB each) and bigger history (1MB) than 4MB boards.
+# History: 1MB — ~38 days per device (3 ThermoPro + 1 ping)
+# C5 bootloader lives at 0x2000 (managed by build system, not in this table).
+# Name,     Type, SubType,  Offset,   Size,      Flags
+nvs,        data, nvs,      0x9000,   0x4000,
+otadata,    data, ota,      0xD000,   0x2000,
+phy_init,   data, phy,      0xF000,   0x1000,
+ota_0,      app,  ota_0,    0x10000,  0x300000,
+ota_1,      app,  ota_1,    ,         0x300000,
+history,    data, nvs,      ,         0x100000,
+coredump,   data, coredump, ,         0x10000,
