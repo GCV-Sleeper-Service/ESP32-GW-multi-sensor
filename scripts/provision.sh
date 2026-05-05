@@ -15,8 +15,8 @@ CONFIG_DIR="config"
 BAK_GATEWAY_AGG="$CONFIG_DIR/gateway-agg-s3-16m-1.json.bak"
 BAK_AGGREGATOR_AGG="$CONFIG_DIR/aggregator-agg-s3-16m-1.json.bak"
 BAK_SENSORS_AGG="$CONFIG_DIR/sensors-agg-s3-16m-1.json.bak"
-BAK_GATEWAY_WROOM="$CONFIG_DIR/gateway-sat-esp32-4m-190.json.bak"
-BAK_SENSORS_WROOM="$CONFIG_DIR/sensors-sat-esp32-4m-190.json.bak"
+BAK_GATEWAY_WROOM="$CONFIG_DIR/gateway-sat-esp32-4m-170.json.bak"
+BAK_SENSORS_WROOM="$CONFIG_DIR/sensors-sat-esp32-4m-170.json.bak"
 
 # Active config file paths (created/removed by this script)
 # Note: gateway.json, aggregator.json, and WROOM sensors are gitignored.
@@ -24,7 +24,7 @@ BAK_SENSORS_WROOM="$CONFIG_DIR/sensors-sat-esp32-4m-190.json.bak"
 ACTIVE_GATEWAY="$CONFIG_DIR/gateway.json"
 ACTIVE_AGGREGATOR="$CONFIG_DIR/aggregator.json"
 ACTIVE_SENSORS_AGG="$CONFIG_DIR/sensors-agg-s3-16m-1.json"
-ACTIVE_SENSORS_WROOM="$CONFIG_DIR/sensors-sat-esp32-4m-190.json"
+ACTIVE_SENSORS_WROOM="$CONFIG_DIR/sensors-sat-esp32-4m-170.json"
 
 # ---------------------------------------------------------------------------
 # Helper: print_usage
@@ -36,7 +36,7 @@ print_usage() {
   echo "  status                Show current configuration (no changes made)"
   echo "  aggregator [--dry-run]  Switch to S3 aggregator (agg-s3-16m-1)"
   echo "  satellite  [--dry-run]  Switch to C3 satellite (default, CI-safe)"
-  echo "  wroom      [--dry-run]  Switch to WROOM satellite (sat-esp32-4m-190)"
+  echo "  wroom      [--dry-run]  Switch to WROOM satellite (sat-esp32-4m-170)"
   echo ""
   echo "Options:"
   echo "  --dry-run   Print pipeline steps without executing them"
@@ -82,7 +82,7 @@ require_python3() {
 
 # ---------------------------------------------------------------------------
 # Helper: detect_current_config
-# Returns one of: c3-default | aggregator:agg-s3-16m-1 | wroom:sat-esp32-4m-190 | unknown
+# Returns one of: c3-default | aggregator:agg-s3-16m-1 | wroom:sat-esp32-4m-170 | unknown
 # ---------------------------------------------------------------------------
 detect_current_config() {
   if [[ ! -f "$ACTIVE_GATEWAY" ]]; then
@@ -99,7 +99,7 @@ detect_current_config() {
 
   case "$esphome_name" in
     agg-s3-16m-1)     echo "aggregator:agg-s3-16m-1" ;;
-    sat-esp32-4m-190) echo "wroom:sat-esp32-4m-190" ;;
+    sat-esp32-4m-170) echo "wroom:sat-esp32-4m-170" ;;
     *)                echo "unknown" ;;
   esac
 }
@@ -410,8 +410,8 @@ show_status() {
     aggregator:agg-s3-16m-1)
       role="aggregator"; device="agg-s3-16m-1 (ESP32-S3)"; ci_safe="❌ NO"
       ;;
-    wroom:sat-esp32-4m-190)
-      role="satellite"; device="sat-esp32-4m-190 (WROOM)"; ci_safe="❌ NO"
+    wroom:sat-esp32-4m-170)
+      role="satellite"; device="sat-esp32-4m-170 (WROOM)"; ci_safe="❌ NO"
       ;;
     *)
       role="unknown"; device="unknown"; ci_safe="❓ UNKNOWN"
@@ -591,7 +591,7 @@ activate_wroom() {
   require_python3
 
   echo "════════════════════════════════════════"
-  echo " Provisioning: WROOM Satellite (sat-esp32-4m-190)"
+  echo " Provisioning: WROOM Satellite (sat-esp32-4m-170)"
   echo "════════════════════════════════════════"
   echo ""
 
@@ -600,14 +600,14 @@ activate_wroom() {
   local current
   current=$(detect_current_config)
 
-  if [[ "$current" == "wroom:sat-esp32-4m-190" ]]; then
+  if [[ "$current" == "wroom:sat-esp32-4m-170" ]]; then
     echo "  Already in WROOM satellite mode. Validating..."
     validate_after_switch wroom || true
     print_workflow wroom "$dry_run"
   else
     if [[ "$dry_run" == "true" ]]; then
       echo ""
-      echo "  [DRY-RUN] Would switch from $current → wroom:sat-esp32-4m-190"
+      echo "  [DRY-RUN] Would switch from $current → wroom:sat-esp32-4m-170"
       echo "  [DRY-RUN] Would run: clean_active_configs"
       echo "  [DRY-RUN] Would copy: $BAK_GATEWAY_WROOM → $ACTIVE_GATEWAY"
       echo "  [DRY-RUN] Would copy: $BAK_SENSORS_WROOM → $ACTIVE_SENSORS_WROOM"
@@ -645,7 +645,7 @@ activate_wroom() {
   fi
 
   echo ""
-  echo "  ⚠️  WARNING: Current configuration is for WROOM satellite (sat-esp32-4m-190)."
+  echo "  ⚠️  WARNING: Current configuration is for WROOM satellite (sat-esp32-4m-170)."
   echo "  ⚠️  DO NOT push this configuration to the remote repo — it will break CI."
   echo "  ⚠️  Run 'bash scripts/provision.sh satellite' before pushing."
   echo ""

@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-04-XX — Phase VX in progress (v7.6.10.X). Current Phase: **Phase VX** (board onboarding sprint)._
+_Last updated: 2026-05-05 — Phase VX in progress (v7.6.10.0 merged). Current Phase: **Phase VX** (board onboarding sprint)._
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -211,12 +211,11 @@ Phase VX uses the same prompt methodology as Phase V: Claude advisory sessions p
 
 | Version | Scope | Prompt File | Handoff | Status |
 |---------|-------|-------------|---------|--------|
-| v7.6.10.0 | ESPHome 2026.4.1 upgrade verification + local component re-patch | `prompts/phaseVX/v7.6.10.0-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.0.md` | 🔜 Queued |
+| v7.6.10.0 | ESPHome 2026.4.1 upgrade verification + local component re-patch | `prompts/phaseVX/v7.6.10.0-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.0.md` | ✅ Complete (PR #200) |
 | v7.6.10.1 | Board profiles + partition tables for 3 new boards | `prompts/phaseVX/v7.6.10.1-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.1.md` | 🔜 Queued |
 | v7.6.10.2 | Flash, measure, document | _(operator-driven, see measurement protocol)_ | _(no agent handoff)_ | 🔜 Queued |
 | v7.6.10.3 | Capacity study + board selection guide update | _(Claude advisory session)_ | _(no agent handoff)_ | 🔜 Queued |
 | v7.6.10.4 | Dashboard auth refactor (optional) | _(TBD if included)_ | _(TBD)_ | 🔜 Optional |
-
 
 **New boards onboarded:**
 
@@ -224,7 +223,12 @@ Phase VX uses the same prompt methodology as Phase V: Claude advisory sessions p
 |----------|------|------|-------|-------|----|-----------|
 | esp32-s3-supermini-4m | sat-s3-4m-173 | ESP32-S3 | 4 MB | 2 MB quad | 192.168.120.173 | ___ |
 | esp32-c5-wroom1u-8m | sat-c5-8m-180 | ESP32-C5 | 8 MB | 8 MB quad | 192.168.120.180 | ___ |
-| esp32-c6-supermini-4m | sat-c6-4m-182 | ESP32-C6 | 4 MB | None | 192.168.120.182 | ___ |
+| esp32-c6-supermini-4m | sat-c6-4m-184 | ESP32-C6 | 4 MB | None | 192.168.120.184 | ___ |
+
+**Findings:**
+- BUG-084: Heap exhaustion under 8 concurrent HTTP connections on non-PSRAM boards (C3, WROOM). Stack is fine (watermark ~12,900 B on 16 KB stack). Stress test script needs concurrent request reduction.
+- S3 watermark dropped from 12,528 B to 10,036 B after ESPHome 2026.4.1 — monitor.
+- IRAM optimization (`sram1_as_iram`) not applicable — would worsen heap pressure on WROOM. N/A for RISC-V boards.
 
 
 ### Phase 7 — Per-Device Persistence Engine — After Phase V
@@ -235,7 +239,7 @@ Before starting Phase 7, read `prompts/handoff/phaseD/phaseD-results.md` for the
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
-| v7.7.0.0 | Per-device structs, key scheme, hash | `prompts/phase7/v7.7.0.0-implementation-instructions-for-coding-agent.md` | Pending |
+| v7.7.0.0 | Per-device structs, key scheme, hash | `prompts/phase7/v7.7.0.0-implementation-instructions-for-coding-agent.md` | ✅ Complete |
 | v7.7.0.1 | Per-device persist (write path) | `prompts/phase7/v7.7.0.1-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.7.0.2 | Per-device restore (boot) + retention budget | _Prompt not yet created_ | Pending |
 | v7.7.0.3 | Wire new engine, storage-stats v2 | _Prompt not yet created_ | Pending |
