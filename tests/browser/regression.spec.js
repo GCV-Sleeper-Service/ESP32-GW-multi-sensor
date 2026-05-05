@@ -31,7 +31,8 @@ test.afterEach(async ({ page }) => {
 test.describe('14. Phase 2 Closure — Full Regression', () => {
   // Scenario 1: full v2 manifest → correct rendering
   test('scenario 1: sensor cards render correctly when /api/manifest returns full v2 manifest', async ({ page }) => {
-    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (4) and Outside name are 3sensor-specific; mixed fixture has 4 sensors including nas01, so these assertions do not apply.');
+    test.skip(process.env.FIXTURE_SET === '3sensor', '3sensor fixture has 4 cards (3 env + 1 network) and no system device; the 5-card assertion is active-manifest-specific.');
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (5) and Outside name are active-manifest-specific; mixed fixture has 4 sensors including nas01, so these assertions do not apply.');
     test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator manifest has 0 sensors; loadSensorManifest() falls back to DEFAULT_SENSOR_META (source=auto-promoted). Satellite-manifest rendering verified in other groups.');
     test.skip(process.env.FIXTURE_SET === 'system', 'System fixture has 2 env sensors (no Outside); sensor name assertions are 3sensor-specific.');
     // Default mock server serves full v2 manifest from /api/manifest.
@@ -42,8 +43,8 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
     await page.waitForFunction(() => window._manifest && window._manifest.schema_version === 2, { timeout: 10000 });
     const source = await page.evaluate(() => window._manifest.source);
     expect(source).not.toBe('auto-promoted');
-    // Sensor cards must render — 3 environmental + 1 network = 4 total
-    await expect(page.locator('.sensor-card')).toHaveCount(4);
+    // Sensor cards must render — 3 environmental + 1 network + 1 system = 5 total
+    await expect(page.locator('.sensor-card')).toHaveCount(5);
     // Environmental cards must contain expected sensor names from the manifest
     for (const name of ['Office', 'First Floor', 'Outside']) {
       await expect(
@@ -105,19 +106,19 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
 
   // Scenario 4: environmental card renderer dispatches correctly
   test('scenario 4: environmental card renderer dispatches correctly for all sensors', async ({ page }) => {
-    test.skip(process.env.FIXTURE_SET === 'mixed', 'expectedSensorCount (4) and envSensors.length (3) are 3sensor-specific; mixed fixture has 2 env + 1 network + 1 system (nas01) = 4 total.');
-    test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator fixture uses DEFAULT_SENSOR_META fallback (3 env, no network); expectedSensorCount(4) and envSensors.length(3) assertions are satellite-specific.');
+    test.skip(process.env.FIXTURE_SET === '3sensor', '3sensor fixture has 4 total sensors; expectedSensorCount(5) is only valid for the active default manifest.');
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'expectedSensorCount (5) and envSensors.length (3) are active-manifest-specific; mixed fixture has 2 env + 1 network + 1 system (nas01) = 4 total.');
+    test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator fixture uses DEFAULT_SENSOR_META fallback (3 env, no network); expectedSensorCount(5) and envSensors.length(3) assertions are satellite-specific.');
     test.skip(process.env.FIXTURE_SET === 'system', 'System fixture has 2 env sensors (not 3); envSensors.length(3) assertion is 3sensor-specific.');
-    // v7.5.4.2: SENSORS now includes network devices, so getSensors() returns 4.
-    // Environmental sensors are 3; network devices add 1 more.
-    await loadDashboard(page, { expectedSensorCount: 4 });
+    // Active manifest includes 3 environmental, 1 network, and 1 system device.
+    await loadDashboard(page, { expectedSensorCount: 5 });
     await page.waitForFunction(() => {
       if (!window._manifest || !Array.isArray(window._manifest.sensors)) return false;
       if (!window.App || !App.State || typeof App.State.getSensors !== 'function') return false;
       var envSensors = window._manifest.sensors.filter(function(sensor) {
         return !sensor.category || sensor.category === 'environmental';
       });
-      // Total sensors = environmental + network devices
+      // Total sensors = environmental + network + system devices
       return envSensors.length > 0
         && App.State.getSensors().length === window._manifest.sensors.length
         && document.querySelectorAll('.sensor-card').length === window._manifest.sensors.length;
@@ -141,8 +142,8 @@ test.describe('14. Phase 2 Closure — Full Regression', () => {
     }, { timeout: 5000 });
     const cards = page.locator('.sensor-card');
     const count = await cards.count();
-    // 3 environmental + 1 network = 4 total
-    expect(count).toBe(4);
+    // 3 environmental + 1 network + 1 system = 5 total
+    expect(count).toBe(5);
     for (let i = 0; i < count; i++) {
       await expect(cards.nth(i).locator('.sensor-card-header')).toBeVisible();
       await expect(cards.nth(i).locator('.sensor-readings')).toBeVisible();
@@ -329,13 +330,14 @@ test.describe('15. Phase 3 Closure — v2 API Regression', () => {
 
   // Test 6: Dashboard renders identically with new endpoints
   test('dashboard renders identically with new endpoints', async ({ page }) => {
-    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (4) and Outside name are 3sensor-specific; mixed fixture has 4 sensors (includes nas01; layout/names differ).');
-    test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator uses DEFAULT_SENSOR_META fallback (3 env-only); card count (4) and wan_ping network card are satellite-specific.');
+    test.skip(process.env.FIXTURE_SET === '3sensor', '3sensor fixture has 4 cards and no system device; the 5-card active-manifest assertion does not apply.');
+    test.skip(process.env.FIXTURE_SET === 'mixed', 'Sensor count (5) and Outside name are active-manifest-specific; mixed fixture has 4 sensors (includes nas01; layout/names differ).');
+    test.skip(process.env.FIXTURE_SET === 'aggregator', 'Aggregator uses DEFAULT_SENSOR_META fallback (3 env-only); card count (5) and wan_ping network card are satellite-specific.');
     test.skip(process.env.FIXTURE_SET === 'system', 'System fixture has 2 env sensors (no Outside); Outside name assertion is 3sensor-specific.');
     await loadDashboard(page);
     await waitForConnected(page);
-    // 3 environmental + 1 network = 4 sensor cards total
-    await expect(page.locator('.sensor-card')).toHaveCount(4);
+    // 3 environmental + 1 network + 1 system = 5 sensor cards total
+    await expect(page.locator('.sensor-card')).toHaveCount(5);
     // Verify all environmental sensor names are present
     for (const name of ['Office', 'First Floor', 'Outside']) {
       await expect(

@@ -11,9 +11,9 @@
       "poll_interval_seconds": 30
     },
     {
-      "id": "sat-esp32-4m-190",
+      "id": "sat-esp32-4m-170",
       "name": "Second satellite - esp32 wroom 4mb flash",
-      "base_url": "http://192.168.120.190",
+      "base_url": "http://192.168.120.170",
       "poll_interval_seconds": 30
     }
   ]

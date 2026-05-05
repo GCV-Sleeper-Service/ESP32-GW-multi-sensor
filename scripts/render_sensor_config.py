@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_aggregator_config, load_board_profile, load_gateway_config, load_manifest, manifest_v2
 
-VERSION = "7.6.9.5"
+VERSION = "7.6.10.0"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"
@@ -511,6 +511,7 @@ def render_yaml_ping_boot(sensors: List[Dict]) -> str:
 def render_header_file(path: Path, sensors: List[Dict[str, str]]) -> str:
     text = path.read_text(encoding="utf-8")
     text = re.sub(r"sensor_history_multi-v[0-9.]+\.h", f"sensor_history_multi-v{VERSION}.h", text)
+    text = re.sub(r"config-v[0-9.]+\.h", f"config-v{VERSION}.h", text)
     text = re.sub(
         r"// ── SENSOR COUNT CONFIGURATION GUIDE \(v[0-9.]+\) ──",
         f"// ── SENSOR COUNT CONFIGURATION GUIDE (v{VERSION}) ──",

@@ -1,6 +1,6 @@
 # ESP32-GW Multi-Sensor — Architecture Overview
 
-_Last updated: 2026-04-08 — Phase X complete, Phase Y planned._
+_Last updated: 2026-05-05 — Phase VX in progress (v7.6.10.0). Phase V complete._
 
 ---
 
@@ -8,7 +8,7 @@ _Last updated: 2026-04-08 — Phase X complete, Phase Y planned._
 
 A manifest-driven IoT gateway platform built on ESP32. Receives BLE sensor broadcasts, accepts pushed metrics from external systems, aggregates data from multiple satellite gateways, and serves everything through an embedded HTML dashboard with real-time charts.
 
-**Current version:** v7.6.5.8 — Phase X complete (Dashboard Architecture Refactor).
+**Current version:** v7.6.10.0 — Phase VX (Board Onboarding Sprint). ESPHome 2026.4.1.
 
 ---
 
@@ -26,7 +26,7 @@ A manifest-driven IoT gateway platform built on ESP32. Receives BLE sensor broad
 
 ### Firmware Stack
 
-- **ESPHome 2026.2.1** with ESP-IDF 5.5.2 backend
+- **ESPHome 2026.4.1** with ESP-IDF 5.5.4 backend
 - Local component override at `firmware/local_components/web_server_idf/` (httpd stack patched to 16KB)
 - Board profiles in `firmware/boards/*.yaml` drive code generation via `render_sensor_config.py`
 - NVS persistence for satellite configuration (Phase D) and sensor history
@@ -80,7 +80,9 @@ Board switching: `scripts/provision.sh <aggregator|wroom|satellite>`. Always run
 | Phase 6 | v7.5.6.x | Data ingest + system metrics | ✅ Complete |
 | Phase D | v7.6.0.x | Runtime satellite management | ✅ Complete |
 | Phase X | v7.6.4.0–v7.6.5.8 | Dashboard architecture refactor | ✅ Complete |
-| **Phase Y** | **v7.6.6.x** | **Firmware refactor (sensor_history_multi.h)** | **Planned** |
+| Phase V | v7.6.6.0–v7.6.9.5 | Firmware stabilization and history | ✅ Complete |
+| Phase Y | v7.6.6.x | Firmware refactor (sensor_history_multi.h) | ✅ Complete |
+| **Phase VX** | **v7.6.10.0–v7.6.10.3** | **Board onboarding sprint** | **In Progress** |
 | Phase 7 | v7.7.0.x–v7.7.2.x | Per-device persistence engine | Planned |
 | Phase E | v8.0.x | Captive portal + WiFi config | Not yet planned |
 

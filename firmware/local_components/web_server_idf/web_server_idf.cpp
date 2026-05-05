@@ -74,12 +74,13 @@ int nonblocking_send(httpd_handle_t hd, int sockfd, const char *buf, size_t buf_
   // Use MSG_DONTWAIT to prevent blocking when TCP send buffer is full
   int ret = send(sockfd, buf, buf_len, flags | MSG_DONTWAIT);
   if (ret < 0) {
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+    const int err = errno;
+    if (err == EAGAIN || err == EWOULDBLOCK) {
       // Buffer full - retry later
       return HTTPD_SOCK_ERR_TIMEOUT;
     }
     // Real error
-    ESP_LOGD(TAG, "send error: errno %d", errno);
+    ESP_LOGD(TAG, "send error: errno %d", err);
     return HTTPD_SOCK_ERR_FAIL;
   }
   return ret;
@@ -120,6 +121,7 @@ void AsyncWebServer::begin() {
   if (this->server_) {
     this->end();
   }
+  // Default httpd stack is defined by ESP-IDF. Increase it to cover the web_server JSON handlers.
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.stack_size = 16384;  // PATCHED: BUG-076 — ESPHome default 4KB overflows with any non-trivial handler
   config.server_port = this->port_;
@@ -272,19 +274,6 @@ StringRef AsyncWebServerRequest::url_to(std::span<char, URL_BUF_SIZE> buffer) co
   return StringRef(buffer.data(), decoded_len);
 }
 
-void AsyncWebServerRequest::send(AsyncWebServerResponse *response) {
-  httpd_resp_send(*this, response->get_content_data(), response->get_content_size());
-}
-
-void AsyncWebServerRequest::send(int code, const char *content_type, const char *content) {
-  this->init_response_(nullptr, code, content_type);
-  if (content) {
-    httpd_resp_send(*this, content, HTTPD_RESP_USE_STRLEN);
-  } else {
-    httpd_resp_send(*this, nullptr, 0);
-  }
-}
-
 void AsyncWebServerRequest::redirect(const std::string &url) {
   httpd_resp_set_status(*this, "302 Found");
   httpd_resp_set_hdr(*this, "Location", url.c_str());
@@ -293,30 +282,59 @@ void AsyncWebServerRequest::redirect(const std::string &url) {
 }
 
 void AsyncWebServerRequest::init_response_(AsyncWebServerResponse *rsp, int code, const char *content_type) {
-  // Set status code - use ESP-IDF constants for common codes, snprintf for any others.
-  // BUG-078: the original switch only mapped 200/404/409 and defaulted everything else
-  // to 500, silently breaking all 400/401/405/429/501/503 responses.
+  // Use stable string literals/ESP-IDF constants because httpd_resp_set_status() keeps the pointer.
   const char *status;
-  char status_buf[40];
   switch (code) {
-    case 200: status = HTTPD_200; break;
-    case 204: status = "204 No Content"; break;
-    case 301: status = "301 Moved Permanently"; break;
-    case 302: status = "302 Found"; break;
-    case 400: status = HTTPD_400; break;
-    case 401: status = "401 Unauthorized"; break;
-    case 403: status = "403 Forbidden"; break;
-    case 404: status = HTTPD_404; break;
-    case 405: status = "405 Method Not Allowed"; break;
-    case 408: status = "408 Request Timeout"; break;
-    case 409: status = HTTPD_409; break;
-    case 429: status = "429 Too Many Requests"; break;
-    case 500: status = HTTPD_500; break;
-    case 501: status = "501 Not Implemented"; break;
-    case 503: status = "503 Service Unavailable"; break;
+    case 200:
+      status = HTTPD_200;
+      break;
+    case 204:
+      status = "204 No Content";
+      break;
+    case 301:
+      status = "301 Moved Permanently";
+      break;
+    case 302:
+      status = "302 Found";
+      break;
+    case 400:
+      status = HTTPD_400;
+      break;
+    case 401:
+      status = "401 Unauthorized";
+      break;
+    case 403:
+      status = "403 Forbidden";
+      break;
+    case 404:
+      status = HTTPD_404;
+      break;
+    case 405:
+      status = "405 Method Not Allowed";
+      break;
+    case 408:
+      status = "408 Request Timeout";
+      break;
+    case 409:
+      status = HTTPD_409;
+      break;
+    case 414:
+      status = "414 URI Too Long";
+      break;
+    case 429:
+      status = "429 Too Many Requests";
+      break;
+    case 500:
+      status = HTTPD_500;
+      break;
+    case 501:
+      status = "501 Not Implemented";
+      break;
+    case 503:
+      status = "503 Service Unavailable";
+      break;
     default:
-      snprintf(status_buf, sizeof(status_buf), "%d Unknown", code);
-      status = status_buf;
+      status = HTTPD_500;
       break;
   }
   httpd_resp_set_status(*this, status);
@@ -417,13 +435,7 @@ AsyncWebParameter *AsyncWebServerRequest::getParam(const char *name) {
   }
 
   // Look up value from query strings
-  optional<std::string> val = query_key_value(this->post_query_.c_str(), this->post_query_.size(), name);
-  if (!val.has_value()) {
-    auto url_query = request_get_url_query(*this);
-    if (url_query.has_value()) {
-      val = query_key_value(url_query.value().c_str(), url_query.value().size(), name);
-    }
-  }
+  auto val = this->find_query_value_(name);
 
   // Don't cache misses to avoid wasting memory when handlers check for
   // optional parameters that don't exist in the request
@@ -434,6 +446,50 @@ AsyncWebParameter *AsyncWebServerRequest::getParam(const char *name) {
   auto *param = new AsyncWebParameter(name, val.value());  // NOLINT(cppcoreguidelines-owning-memory)
   this->params_.push_back(param);
   return param;
+}
+
+/// Search post_query then URL query with a callback.
+/// Returns first truthy result, or value-initialized default.
+/// URL query is accessed directly from req->uri (same pattern as url_to()).
+template<typename Func>
+static auto search_query_sources(httpd_req_t *req, const std::string &post_query, const char *name, Func func)
+    -> decltype(func(nullptr, size_t{0}, name)) {
+  if (!post_query.empty()) {
+    auto result = func(post_query.c_str(), post_query.size(), name);
+    if (result) {
+      return result;
+    }
+  }
+  // Use httpd API for query length, then access string directly from URI.
+  // http_parser identifies components by offset/length without modifying the URI string.
+  // This is the same pattern used by url_to().
+  auto len = httpd_req_get_url_query_len(req);
+  if (len == 0) {
+    return {};
+  }
+  const char *query = strchr(req->uri, '?');
+  if (query == nullptr) {
+    return {};
+  }
+  query++;  // skip '?'
+  return func(query, len, name);
+}
+
+optional<std::string> AsyncWebServerRequest::find_query_value_(const char *name) const {
+  return search_query_sources(this->req_, this->post_query_, name,
+                              [](const char *q, size_t len, const char *k) { return query_key_value(q, len, k); });
+}
+
+bool AsyncWebServerRequest::hasArg(const char *name) {
+  return search_query_sources(this->req_, this->post_query_, name, query_has_key);
+}
+
+std::string AsyncWebServerRequest::arg(const char *name) {
+  auto val = this->find_query_value_(name);
+  if (val.has_value()) {
+    return std::move(val.value());
+  }
+  return {};
 }
 
 void AsyncWebServerResponse::addHeader(const char *name, const char *value) {
@@ -479,9 +535,12 @@ void AsyncEventSource::handleRequest(AsyncWebServerRequest *request) {
     this->on_connect_(rsp);
   }
   this->sessions_.push_back(rsp);
+  // Wake up WebServer::loop() to drain deferred event queues for this client.
+  // Safe from httpd task context via the pending_enable_loop_ flag.
+  this->web_server_->enable_loop_soon_any_context();
 }
 
-void AsyncEventSource::loop() {
+bool AsyncEventSource::loop() {
   // Clean up dead sessions safely
   // This follows the ESP-IDF pattern where free_ctx marks resources as dead
   // and the main loop handles the actual cleanup to avoid race conditions
@@ -499,6 +558,7 @@ void AsyncEventSource::loop() {
       ++i;
     }
   }
+  return !this->sessions_.empty();
 }
 
 void AsyncEventSource::try_send_nodefer(const char *message, const char *event, uint32_t id, uint32_t reconnect) {
@@ -549,7 +609,7 @@ AsyncEventSourceResponse::AsyncEventSourceResponse(const AsyncWebServerRequest *
 
   // Configure reconnect timeout and send config
   // this should always go through since the tcp send buffer is empty on connect
-  std::string message = ws->get_config_json();
+  auto message = ws->get_config_json();
   this->try_send_nodefer(message.c_str(), "ping", millis(), 30000);
 
 #ifdef USE_WEBSERVER_SORTING
@@ -603,7 +663,7 @@ void AsyncEventSourceResponse::deq_push_back_with_dedup_(void *source, message_g
 void AsyncEventSourceResponse::process_deferred_queue_() {
   while (!deferred_queue_.empty()) {
     DeferredEvent &de = deferred_queue_.front();
-    std::string message = de.message_generator_(web_server_, de.source_);
+    auto message = de.message_generator_(web_server_, de.source_);
     if (this->try_send_nodefer(message.c_str(), "state")) {
       // O(n) but memory efficiency is more important than speed here which is why std::vector was chosen
       deferred_queue_.erase(deferred_queue_.begin());
@@ -840,7 +900,7 @@ void AsyncEventSourceResponse::deferrable_send_state(void *source, const char *e
     // trying to send first
     deq_push_back_with_dedup_(source, message_generator);
   } else {
-    std::string message = message_generator(web_server_, source);
+    auto message = message_generator(web_server_, source);
     if (!this->try_send_nodefer(message.c_str(), "state")) {
       deq_push_back_with_dedup_(source, message_generator);
     }
@@ -907,7 +967,7 @@ esp_err_t AsyncWebServer::handle_multipart_upload_(httpd_req_t *r, const char *c
   });
 
   // Use heap buffer - 1460 bytes is too large for the httpd task stack
-  auto buffer = std::make_unique<char[]>(MULTIPART_CHUNK_SIZE);
+  auto buffer = std::make_unique_for_overwrite<char[]>(MULTIPART_CHUNK_SIZE);
   size_t bytes_since_yield = 0;
 
   for (size_t remaining = r->content_len; remaining > 0;) {

@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// config-v7.6.9.5.h - hourly persistence with dedicated history NVS partition
+// config-v7.6.10.0.h - hourly persistence with dedicated history NVS partition
 // Source fragment: firmware/core/config.h. Assembled output: dashboard/sensor_history_multi.h.
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
@@ -93,7 +93,6 @@
 #include <ping/ping_sock.h>
 #include "gateway_manifest.h"
 #include "aggregator_config.h"
-
 static const char *const TAG = "history";
 
 // ── Compile-time configuration ──────────────────────────────────
@@ -472,7 +471,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.9.5) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.6.10.0) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -528,7 +527,6 @@ static const char *const HISTORY_NAMESPACE = "histv631";
 // Namespace intentionally preserved from v6.3.1 so retained history survives
 // an in-place v6.3.1 -> v6.4 / v6.5 upgrade. Storage schema is unchanged.
 static const char *const HISTORY_PARTITION_LABEL = "history";
-
 struct HistoryMeta {
   uint32_t magic = HISTORY_META_MAGIC;
   uint16_t version = HISTORY_META_VERSION;

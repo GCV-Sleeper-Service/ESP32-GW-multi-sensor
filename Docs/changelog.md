@@ -2,6 +2,21 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.10.0] - 2026-04-23 - Phase VX: ESPHome Upgrade Verification
+
+### Changed
+- ESPHome verification baseline advanced to 2026.4.1 with ESP-IDF 5.5.4.
+- Refreshed the local `web_server_idf` override from the ESPHome 2026.4.1 installation and re-applied the stack-size and HTTP_DELETE patches.
+- Kept the local override stack assignment explicitly pinned to `16384`.
+- Bumped the generated firmware/dashboard/fixture version baseline to `7.6.10.0` and synchronized generator-side version constants so regeneration no longer emits stale `v7.6.9.5` assets.
+- Updated Playwright browser expectations for the active satellite manifest shape (`3 environmental + 1 network + 1 system = 5` cards) so the suite matches the default C3-derived fixture set restored on `main`.
+
+### Validation
+- `bash scripts/patch-esphome-httpd-stack.sh --check` passes after the refresh.
+- Clean `esphome compile` builds succeed for the C3, WROOM, and S3 production boards on ESPHome 2026.4.1.
+- `bash scripts/preflight.sh` passes after regenerating the aggregator, WROOM, and satellite outputs for `7.6.10.0`.
+- `npx playwright test` passes (`206 passed`, `92 skipped`).
+
 ## [v7.6.9.5] - 2026-04-20 - Phase V V5: C3 httpd Stack Override Fix
 
 ### Fixed

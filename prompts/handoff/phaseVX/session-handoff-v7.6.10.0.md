@@ -1,28 +1,22 @@
 # Session Handoff — v7.6.10.0: ESPHome Upgrade Verification
 
-_Date: 2026-04-22_
+_Date: 2026-04-22 | Updated: 2026-05-05 (post-merge observations added)_
 _Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
-_Status: Phase V COMPLETE (v7.6.9.5 merged). Phase VX started. ESPHome already upgraded to 2026.4.1._
+_Status: ✅ COMPLETE — PR #200 merged. All three boards flashed and verified on ESPHome 2026.4.1._
 
 ---
 
 ## Project State Summary
 
-Phase V is formally closed. The operator has already upgraded the ESPHome installation from 2026.2.1 to 2026.4.1 (ahead of the sprint prompt's 2026.4.0 target). ESP-IDF is now at 5.5.4 (bundled with ESPHome 2026.4.1).
+Phase V is formally closed. The operator upgraded the ESPHome installation from 2026.2.1 to 2026.4.1. ESP-IDF is now at 5.5.4 (bundled with ESPHome 2026.4.1). PR #200 refreshed the local `web_server_idf` override, re-applied both patches (16 KB stack + HTTP_DELETE handler), bumped VERSION to 7.6.10.0, and aligned Playwright expectations with the 5-card active manifest shape.
 
-**What has NOT been done yet:**
-- The `scripts/patch-esphome-httpd-stack.sh` has NOT been re-run against the new ESPHome version
-- The existing 3 production boards have NOT been clean-built against ESPHome 2026.4.1
-- Stress tests have NOT been run post-upgrade
-- VERSION still reads `7.6.9.5`
+**Current board fleet:**
 
-**Current board fleet (existing production boards):**
-
-| Board | Chip | IP | Role | Last verified ESPHome |
-|---|---|---|---|---|
-| ESP32-C3 SuperMini | ESP32-C3 | 192.168.120.189 | Satellite | 2026.2.1 (v7.6.9.5) |
-| ESP32-WROOM-32D | ESP32 | 192.168.120.190 | Satellite | 2026.2.1 (v7.6.9.5) |
-| ESP32-S3-DevKitC1-N16R8 | ESP32-S3 | 192.168.120.191 | Aggregator | 2026.2.1 (v7.6.9.5) |
+| Board | Chip | IP | Role | Verified ESPHome | Watermark |
+|---|---|---|---|---|---|
+| ESP32-C3 SuperMini | ESP32-C3 | 192.168.120.189 | Satellite | 2026.4.1 (v7.6.10.0) | 12,924 B |
+| ESP32-WROOM-32D | ESP32 | 192.168.120.170 | Satellite | 2026.4.1 (v7.6.10.0) | 12,996 B |
+| ESP32-S3-DevKitC1-N16R8 | ESP32-S3 | 192.168.120.191 | Aggregator | 2026.4.1 (v7.6.10.0) | 10,036 B |
 
 ---
 
@@ -30,7 +24,7 @@ Phase V is formally closed. The operator has already upgraded the ESPHome instal
 
 | Version | Scope | Status |
 |---|---|---|
-| **v7.6.10.0** | **ESPHome upgrade verification + local component re-patch** | **⬅️ Current** |
+| **v7.6.10.0** | **ESPHome upgrade verification + local component re-patch** | **✅ Complete (PR #200)** |
 | v7.6.10.1 | Board profiles + partition tables for 3 new boards | 🔜 Queued |
 | v7.6.10.2 | Flash, measure, document (operator-driven) | 🔜 Queued |
 | v7.6.10.3 | Capacity study + board selection guide update (advisory) | 🔜 Queued |
@@ -40,75 +34,100 @@ Phase V is formally closed. The operator has already upgraded the ESPHome instal
 
 ## v7.6.10.0 Scope
 
-### Why this step exists
+### What this step did
 
-ESPHome 2026.4.1 includes changes to the upstream `web_server_idf.cpp` that the project overrides with a local component. The patch script copies the new upstream and re-applies the 16 KB stack patch + HTTP_DELETE handler patch. If the upstream API changed, the patch may fail. This step verifies the patch, confirms existing boards still compile and pass stress tests, and formally opens Phase VX.
+1. **Re-ran `scripts/patch-esphome-httpd-stack.sh`** — refreshed local override from ESPHome 2026.4.1 upstream
+2. **Verified `--check` passes** — both patches active
+3. **Clean-built all 3 existing boards** — C3, WROOM, S3
+4. **Updated `firmware/local_components/web_server_idf/PATCH_INFO.md`** — ESPHome 2026.4.1
+5. **Bumped VERSION to 7.6.10.0**, updated changelog
+6. **Aligned Playwright expectations** — active manifest now has 5 cards (3 env + 1 network + 1 system)
+7. **Fixed review issues** — restored HTTP status mappings, added ESPHome version gate for SSE callback type, scoped fixture-specific test skips, removed tracked `.pyc`
 
-### What this step does
-
-1. **Re-run `scripts/patch-esphome-httpd-stack.sh`** — copies new upstream from ESPHome 2026.4.1, re-applies patches
-2. **Verify `--check` passes** — confirms both patches are active
-3. **Clean build all 3 existing boards** — `esphome compile` for C3, WROOM, S3
-4. **Update `firmware/local_components/web_server_idf/PATCH_INFO.md`** — record new ESPHome version
-5. **Bump VERSION to 7.6.10.0**, update changelog
-6. **Run Playwright tests** — all fixture sets green
-
-### What this step does NOT do
-
-- No pip install or ESPHome upgrade (already done)
-- No board profile changes (v7.6.10.1 scope)
-- No new partition tables
-- No firmware handler changes
-- No dashboard changes
-- No NVS format changes
-
-### Files modified
-
-- `firmware/local_components/web_server_idf/web_server_idf.cpp` — refreshed from ESPHome 2026.4.1 upstream with patches re-applied
-- `firmware/local_components/web_server_idf/PATCH_INFO.md` — updated ESPHome version
+### Files directly modified (by this step)
+- `firmware/local_components/web_server_idf/web_server_idf.cpp` — refreshed from upstream with patches
+- `firmware/local_components/web_server_idf/web_server_idf.h` — refreshed, version-gated callback type
+- `firmware/local_components/web_server_idf/utils.cpp`, `utils.h`, `multipart.h` — refreshed
+- `firmware/local_components/web_server_idf/PATCH_INFO.md` — updated version info
+- `VERSION` — bumped to 7.6.10.0
 - `Docs/changelog.md` — v7.6.10.0 entry
-- `VERSION` — bump to `7.6.10.0`
+- `scripts/render_sensor_config.py` — VERSION constant + config.h regex
+- `tests/browser/regression.spec.js`, `sensor-cards.spec.js` — 5-card expectations + 3sensor skips
+- `.gitignore` — added `__pycache__/` and `*.pyc`
+- `config/aggregator-agg-s3-16m-1.json.bak` — WROOM IP .190→.170
+- `config/aggregator.example.json` — WROOM IP .190→.170
+- `config/gateway-sat-esp32-4m-190.json.bak` — WROOM name/IP .190→.170
 
-### Files NOT modified
-
-- `scripts/patch-esphome-httpd-stack.sh` — the script itself should not change
-- `firmware/core/*.h` — no firmware handler changes
-- `dashboard/modules/*.js` — no dashboard changes
-- Board profiles, partition tables — unchanged
+### Files regenerated by pipeline (expected, not scope creep)
+- `dashboard/dashboard.js`, `dashboard.html`, `dashboard.h`, `sensor_history_multi.h`
+- `src/gateway_manifest.h`, `src/aggregator_config.h`
+- `firmware/core/config.h`, `firmware/core/data-model.h` (version comment updated by renderer)
+- `tests/fixtures/manifest.json`, `tests/fixtures/generate-fixtures.js`
+- `tests/fixtures/variants/{1sensor,2sensor,3sensor,4sensor,mixed,system}/manifest.json`
+- `firmware/esp32-c3-multi-sensor.yaml` (version string)
+- `firmware/bootstrap/*.yaml` (trailing newline normalization)
 
 ---
 
-## Device Testing
+## Post-Merge Observations (2026-05-05)
 
-### Operator tasks after merge
+### S3 Aggregator Watermark Regression
 
-1. Flash all 3 existing boards with v7.6.10.0 firmware:
-   ```bash
-   bash scripts/provision.sh satellite
-   esphome run firmware/esp32-c3-multi-sensor.yaml
-   
-   bash scripts/provision.sh wroom
-   esphome run firmware/esp32-wroom-32d-gw.yaml
-   
-   bash scripts/provision.sh aggregator
-   esphome run firmware/esp32-s3-devkitc1-n16r8-gw.yaml
-   
-   bash scripts/provision.sh satellite  # return to CI-safe
-   ```
+The S3 watermark dropped from 12,528 B (v7.6.9.5) to 10,036 B (v7.6.10.0) — a ~2,500 B increase in peak stack usage. Still above the 10,000 B acceptance threshold. Likely caused by ESPHome 2026.4.1's new SSE code paths (`SerializationBuffer`, `enable_loop_soon_any_context()`, `bool loop()` return type). The aggregator exercises these more heavily than satellites.
 
-2. Wait 2 minutes per board, then stress test:
-   ```bash
-   bash scripts/stress-test-httpd-stack.sh 192.168.120.189  # C3
-   bash scripts/stress-test-httpd-stack.sh 192.168.120.190  # WROOM
-   bash scripts/stress-test-httpd-stack.sh 192.168.120.191  # S3
-   ```
+**Action**: Monitor in future upgrades. If a subsequent ESPHome version pushes below 10,000 B, the httpd stack may need increasing beyond 16 KB for the aggregator.
 
-3. **Acceptance:** all watermarks ≥ 10,000 bytes. No regression from v7.6.9.5 baselines:
-   - C3: ~12,600 B
-   - WROOM: ~13,044 B
-   - S3: ~12,528 B
+### Stress Test Crashes — BUG-084
 
-4. Smoke test dashboard at each IP — loads, shows data, no errors.
+The stress test script (`scripts/stress-test-httpd-stack.sh`) crashes both the C3 and WROOM boards. The S3 aggregator did not crash but the script itself exited prematurely. See BUG-084 documentation for full analysis.
+
+Root cause: heap exhaustion under 8 concurrent HTTP connections, NOT stack overflow. The stress test proves the 16 KB stack is working correctly (watermarks ~12,900 B) but reveals a concurrency limit on non-PSRAM boards.
+
+### patch-esphome-httpd-stack.sh --check Drift Warning
+
+`--check` reports "WARNING: Upstream web_server_idf.cpp has diverged (46 line differences)". This is expected — the local override contains project-specific fixes (HTTP status mappings, version gate) beyond the two standard patches that the drift detection strips. Do NOT re-run without `--check` to "fix" this — it would overwrite the project fixes. See LESSON-OPS-130.
+
+### IRAM Investigation — No Action Needed
+
+ESPHome 2026.4.1 emits a new hint on the WROOM: "Bootloader supports SRAM1 as IRAM (+40KB). Set sram1_as_iram: true". Analysis:
+
+- **ESP32/WROOM**: `sram1_as_iram: true` would grant +40 KB IRAM but subtract ~40 KB from DRAM. Since DRAM/heap is the bottleneck (BUG-084), this would worsen the situation. **Do NOT enable.**
+- **ESP32-S3**: IRAM at 100% usage in build output, but the S3 has 8 MB PSRAM — code spills to flash automatically. No action needed.
+- **ESP32-C3/C6/C5**: RISC-V unified memory architecture. No separate IRAM/DRAM split. The `sram1_as_iram` concept does not apply.
+
+No board profile changes needed. No investigation needed for C5/C6 boards on this matter.
+
+See LESSON-OPS-131.
+
+---
+
+## Device Testing Results
+
+### Build outputs (ESPHome 2026.4.1 / ESP-IDF 5.5.4)
+
+| Board | Binary size | RAM usage | Flash usage |
+|---|---|---|---|
+| C3 | 1,428,928 B | 18.5% (60,688 / 327,680) | 80.7% (1,428,672 / 1,769,472) |
+| WROOM | 1,279,395 B | 22.0% (72,128 / 327,680) | 72.3% (1,279,139 / 1,769,472) |
+| S3 | 934,715 B | 37.7% (123,640 / 327,680) | 29.7% (934,459 / 3,145,728) |
+
+### Runtime telemetry (post-flash)
+
+| Board | httpd_wm | free_heap | min_free_heap | Notes |
+|---|---|---|---|---|
+| C3 (189) | 12,924 | 58,456 | 47,616 | Healthy |
+| WROOM (170) | 13,188 | 38,760 | 15,936 | Low min_free_heap after 8 days |
+| S3 (191) | 10,036 | 53,432 | 8,398,704 | min_free_heap includes 8 MB PSRAM |
+
+### Stress test results
+
+| Board | Result | Root cause | Watermark during test |
+|---|---|---|---|
+| C3 (189) | **CRASH** during Wave 2 | Heap exhaustion (min_free_heap → 19,956 in Wave 1) | 12,900 B (stack OK) |
+| WROOM (170) | **CRASH** during Wave 1 | Heap exhaustion (pre-stress min_free_heap already 13,216) | 12,996 B (stack OK) |
+| S3 (191) | **Script exit** (board survived) | `set -e` + curl timeout on one of 8 concurrent requests | 10,036 B (stack OK) |
+
+See BUG-084 for full analysis and recommendations.
 
 ---
 
@@ -118,8 +137,10 @@ ESPHome 2026.4.1 includes changes to the upstream `web_server_idf.cpp` that the 
 
 - ESPHome 2026.4.1 with ESP-IDF 5.5.4 is the verified build environment
 - Local component override confirmed working on all 3 architectures
-- Stress test baselines established on the new ESPHome version
 - `SRAM_KB_BY_CHIP` in `render_sensor_config.py` still only has 3 entries — v7.6.10.1 must add `esp32c6` and `esp32c5`
+- Stress test script needs updating before running on new boards (BUG-084)
+- `provision.sh` banner and backup filenames still reference `sat-esp32-4m-190` — cosmetic, fix in v7.6.10.1
+- IRAM optimization: not applicable, no board profile changes needed (LESSON-OPS-131)
 
 ---
 

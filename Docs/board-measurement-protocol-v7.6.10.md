@@ -2,6 +2,7 @@
 
 _Phase VX Step 2. Operator-driven — not an agent prompt._
 _Purpose: Flash each board with project firmware, collect baseline telemetry, run stress tests, record results._
+_Updated: 2026-05-05 — corrected IPs, added BUG-084 stress test guidance._
 
 ---
 
@@ -11,6 +12,7 @@ _Purpose: Flash each board with project firmware, collect baseline telemetry, ru
 - All boards physically connected and responding to ping
 - `esphome --version` shows 2026.4.1
 - `bash scripts/patch-esphome-httpd-stack.sh --check` passes
+- Stress test script updated with BUG-084 fixes (`--concurrent` parameter support)
 
 ---
 
@@ -19,11 +21,34 @@ _Purpose: Flash each board with project firmware, collect baseline telemetry, ru
 | Board | board_id | IP | Serial | Role |
 |---|---|---|---|---|
 | ESP32-C3 SuperMini | esp32-c3-supermini | 192.168.120.189 | — | Satellite (existing) |
-| ESP32-WROOM-32D | esp32-wroom-32d | 192.168.120.190 | — | Satellite (existing) |
+| ESP32-WROOM-32D | esp32-wroom-32d | 192.168.120.170 | — | Satellite (existing) |
 | ESP32-S3-DevKitC1-N16R8 | esp32-s3-devkitc1-n16r8 | 192.168.120.191 | /dev/ttyACM0 | Aggregator (existing) |
-| ESP32-S3 SuperMini | esp32-s3-supermini-4m | 192.168.120.192 | /dev/ttyACM1 | Satellite (new) |
-| ESP32-C5-WROOM-1U | esp32-c5-wroom1u-8m | 192.168.120.195 | /dev/ttyACM1 | Satellite (new) |
-| ESP32-C6 SuperMini | esp32-c6-supermini-4m | 192.168.120.196 | /dev/ttyACM1 | Satellite (new) |
+| ESP32-S3 SuperMini | esp32-s3-supermini-4m | 192.168.120.173 | TBD | Satellite (new) |
+| ESP32-C5-WROOM-1U | esp32-c5-wroom1u-8m | 192.168.120.180 | TBD | Satellite (new) |
+| ESP32-C6 SuperMini | esp32-c6-supermini-4m | 192.168.120.184 | TBD | Satellite (new) |
+
+---
+
+## Stress Test Guidance (BUG-084)
+
+8 concurrent HTTP connections crash non-PSRAM boards (C3, WROOM, C6) via heap exhaustion.
+The stack is fine — the crash is a heap resource limit, not a stack overflow.
+
+**Use the correct concurrency level per board:**
+
+| Board | PSRAM | Recommended `--concurrent` |
+|---|---|---|
+| C3, WROOM, C6 | None | 4 (default) |
+| S3 SuperMini | 2 MB | 4 (conservative — verify heap first) |
+| S3 DevKitC, C5 | 8 MB | 8 |
+
+```bash
+# Non-PSRAM boards (default --concurrent=4)
+bash scripts/stress-test-httpd-stack.sh 192.168.120.189
+
+# PSRAM boards (can try 8)
+bash scripts/stress-test-httpd-stack.sh 192.168.120.191 --concurrent=8
+```
 
 ---
 
@@ -42,8 +67,8 @@ The new boards don't have gateway configs yet. Create a minimal but representati
 Example for the C6:
 ```yaml
 esphome:
-  name: sat-c6-4m-1
-  friendly_name: sat-c6-4m-1
+  name: sat-c6-4m-184
+  friendly_name: sat-c6-4m-184
 
 esp32:
   variant: esp32c6
@@ -75,7 +100,7 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   ap:
-    ssid: "Sat-C6-4M-1 Fallback"
+    ssid: "Sat-C6-4M-184 Fallback"
 
 captive_portal:
 
@@ -141,7 +166,11 @@ Note: The test firmware won't have `/api/status/full` (that's the project's cust
 **5. Run stress test**
 
 ```bash
+# Non-PSRAM boards (C3, WROOM, C6) — use default concurrent=4
 bash scripts/stress-test-httpd-stack.sh <BOARD_IP>
+
+# PSRAM boards (S3, C5) — can use higher concurrency
+bash scripts/stress-test-httpd-stack.sh <BOARD_IP> --concurrent=8
 ```
 
 Note: The stress test requires the board to have `/api/status/full`. If running with minimal test firmware, the stress test will fail. In that case, record the debug sensor values as the baseline and note "stress test N/A — minimal firmware".
@@ -154,7 +183,7 @@ If the boards are later flashed with full project firmware (after provision.sh i
 
 ### For each EXISTING board:
 
-If v7.6.10.0 included re-flashing existing boards, those measurements are already captured. Otherwise:
+The v7.6.10.0 baselines are already captured (see measurement log). To refresh:
 
 ```bash
 # C3
@@ -164,16 +193,16 @@ curl -s -u ESPadmin:ESPpass100 http://192.168.120.189/api/status/full | jq '{
 bash scripts/stress-test-httpd-stack.sh 192.168.120.189
 
 # WROOM
-curl -s -u ESPadmin:ESPpass100 http://192.168.120.190/api/status/full | jq '{
+curl -s -u ESPadmin:ESPpass100 http://192.168.120.170/api/status/full | jq '{
   version, httpd_stack_watermark_bytes, free_heap, min_free_heap, uptime_seconds
 }'
-bash scripts/stress-test-httpd-stack.sh 192.168.120.190
+bash scripts/stress-test-httpd-stack.sh 192.168.120.170
 
 # S3
 curl -s -u ESPadmin:ESPpass100 http://192.168.120.191/api/status/full | jq '{
   version, httpd_stack_watermark_bytes, free_heap, min_free_heap, uptime_seconds
 }'
-bash scripts/stress-test-httpd-stack.sh 192.168.120.191
+bash scripts/stress-test-httpd-stack.sh 192.168.120.191 --concurrent=8
 ```
 
 ---
@@ -184,6 +213,7 @@ bash scripts/stress-test-httpd-stack.sh 192.168.120.191
 - **PSRAM boards:** `free_heap` may include PSRAM on S3 boards. Check whether the value is unreasonably large (>300 KB on a 512 KB SRAM chip = PSRAM is included). Record both values and note "includes PSRAM" where applicable.
 - **Binary sizes:** Record the build output's RAM and Flash percentages for each board.
 - **C5 crystal warning:** If esptool shows "Detected crystal freq 0.58 MHz" during flash — this is cosmetic (esptool misdetection). It does not affect operation.
+- **BUG-084:** If a board crashes during stress test, record the pre-stress watermark as the stack measurement and note "crashed during wave N (heap exhaustion — BUG-084)". The stack watermark at baseline is the relevant measurement for stack sizing.
 
 ---
 
