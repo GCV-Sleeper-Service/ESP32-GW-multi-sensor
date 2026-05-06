@@ -1,0 +1,12 @@
+# esp32-s3-4m-multi-partitions.csv
+# Partition layout for ESP32-S3 SuperMini with 4MB flash.
+# Same layout as C3/WROOM (4MB flash budget).
+# History: 512KB — ~19 days per device (3 ThermoPro + 1 ping)
+# Name,     Type, SubType,  Offset,   Size,      Flags
+nvs,        data, nvs,      0x9000,   0x4000,
+otadata,    data, ota,      0xD000,   0x2000,
+phy_init,   data, phy,      0xF000,   0x1000,
+ota_0,      app,  ota_0,    0x10000,  0x1B0000,
+ota_1,      app,  ota_1,    ,         0x1B0000,
+history,    data, nvs,      ,         0x80000,
+coredump,   data, coredump, ,         0x10000,

@@ -1,0 +1,26 @@
+# ESP32-S3 SuperMini — Board Profile
+# Small-form S3 satellite with 2MB PSRAM. Tests small-PSRAM satellite role.
+# Same chip as the S3 DevKitC aggregator but with less PSRAM (2MB vs 8MB) and less flash (4MB vs 16MB).
+board_id: "esp32-s3-supermini-4m"
+chip_variant: "esp32s3"
+esphome_board: "esp32-s3-devkitc-1"
+flash_size: "4MB"
+partitions: "../partitions/esp32-s3-4m-multi-partitions.csv"
+framework:
+  type: "esp-idf"
+sdkconfig_options:
+  CONFIG_LWIP_MAX_SOCKETS: "15"
+psram:
+  mode: "quad"
+  speed: "80MHz"
+capabilities:
+  ble: true
+  psram: true
+  dual_core: true
+  ram_kb: 512
+external_components:
+  - source:
+      type: local
+      path: local_components
+    components: [web_server_idf]
+notes: "Small-form S3 satellite. 2MB quad PSRAM, 4MB flash. Same partition budget as C3/WROOM."

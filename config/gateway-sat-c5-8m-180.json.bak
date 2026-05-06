@@ -1,0 +1,6 @@
+{
+    "board": "esp32-c5-wroom1u-8m",
+    "esphome_name": "sat-c5-8m-180",
+    "friendly_name": "C5 WROOM-1U satellite - 8MB flash 8MB PSRAM",
+    "wifi_address": "192.168.120.180"
+}

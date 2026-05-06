@@ -2,6 +2,22 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.10.1] - 2026-05-05 - Phase VX: Board Profiles and Partition Tables
+
+### Added
+- Board profile: `firmware/boards/esp32-s3-supermini-4m.yaml` - ESP32-S3 SuperMini (4MB flash, 2MB PSRAM)
+- Board profile: `firmware/boards/esp32-c6-supermini-4m.yaml` - ESP32-C6 SuperMini (4MB flash, first C6 in fleet)
+- Board profile: `firmware/boards/esp32-c5-wroom1u-8m.yaml` - ESP32-C5 WROOM-1U MCN8R8 (8MB flash, 8MB PSRAM, first C5 in fleet)
+- Partition table: `partitions/esp32-s3-4m-multi-partitions.csv` - 4MB layout (matches C3/WROOM)
+- Partition table: `partitions/esp32-c6-multi-partitions.csv` - 4MB layout (matches C3/WROOM)
+- Partition table: `partitions/esp32-c5-multi-partitions.csv` - 8MB layout (3MB OTA slots, 1MB history)
+- `SRAM_KB_BY_CHIP` entries for `esp32c6` (512 KB) and `esp32c5` (384 KB) in `render_sensor_config.py`
+
+### Validation
+- `esphome compile /tmp/test-esp32-s3-supermini-4m.yaml` passes.
+- `esphome compile /tmp/test-esp32-c6-supermini-4m.yaml` passes.
+- `esphome compile /tmp/test-esp32-c5-wroom1u-8m.yaml` passes with `CONFIG_XTAL_FREQ_48: "y"` and the expected `0x2000` bootloader offset / `0x10000` app offset layout.
+
 ## [v7.6.10.0] - 2026-04-23 - Phase VX: ESPHome Upgrade Verification
 
 ### Changed

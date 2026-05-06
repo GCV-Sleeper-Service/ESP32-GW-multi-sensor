@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_aggregator_config, load_board_profile, load_gateway_config, load_manifest, manifest_v2
 
-VERSION = "7.6.10.0"
+VERSION = "7.6.10.1"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"
@@ -61,6 +61,8 @@ class RenderError(Exception):
 SRAM_KB_BY_CHIP = {
     "esp32": "520 KB",
     "esp32c3": "400 KB",
+    "esp32c5": "384 KB",
+    "esp32c6": "512 KB",
     "esp32s3": "512 KB",
 }
 

@@ -1,0 +1,23 @@
+# ESP32-C6 SuperMini — Board Profile
+# First C6 in fleet. RISC-V single core, WiFi 6 (2.4 GHz), BLE 5.3, 802.15.4 (Zigbee/Thread).
+# 512 KB SRAM — 25% more than C3. No PSRAM.
+board_id: "esp32-c6-supermini-4m"
+chip_variant: "esp32c6"
+esphome_board: "esp32-c6-devkitm-1"
+flash_size: "4MB"
+partitions: "../partitions/esp32-c6-multi-partitions.csv"
+framework:
+  type: "esp-idf"
+sdkconfig_options:
+  CONFIG_LWIP_MAX_SOCKETS: "15"
+capabilities:
+  ble: true
+  psram: false
+  dual_core: false
+  ram_kb: 512
+external_components:
+  - source:
+      type: local
+      path: local_components
+    components: [web_server_idf]
+notes: "First C6 satellite. WiFi 6 + Zigbee/Thread capable. 512 KB SRAM, no PSRAM. Not recommended for aggregation (single core)."
