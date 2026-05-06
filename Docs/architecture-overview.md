@@ -16,11 +16,14 @@ A manifest-driven IoT gateway platform built on ESP32. Receives BLE sensor broad
 
 ### Hardware Targets
 
-| Board | Role | PSRAM | Max Satellites |
-|-------|------|-------|----------------|
-| ESP32-C3 SuperMini | Satellite only | None | N/A |
-| ESP32-WROOM-32D | Satellite only | None | N/A |
-| ESP32-S3-DevKitC1-N16R8 | Satellite + Aggregator | 8MB | 8 |
+| Board | Role | PSRAM | Max Satellites | Status |
+|-------|------|-------|----------------|--------|
+| ESP32-C3 SuperMini | Satellite only | None | N/A | Production |
+| ESP32-WROOM-32D | Satellite only | None | N/A | Production |
+| ESP32-S3-DevKitC1-N16R8 | Satellite + Aggregator | 8MB OPI | 8 | Production |
+| ESP32-S3 SuperMini | Satellite (+ light agg ≤4) | 2MB quad | 4 | v7.6.10.1 |
+| ESP32-C6 SuperMini | Satellite only | None | N/A | v7.6.10.1 |
+| ESP32-C5 WROOM-1U | Satellite only | 8MB quad | N/A | v7.6.10.1 (⚠️ BLE re-test needed) |
 
 **Design rule:** Aggregator role is restricted to PSRAM-equipped boards. No PSRAM = satellite-only; 2MB PSRAM caps at 4 satellites; 4MB+ caps at 8 satellites.
 
@@ -82,7 +85,7 @@ Board switching: `scripts/provision.sh <aggregator|wroom|satellite>`. Always run
 | Phase X | v7.6.4.0–v7.6.5.8 | Dashboard architecture refactor | ✅ Complete |
 | Phase V | v7.6.6.0–v7.6.9.5 | Firmware stabilization and history | ✅ Complete |
 | Phase Y | v7.6.6.x | Firmware refactor (sensor_history_multi.h) | ✅ Complete |
-| **Phase VX** | **v7.6.10.0–v7.6.10.3** | **Board onboarding sprint** | **In Progress** |
+| **Phase VX** | **v7.6.10.0–v7.6.10.4** | **Board onboarding sprint** | **In Progress** |
 | Phase 7 | v7.7.0.x–v7.7.2.x | Per-device persistence engine | Planned |
 | Phase E | v8.0.x | Captive portal + WiFi config | Not yet planned |
 
@@ -103,8 +106,9 @@ Board switching: `scripts/provision.sh <aggregator|wroom|satellite>`. Always run
 | `Docs/writing-guide/methodology.md` | Prompt writing methodology |
 | `Docs/aggregator-setup.md` | Operator documentation for aggregator configuration |
 | `Docs/data-ingest-setup.md` | Operator documentation for data ingest |
-| `Docs/esp32-board-selection-guide.md` | Board selection and capability reference |
-| `prompts/prompt-index-and-workflow.md` | Master prompt index and workflow |
+| `Docs/esp32-board-selection-guide.md` | Board selection guide — 6 boards, measured data (v7.6.10.0) |
+| `Docs/phase-V-capacity-study.md` | Memory/flash capacity study — 6 boards, BUG-084, role variants |
+| `Docs/board-measurement-log-v7.6.10.md` | Phase VX board measurement data || `prompts/prompt-index-and-workflow.md` | Master prompt index and workflow |
 | `prompts/handoff/phaseX-results.md` | Phase X delivery record |
 | `prompts/handoff/phaseD/phaseD-results.md` | Phase D delivery record |
 
