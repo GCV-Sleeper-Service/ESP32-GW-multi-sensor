@@ -185,6 +185,37 @@ Recovery:
 - reran `bash scripts/minify-dashboard.sh`
 - reran `bash scripts/generate-header.sh`
 
+### 7. CI stop: aggregator browser job exposed readiness/build-order coupling
+
+After the branch was pushed, CI failed only on:
+
+- `browser-tests (aggregator)`
+
+Observed failure:
+
+- aggregator mode rendered only 2 gateway tabs instead of 4
+- the offline satellite tab was missing
+- per-gateway tests timed out waiting for `.gw-tab[data-gw="gw-main"]`
+
+Root causes:
+
+- `_aggregatorReady` was set before the first `/api/aggregator/gateways` payload had
+  been applied to the gateway selector
+- the selector was not rebuilt when boot started with an empty gateway list and the
+  first live gateway payload arrived
+- during investigation, rerunning the dashboard pipeline in parallel caused
+  `dashboard.html` to be rebuilt from a stale `dashboard.js`, which briefly masked the
+  real fix
+
+Recovery:
+
+- changed aggregator readiness so tests only proceed after the first gateway payload is
+  applied
+- added selector sync logic so the tab bar is rebuilt when gateway topology changes from
+  the initial empty state
+- reran the full dashboard pipeline sequentially in the required order
+- reran `FIXTURE_SET=aggregator npx playwright test tests/browser/aggregator.spec.js --grep "19\. Aggregator Mode"` successfully
+
 ## Prompt Recommendations
 
 The current prompt set worked, but several avoidable stops came from implicit repo
@@ -210,11 +241,15 @@ coupling that should be made explicit.
 4. State that `bash scripts/minify-dashboard.sh` and `bash scripts/generate-header.sh`
    must run sequentially, never in parallel.
 
-5. Add a PR bootstrap contingency:
+5. State that the entire dashboard regeneration pipeline is ordered, not parallel:
+   `bundle-dashboard.sh -> render_sensor_config.py --write -> build-dashboard.sh ->
+   minify-dashboard.sh -> generate-header.sh -> render_sensor_config.py --check`.
+
+6. Add a PR bootstrap contingency:
    if `gh pr create` reports that a PR already exists for the branch, reuse that PR and
    update its body instead of treating the session as blocked.
 
-6. Clarify that the "no localStorage/sessionStorage" rule applies to credential storage,
+7. Clarify that the "no localStorage/sessionStorage" rule applies to credential storage,
    unless the intent is to remove all existing dashboard preference storage in the same
    step.
 

@@ -64,6 +64,34 @@ function renderGatewaySelector(gateways) {
   });
 }
 
+function _getActiveGatewayTabId() {
+  var activeTab = document.querySelector('.gw-tab.active');
+  return activeTab ? activeTab.getAttribute('data-gw') : 'all';
+}
+
+function _gatewaySelectorNeedsRefresh(gateways) {
+  var tabs = document.querySelectorAll('.gw-tab');
+  var expectedCount = (gateways ? gateways.length : 0) + 2;
+  if (tabs.length !== expectedCount) return true;
+  if (!document.querySelector('.gw-tab[data-gw="all"]')) return true;
+  if (!document.querySelector('.gw-tab[data-gw="settings"]')) return true;
+  for (var i = 0; i < (gateways || []).length; i++) {
+    var gw = gateways[i];
+    if (!document.querySelector('.gw-tab[data-gw="' + gw.id + '"]')) return true;
+  }
+  return false;
+}
+
+function _syncGatewaySelector(gateways, preferredGwId) {
+  var activeGwId = preferredGwId || _getActiveGatewayTabId();
+  if (!_gatewaySelectorNeedsRefresh(gateways)) return;
+  renderGatewaySelector(gateways || []);
+  if (!activeGwId || activeGwId === 'all') return;
+  var activeTab = document.querySelector('.gw-tab[data-gw="' + activeGwId + '"]');
+  if (!activeTab) return;
+  activeTab.click();
+}
+
 function renderAllGatewaysSummary(gateways) {
   var grid = document.getElementById('gwGrid');
   grid.innerHTML = '';
@@ -490,25 +518,26 @@ async function initAggregatorDashboard() {
   var gwBody = document.getElementById('body-gateways');
   if (gwHdr) gwHdr.style.display = '';
   if (gwBody) gwBody.style.display = '';
+  window._aggregatorReady = false;
   renderGatewaySelector(window._aggregatorGateways);
   // Render "All Gateways" as the default active view
   renderAllGatewaysSummary(window._aggregatorGateways);
   // Start periodic aggregator polling — 15s interval, in-flight guarded
   setInterval(pollAggregatorLive, 15000);
   pollAggregatorLive();
-  // Signal for Playwright test infrastructure (v7.5.5.4 will use this)
-  window._aggregatorReady = true;
 }
 
 var _aggLiveInFlight = false;
 function pollAggregatorLive() {
   if (_aggLiveInFlight) return;
   _aggLiveInFlight = true;
-  _aggregatorFetchWithReauth('/api/aggregator/gateways', {cache: 'no-store'}, 'aggregator dashboard')
+  return _aggregatorFetchWithReauth('/api/aggregator/gateways', {cache: 'no-store'}, 'aggregator dashboard')
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data && data.gateways) {
+        var activeGwId = _getActiveGatewayTabId();
         window._aggregatorGateways = data.gateways;
+        _syncGatewaySelector(window._aggregatorGateways, activeGwId);
         // Update gateway selector tab status indicators
         data.gateways.forEach(function(gw) {
           var tab = document.querySelector('.gw-tab[data-gw="' + gw.id + '"]');
@@ -538,6 +567,7 @@ function pollAggregatorLive() {
             _populateGatewayDeviceLive(gwId, _currentGwSensors);
           }
         }
+        window._aggregatorReady = true;
       }
     })
     .catch(function() { /* silent */ })
