@@ -110,6 +110,7 @@ function requestManagementCredentials(actionLabel) {
       if (verifyController) requestOptions.signal = verifyController.signal;
       fetch(ESP_HOST + '/api/status/full', requestOptions).then(function(resp) {
         if (resp.ok) {
+          if (settled) return;
           setAuthCredentials(username, password);
           finish({ username: username, password: password, authHeader: authHeader }, false);
           return;
