@@ -1,21 +1,23 @@
 # Phase V — Memory and Flash Capacity Study
 
-**Date:** 2026-04-12  
-**Scope:** ESP32-C3 and ESP32-S3 boards — current and future sensor/device type combinations  
+**Date:** 2026-05-05 (expanded from 2026-04-12 original)  
+**Scope:** All 6 ESP32 board variants — current and future sensor/device type combinations  
 **Purpose:** Inform Phase 7 (v7.7.x) per-device persistence engine design, partition sizing, and sensor expansion planning  
+**Measurement source:** `Docs/board-measurement-log-v7.6.10.md` — all values are measured at ESPHome 2026.4.1 / ESP-IDF 5.5.4  
 **No code changes — research and planning document only**
 
 ---
 
 ## Executive Summary
 
-| Board | Max persistent metrics (safe heap) | Max live-only metrics | Notes |
-|---|---|---|---|
-| ESP32-C3 SuperMini (400 KB SRAM) | ~7–8 | ~400+ | Heap floor: 65 KB. Each persistent metric costs ~804 B static. |
-| ESP32-S3 N16R8 (512 KB + 8 MB PSRAM) | 50+ (PSRAM-backed) | 1000+ | Heap floor: 100 KB internal. PSRAM absorbs dynamic allocations. |
-| ESP32 WROOM-32D 4 MB (520 KB SRAM) | ~9–10 | ~500+ | Slightly more SRAM than C3, no PSRAM. |
-| ESP32 8 MB flash (520 KB SRAM) | ~9–10 | ~500+ | Same SRAM as WROOM-32D, flash budget increased. |
-| ESP32 16 MB flash (520 KB SRAM) | ~9–10 | ~500+ | Same SRAM as WROOM-32D, maximum flash. |
+| Board | Measured free_heap | Max persistent metrics (safe heap) | Max live-only metrics | BUG-084 max concurrent | Notes |
+|---|---|---|---|---|---|
+| ESP32-C3 SuperMini (400 KB SRAM) | 58,456 B | ~7–8 | ~400+ | 4 | Heap floor: 58 KB. Each persistent metric costs ~804 B static. |
+| ESP32-WROOM-32D (520 KB SRAM) | 38,760 B | ~9–10 | ~500+ | 4 | More SRAM than C3 but tighter measured heap (long uptime). |
+| ESP32-S3 DevKitC N16R8 (512 KB + 8 MB PSRAM) | 53,432 B (int) | 50+ (PSRAM-backed) | 1000+ | 8 | Heap floor: 100 KB internal. PSRAM absorbs dynamic allocations. |
+| ESP32-S3 SuperMini (512 KB + 2 MB PSRAM) | 123,156 B (int) | 30+ (PSRAM-backed) | 1000+ | 8 | Best satellite free_heap. 2 MB PSRAM. |
+| ESP32-C6 SuperMini (512 KB SRAM) | 150,332 B | ~15–18 | ~600+ | 4 | Highest non-PSRAM free_heap. ⚠️ 91.6% flash on 4 MB. |
+| ESP32-C5 WROOM-1U (384 KB + 8 MB PSRAM) | 32,908 B (int) | ~8 (low internal heap) | 1000+ (PSRAM) | 8 | Lowest internal heap. ⚠️ BLE antenna issue. |
 
 **Current production firmware** (v7.6.6.8) uses:
 - ESP32-C3: 11 persistent metrics across 5 sensors (3 env × 2 + 1 ping × 2 + 1 system × 3) = 868 B × 11 = ~9,548 B static history buffers
@@ -81,17 +83,30 @@ struct SensorEntity:
 
 ### Task stack costs (one-time, not per metric)
 
-| Task | Stack size | Measured peak (v7.6.9.5) | Notes |
+| Task | Stack size | Measured peak (v7.6.10.0) | Notes |
 |---|---|---|---|
-| httpd task | 16,384 B | ~3,460 B (C3), ~3,340 B (WROOM) | BUG-076 patch via local component override. C3 was missing override pre-v7.6.9.5 (ran on stock 4 KB). |
+| httpd task | 16,384 B | ~3,460 B (C3), ~3,200 B (WROOM), ~6,350 B (S3) | 16 KB override via local component. S3 regression: ESPHome 2026.4.1 SSE. |
 | ping_adapter task | 4,096 B | TBD | |
 | agg_poll task | 10,240 B | 10,240 B (unchanged) | AGGREGATOR_ENABLED only; Phase 7 history sync must remain a separate task. |
 | hist_delete task | 8,192 B | 8,192 B | On-demand, transient maintenance task. |
 | import deferred task | 8,192 B | 8,192 B | V1-D import task; created only during import. |
 
-**v7.6.9.5 finding:** Peak httpd stack usage is ~3,400 B across both RISC-V (C3)
-and Xtensa (WROOM/S3) architectures. The 16 KB allocation provides ~12,900 B
-headroom (79%). No architecture-conditional sizing is needed.
+**v7.6.10.0 findings:** The httpd stack watermark varies significantly by board:
+
+| Board | httpd_stack_wm | Used | Headroom | Headroom % |
+|---|---|---|---|---|
+| C3 SuperMini | 12,924 B | ~3,460 B | 12,924 B | 79% |
+| WROOM-32D | 13,188 B | ~3,196 B | 13,188 B | 80% |
+| S3 DevKitC N16R8 | 10,036 B | ~6,348 B | 10,036 B | 61% |
+| S3 SuperMini | 12,512 B | ~3,872 B | 12,512 B | 76% |
+| C6 SuperMini | 12,820 B | ~3,564 B | 12,820 B | 78% |
+| C5 WROOM-1U | 12,728 B | ~3,656 B | 12,728 B | 78% |
+
+**S3 DevKitC watermark regression:** Dropped from 12,528 B (v7.6.9.5) to 10,036 B
+(v7.6.10.0) — a 2,492 B increase in stack usage. Caused by ESPHome 2026.4.1's new
+SSE internals. The S3 SuperMini does NOT show this regression (12,512 B), suggesting
+the SSE code path is aggregator-specific. Still above the 10,000 B threshold but
+should be monitored on future ESPHome upgrades.
 
 ### NVS flash per metric per segment
 
@@ -513,6 +528,143 @@ The following constraints are derived from this capacity study and must be honou
 4. **Aggregator history partition must be separate from the system NVS partition.** Mixing history data with config data in the same 256 KB partition (as in v7.6.x) is not viable at Phase 7 scale.
 5. **History pull for Phase 7 Option 2 must run in a task separate from `agg_poll`** to avoid blocking live sensor updates.
 6. **OTA must be disabled for the Phase 7 partition-table change.** A re-flash utility must be provided with clear operator documentation.
+
+---
+
+## §10 — Six-Board Measured Capacity Table (v7.6.10.0)
+
+All values measured at ESPHome 2026.4.1 / ESP-IDF 5.5.4 on actual hardware. Source: `Docs/board-measurement-log-v7.6.10.md`.
+
+### Build Outputs
+
+| Board | Chip | Arch | Flash | Binary | RAM % | Flash % | OTA Headroom |
+|---|---|---|---|---|---|---|---|
+| C3 SuperMini | ESP32-C3 | RISC-V | 4 MB | 1,428,928 B | 18.5% | 80.7% | 340 KB |
+| WROOM-32D | ESP32 | Xtensa LX6 | 4 MB | 1,279,395 B | 22.0% | 72.3% | 490 KB |
+| S3 DevKitC N16R8 | ESP32-S3 | Xtensa LX7 | 16 MB | 934,715 B | 37.7% | 29.7% | 2.1 MB |
+| S3 SuperMini | ESP32-S3 | Xtensa LX7 | 4 MB | 1,305,072 B | 20.4% | 73.7% | 464 KB |
+| C6 SuperMini | ESP32-C6 | RISC-V | 4 MB | 1,620,928 B | 20.5% | 91.6% | ⚠️ 145 KB |
+| C5 WROOM-1U | ESP32-C5 | RISC-V | 8 MB | 1,662,064 B | 22.0% | 52.8% | 1.5 MB |
+
+**Key observation:** WiFi 6 + 802.15.4 boards (C6, C5) have ~192–233 KB larger binaries than WiFi 4 boards (C3, WROOM, S3). This is the radio driver stack code, not application firmware.
+
+### Runtime Heap
+
+| Board | SRAM | PSRAM | free_heap | min_free_heap | httpd_wm | Safe Concurrent |
+|---|---|---|---|---|---|---|
+| C3 SuperMini | 400 KB | None | 58,456 | 47,616 | 12,924 | 4 |
+| WROOM-32D | 520 KB | None | 38,760 | 15,936 | 13,188 | 4 |
+| S3 DevKitC N16R8 | 512 KB | 8 MB OPI | 53,432 | 8,398,704 | 10,036 | 8 |
+| S3 SuperMini | 512 KB | 2 MB quad | 123,156 | 2,209,636 | 12,512 | 8 |
+| C6 SuperMini | 512 KB | None | 150,332 | 152,820 | 12,820 | 4 |
+| C5 WROOM-1U | 384 KB | 8 MB quad | 32,908 | 8,420,784 | 12,728 | 8 |
+
+---
+
+## §11 — Cross-Architecture Comparison: RISC-V vs Xtensa
+
+### RISC-V boards: C3 (single-core 160 MHz), C6 (single-core 160 MHz), C5 (single-core 240 MHz)
+
+RISC-V boards use unified memory — there is no separate IRAM/DRAM split. All code that fits runs from SRAM, the rest executes from flash. This simplifies memory management but means there's no IRAM optimization lever (LESSON-OPS-131 is N/A for RISC-V).
+
+httpd stack watermarks are consistent: 12,728–12,924 B across all three RISC-V boards, suggesting ~3,400–3,650 B peak stack usage. The 16 KB stack override provides 78–79% headroom.
+
+### Xtensa boards: WROOM (dual-core LX6 240 MHz), S3 (dual-core LX7 240 MHz)
+
+Xtensa boards have separate IRAM and DRAM. The S3 shows `IRAM: 100.0%` — all 16,384 B of IRAM is consumed. Overflow code executes from flash (slightly slower, acceptable for this workload). The WROOM could theoretically use `sram1_as_iram: true` to gain 40 KB IRAM, but this subtracts from DRAM and is counterproductive (LESSON-OPS-131).
+
+**S3 DevKitC stack anomaly:** The S3 DevKitC N16R8 shows a significantly lower httpd watermark (10,036 B) than all other boards (12,512–13,188 B). This is a 2,492 B regression from v7.6.9.5 and is unique to the aggregator role — the S3 SuperMini (satellite) shows 12,512 B. The cause is ESPHome 2026.4.1's new SSE internals, which only affect the aggregator's SSE event stream generation.
+
+### Heap behavior difference
+
+| Architecture | Heap trend | Notes |
+|---|---|---|
+| RISC-V (C3/C6) | Stable after boot | free_heap settles within 30–60s |
+| RISC-V (C5) | Declining for 2.5+ min | 50 KB → 33 KB over 165s. Needs longer observation. |
+| Xtensa (WROOM) | Stable but tight | min_free_heap of 15,936 B after extended uptime |
+| Xtensa (S3) | Stable with PSRAM overflow | Internal heap stays ~53 KB; dynamic allocs go to PSRAM |
+
+---
+
+## §12 — PSRAM Impact: Measured Comparison
+
+| Board | PSRAM | Internal free_heap | Total free_heap | Crash under 8 concurrent | Effect |
+|---|---|---|---|---|---|
+| C3 SuperMini | None | 58,456 | 58,456 | ❌ CRASH | Baseline non-PSRAM behavior |
+| WROOM-32D | None | 38,760 | 38,760 | ❌ CRASH | Tightest non-PSRAM board |
+| C6 SuperMini | None | 150,332 | 164,936 | (untested at 8) | Most capable non-PSRAM |
+| S3 SuperMini | **2 MB quad** | 123,156 | 2,225,904 | ✅ PASS | Even 2 MB PSRAM eliminates crash |
+| S3 DevKitC | **8 MB OPI** | 53,432 | 8,452,136 | ✅ PASS | Standard aggregator configuration |
+| C5 WROOM-1U | **8 MB quad** | 32,908 | 8,434,968 | ✅ PASS | PSRAM saves C5 despite low internal heap |
+
+**Key finding:** PSRAM of any size (2 MB, 8 MB) completely eliminates BUG-084 crash susceptibility. The crash occurs when heap drops below the ~15–20 KB WiFi/LWIP minimum. With PSRAM, dynamic allocations overflow to PSRAM before internal heap reaches critical levels.
+
+**Trade-off:** PSRAM is ~6× slower than internal SRAM (~40 MHz SPI bus vs ~240 MHz internal bus). For a 15-second sensor poll cycle and 30-second dashboard refresh, this latency is irrelevant.
+
+---
+
+## §13 — BUG-084: Concurrency as a Capacity Constraint
+
+BUG-084 establishes that non-PSRAM boards have a hard limit of 4 concurrent HTTP connections. This has planning implications:
+
+### Scenario analysis for non-PSRAM satellites
+
+| Scenario | Connections | C3/WROOM/C6 | S3/C5 (PSRAM) |
+|---|---|---|---|
+| Dashboard open (SSE + status poll) | 2 | ✅ | ✅ |
+| Dashboard + aggregator polling | 3–4 | ✅ (at limit) | ✅ |
+| Dashboard + aggregator + Prometheus scrape | 5–6 | ⚠️ Risk zone | ✅ |
+| Two dashboard tabs | 4 | ✅ (at limit) | ✅ |
+| Two dashboards + aggregator | 5–6 | ❌ Likely crash | ✅ |
+
+**Phase 7 implication:** The per-device persistence engine must not add long-running HTTP connections to the satellite. The deferred task pattern (httpd handler → xTaskCreate → NVS operation) is mandatory precisely because it keeps the httpd connection short-lived.
+
+**Aggregator socket scaling:** For S3 aggregators with PSRAM, the current `CONFIG_LWIP_MAX_SOCKETS: 15` supports up to 8 satellites + 2 dashboard sessions. For larger deployments, this value should be increased in the board profile's `sdkconfig_options`.
+
+---
+
+## §14 — Satellite Role Variants: BLE-Disabled Configurations
+
+Two upcoming use cases don't need the BLE radio stack:
+
+### §14.1 — Zigbee-only satellite (C5/C6)
+
+When C5/C6 boards receive data from Zigbee sensors via 802.15.4, BLE passive scanning is unnecessary overhead. The ESP-IDF BLE stack (NimBLE on RISC-V) consumes ~40–60 KB of heap.
+
+| Board | Current free_heap (BLE enabled) | Estimated free_heap (BLE disabled) | Persistent metric headroom |
+|---|---|---|---|
+| C6 (512 KB, no PSRAM) | 150,332 B | ~190–210 KB | ~25–30 metrics |
+| C5 (384 KB, 8M PSRAM) | 32,908 B (internal) | ~80–90 KB (internal) | ~15 metrics (internal only) |
+
+Disabling BLE on the C5 would transform it from "danger zone" (32 KB internal) to "comfortable" (80+ KB internal). For Zigbee-only C5 satellites, this is the recommended configuration.
+
+### §14.2 — WiFi-only satellite (any board)
+
+Weather stations and power meters that expose REST APIs over WiFi don't need BLE at all. The satellite queries these devices via HTTP client (`fetch_to_buffer()`). Disabling BLE frees the same ~40–60 KB.
+
+| Board | Current free_heap | Estimated with BLE disabled | Persistent metrics gained |
+|---|---|---|---|
+| C3 (400 KB) | 58,456 B | ~100–120 KB | +5–7 additional |
+| WROOM (520 KB) | 38,760 B | ~80–100 KB | +5–7 additional |
+| C6 (512 KB) | 150,332 B | ~190–210 KB | +5–7 additional |
+
+**Implementation:** Remove `esp32_ble_tracker` component from the board profile's sensor config. The `render_sensor_config.py` pipeline already uses substitution-driven generation — a `capabilities.ble: false` flag could drive this. This is a Phase 7 or Phase E task.
+
+### §14.3 — Binary sensor satellite (C6 with 4 MB flash)
+
+Binary sensors (door/window contacts, motion sensors, leak detectors) have a distinct capacity profile. They use `EventLog` (§6) at ~168 B per sensor instead of `HistoryBuffer` at 776 B. Firmware code additions for binary sensor support are minimal compared to environmental sensors.
+
+The C6 with 4 MB flash (91.6% OTA utilization) is a suitable candidate for binary-sensor-only firmware:
+
+| Metric | Environmental firmware | Binary sensor firmware (estimated) |
+|---|---|---|
+| HistoryBuffer per metric | 776 B | N/A |
+| EventLog per sensor | N/A | ~168 B |
+| Code size delta | Baseline | ~+5–10 KB (event log code) |
+| Flash % impact on C6 4MB | 91.6% | ~92–93% (still within limit) |
+| Sensors supported (C6 heap) | ~15–18 env metrics | ~50+ binary sensors |
+
+The C6 with 8 MB flash is the primary C6 satellite for environmental sensor workloads. The 4 MB variant is retained for lightweight binary sensor deployments.
 
 ---
 

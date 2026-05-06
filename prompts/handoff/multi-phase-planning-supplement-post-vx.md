@@ -23,14 +23,24 @@ _The advisor running the multi-phase planning session should read `Docs/board-me
 
 | Board | IP | free_heap (boot) | min_free_heap | httpd_stack_wm | Max persistent metrics | Aggregator viable? |
 |---|---|---|---|---|---|---|
-| C3 SuperMini | .189 | 58,456 | 47,616 | 12,924 | ___ | No (no PSRAM) |
-| WROOM-32D | .170 | 38,760 | 15,936 | 13,188 | ___ | No (no PSRAM, tight heap) |
-| S3 DevKitC (8M) | .191 | 53,432 | 8,398,704 | 10,036 | ___ | Yes (current aggregator) |
-| S3 SuperMini (2M) | .173 | ___ | ___ | ___ | ___ | ___ |
-| C6 SuperMini | .184 | ___ | ___ | ___ | ___ | No (no PSRAM) |
-| C5 WROOM-1U (8M) | .180 | ___ | ___ | ___ | ___ | ___ |
+| C3 SuperMini | .189 | 58,456 | 47,616 | 12,924 | 8 | No (no PSRAM) |
+| WROOM-32D | .170 | 38,760 | 15,936 | 13,188 | 10–12 | No (no PSRAM, tight heap) |
+| S3 DevKitC (8M) | .191 | 53,432 | 8,398,704 | 10,036 | 50+ (PSRAM) | Yes (current aggregator) |
+| S3 SuperMini (2M) | .173 | 123,156 | 2,209,636 | 12,512 | 30+ (PSRAM) | Marginal (2MB PSRAM, ≤4 satellites) |
+| C6 SuperMini | .184 | 150,332 | 152,820 | 12,820 | 15–18 | No (no PSRAM, single core) |
+| C5 WROOM-1U (8M) | .180 | 32,908 | 8,420,784 | 12,728 | 8 (low internal heap) | No (⚠️ BLE non-functional — see below) |
 
 These measured values supersede the capacity study's estimates where they differ.
+
+**C5 BLE failure note:** The C5 compiles and boots but did NOT receive BLE sensor data during
+testing. **Root cause: external IPEX antenna was not attached.** Re-test with antenna planned,
+plus C5 SuperMini (integrated antenna) being procured for independent verification.
+Phase 7 planning should treat C5 BLE as "pending re-test" rather than "non-functional."
+For Zigbee-only C5 workloads, BLE can be disabled to free ~50 KB internal heap.
+
+**C6 flash constraint note:** The C6 with 4MB flash uses 91.6% of its OTA partition.
+Phase 7 firmware growth may exceed the partition. C6 satellites may need to skip
+Phase 7 persistence features or acquire C6 boards with larger flash.
 
 **BUG-084 note for planning:** Non-PSRAM boards (C3, WROOM, C6) crash under 8 concurrent
 HTTP connections. This limits operational scenarios — dashboard open + aggregator polling
@@ -114,7 +124,8 @@ Add these to the Current State Summary (in addition to the v7.6.9.5 supplement's
 - **BUG-084:** Non-PSRAM boards crash under 8 concurrent HTTP connections (heap exhaustion). Safe limit: 4 concurrent. Stress test updated with `--concurrent` parameter.
 - **S3 watermark:** Dropped from 12,528 to 10,036 B after ESPHome 2026.4.1. Monitor.
 - **IRAM:** `sram1_as_iram` not applicable (LESSON-OPS-131). No board profile changes.
-- **Known board compilation failures:** List any C6/C5 boards that failed to compile in Phase VX — these constrain Phase 7/8/10 planning for those board families.
+- **Known board compilation failures:** None — all 6 boards compile successfully. However, ESP32-C5 BLE reception is non-functional (A-004). C5 is usable for WiFi/Zigbee testing only.
+- **C6 flash constraint:** 91.6% OTA partition utilization on 4MB flash. Phase 7/8/10 firmware growth may require C6 boards with larger flash or partition redesign.
 
 ---
 

@@ -2,7 +2,7 @@
 
 _Phase VX measurement results. Fill after running `Docs/board-measurement-protocol-v7.6.10.md`._
 _This file is consumed by `prompts/handoff/multi-phase-planning-supplement-post-vx.md` for Phase 7 planning._
-_Updated: 2026-05-05 — pre-filled v7.6.10.0 baselines for existing 3 boards._
+_Updated: 2026-05-05 — v7.6.10.2 measurements complete. All boards measured._
 
 ---
 
@@ -24,9 +24,9 @@ _Updated: 2026-05-05 — pre-filled v7.6.10.0 baselines for existing 3 boards._
 | C3 SuperMini | esp32-c3-supermini | ESP32-C3 | 4 MB | 1,428,928 B | 60,688 B | 18.5% | 1,428,672 B | 80.7% | ✅ |
 | WROOM-32D | esp32-wroom-32d | ESP32 | 4 MB | 1,279,395 B | 72,128 B | 22.0% | 1,279,139 B | 72.3% | ✅ |
 | S3 DevKitC N16R8 | esp32-s3-devkitc1-n16r8 | ESP32-S3 | 16 MB | 934,715 B | 123,640 B | 37.7% | 934,459 B | 29.7% | ✅ |
-| S3 SuperMini | esp32-s3-supermini-4m | ESP32-S3 | 4 MB | 1,305,072 B | 66,708 | 20.4% | 1,304,663 | 73.7% | ✅ |
-| C6 SuperMini | esp32-c6-supermini-4m | ESP32-C6 | 4 MB | 1,620,928 | 67,076 | 20.5% | 1,620,572 | 91.6% | ✅ |
-| C5 WROOM-1U | esp32-c5-wroom1u-8m | ESP32-C5 | 8 MB | 1,662,064 | 72,204 | 22.0% | 1,661,704 | 52.8% | ✅ |
+| S3 SuperMini | esp32-s3-supermini-4m | ESP32-S3 | 4 MB | 1,305,072 B | 66,708 B | 20.4% | 1,304,663 B | 73.7% | ✅ |
+| C6 SuperMini | esp32-c6-supermini-4m | ESP32-C6 | 4 MB | 1,620,928 B | 67,076 B | 20.5% | 1,620,572 B | 91.6% | ✅ |
+| C5 WROOM-1U | esp32-c5-wroom1u-8m | ESP32-C5 | 8 MB | 1,662,064 B | 72,204 B | 22.0% | 1,661,704 B | 52.8% | ✅ |
 
 ---
 
@@ -39,9 +39,13 @@ _Values collected ≥2 minutes after boot. All heap values in bytes unless noted
 | C3 SuperMini | ESP32-C3 | RISC-V | 400 KB | None | 58,456 | 47,616 | — | 12,924 | v7.6.10.0 baseline (218s uptime) |
 | WROOM-32D | ESP32 | Xtensa LX6 | 520 KB | None | 38,760 | 15,936 | — | 13,188 | v7.6.10.0 baseline (1070s uptime) |
 | S3 DevKitC N16R8 | ESP32-S3 | Xtensa LX7 | 512 KB | 8 MB OPI | 53,432 | 8,398,704 | — | 10,036 | min_free_heap includes 8MB PSRAM |
-| S3 SuperMini | ESP32-S3 | Xtensa LX7 | 512 KB | 2 MB quad | 123,156 | 2,209,636 | 16.5% | 12,512 | NEW — free_heap may include PSRAM |
-| C6 SuperMini | ESP32-C6 | RISC-V | 512 KB | None | 150,332 | 152,820 | 6.4% | 12,820 | NEW — first C6 |
-| C5 WROOM-1U | ESP32-C5 | RISC-V | 384 KB | 8 MB quad | 32,908 | 8,420,784 | ___ | 12,728 | NEW — free_heap may include PSRAM |
+| S3 SuperMini | ESP32-S3 | Xtensa LX7 | 512 KB | 2 MB quad | 123,156 | 2,209,636 | 16.5% | 12,512 | free_heap_internal only; PSRAM in total |
+| C6 SuperMini | ESP32-C6 | RISC-V | 512 KB | None | 150,332 | 152,820 | 8.8% | 12,820 | ⚠️ min_free_heap > free_heap — see Anomaly A-002 |
+| C5 WROOM-1U | ESP32-C5 | RISC-V | 384 KB | 8 MB quad | 32,908 | 8,420,784 | N/A (PSRAM) | 12,728 | ⚠️ Very low internal heap. See Anomaly A-003 |
+
+_Heap frag % calculation for non-PSRAM boards: (free_heap_total − free_heap_internal) / free_heap_total × 100._
+_C6: (164,936 − 150,332) / 164,936 = 8.8%. The 14.6 KB difference may be RTC or other non-internal allocatable memory._
+_C5: N/A — free_heap_total includes 8 MB PSRAM, making the non-PSRAM fragmentation metric meaningless._
 
 ---
 
@@ -58,10 +62,10 @@ _Default concurrent=4 for non-PSRAM boards. Use --concurrent=8 for PSRAM boards.
 | C3 SuperMini | 4 | 12,928 | 12,920 | 13,280 | 14,216 | 12,920 | 13,280 | 12,920 | re-run with fixed script |
 | WROOM-32D | 4 | 13,076 | 13,924 | 13,268 | 13,188 | 14,020 | 14,020 | 13,188 | re-run with fixed script |
 | S3 DevKitC N16R8 | 4 | 12,980 | 12,964 | 12,964 | 12,852 | 12,852 | 12,852 | 12,852 | re-run with fixed script |
-| S3 SuperMini | 4 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | Pass |
-| S3 SuperMini | 8 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | Pass |
-| C6 SuperMini | 4 | 12,820 | 12,820 | 12,820 | 12,820 | 12,820 | 12,820 | 12,820 | Pass |
-| C5 WROOM-1U | 8 | 12,728 | 12,728 | 12,728 | 12,728 | 12,664 | 12,664 | 12664 | Pass |
+| S3 SuperMini | 4 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | PASS |
+| S3 SuperMini | 8 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | 12,512 | PASS |
+| C6 SuperMini | 4 | 12,820 | 12,820 | 12,820 | 12,820 | 12,820 | 12,820 | 12,820 | PASS |
+| C5 WROOM-1U | 8 | 12,728 | 12,728 | 12,728 | 12,728 | 12,664 | 12,664 | 12,664 | PASS |
 
 _BUG-084: The concurrent=8 rows for C3 and WROOM document the crash. Re-run with concurrent=4 after script fix._
 _Note: S3 at concurrent=8 — board survived but script exited due to set -e + curl timeout. Re-run with fixed script._
@@ -115,6 +119,67 @@ subtract ~40 KB from DRAM, worsening BUG-084 heap pressure. See LESSON-OPS-131.
 
 S3 build shows `IRAM: 100.0% (16384/16384)`. Not a problem — overflow code executes
 from flash (slightly slower). No configuration change helps.
+
+### A-001: C6 flash utilization at 91.6% — limited headroom (2026-05-05)
+
+The C6's WiFi 6 (802.11ax) and 802.15.4 radio stacks add ~192 KB to the binary compared
+to C3's WiFi 4 (802.11n). With the 4MB partition table's 1,769,472 B OTA slots, only
+~145 KB headroom remains. Any significant firmware growth (Phase 7 per-device persistence,
+new sensor types) risks exceeding the OTA partition. C6 with 4MB flash is constrained for
+future expansion. Mitigation options: acquire C6 board with larger flash (16 MB DevKitC),
+or accept that C6 satellites won't receive Phase 7 persistence features without a partition
+table redesign.
+
+### A-002: C6 min_free_heap (152,820) > free_heap (150,332) — measurement inversion (2026-05-05)
+
+The API reports `min_free_heap: 152,820` and `free_heap: 150,332` for the C6. This is
+inverted — `min_free_heap` should be ≤ `free_heap`. The cause: `free_heap` reports
+`free_heap_internal` (150,332 B), but `min_free_heap` appears to track the total heap
+minimum (including 14.6 KB of non-internal allocatable memory such as RTC SRAM). On
+all other non-PSRAM boards, `min_free_heap < free_heap` because the total and internal
+heaps are effectively identical. The C6 has an additional ~14.6 KB of non-internal
+allocatable memory (`free_heap_total: 164,936` vs `free_heap_internal: 150,332`).
+
+This is a firmware reporting issue, not a hardware problem. Consider using
+`esp_get_minimum_free_heap_size()` with `MALLOC_CAP_INTERNAL` flag for consistent
+non-PSRAM board reporting.
+
+### A-003: C5 very low internal free heap and declining trend (2026-05-05)
+
+C5 internal `free_heap` measured at 32,908 B after 165s uptime. Earlier sensor readings
+show the heap declining: 50,336 B (30s) → 47,792 B (93s) → 44,888 B (123s) → 32,908 B
+(165s curl). This is a ~17 KB decline in 2.5 minutes. Possible causes: lazy component
+initialization (normal), or a slow memory leak (concerning). The 8 MB PSRAM prevents
+crash, but internal heap below 33 KB is in the danger zone for WiFi/BLE stack stability.
+
+Need extended uptime measurement (30+ minutes) to confirm whether the heap stabilizes
+or continues declining. If it stabilizes above ~25 KB, the C5 is viable but tight.
+If it continues declining, a memory leak in the C5 BLE or WiFi 6 driver is likely.
+
+### A-004: C5 BLE sensor reception failure — antenna not attached (2026-05-05)
+
+The C5 compiled and booted successfully with the full project firmware. WiFi, dashboard
+serving, and system metrics all function normally. However, **no BLE sensor data was
+received** during the 2.5-minute observation window. All three sensor cards on the
+dashboard show "No data" and the ESPHome built-in page shows "NA" for all sensor values.
+
+The history system logged gap-insertion warnings at the 60-second mark:
+```
+[20:45:00.955][W][history:307]: Office: no temp — gap inserted
+```
+
+Compare with the C6, which received BLE sensor data within 20 seconds of boot.
+
+**Root cause (confirmed by operator): the IPEX external antenna was NOT connected to the
+WROOM-1U module during testing.** Without an antenna, BLE reception range is effectively
+zero.
+
+**Next steps:**
+1. Attach external antenna to the WROOM-1U IPEX connector and re-test BLE reception
+2. Operator is also procuring a C5 SuperMini board with integrated antenna for
+   independent verification
+3. If BLE works with antenna: A-004 is resolved as operator error, not a chip/driver issue
+4. If BLE still fails with antenna: escalate as ESP-IDF C5 BLE maturity issue
 
 ---
 

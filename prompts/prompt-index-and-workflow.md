@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-05-05 — Phase VX in progress (v7.6.10.0 merged). Current Phase: **Phase VX** (board onboarding sprint)._
+_Last updated: 2026-05-05 — Phase VX in progress (v7.6.10.3 complete). Current Phase: **Phase VX** (board onboarding sprint). Next: v7.6.10.4 (dashboard auth refactor)._
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -213,9 +213,9 @@ Phase VX uses the same prompt methodology as Phase V: Claude advisory sessions p
 |---------|-------|-------------|---------|--------|
 | v7.6.10.0 | ESPHome 2026.4.1 upgrade verification + local component re-patch | `prompts/phaseVX/v7.6.10.0-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.0.md` | ✅ Complete (PR #200) |
 | v7.6.10.1 | Board profiles + partition tables for 3 new boards | `prompts/phaseVX/v7.6.10.1-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.1.md` | ✅ Complete |
-| v7.6.10.2 | Flash, measure, document | _(operator-driven, see measurement protocol)_ | _(no agent handoff)_ | 🔜 Queued |
-| v7.6.10.3 | Capacity study + board selection guide update | _(Claude advisory session)_ | _(no agent handoff)_ | 🔜 Queued |
-| v7.6.10.4 | Dashboard auth refactor (optional) | _(TBD if included)_ | _(TBD)_ | 🔜 Optional |
+| v7.6.10.2 | Flash, measure, document | _(operator-driven, see measurement protocol)_ | _(no agent handoff)_ | ✅ Complete |
+| v7.6.10.3 | Capacity study + board selection guide update | _(Claude advisory session)_ | `prompts/handoff/phaseVX/session-handoff-v7.6.10.3.md` | ✅ Complete |
+| v7.6.10.4 | Dashboard auth refactor | `prompts/phaseVX/v7.6.10.4-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.4.md` | 🔜 Next |
 
 **New boards onboarded:**
 
