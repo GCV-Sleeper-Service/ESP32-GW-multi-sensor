@@ -69,72 +69,87 @@ App.Boot.start = function() {
       // to avoid overwhelming the ESP32-C3 HTTP server (~4-7 concurrent connections).
       // See Docs/dashboard-stability-remediation-plan.md for full rationale.
 
-      // v7.5.4.2: Start /api/v2/live polling for network card live data updates.
-      // Network devices do not appear in SSE state events, so a periodic poll is needed.
-      setInterval(pollV2Live, 15000);
-      pollV2Live(); // initial fetch
+      probeAuth().then(function(authState) {
+        if (authState !== 'required') return true;
+        return requestAuth('dashboard access').then(function() { return true; }, function(err) {
+          dlog('auth bootstrap failed: ' + err.message, 'err');
+          return false;
+        });
+      }).then(function() {
+        var firstStatusSnapshotPromise = Promise.resolve(false);
+        historyBootstrapConsumed = false;
 
-      // BUG-043-cont (PR2) Fix A: In SSE mode, start the event stream first, then defer the
-      // status snapshot ~2s. SSE 'state' events already carry initial live state so an
-      // immediate /api/status call is unnecessary and adds pressure during the fragile
-      // connection-open window. Polling mode is unchanged — startPolling() handles its
-      // own status fetch after the deferred sequential initial poll completes.
-      if (TRANSPORT === 'sse') {
-        try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); }
-        setTimeout(function() { loadStatusSnapshot().catch(function(){}); }, 2000);
-      } else {
-        try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); }
-      }
+        // v7.5.4.2: Start /api/v2/live polling for network card live data updates.
+        // Network devices do not appear in SSE state events, so a periodic poll is needed.
+        setInterval(pollV2Live, 15000);
+        pollV2Live(); // initial fetch
 
-      // BUG-043-cont (PR2) Fix D: Defer storage stats from 3s to 5s — reduces overlap with
-      // the sequential initial poll (which now takes ~7-8s at batch=1, 200ms gap).
-      setTimeout(function() {
-        if (isImportActive()) return;
-        loadStorageStats().catch(function(){});
-        // BUG-037 Fix 8: storage stats interval increased from 60s to 120s
-        // (storage stats change only on NVS persist cycles, roughly every 60 minutes)
-        storageStatsIntervalId = setInterval(function() {
+        // BUG-043-cont (PR2) Fix A: In SSE mode, start the event stream first, then defer the
+        // status snapshot ~2s. SSE 'state' events already carry initial live state so an
+        // immediate /api/status call is unnecessary and adds pressure during the fragile
+        // connection-open window. Polling mode is unchanged — startPolling() handles its
+        // own status fetch after the deferred sequential initial poll completes.
+        if (TRANSPORT === 'sse') {
+          try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); }
+          firstStatusSnapshotPromise = new Promise(function(resolve) {
+            setTimeout(function() {
+              resolve(loadStatusSnapshot().catch(function(){ return false; }));
+            }, 2000);
+          });
+        } else {
+          try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); }
+          firstStatusSnapshotPromise = loadStatusSnapshot().catch(function(){ return false; });
+        }
+
+        // BUG-043-cont (PR2) Fix D: Defer storage stats from 3s to 5s — reduces overlap with
+        // the sequential initial poll (which now takes ~7-8s at batch=1, 200ms gap).
+        setTimeout(function() {
           if (isImportActive()) return;
           loadStorageStats().catch(function(){});
-        }, 120000);
-      }, 5000);
+          // BUG-037 Fix 8: storage stats interval increased from 60s to 120s
+          // (storage stats change only on NVS persist cycles, roughly every 60 minutes)
+          storageStatsIntervalId = setInterval(function() {
+            if (isImportActive()) return;
+            loadStorageStats().catch(function(){});
+          }, 120000);
+        }, 5000);
 
-      // BUG-037 Fix 5: 30s status interval only in polling mode — in SSE mode,
-      // state is delivered via SSE events, so periodic /api/status polling is unnecessary
-      if (TRANSPORT !== 'sse') {
-        statusSnapshotIntervalId = setInterval(function() {
-          if (isImportActive()) return;
-          loadStatusSnapshot().catch(function(){});
-        }, 30000);
-      }
+        // BUG-037 Fix 5: 30s status interval only in polling mode — in SSE mode,
+        // state is delivered via SSE events, so periodic /api/status polling is unnecessary
+        if (TRANSPORT !== 'sse') {
+          statusSnapshotIntervalId = setInterval(function() {
+            if (isImportActive()) return;
+            loadStatusSnapshot().catch(function(){});
+          }, 30000);
+        }
 
-      // v7.6.9.4 (#139 partial): gate initial history load on first status snapshot.
-      // Fixed 10 s timer was a worst-case estimate. Gating on loadStatusSnapshot()
-      // gives a live signal the board is (a) responsive, (b) at post-boot heap,
-      // (c) past the BLE/WiFi settle window. Preserves a 15 s fallback in case
-      // /api/status/full is unreachable (auth mismatch, network drop).
-      // loadHistory() is idempotent via _historyInFlight guard, so both triggers
-      // firing is safe.
-      var _v7_9_4_historyKicked = false;
-      function _v7_9_4_kickHistoryOnce() {
-        if (_v7_9_4_historyKicked || isImportActive()) return;
-        _v7_9_4_historyKicked = true;
-        Promise.resolve(loadHistory()).catch(function(){});
-      }
-      // Primary trigger: fire 1 s after the first status snapshot resolves.
-      // loadStatusSnapshot() is already called elsewhere in boot.js — chain off it.
-      loadStatusSnapshot().then(function() {
-        setTimeout(_v7_9_4_kickHistoryOnce, 1000);
-      }).catch(function(){});
-      // Safety fallback: always fire by 15 s so the user sees charts even if
-      // /api/status/full never returns.
-      historyBootstrapTimerId = setTimeout(_v7_9_4_kickHistoryOnce, 15000);
+        // v7.6.9.4 (#139 partial): gate initial history load on first status snapshot.
+        // Fixed 10 s timer was a worst-case estimate. Gating on loadStatusSnapshot()
+        // gives a live signal the board is (a) responsive, (b) at post-boot heap,
+        // (c) past the BLE/WiFi settle window. Preserves a 15 s fallback in case
+        // /api/status/full is unreachable (auth mismatch, network drop).
+        // loadHistory() is idempotent via _historyInFlight guard, so both triggers
+        // firing is safe.
+        var _v7_9_4_historyKicked = false;
+        function _v7_9_4_kickHistoryOnce() {
+          if (_v7_9_4_historyKicked || historyBootstrapConsumed || isImportActive()) return;
+          _v7_9_4_historyKicked = true;
+          historyBootstrapConsumed = true;
+          Promise.resolve(loadHistory()).catch(function(){});
+        }
+        firstStatusSnapshotPromise.then(function() {
+          setTimeout(_v7_9_4_kickHistoryOnce, 1000);
+        }).catch(function(){});
+        // Safety fallback: always fire by 15 s so the user sees charts even if
+        // /api/status/full never returns.
+        historyBootstrapTimerId = setTimeout(_v7_9_4_kickHistoryOnce, 15000);
 
-      // Aggregator overlay: if this device is an aggregator, show the Gateways section
-      // and start the aggregator polling loop. Local sensors are already running above.
-      if (isAggregator) {
-        initAggregatorDashboard();
-      }
+        // Aggregator overlay: if this device is an aggregator, show the Gateways section
+        // and start the aggregator polling loop. Local sensors are already running above.
+        if (isAggregator) {
+          initAggregatorDashboard();
+        }
+      });
     });
   });
 };

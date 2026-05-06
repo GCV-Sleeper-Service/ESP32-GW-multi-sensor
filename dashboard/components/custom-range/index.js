@@ -21,7 +21,7 @@ var CustomRange = (function() {
     var modal = _getModal();
     if (!modal) return;
     // Fetch fresh bounds then show
-    fetch(ESP_HOST + '/api/storage-stats')
+    authFetch(ESP_HOST + '/api/storage-stats')
       .then(safeJsonResponse)
       .then(function(data) {
         _availOldest = data.retention_oldest_epoch || 0;

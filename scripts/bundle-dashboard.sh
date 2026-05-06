@@ -8,6 +8,7 @@ cd "$ROOT"
 FILES=(
   dashboard/core/app-shell.js            # was 00-app-shell
   dashboard/core/config.js               # was 01-config-state
+  dashboard/core/auth.js                 # auth state + authenticated fetch wrapper
   dashboard/core/sensor-defs.js          # was 02-sensor-defs
   dashboard/core/history.js              # was 03-history-fetch
   dashboard/core/manifest.js             # was 04-manifest

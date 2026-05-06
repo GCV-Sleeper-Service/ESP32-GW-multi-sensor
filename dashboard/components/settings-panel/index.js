@@ -127,7 +127,7 @@ function loadStorageStats(attempt) {
       ? 'Refreshing storage statistics...'
       : 'Retrying storage statistics (' + (tryNum + 1) + '/3)...';
   }
-  return fetch(ESP_HOST + '/api/storage-stats', {cache:'no-store'})
+  return authFetch(ESP_HOST + '/api/storage-stats', {cache:'no-store'})
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(data) { _storageStatsInFlight = false; applyStorageStats(data); return data; })
     .catch(function(err) {
@@ -162,4 +162,4 @@ var pollingDeviceIntervalId = null;
 var storageStatsIntervalId = null;
 var statusSnapshotIntervalId = null;
 var historyBootstrapTimerId = null;
-
+var historyBootstrapConsumed = false;

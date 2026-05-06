@@ -1,6 +1,6 @@
 function importFetchJsonWithRetry(url, options, label, statusEl, attempt) {
   var tryNum = Number(attempt || 1);
-  return fetch(url, options)
+  return authFetch(url, options)
     .then(safeJsonResponse)
     .catch(function(err) {
       if (!isTransientImportError(err) || tryNum >= 3) throw err;
@@ -43,6 +43,7 @@ function requestManagementCredentials(actionLabel) {
     modal.setAttribute('aria-hidden', 'false');
 
     var settled = false;
+    var verifying = false;
     function cleanup() {
       toggleBtn.removeEventListener('click', onToggle);
       cancelBtn.removeEventListener('click', onCancel);
@@ -62,6 +63,7 @@ function requestManagementCredentials(actionLabel) {
       else resolve(value);
     }
     function onToggle() {
+      if (verifying) return;
       var show = passInput.type === 'password';
       passInput.type = show ? 'text' : 'password';
       toggleBtn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
@@ -70,6 +72,7 @@ function requestManagementCredentials(actionLabel) {
       try { passInput.setSelectionRange(passInput.value.length, passInput.value.length); } catch (e) {}
     }
     function validateAndSubmit() {
+      if (verifying) return;
       var username = String(userInput.value || '').trim();
       var password = String(passInput.value || '');
       if (!username) {
@@ -82,9 +85,43 @@ function requestManagementCredentials(actionLabel) {
         passInput.focus();
         return;
       }
-      finish({ username: username, password: password }, false);
+      verifying = true;
+      errorEl.textContent = 'Verifying credentials...';
+      submitBtn.disabled = true;
+      cancelBtn.disabled = true;
+      toggleBtn.disabled = true;
+      userInput.disabled = true;
+      passInput.disabled = true;
+      var authHeader = 'Basic ' + btoa(username + ':' + password);
+      fetch(ESP_HOST + '/api/status/full', {
+        cache: 'no-store',
+        headers: { 'Authorization': authHeader }
+      }).then(function(resp) {
+        if (resp.ok) {
+          setAuthCredentials(username, password);
+          finish({ username: username, password: password, authHeader: authHeader }, false);
+          return;
+        }
+        return resp.json().catch(function() { return null; }).then(function(data) {
+          var msg = data && data.message ? data.message : ('HTTP ' + resp.status);
+          throw new Error(msg);
+        });
+      }).catch(function(err) {
+        verifying = false;
+        submitBtn.disabled = false;
+        cancelBtn.disabled = false;
+        toggleBtn.disabled = false;
+        userInput.disabled = false;
+        passInput.disabled = false;
+        errorEl.textContent = err && err.message ? err.message : 'Authentication failed';
+        passInput.focus();
+        passInput.select();
+      });
     }
-    function onCancel() { finish(null, false); }
+    function onCancel() {
+      if (verifying) return;
+      finish(null, false);
+    }
     function onSubmit() { validateAndSubmit(); }
     function onKeyDown(ev) {
       if (ev.key === 'Enter') {
@@ -94,11 +131,13 @@ function requestManagementCredentials(actionLabel) {
     }
     function onEscape(ev) {
       if (ev.key === 'Escape') {
+        if (verifying) return;
         ev.preventDefault();
         finish(null, false);
       }
     }
     function onBackdropClick(ev) {
+      if (verifying) return;
       if (ev.target === modal) finish(null, false);
     }
 
@@ -115,22 +154,33 @@ function requestManagementCredentials(actionLabel) {
 
 function postManagementAction(path, busyText, actionLabel) {
   var statusEl = document.getElementById('mgmt-status');
-  return requestManagementCredentials(actionLabel)
-    .then(function(creds) {
-      if (!creds) {
+  return requestAuth(actionLabel)
+    .then(function() {
+      if (!isAuthenticated()) {
         if (statusEl) statusEl.textContent = 'Action cancelled';
         throw new Error('Authentication cancelled');
       }
       if (statusEl) statusEl.textContent = busyText;
-      return fetch(ESP_HOST + path, {
-          method: 'POST',
-          cache: 'no-store',
-          headers: {
-            'Authorization': 'Basic ' + btoa(creds.username + ':' + creds.password),
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: 'a=1'
+      return authFetch(ESP_HOST + path, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'a=1'
+      }).then(function(r) {
+        if (r.status !== 401) return r;
+        return requestAuth(actionLabel).then(function() {
+          return authFetch(ESP_HOST + path, {
+            method: 'POST',
+            cache: 'no-store',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'a=1'
+          });
         });
+      });
     })
     .then(function(r) {
       return r.json().catch(function(){ return {ok:false, message:'Invalid JSON response'}; }).then(function(data) {
@@ -167,4 +217,3 @@ function deleteHistoryData() {
 // ═══════════════════════════════════════════════════════════════════
 // Import v1 — CSV import into NVS history
 // ═══════════════════════════════════════════════════════════════════
-

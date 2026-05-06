@@ -1,17 +1,17 @@
-var _aggregatorAuthHeader = '';
-
-function _setAggregatorAuthFromCreds(creds) {
-  if (!creds || !creds.username || !creds.password) return;
-  _aggregatorAuthHeader = 'Basic ' + btoa(creds.username + ':' + creds.password);
-}
-
 function _aggregatorFetch(path, init) {
   var reqInit = Object.assign({}, init || {});
   reqInit.cache = reqInit.cache || 'no-store';
-  var headers = Object.assign({}, reqInit.headers || {});
-  if (_aggregatorAuthHeader) headers.Authorization = _aggregatorAuthHeader;
-  reqInit.headers = headers;
-  return fetch(ESP_HOST + path, reqInit);
+  return authFetch(ESP_HOST + path, reqInit);
+}
+
+function _aggregatorFetchWithReauth(path, init, actionLabel) {
+  return _aggregatorFetch(path, init).then(function(resp) {
+    if (resp.status !== 401 || !shouldPromptForAuth()) return resp;
+    return requestAuth(actionLabel || 'aggregator dashboard').then(function(creds) {
+      if (!creds || !isAuthenticated()) return resp;
+      return _aggregatorFetch(path, init);
+    });
+  });
 }
 
 async function detectAggregatorMode() {
@@ -24,18 +24,6 @@ async function detectAggregatorMode() {
 
     DASHBOARD_MODE = 'aggregator';
     window._aggregatorGateways = [];
-
-    var creds = await requestManagementCredentials('aggregator dashboard');
-    if (creds) {
-      _setAggregatorAuthFromCreds(creds);
-      var r = await _aggregatorFetch('/api/aggregator/gateways', {cache: 'no-store'});
-      if (r.ok) {
-        var data = await r.json();
-        if (data && Array.isArray(data.gateways)) {
-          window._aggregatorGateways = data.gateways;
-        }
-      }
-    }
     return true;
   } catch(e) { /* not aggregator ? satellite mode */ }
   return false;
@@ -192,7 +180,7 @@ var _aggDeviceLiveInFlight = false;
 function _populateGatewayDeviceLive(gwId, gwSensors) {
   if (_aggDeviceLiveInFlight) return;
   _aggDeviceLiveInFlight = true;
-  _aggregatorFetch('/api/aggregator/live', {cache: 'no-store'})
+  _aggregatorFetchWithReauth('/api/aggregator/live', {cache: 'no-store'}, 'aggregator dashboard')
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(data) {
       if (!data || !data.gateways || !data.gateways[gwId]) return;
@@ -370,21 +358,19 @@ function _handleTestSatellite(urlInput, statusEl) {
   }
   _satTestInFlight = true;
   if (statusEl) statusEl.textContent = 'Authenticating...';
-  requestManagementCredentials('satellite test')
-    .then(function(creds) {
+  requestAuth('satellite test')
+    .then(function() {
       // Re-query status element by stable id — panel may have been re-rendered since click (R1 fix)
       var liveStatusEl = document.getElementById('sat-add-status');
-      if (!creds) {
+      if (!isAuthenticated()) {
         if (liveStatusEl) liveStatusEl.textContent = 'Test cancelled';
         return Promise.reject(new Error('AUTH_CANCELLED'));
       }
-      _setAggregatorAuthFromCreds(creds);
       if (liveStatusEl) liveStatusEl.textContent = 'Testing...';
-      return fetch(ESP_HOST + '/api/aggregator/test-satellite?url=' + encodeURIComponent(capturedUrl), {
+      return _aggregatorFetch('/api/aggregator/test-satellite?url=' + encodeURIComponent(capturedUrl), {
         method: 'POST',
         cache: 'no-store',
         headers: {
-          'Authorization': 'Basic ' + btoa(creds.username + ':' + creds.password),
           'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: 'a=1'
@@ -419,10 +405,9 @@ function _handleAddSatellite(urlInput, nameInput, statusEl) {
   _satAddInFlight = true;
   if (statusEl) statusEl.textContent = 'Authenticating...';
 
-  requestManagementCredentials('satellite add')
-  .then(function(creds) {
-    if (!creds) throw new Error('AUTH_CANCELLED');
-    _setAggregatorAuthFromCreds(creds);
+  requestAuth('satellite add')
+  .then(function() {
+    if (!isAuthenticated()) throw new Error('AUTH_CANCELLED');
     if (statusEl) statusEl.textContent = 'Adding...';
     var query = 'url=' + encodeURIComponent(url);
     if (name) query += '&name=' + encodeURIComponent(name);
@@ -458,18 +443,16 @@ function _handleRemoveSatellite(satId, satName, statusEl) {
   if (!confirm('Remove satellite ' + satName + '? This cannot be undone.')) return;
   _satRemoveInFlight = true;
   if (statusEl) statusEl.textContent = 'Authenticating...';
-  requestManagementCredentials('satellite removal')
-    .then(function(creds) {
-      if (!creds) {
+  requestAuth('satellite removal')
+    .then(function() {
+      if (!isAuthenticated()) {
         if (statusEl) statusEl.textContent = 'Remove cancelled';
         return null;
       }
-      _setAggregatorAuthFromCreds(creds);
       if (statusEl) statusEl.textContent = 'Removing...';
-      return fetch(ESP_HOST + '/api/aggregator/satellite/' + encodeURIComponent(satId), {
+      return _aggregatorFetch('/api/aggregator/satellite/' + encodeURIComponent(satId), {
         method: 'DELETE',
-        cache: 'no-store',
-        headers: { 'Authorization': 'Basic ' + btoa(creds.username + ':' + creds.password) }
+        cache: 'no-store'
       })
       .then(safeJsonResponse)
       .then(function() { _refreshSettingsPanel(); });
@@ -486,7 +469,7 @@ function _handleRemoveSatellite(satId, satName, statusEl) {
 }
 
 function _refreshSettingsPanel() {
-  _aggregatorFetch('/api/aggregator/gateways', {cache: 'no-store'})
+  _aggregatorFetchWithReauth('/api/aggregator/gateways', {cache: 'no-store'}, 'aggregator dashboard')
     .then(safeJsonResponse)
     .then(function(data) {
       if (data && data.gateways) {
@@ -521,7 +504,7 @@ var _aggLiveInFlight = false;
 function pollAggregatorLive() {
   if (_aggLiveInFlight) return;
   _aggLiveInFlight = true;
-  _aggregatorFetch('/api/aggregator/gateways', {cache: 'no-store'})
+  _aggregatorFetchWithReauth('/api/aggregator/gateways', {cache: 'no-store'}, 'aggregator dashboard')
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data && data.gateways) {
@@ -560,4 +543,3 @@ function pollAggregatorLive() {
     .catch(function() { /* silent */ })
     .finally(function() { _aggLiveInFlight = false; });
 }
-
