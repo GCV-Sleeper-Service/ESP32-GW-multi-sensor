@@ -216,6 +216,25 @@ Recovery:
 - reran the full dashboard pipeline sequentially in the required order
 - reran `FIXTURE_SET=aggregator npx playwright test tests/browser/aggregator.spec.js --grep "19\. Aggregator Mode"` successfully
 
+### 8. GitHub PR metadata updates needed safer transport than inline shell quoting
+
+Two PR-maintenance commands failed for process reasons rather than repository state:
+
+- `gh pr edit` failed against GitHub GraphQL due the deprecated classic-projects path
+- an inline `gh pr comment --body "..."` command failed because shell backticks in the
+  comment body were interpreted as command substitution
+
+Recovery:
+
+- used GitHub REST `PATCH` for the PR body update
+- used file-backed payloads (`--body-file`) for the PR comment update
+
+Result:
+
+- PR body was corrected successfully
+- PR summary comment was posted successfully
+- PR was then marked ready for review
+
 ## Prompt Recommendations
 
 The current prompt set worked, but several avoidable stops came from implicit repo
@@ -252,6 +271,12 @@ coupling that should be made explicit.
 7. Clarify that the "no localStorage/sessionStorage" rule applies to credential storage,
    unless the intent is to remove all existing dashboard preference storage in the same
    step.
+
+8. For GitHub CLI PR body/comment operations, prefer `--body-file` or REST payload files
+   over inline shell strings whenever markdown includes backticks or quotes.
+
+9. Add a documented REST fallback for `gh pr edit` in case repository/project metadata
+   causes GraphQL failures during PR maintenance.
 
 ## Notes
 
