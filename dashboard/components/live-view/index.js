@@ -63,6 +63,11 @@ var _historyInFlight = false;
 function loadHistory() {
   if (isImportActive()) return Promise.resolve(false);
   if (_historyInFlight) { dlog('History load already in flight — skipping', 'warn'); return Promise.resolve(false); } // BUG-043-cont Fix 3
+  historyBootstrapConsumed = true;
+  if (historyBootstrapTimerId) {
+    clearTimeout(historyBootstrapTimerId);
+    historyBootstrapTimerId = null;
+  }
   _historyInFlight = true; // BUG-043-cont Fix 3
   var badge = document.getElementById('histBadge');
   badge.textContent = 'loading...'; badge.classList.add('empty');
@@ -430,4 +435,3 @@ App.Features.register({
 // detectAggregatorMode() probes /api/aggregator/gateways at runtime.
 // On satellites the endpoint returns 404 (fast fail). On aggregators it
 // returns the gateway list. The same dashboard.html is served by both.
-

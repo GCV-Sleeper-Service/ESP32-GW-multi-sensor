@@ -283,7 +283,7 @@ function waitForImportReady(statusEl, targetSensorId) {
         '... (' + attempt + '/' + maxAttempts + ')';
     }
 
-    return fetch(ESP_HOST + '/api/import/status', { cache: 'no-store' })
+    return authFetch(ESP_HOST + '/api/import/status', { cache: 'no-store' })
       .then(safeJsonResponse)
       .then(function(data) {
         if (data && data.ready === true) return;
@@ -310,13 +310,12 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
   var isSingle = (importMode === 'single');
   if (statusEl) statusEl.textContent = 'Authenticating...';
 
-  requestManagementCredentials('history import').then(function(creds) {
-    if (!creds) {
+  requestAuth('history import').then(function() {
+    if (!isAuthenticated()) {
       if (statusEl) statusEl.textContent = 'Import cancelled';
       return;
     }
 
-    var authHeader = 'Basic ' + btoa(creds.username + ':' + creds.password);
     var pacing = {
       pauseBeforeBeginMs: 250,
       dataBatchGapMs: 120,
@@ -324,7 +323,6 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
       postFinishReloadDelayMs: 500
     };
 
-    importState.authHeader = authHeader;
     importState.mode = importMode || 'multi';
     importState.targetSensor = targetSensorId || '';
     suspendDashboardNetworkActivity(statusEl);
@@ -346,7 +344,6 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
             method: 'POST',
             cache: 'no-store',
             headers: {
-              'Authorization': authHeader,
               'Content-Type': 'application/x-www-form-urlencoded'
             },
             body: 'a=1'
@@ -379,7 +376,6 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
                   method: 'POST',
                   cache: 'no-store',
                   headers: {
-                    'Authorization': authHeader,
                     'Content-Type': 'application/x-www-form-urlencoded'
                   },
                   body: 'a=1'
@@ -410,7 +406,6 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
             method: 'POST',
             cache: 'no-store',
             headers: {
-              'Authorization': authHeader,
               'Content-Type': 'application/x-www-form-urlencoded'
             },
             body: 'a=1'
@@ -438,13 +433,11 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
       })
       .then(function(result) {
         if (isImportActive()) resumeDashboardNetworkActivity();
-        importState.authHeader = '';
         importState.mode = '';
         importState.targetSensor = '';
         return result;
       }, function(err) {
         if (isImportActive()) resumeDashboardNetworkActivity();
-        importState.authHeader = '';
         importState.mode = '';
         importState.targetSensor = '';
         throw err;
@@ -459,4 +452,3 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
     }
   });
 }
-

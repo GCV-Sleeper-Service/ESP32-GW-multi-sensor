@@ -2,6 +2,26 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.6.10.4] - 2026-05-06 - Phase VX: Dashboard Authentication Refactor
+
+### Added
+- New core auth module `dashboard/core/auth.js` with session-scoped Authorization header management, boot-time auth probing, and an `authFetch()` wrapper for auth-gated dashboard requests.
+
+### Changed
+- Dashboard boot now probes `/api/status/full` once up front and uses the custom auth modal for dashboard-wide management authentication instead of browser-managed `same-origin` credentials.
+- Replaced auth-gated dashboard fetches with `authFetch()` across status snapshot, history, storage-stats, custom range, import, auth modal management actions, and aggregator gateway flows.
+- Extended `dashboard/components/auth-modal/index.js` to verify credentials against `/api/status/full`, store the shared auth header centrally, and support re-use across dashboard and management actions.
+- Removed the aggregator-only auth header state so satellite and aggregator dashboards now share the same application-level auth flow.
+- Bumped version sources to `7.6.10.4` and regenerated dashboard/manifest artifacts required by the dashboard build pipeline.
+
+### Validation
+- `bash scripts/bundle-dashboard.sh --write`
+- `python3 scripts/render_sensor_config.py --write`
+- `bash scripts/build-dashboard.sh --write`
+- `bash scripts/minify-dashboard.sh`
+- `bash scripts/generate-header.sh`
+- `python3 scripts/render_sensor_config.py --check`
+
 ## [v7.6.10.1] - 2026-05-05 - Phase VX: Board Profiles and Partition Tables
 
 ### Added

@@ -131,7 +131,7 @@ function fetchDeviceHistory(sensor, manifest) {
       if (isAggregatorProxy && typeof _aggregatorFetch === 'function') {
         req = _aggregatorFetch(m.url, {cache: 'no-store'});
       } else {
-        req = fetch(ESP_HOST + m.url, {cache:'no-store'});
+        req = authFetch(ESP_HOST + m.url, {cache:'no-store'});
       }
 
       return req
@@ -238,5 +238,4 @@ function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
 function currentExportDateTag() {
   return new Date().toISOString().slice(0, 10);
 }
-
 

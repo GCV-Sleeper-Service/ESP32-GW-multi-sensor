@@ -978,7 +978,7 @@
 // resolution with fallback to legacy /history/{id}/temp and /history/{id}/hum.
 
 var App = window.App || (window.App = {});
-App.version = 'v7.6.10.1';
+App.version = 'v7.6.10.4';
 App.Config = App.Config || {};
 App.State = App.State || {};
 App.Util = App.Util || {};
@@ -1141,6 +1141,107 @@ var DASHBOARD_MODE = 'satellite'; // 'satellite' | 'aggregator'
 })(App.State);
 
 // ── Sensor definitions ──────────────────────────────────────────
+var _authHeader = null;
+var _authPromptSuppressed = false;
+var _authPromptPending = null;
+
+function _copyAuthHeaders(headers) {
+  var out = {};
+  if (!headers) return out;
+  if (typeof Headers !== 'undefined' && headers instanceof Headers) {
+    headers.forEach(function(value, key) { out[key] = value; });
+    return out;
+  }
+  if (Array.isArray(headers)) {
+    headers.forEach(function(entry) {
+      if (!entry || entry.length < 2) return;
+      out[entry[0]] = entry[1];
+    });
+    return out;
+  }
+  Object.keys(headers).forEach(function(key) {
+    out[key] = headers[key];
+  });
+  return out;
+}
+
+function setAuthCredentials(username, password) {
+  _authHeader = 'Basic ' + btoa(String(username || '') + ':' + String(password || ''));
+  _authPromptSuppressed = false;
+  return _authHeader;
+}
+
+function setAuthHeader(header) {
+  _authHeader = header || null;
+  if (_authHeader) _authPromptSuppressed = false;
+  return _authHeader;
+}
+
+function clearAuth() {
+  _authHeader = null;
+}
+
+function cancelAuth() {
+  _authHeader = null;
+  _authPromptSuppressed = true;
+}
+
+function shouldPromptForAuth() {
+  return !_authPromptSuppressed;
+}
+
+function isAuthenticated() {
+  return _authHeader !== null;
+}
+
+function getAuthHeader() {
+  return _authHeader;
+}
+
+function authFetch(url, opts) {
+  var req = Object.assign({}, opts || {});
+  var headers = _copyAuthHeaders(req.headers);
+  if (_authHeader) headers.Authorization = _authHeader;
+  if (Object.keys(headers).length) req.headers = headers;
+  else delete req.headers;
+  delete req.credentials;
+  return fetch(url, req).then(function(resp) {
+    if (resp.status === 401 && _authHeader) clearAuth();
+    return resp;
+  });
+}
+
+function probeAuth() {
+  return fetch(ESP_HOST + '/api/status/full', {cache: 'no-store'})
+    .then(function(resp) {
+      if (resp.status === 401) return 'required';
+      return 'not-required';
+    })
+    .catch(function() {
+      return 'required';
+    });
+}
+
+function requestAuth(actionLabel) {
+  if (_authPromptPending) return _authPromptPending;
+  _authPromptPending = Promise.resolve(requestManagementCredentials(actionLabel || 'dashboard access'))
+    .then(function(creds) {
+      if (!creds) {
+        cancelAuth();
+        return null;
+      }
+      if (creds.authHeader) setAuthHeader(creds.authHeader);
+      else setAuthCredentials(creds.username, creds.password);
+      return creds;
+    });
+  return _authPromptPending.then(function(result) {
+    _authPromptPending = null;
+    return result;
+  }, function(err) {
+    _authPromptPending = null;
+    throw err;
+  });
+}
 var SENSOR_COLORS = ['#fbbf24', '#f87171', '#34d399', '#60a5fa'];
 
 // <<< SENSOR_MANIFEST:DEFAULT_SENSOR_META_BEGIN >>>
@@ -1507,7 +1608,7 @@ function fetchDeviceHistory(sensor, manifest) {
       if (isAggregatorProxy && typeof _aggregatorFetch === 'function') {
         req = _aggregatorFetch(m.url, {cache: 'no-store'});
       } else {
-        req = fetch(ESP_HOST + m.url, {cache:'no-store'});
+        req = authFetch(ESP_HOST + m.url, {cache:'no-store'});
       }
 
       return req
@@ -1614,7 +1715,6 @@ function buildMergedSensorCsv(meta, sensors, sensorRowsList) {
 function currentExportDateTag() {
   return new Date().toISOString().slice(0, 10);
 }
-
 
 function makeSensorConfig(meta, idx) {
   var id = meta.id, name = meta.name;
@@ -1877,12 +1977,22 @@ function loadStatusSnapshot() {
   _statusInFlight = true;
   // /api/status returns only {ok, role, id} (SEC-ADR RV-03 strip in v7.6.8.0).
   // The enriched payload with free_heap/uptime_seconds is on the authenticated full-status endpoint.
-  // Use 'same-origin' credentials so the browser carries the dashboard page's
-  // Basic Auth to this request. Same-origin is deliberately narrower than
-  // 'include' - we never want credentials sent to a cross-origin host.
-  return fetch(ESP_HOST + '/api/status/full', {cache:'no-store', credentials:'same-origin'})
-    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function(status) { return applyStatusSnapshot(status); })
+  return authFetch(ESP_HOST + '/api/status/full', {cache:'no-store'})
+    .then(function(r) {
+      if (r.status === 401) {
+        if (!shouldPromptForAuth()) return false;
+        return requestAuth('dashboard access').then(function(creds) {
+          if (!creds || !isAuthenticated()) return false;
+          return authFetch(ESP_HOST + '/api/status/full', {cache:'no-store'})
+            .then(function(retry) {
+              if (!retry.ok) throw new Error('HTTP ' + retry.status);
+              return retry.json().then(function(status) { return applyStatusSnapshot(status); });
+            });
+        });
+      }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json().then(function(status) { return applyStatusSnapshot(status); });
+    })
     .catch(function(err) {
       dlog('Status snapshot failed: ' + err.message, 'err');
       return false;
@@ -2291,7 +2401,7 @@ var CustomRange = (function() {
     var modal = _getModal();
     if (!modal) return;
     // Fetch fresh bounds then show
-    fetch(ESP_HOST + '/api/storage-stats')
+    authFetch(ESP_HOST + '/api/storage-stats')
       .then(safeJsonResponse)
       .then(function(data) {
         _availOldest = data.retention_oldest_epoch || 0;
@@ -2728,7 +2838,7 @@ function loadStorageStats(attempt) {
       ? 'Refreshing storage statistics...'
       : 'Retrying storage statistics (' + (tryNum + 1) + '/3)...';
   }
-  return fetch(ESP_HOST + '/api/storage-stats', {cache:'no-store'})
+  return authFetch(ESP_HOST + '/api/storage-stats', {cache:'no-store'})
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(data) { _storageStatsInFlight = false; applyStorageStats(data); return data; })
     .catch(function(err) {
@@ -2753,7 +2863,6 @@ function loadStorageStats(attempt) {
 
 var importState = {
   active: false,
-  authHeader: '',
   startedAt: 0,
   mode: '',        // 'multi' or 'single'
   targetSensor: '' // sensor ID for single mode
@@ -2763,7 +2872,7 @@ var pollingDeviceIntervalId = null;
 var storageStatsIntervalId = null;
 var statusSnapshotIntervalId = null;
 var historyBootstrapTimerId = null;
-
+var historyBootstrapConsumed = false;
 function isImportActive() {
   return !!importState.active;
 }
@@ -2852,7 +2961,7 @@ function isTransientImportError(err) {
 
 function importFetchJsonWithRetry(url, options, label, statusEl, attempt) {
   var tryNum = Number(attempt || 1);
-  return fetch(url, options)
+  return authFetch(url, options)
     .then(safeJsonResponse)
     .catch(function(err) {
       if (!isTransientImportError(err) || tryNum >= 3) throw err;
@@ -2895,7 +3004,22 @@ function requestManagementCredentials(actionLabel) {
     modal.setAttribute('aria-hidden', 'false');
 
     var settled = false;
+    var verifying = false;
+    var verifyController = null;
+    function setVerifyUiState(isBusy) {
+      verifying = !!isBusy;
+      submitBtn.disabled = !!isBusy;
+      toggleBtn.disabled = !!isBusy;
+      userInput.disabled = !!isBusy;
+      passInput.disabled = !!isBusy;
+      cancelBtn.disabled = false;
+    }
     function cleanup() {
+      if (verifyController && typeof verifyController.abort === 'function') {
+        try { verifyController.abort(); } catch (e) {}
+      }
+      verifyController = null;
+      setVerifyUiState(false);
       toggleBtn.removeEventListener('click', onToggle);
       cancelBtn.removeEventListener('click', onCancel);
       submitBtn.removeEventListener('click', onSubmit);
@@ -2914,6 +3038,7 @@ function requestManagementCredentials(actionLabel) {
       else resolve(value);
     }
     function onToggle() {
+      if (verifying) return;
       var show = passInput.type === 'password';
       passInput.type = show ? 'text' : 'password';
       toggleBtn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
@@ -2922,6 +3047,7 @@ function requestManagementCredentials(actionLabel) {
       try { passInput.setSelectionRange(passInput.value.length, passInput.value.length); } catch (e) {}
     }
     function validateAndSubmit() {
+      if (verifying) return;
       var username = String(userInput.value || '').trim();
       var password = String(passInput.value || '');
       if (!username) {
@@ -2934,9 +3060,41 @@ function requestManagementCredentials(actionLabel) {
         passInput.focus();
         return;
       }
-      finish({ username: username, password: password }, false);
+      setVerifyUiState(true);
+      errorEl.textContent = 'Verifying credentials...';
+      var authHeader = 'Basic ' + btoa(username + ':' + password);
+      verifyController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var requestOptions = {
+        cache: 'no-store',
+        headers: { 'Authorization': authHeader }
+      };
+      if (verifyController) requestOptions.signal = verifyController.signal;
+      fetch(ESP_HOST + '/api/status/full', requestOptions).then(function(resp) {
+        if (resp.ok) {
+          if (settled) return;
+          setAuthCredentials(username, password);
+          finish({ username: username, password: password, authHeader: authHeader }, false);
+          return;
+        }
+        return resp.json().catch(function() { return null; }).then(function(data) {
+          var msg = data && data.message ? data.message : ('HTTP ' + resp.status);
+          throw new Error(msg);
+        });
+      }).catch(function(err) {
+        verifyController = null;
+        if (settled || (err && err.name === 'AbortError')) return;
+        setVerifyUiState(false);
+        errorEl.textContent = err && err.message ? err.message : 'Authentication failed';
+        passInput.focus();
+        passInput.select();
+      });
     }
-    function onCancel() { finish(null, false); }
+    function onCancel() {
+      if (verifyController && typeof verifyController.abort === 'function') {
+        try { verifyController.abort(); } catch (e) {}
+      }
+      finish(null, false);
+    }
     function onSubmit() { validateAndSubmit(); }
     function onKeyDown(ev) {
       if (ev.key === 'Enter') {
@@ -2947,11 +3105,19 @@ function requestManagementCredentials(actionLabel) {
     function onEscape(ev) {
       if (ev.key === 'Escape') {
         ev.preventDefault();
+        if (verifyController && typeof verifyController.abort === 'function') {
+          try { verifyController.abort(); } catch (e) {}
+        }
         finish(null, false);
       }
     }
     function onBackdropClick(ev) {
-      if (ev.target === modal) finish(null, false);
+      if (ev.target === modal) {
+        if (verifyController && typeof verifyController.abort === 'function') {
+          try { verifyController.abort(); } catch (e) {}
+        }
+        finish(null, false);
+      }
     }
 
     toggleBtn.addEventListener('click', onToggle);
@@ -2967,22 +3133,34 @@ function requestManagementCredentials(actionLabel) {
 
 function postManagementAction(path, busyText, actionLabel) {
   var statusEl = document.getElementById('mgmt-status');
-  return requestManagementCredentials(actionLabel)
-    .then(function(creds) {
-      if (!creds) {
+  return requestAuth(actionLabel)
+    .then(function() {
+      if (!isAuthenticated()) {
         if (statusEl) statusEl.textContent = 'Action cancelled';
         throw new Error('Authentication cancelled');
       }
       if (statusEl) statusEl.textContent = busyText;
-      return fetch(ESP_HOST + path, {
-          method: 'POST',
-          cache: 'no-store',
-          headers: {
-            'Authorization': 'Basic ' + btoa(creds.username + ':' + creds.password),
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: 'a=1'
+      return authFetch(ESP_HOST + path, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'a=1'
+      }).then(function(r) {
+        if (r.status !== 401) return r;
+        return requestAuth(actionLabel).then(function(creds) {
+          if (!creds || !isAuthenticated()) throw new Error('Authentication cancelled');
+          return authFetch(ESP_HOST + path, {
+            method: 'POST',
+            cache: 'no-store',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'a=1'
+          });
         });
+      });
     })
     .then(function(r) {
       return r.json().catch(function(){ return {ok:false, message:'Invalid JSON response'}; }).then(function(data) {
@@ -3019,7 +3197,6 @@ function deleteHistoryData() {
 // ═══════════════════════════════════════════════════════════════════
 // Import v1 — CSV import into NVS history
 // ═══════════════════════════════════════════════════════════════════
-
 function importHistoryData() {
   var statusEl = document.getElementById('mgmt-status');
   var fileInput = document.getElementById('importFileInput');
@@ -3305,7 +3482,7 @@ function waitForImportReady(statusEl, targetSensorId) {
         '... (' + attempt + '/' + maxAttempts + ')';
     }
 
-    return fetch(ESP_HOST + '/api/import/status', { cache: 'no-store' })
+    return authFetch(ESP_HOST + '/api/import/status', { cache: 'no-store' })
       .then(safeJsonResponse)
       .then(function(data) {
         if (data && data.ready === true) return;
@@ -3332,13 +3509,12 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
   var isSingle = (importMode === 'single');
   if (statusEl) statusEl.textContent = 'Authenticating...';
 
-  requestManagementCredentials('history import').then(function(creds) {
-    if (!creds) {
+  requestAuth('history import').then(function() {
+    if (!isAuthenticated()) {
       if (statusEl) statusEl.textContent = 'Import cancelled';
       return;
     }
 
-    var authHeader = 'Basic ' + btoa(creds.username + ':' + creds.password);
     var pacing = {
       pauseBeforeBeginMs: 250,
       dataBatchGapMs: 120,
@@ -3346,7 +3522,6 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
       postFinishReloadDelayMs: 500
     };
 
-    importState.authHeader = authHeader;
     importState.mode = importMode || 'multi';
     importState.targetSensor = targetSensorId || '';
     suspendDashboardNetworkActivity(statusEl);
@@ -3368,7 +3543,6 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
             method: 'POST',
             cache: 'no-store',
             headers: {
-              'Authorization': authHeader,
               'Content-Type': 'application/x-www-form-urlencoded'
             },
             body: 'a=1'
@@ -3401,7 +3575,6 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
                   method: 'POST',
                   cache: 'no-store',
                   headers: {
-                    'Authorization': authHeader,
                     'Content-Type': 'application/x-www-form-urlencoded'
                   },
                   body: 'a=1'
@@ -3432,7 +3605,6 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
             method: 'POST',
             cache: 'no-store',
             headers: {
-              'Authorization': authHeader,
               'Content-Type': 'application/x-www-form-urlencoded'
             },
             body: 'a=1'
@@ -3460,13 +3632,11 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
       })
       .then(function(result) {
         if (isImportActive()) resumeDashboardNetworkActivity();
-        importState.authHeader = '';
         importState.mode = '';
         importState.targetSensor = '';
         return result;
       }, function(err) {
         if (isImportActive()) resumeDashboardNetworkActivity();
-        importState.authHeader = '';
         importState.mode = '';
         importState.targetSensor = '';
         throw err;
@@ -3481,7 +3651,6 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
     }
   });
 }
-
 function updateBadge() {
   var badge = document.getElementById('histBadge'), total = historyPoints + liveAvgPoints;
   if (total > 0) {
@@ -4069,6 +4238,11 @@ var _historyInFlight = false;
 function loadHistory() {
   if (isImportActive()) return Promise.resolve(false);
   if (_historyInFlight) { dlog('History load already in flight — skipping', 'warn'); return Promise.resolve(false); } // BUG-043-cont Fix 3
+  historyBootstrapConsumed = true;
+  if (historyBootstrapTimerId) {
+    clearTimeout(historyBootstrapTimerId);
+    historyBootstrapTimerId = null;
+  }
   _historyInFlight = true; // BUG-043-cont Fix 3
   var badge = document.getElementById('histBadge');
   badge.textContent = 'loading...'; badge.classList.add('empty');
@@ -4436,21 +4610,20 @@ App.Features.register({
 // detectAggregatorMode() probes /api/aggregator/gateways at runtime.
 // On satellites the endpoint returns 404 (fast fail). On aggregators it
 // returns the gateway list. The same dashboard.html is served by both.
-
-var _aggregatorAuthHeader = '';
-
-function _setAggregatorAuthFromCreds(creds) {
-  if (!creds || !creds.username || !creds.password) return;
-  _aggregatorAuthHeader = 'Basic ' + btoa(creds.username + ':' + creds.password);
-}
-
 function _aggregatorFetch(path, init) {
   var reqInit = Object.assign({}, init || {});
   reqInit.cache = reqInit.cache || 'no-store';
-  var headers = Object.assign({}, reqInit.headers || {});
-  if (_aggregatorAuthHeader) headers.Authorization = _aggregatorAuthHeader;
-  reqInit.headers = headers;
-  return fetch(ESP_HOST + path, reqInit);
+  return authFetch(ESP_HOST + path, reqInit);
+}
+
+function _aggregatorFetchWithReauth(path, init, actionLabel) {
+  return _aggregatorFetch(path, init).then(function(resp) {
+    if (resp.status !== 401 || !shouldPromptForAuth()) return resp;
+    return requestAuth(actionLabel || 'aggregator dashboard').then(function(creds) {
+      if (!creds || !isAuthenticated()) return resp;
+      return _aggregatorFetch(path, init);
+    });
+  });
 }
 
 async function detectAggregatorMode() {
@@ -4463,18 +4636,6 @@ async function detectAggregatorMode() {
 
     DASHBOARD_MODE = 'aggregator';
     window._aggregatorGateways = [];
-
-    var creds = await requestManagementCredentials('aggregator dashboard');
-    if (creds) {
-      _setAggregatorAuthFromCreds(creds);
-      var r = await _aggregatorFetch('/api/aggregator/gateways', {cache: 'no-store'});
-      if (r.ok) {
-        var data = await r.json();
-        if (data && Array.isArray(data.gateways)) {
-          window._aggregatorGateways = data.gateways;
-        }
-      }
-    }
     return true;
   } catch(e) { /* not aggregator ? satellite mode */ }
   return false;
@@ -4513,6 +4674,43 @@ function renderGatewaySelector(gateways) {
       }
     });
   });
+}
+
+function _getActiveGatewayTabId() {
+  var activeTab = document.querySelector('.gw-tab.active');
+  return activeTab ? activeTab.getAttribute('data-gw') : 'all';
+}
+
+function _findGatewayTab(gwId) {
+  var matchId = String(gwId);
+  var tabs = document.querySelectorAll('.gw-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    if (tabs[i].getAttribute('data-gw') === matchId) return tabs[i];
+  }
+  return null;
+}
+
+function _gatewaySelectorNeedsRefresh(gateways) {
+  var tabs = document.querySelectorAll('.gw-tab');
+  var expectedCount = (gateways ? gateways.length : 0) + 2;
+  if (tabs.length !== expectedCount) return true;
+  if (!document.querySelector('.gw-tab[data-gw="all"]')) return true;
+  if (!document.querySelector('.gw-tab[data-gw="settings"]')) return true;
+  for (var i = 0; i < (gateways || []).length; i++) {
+    var gw = gateways[i];
+    if (!_findGatewayTab(gw.id)) return true;
+  }
+  return false;
+}
+
+function _syncGatewaySelector(gateways, preferredGwId) {
+  var activeGwId = preferredGwId || _getActiveGatewayTabId();
+  if (!_gatewaySelectorNeedsRefresh(gateways)) return;
+  renderGatewaySelector(gateways || []);
+  if (!activeGwId || activeGwId === 'all') return;
+  var activeTab = _findGatewayTab(activeGwId);
+  if (!activeTab) return;
+  activeTab.click();
 }
 
 function renderAllGatewaysSummary(gateways) {
@@ -4631,7 +4829,7 @@ var _aggDeviceLiveInFlight = false;
 function _populateGatewayDeviceLive(gwId, gwSensors) {
   if (_aggDeviceLiveInFlight) return;
   _aggDeviceLiveInFlight = true;
-  _aggregatorFetch('/api/aggregator/live', {cache: 'no-store'})
+  _aggregatorFetchWithReauth('/api/aggregator/live', {cache: 'no-store'}, 'aggregator dashboard')
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(data) {
       if (!data || !data.gateways || !data.gateways[gwId]) return;
@@ -4809,21 +5007,19 @@ function _handleTestSatellite(urlInput, statusEl) {
   }
   _satTestInFlight = true;
   if (statusEl) statusEl.textContent = 'Authenticating...';
-  requestManagementCredentials('satellite test')
-    .then(function(creds) {
+  requestAuth('satellite test')
+    .then(function() {
       // Re-query status element by stable id — panel may have been re-rendered since click (R1 fix)
       var liveStatusEl = document.getElementById('sat-add-status');
-      if (!creds) {
+      if (!isAuthenticated()) {
         if (liveStatusEl) liveStatusEl.textContent = 'Test cancelled';
         return Promise.reject(new Error('AUTH_CANCELLED'));
       }
-      _setAggregatorAuthFromCreds(creds);
       if (liveStatusEl) liveStatusEl.textContent = 'Testing...';
-      return fetch(ESP_HOST + '/api/aggregator/test-satellite?url=' + encodeURIComponent(capturedUrl), {
+      return _aggregatorFetch('/api/aggregator/test-satellite?url=' + encodeURIComponent(capturedUrl), {
         method: 'POST',
         cache: 'no-store',
         headers: {
-          'Authorization': 'Basic ' + btoa(creds.username + ':' + creds.password),
           'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: 'a=1'
@@ -4858,10 +5054,9 @@ function _handleAddSatellite(urlInput, nameInput, statusEl) {
   _satAddInFlight = true;
   if (statusEl) statusEl.textContent = 'Authenticating...';
 
-  requestManagementCredentials('satellite add')
-  .then(function(creds) {
-    if (!creds) throw new Error('AUTH_CANCELLED');
-    _setAggregatorAuthFromCreds(creds);
+  requestAuth('satellite add')
+  .then(function() {
+    if (!isAuthenticated()) throw new Error('AUTH_CANCELLED');
     if (statusEl) statusEl.textContent = 'Adding...';
     var query = 'url=' + encodeURIComponent(url);
     if (name) query += '&name=' + encodeURIComponent(name);
@@ -4897,18 +5092,16 @@ function _handleRemoveSatellite(satId, satName, statusEl) {
   if (!confirm('Remove satellite ' + satName + '? This cannot be undone.')) return;
   _satRemoveInFlight = true;
   if (statusEl) statusEl.textContent = 'Authenticating...';
-  requestManagementCredentials('satellite removal')
-    .then(function(creds) {
-      if (!creds) {
+  requestAuth('satellite removal')
+    .then(function() {
+      if (!isAuthenticated()) {
         if (statusEl) statusEl.textContent = 'Remove cancelled';
         return null;
       }
-      _setAggregatorAuthFromCreds(creds);
       if (statusEl) statusEl.textContent = 'Removing...';
-      return fetch(ESP_HOST + '/api/aggregator/satellite/' + encodeURIComponent(satId), {
+      return _aggregatorFetch('/api/aggregator/satellite/' + encodeURIComponent(satId), {
         method: 'DELETE',
-        cache: 'no-store',
-        headers: { 'Authorization': 'Basic ' + btoa(creds.username + ':' + creds.password) }
+        cache: 'no-store'
       })
       .then(safeJsonResponse)
       .then(function() { _refreshSettingsPanel(); });
@@ -4925,7 +5118,7 @@ function _handleRemoveSatellite(satId, satName, statusEl) {
 }
 
 function _refreshSettingsPanel() {
-  _aggregatorFetch('/api/aggregator/gateways', {cache: 'no-store'})
+  _aggregatorFetchWithReauth('/api/aggregator/gateways', {cache: 'no-store'}, 'aggregator dashboard')
     .then(safeJsonResponse)
     .then(function(data) {
       if (data && data.gateways) {
@@ -4946,28 +5139,29 @@ async function initAggregatorDashboard() {
   var gwBody = document.getElementById('body-gateways');
   if (gwHdr) gwHdr.style.display = '';
   if (gwBody) gwBody.style.display = '';
+  window._aggregatorReady = false;
   renderGatewaySelector(window._aggregatorGateways);
   // Render "All Gateways" as the default active view
   renderAllGatewaysSummary(window._aggregatorGateways);
   // Start periodic aggregator polling — 15s interval, in-flight guarded
   setInterval(pollAggregatorLive, 15000);
   pollAggregatorLive();
-  // Signal for Playwright test infrastructure (v7.5.5.4 will use this)
-  window._aggregatorReady = true;
 }
 
 var _aggLiveInFlight = false;
 function pollAggregatorLive() {
   if (_aggLiveInFlight) return;
   _aggLiveInFlight = true;
-  _aggregatorFetch('/api/aggregator/gateways', {cache: 'no-store'})
+  return _aggregatorFetchWithReauth('/api/aggregator/gateways', {cache: 'no-store'}, 'aggregator dashboard')
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data && data.gateways) {
+        var activeGwId = _getActiveGatewayTabId();
         window._aggregatorGateways = data.gateways;
+        _syncGatewaySelector(window._aggregatorGateways, activeGwId);
         // Update gateway selector tab status indicators
         data.gateways.forEach(function(gw) {
-          var tab = document.querySelector('.gw-tab[data-gw="' + gw.id + '"]');
+          var tab = _findGatewayTab(gw.id);
           if (tab) {
             tab.classList.toggle('gw-online', !!gw.reachable);
             tab.classList.toggle('gw-offline', !gw.reachable);
@@ -4994,12 +5188,12 @@ function pollAggregatorLive() {
             _populateGatewayDeviceLive(gwId, _currentGwSensors);
           }
         }
+        window._aggregatorReady = true;
       }
     })
     .catch(function() { /* silent */ })
     .finally(function() { _aggLiveInFlight = false; });
 }
-
 function updateBoardInfo() {
   var manifest = window._manifest;
   if (!manifest || !manifest.gateway) return;
@@ -5071,72 +5265,87 @@ App.Boot.start = function() {
       // to avoid overwhelming the ESP32-C3 HTTP server (~4-7 concurrent connections).
       // See Docs/dashboard-stability-remediation-plan.md for full rationale.
 
-      // v7.5.4.2: Start /api/v2/live polling for network card live data updates.
-      // Network devices do not appear in SSE state events, so a periodic poll is needed.
-      setInterval(pollV2Live, 15000);
-      pollV2Live(); // initial fetch
+      probeAuth().then(function(authState) {
+        if (authState !== 'required') return true;
+        return requestAuth('dashboard access').then(function() { return true; }, function(err) {
+          dlog('auth bootstrap failed: ' + err.message, 'err');
+          return false;
+        });
+      }).then(function() {
+        var firstStatusSnapshotPromise = Promise.resolve(false);
+        historyBootstrapConsumed = false;
 
-      // BUG-043-cont (PR2) Fix A: In SSE mode, start the event stream first, then defer the
-      // status snapshot ~2s. SSE 'state' events already carry initial live state so an
-      // immediate /api/status call is unnecessary and adds pressure during the fragile
-      // connection-open window. Polling mode is unchanged — startPolling() handles its
-      // own status fetch after the deferred sequential initial poll completes.
-      if (TRANSPORT === 'sse') {
-        try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); }
-        setTimeout(function() { loadStatusSnapshot().catch(function(){}); }, 2000);
-      } else {
-        try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); }
-      }
+        // v7.5.4.2: Start /api/v2/live polling for network card live data updates.
+        // Network devices do not appear in SSE state events, so a periodic poll is needed.
+        setInterval(pollV2Live, 15000);
+        pollV2Live(); // initial fetch
 
-      // BUG-043-cont (PR2) Fix D: Defer storage stats from 3s to 5s — reduces overlap with
-      // the sequential initial poll (which now takes ~7-8s at batch=1, 200ms gap).
-      setTimeout(function() {
-        if (isImportActive()) return;
-        loadStorageStats().catch(function(){});
-        // BUG-037 Fix 8: storage stats interval increased from 60s to 120s
-        // (storage stats change only on NVS persist cycles, roughly every 60 minutes)
-        storageStatsIntervalId = setInterval(function() {
+        // BUG-043-cont (PR2) Fix A: In SSE mode, start the event stream first, then defer the
+        // status snapshot ~2s. SSE 'state' events already carry initial live state so an
+        // immediate /api/status call is unnecessary and adds pressure during the fragile
+        // connection-open window. Polling mode is unchanged — startPolling() handles its
+        // own status fetch after the deferred sequential initial poll completes.
+        if (TRANSPORT === 'sse') {
+          try { connectSSE(); } catch(e) { dlog('SSE: ' + e.message, 'err'); showError('SSE failed'); }
+          firstStatusSnapshotPromise = new Promise(function(resolve) {
+            setTimeout(function() {
+              resolve(loadStatusSnapshot().catch(function(){ return false; }));
+            }, 2000);
+          });
+        } else {
+          try { startPolling(); } catch(e) { dlog('Polling: ' + e.message, 'err'); showError('Polling failed'); }
+          firstStatusSnapshotPromise = loadStatusSnapshot().catch(function(){ return false; });
+        }
+
+        // BUG-043-cont (PR2) Fix D: Defer storage stats from 3s to 5s — reduces overlap with
+        // the sequential initial poll (which now takes ~7-8s at batch=1, 200ms gap).
+        setTimeout(function() {
           if (isImportActive()) return;
           loadStorageStats().catch(function(){});
-        }, 120000);
-      }, 5000);
+          // BUG-037 Fix 8: storage stats interval increased from 60s to 120s
+          // (storage stats change only on NVS persist cycles, roughly every 60 minutes)
+          storageStatsIntervalId = setInterval(function() {
+            if (isImportActive()) return;
+            loadStorageStats().catch(function(){});
+          }, 120000);
+        }, 5000);
 
-      // BUG-037 Fix 5: 30s status interval only in polling mode — in SSE mode,
-      // state is delivered via SSE events, so periodic /api/status polling is unnecessary
-      if (TRANSPORT !== 'sse') {
-        statusSnapshotIntervalId = setInterval(function() {
-          if (isImportActive()) return;
-          loadStatusSnapshot().catch(function(){});
-        }, 30000);
-      }
+        // BUG-037 Fix 5: 30s status interval only in polling mode — in SSE mode,
+        // state is delivered via SSE events, so periodic /api/status polling is unnecessary
+        if (TRANSPORT !== 'sse') {
+          statusSnapshotIntervalId = setInterval(function() {
+            if (isImportActive()) return;
+            loadStatusSnapshot().catch(function(){});
+          }, 30000);
+        }
 
-      // v7.6.9.4 (#139 partial): gate initial history load on first status snapshot.
-      // Fixed 10 s timer was a worst-case estimate. Gating on loadStatusSnapshot()
-      // gives a live signal the board is (a) responsive, (b) at post-boot heap,
-      // (c) past the BLE/WiFi settle window. Preserves a 15 s fallback in case
-      // /api/status/full is unreachable (auth mismatch, network drop).
-      // loadHistory() is idempotent via _historyInFlight guard, so both triggers
-      // firing is safe.
-      var _v7_9_4_historyKicked = false;
-      function _v7_9_4_kickHistoryOnce() {
-        if (_v7_9_4_historyKicked || isImportActive()) return;
-        _v7_9_4_historyKicked = true;
-        Promise.resolve(loadHistory()).catch(function(){});
-      }
-      // Primary trigger: fire 1 s after the first status snapshot resolves.
-      // loadStatusSnapshot() is already called elsewhere in boot.js — chain off it.
-      loadStatusSnapshot().then(function() {
-        setTimeout(_v7_9_4_kickHistoryOnce, 1000);
-      }).catch(function(){});
-      // Safety fallback: always fire by 15 s so the user sees charts even if
-      // /api/status/full never returns.
-      historyBootstrapTimerId = setTimeout(_v7_9_4_kickHistoryOnce, 15000);
+        // v7.6.9.4 (#139 partial): gate initial history load on first status snapshot.
+        // Fixed 10 s timer was a worst-case estimate. Gating on loadStatusSnapshot()
+        // gives a live signal the board is (a) responsive, (b) at post-boot heap,
+        // (c) past the BLE/WiFi settle window. Preserves a 15 s fallback in case
+        // /api/status/full is unreachable (auth mismatch, network drop).
+        // loadHistory() is idempotent via _historyInFlight guard, so both triggers
+        // firing is safe.
+        var _v7_9_4_historyKicked = false;
+        function _v7_9_4_kickHistoryOnce() {
+          if (_v7_9_4_historyKicked || historyBootstrapConsumed || isImportActive()) return;
+          _v7_9_4_historyKicked = true;
+          historyBootstrapConsumed = true;
+          Promise.resolve(loadHistory()).catch(function(){});
+        }
+        firstStatusSnapshotPromise.then(function() {
+          setTimeout(_v7_9_4_kickHistoryOnce, 1000);
+        }).catch(function(){});
+        // Safety fallback: always fire by 15 s so the user sees charts even if
+        // /api/status/full never returns.
+        historyBootstrapTimerId = setTimeout(_v7_9_4_kickHistoryOnce, 15000);
 
-      // Aggregator overlay: if this device is an aggregator, show the Gateways section
-      // and start the aggregator polling loop. Local sensors are already running above.
-      if (isAggregator) {
-        initAggregatorDashboard();
-      }
+        // Aggregator overlay: if this device is an aggregator, show the Gateways section
+        // and start the aggregator polling loop. Local sensors are already running above.
+        if (isAggregator) {
+          initAggregatorDashboard();
+        }
+      });
     });
   });
 };
