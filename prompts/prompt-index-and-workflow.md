@@ -212,7 +212,7 @@ Phase VX uses the same prompt methodology as Phase V: Claude advisory sessions p
 | Version | Scope | Prompt File | Handoff | Status |
 |---------|-------|-------------|---------|--------|
 | v7.6.10.0 | ESPHome 2026.4.1 upgrade verification + local component re-patch | `prompts/phaseVX/v7.6.10.0-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.0.md` | ✅ Complete (PR #200) |
-| v7.6.10.1 | Board profiles + partition tables for 3 new boards | `prompts/phaseVX/v7.6.10.1-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.1.md` | 🔜 Queued |
+| v7.6.10.1 | Board profiles + partition tables for 3 new boards | `prompts/phaseVX/v7.6.10.1-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.1.md` | ✅ Complete |
 | v7.6.10.2 | Flash, measure, document | _(operator-driven, see measurement protocol)_ | _(no agent handoff)_ | 🔜 Queued |
 | v7.6.10.3 | Capacity study + board selection guide update | _(Claude advisory session)_ | _(no agent handoff)_ | 🔜 Queued |
 | v7.6.10.4 | Dashboard auth refactor (optional) | _(TBD if included)_ | _(TBD)_ | 🔜 Optional |
@@ -239,7 +239,7 @@ Before starting Phase 7, read `prompts/handoff/phaseD/phaseD-results.md` for the
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
-| v7.7.0.0 | Per-device structs, key scheme, hash | `prompts/phase7/v7.7.0.0-implementation-instructions-for-coding-agent.md` | ✅ Complete |
+| v7.7.0.0 | Per-device structs, key scheme, hash | `prompts/phase7/v7.7.0.0-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.7.0.1 | Per-device persist (write path) | `prompts/phase7/v7.7.0.1-implementation-instructions-for-coding-agent.md` | Pending |
 | v7.7.0.2 | Per-device restore (boot) + retention budget | _Prompt not yet created_ | Pending |
 | v7.7.0.3 | Wire new engine, storage-stats v2 | _Prompt not yet created_ | Pending |

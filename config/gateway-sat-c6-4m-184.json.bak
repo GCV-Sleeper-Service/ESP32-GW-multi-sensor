@@ -1,0 +1,6 @@
+{
+    "board": "esp32-c6-supermini-4m",
+    "esphome_name": "sat-c6-4m-184",
+    "friendly_name": "C6 SuperMini satellite - 4MB flash",
+    "wifi_address": "192.168.120.184"
+}

@@ -1,0 +1,6 @@
+{
+    "board": "esp32-s3-supermini-4m",
+    "esphome_name": "sat-s3-4m-173",
+    "friendly_name": "S3 SuperMini satellite - 4MB flash 2MB PSRAM",
+    "wifi_address": "192.168.120.173"
+}
