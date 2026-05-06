@@ -57,6 +57,11 @@ git checkout main && git pull
 20. `prompts/handoff/phaseVX/phaseVX-board-onboarding-sprint-prompt.md` — sprint scoping prompt
 21. `prompts/phaseVX/v7.6.10.0-agent-prompt-gpt-codex.md`
 22. `prompts/phaseVX/v7.6.10.0-claude-two-step.md`
+23. `prompts/phaseVX/v7.6.10.1-agent-prompt-gpt-codex.md` — board profile creation prompt (infrastructure workload)
+24. `prompts/phaseVX/v7.6.10.4-agent-prompt-gpt-codex.md` — dashboard auth refactor prompt (JS-only workload, newest iteration)
+25. `prompts/phaseVX/v7.6.10.4-claude-two-step.md` — two-step with auth refactor context
+26. `prompts/handoff/phaseVX/phaseVX-results.md` — Phase VX delivery record
+27. `Docs/session-log-2026-05-06-v7.6.10.4.md` — v7.6.10.4 session log (contains 10 prompt improvement recommendations)
 
 ---
 

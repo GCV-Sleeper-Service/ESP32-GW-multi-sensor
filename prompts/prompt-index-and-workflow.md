@@ -1,7 +1,7 @@
 Coding Agent Prompt Index and Workflow
 
 _Single source of truth for all implementation prompts._
-_Last updated: 2026-05-05 — Phase VX in progress (v7.6.10.3 complete). Current Phase: **Phase VX** (board onboarding sprint). Next: v7.6.10.4 (dashboard auth refactor)._
+_Last updated: 2026-05-06 — Phase VX complete (v7.6.10.4). Current Phase: **Phase VY** (methodology audit). Next: multi-phase planning, then Phase 7._
 _Replaces: `phase3-prompt-templates.md`, `phase3-prompt-templates-updated.md`, `prompt-update-summary.md`_
 
 ---
@@ -215,15 +215,15 @@ Phase VX uses the same prompt methodology as Phase V: Claude advisory sessions p
 | v7.6.10.1 | Board profiles + partition tables for 3 new boards | `prompts/phaseVX/v7.6.10.1-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.1.md` | ✅ Complete |
 | v7.6.10.2 | Flash, measure, document | _(operator-driven, see measurement protocol)_ | _(no agent handoff)_ | ✅ Complete |
 | v7.6.10.3 | Capacity study + board selection guide update | _(Claude advisory session)_ | `prompts/handoff/phaseVX/session-handoff-v7.6.10.3.md` | ✅ Complete |
-| v7.6.10.4 | Dashboard auth refactor | `prompts/phaseVX/v7.6.10.4-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.4.md` | 🔜 Next |
+| v7.6.10.4 | Dashboard auth refactor | `prompts/phaseVX/v7.6.10.4-agent-prompt-gpt-codex.md` | `prompts/handoff/phaseVX/session-handoff-v7.6.10.4.md` | ✅ Complete (PR #202) |
 
 **New boards onboarded:**
 
 | board_id | Name | Chip | Flash | PSRAM | IP | Compiled? |
 |----------|------|------|-------|-------|----|-----------|
-| esp32-s3-supermini-4m | sat-s3-4m-173 | ESP32-S3 | 4 MB | 2 MB quad | 192.168.120.173 | ___ |
-| esp32-c5-wroom1u-8m | sat-c5-8m-180 | ESP32-C5 | 8 MB | 8 MB quad | 192.168.120.180 | ___ |
-| esp32-c6-supermini-4m | sat-c6-4m-184 | ESP32-C6 | 4 MB | None | 192.168.120.184 | ___ |
+| esp32-s3-supermini-4m | sat-s3-4m-173 | ESP32-S3 | 4 MB | 2 MB quad | 192.168.120.173 | Yes |
+| esp32-c5-wroom1u-8m | sat-c5-8m-180 | ESP32-C5 | 8 MB | 8 MB quad | 192.168.120.180 | Yes |
+| esp32-c6-supermini-4m | sat-c6-4m-184 | ESP32-C6 | 4 MB | None | 192.168.120.184 | Yes |
 
 **Findings:**
 - BUG-084: Heap exhaustion under 8 concurrent HTTP connections on non-PSRAM boards (C3, WROOM). Stack is fine (watermark ~12,900 B on 16 KB stack). Stress test script needs concurrent request reduction.
