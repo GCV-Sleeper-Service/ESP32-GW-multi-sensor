@@ -69,6 +69,15 @@ function _getActiveGatewayTabId() {
   return activeTab ? activeTab.getAttribute('data-gw') : 'all';
 }
 
+function _findGatewayTab(gwId) {
+  var matchId = String(gwId);
+  var tabs = document.querySelectorAll('.gw-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    if (tabs[i].getAttribute('data-gw') === matchId) return tabs[i];
+  }
+  return null;
+}
+
 function _gatewaySelectorNeedsRefresh(gateways) {
   var tabs = document.querySelectorAll('.gw-tab');
   var expectedCount = (gateways ? gateways.length : 0) + 2;
@@ -77,7 +86,7 @@ function _gatewaySelectorNeedsRefresh(gateways) {
   if (!document.querySelector('.gw-tab[data-gw="settings"]')) return true;
   for (var i = 0; i < (gateways || []).length; i++) {
     var gw = gateways[i];
-    if (!document.querySelector('.gw-tab[data-gw="' + gw.id + '"]')) return true;
+    if (!_findGatewayTab(gw.id)) return true;
   }
   return false;
 }
@@ -87,7 +96,7 @@ function _syncGatewaySelector(gateways, preferredGwId) {
   if (!_gatewaySelectorNeedsRefresh(gateways)) return;
   renderGatewaySelector(gateways || []);
   if (!activeGwId || activeGwId === 'all') return;
-  var activeTab = document.querySelector('.gw-tab[data-gw="' + activeGwId + '"]');
+  var activeTab = _findGatewayTab(activeGwId);
   if (!activeTab) return;
   activeTab.click();
 }
@@ -540,7 +549,7 @@ function pollAggregatorLive() {
         _syncGatewaySelector(window._aggregatorGateways, activeGwId);
         // Update gateway selector tab status indicators
         data.gateways.forEach(function(gw) {
-          var tab = document.querySelector('.gw-tab[data-gw="' + gw.id + '"]');
+          var tab = _findGatewayTab(gw.id);
           if (tab) {
             tab.classList.toggle('gw-online', !!gw.reachable);
             tab.classList.toggle('gw-offline', !gw.reachable);

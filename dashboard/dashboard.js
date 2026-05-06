@@ -1924,7 +1924,6 @@ function loadStorageStats(attempt) {
 
 var importState = {
   active: false,
-  authHeader: '',
   startedAt: 0,
   mode: '',        // 'multi' or 'single'
   targetSensor: '' // sensor ID for single mode
@@ -2067,7 +2066,21 @@ function requestManagementCredentials(actionLabel) {
 
     var settled = false;
     var verifying = false;
+    var verifyController = null;
+    function setVerifyUiState(isBusy) {
+      verifying = !!isBusy;
+      submitBtn.disabled = !!isBusy;
+      toggleBtn.disabled = !!isBusy;
+      userInput.disabled = !!isBusy;
+      passInput.disabled = !!isBusy;
+      cancelBtn.disabled = false;
+    }
     function cleanup() {
+      if (verifyController && typeof verifyController.abort === 'function') {
+        try { verifyController.abort(); } catch (e) {}
+      }
+      verifyController = null;
+      setVerifyUiState(false);
       toggleBtn.removeEventListener('click', onToggle);
       cancelBtn.removeEventListener('click', onCancel);
       submitBtn.removeEventListener('click', onSubmit);
@@ -2108,18 +2121,16 @@ function requestManagementCredentials(actionLabel) {
         passInput.focus();
         return;
       }
-      verifying = true;
+      setVerifyUiState(true);
       errorEl.textContent = 'Verifying credentials...';
-      submitBtn.disabled = true;
-      cancelBtn.disabled = true;
-      toggleBtn.disabled = true;
-      userInput.disabled = true;
-      passInput.disabled = true;
       var authHeader = 'Basic ' + btoa(username + ':' + password);
-      fetch(ESP_HOST + '/api/status/full', {
+      verifyController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var requestOptions = {
         cache: 'no-store',
         headers: { 'Authorization': authHeader }
-      }).then(function(resp) {
+      };
+      if (verifyController) requestOptions.signal = verifyController.signal;
+      fetch(ESP_HOST + '/api/status/full', requestOptions).then(function(resp) {
         if (resp.ok) {
           setAuthCredentials(username, password);
           finish({ username: username, password: password, authHeader: authHeader }, false);
@@ -2130,19 +2141,18 @@ function requestManagementCredentials(actionLabel) {
           throw new Error(msg);
         });
       }).catch(function(err) {
-        verifying = false;
-        submitBtn.disabled = false;
-        cancelBtn.disabled = false;
-        toggleBtn.disabled = false;
-        userInput.disabled = false;
-        passInput.disabled = false;
+        verifyController = null;
+        if (settled || (err && err.name === 'AbortError')) return;
+        setVerifyUiState(false);
         errorEl.textContent = err && err.message ? err.message : 'Authentication failed';
         passInput.focus();
         passInput.select();
       });
     }
     function onCancel() {
-      if (verifying) return;
+      if (verifyController && typeof verifyController.abort === 'function') {
+        try { verifyController.abort(); } catch (e) {}
+      }
       finish(null, false);
     }
     function onSubmit() { validateAndSubmit(); }
@@ -2154,14 +2164,20 @@ function requestManagementCredentials(actionLabel) {
     }
     function onEscape(ev) {
       if (ev.key === 'Escape') {
-        if (verifying) return;
         ev.preventDefault();
+        if (verifyController && typeof verifyController.abort === 'function') {
+          try { verifyController.abort(); } catch (e) {}
+        }
         finish(null, false);
       }
     }
     function onBackdropClick(ev) {
-      if (verifying) return;
-      if (ev.target === modal) finish(null, false);
+      if (ev.target === modal) {
+        if (verifyController && typeof verifyController.abort === 'function') {
+          try { verifyController.abort(); } catch (e) {}
+        }
+        finish(null, false);
+      }
     }
 
     toggleBtn.addEventListener('click', onToggle);
@@ -2193,7 +2209,8 @@ function postManagementAction(path, busyText, actionLabel) {
         body: 'a=1'
       }).then(function(r) {
         if (r.status !== 401) return r;
-        return requestAuth(actionLabel).then(function() {
+        return requestAuth(actionLabel).then(function(creds) {
+          if (!creds || !isAuthenticated()) throw new Error('Authentication cancelled');
           return authFetch(ESP_HOST + path, {
             method: 'POST',
             cache: 'no-store',
@@ -2565,7 +2582,6 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
       postFinishReloadDelayMs: 500
     };
 
-    importState.authHeader = getAuthHeader() || '';
     importState.mode = importMode || 'multi';
     importState.targetSensor = targetSensorId || '';
     suspendDashboardNetworkActivity(statusEl);
@@ -2676,13 +2692,11 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
       })
       .then(function(result) {
         if (isImportActive()) resumeDashboardNetworkActivity();
-        importState.authHeader = '';
         importState.mode = '';
         importState.targetSensor = '';
         return result;
       }, function(err) {
         if (isImportActive()) resumeDashboardNetworkActivity();
-        importState.authHeader = '';
         importState.mode = '';
         importState.targetSensor = '';
         throw err;
@@ -3727,6 +3741,15 @@ function _getActiveGatewayTabId() {
   return activeTab ? activeTab.getAttribute('data-gw') : 'all';
 }
 
+function _findGatewayTab(gwId) {
+  var matchId = String(gwId);
+  var tabs = document.querySelectorAll('.gw-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    if (tabs[i].getAttribute('data-gw') === matchId) return tabs[i];
+  }
+  return null;
+}
+
 function _gatewaySelectorNeedsRefresh(gateways) {
   var tabs = document.querySelectorAll('.gw-tab');
   var expectedCount = (gateways ? gateways.length : 0) + 2;
@@ -3735,7 +3758,7 @@ function _gatewaySelectorNeedsRefresh(gateways) {
   if (!document.querySelector('.gw-tab[data-gw="settings"]')) return true;
   for (var i = 0; i < (gateways || []).length; i++) {
     var gw = gateways[i];
-    if (!document.querySelector('.gw-tab[data-gw="' + gw.id + '"]')) return true;
+    if (!_findGatewayTab(gw.id)) return true;
   }
   return false;
 }
@@ -3745,7 +3768,7 @@ function _syncGatewaySelector(gateways, preferredGwId) {
   if (!_gatewaySelectorNeedsRefresh(gateways)) return;
   renderGatewaySelector(gateways || []);
   if (!activeGwId || activeGwId === 'all') return;
-  var activeTab = document.querySelector('.gw-tab[data-gw="' + activeGwId + '"]');
+  var activeTab = _findGatewayTab(activeGwId);
   if (!activeTab) return;
   activeTab.click();
 }
@@ -4198,7 +4221,7 @@ function pollAggregatorLive() {
         _syncGatewaySelector(window._aggregatorGateways, activeGwId);
         // Update gateway selector tab status indicators
         data.gateways.forEach(function(gw) {
-          var tab = document.querySelector('.gw-tab[data-gw="' + gw.id + '"]');
+          var tab = _findGatewayTab(gw.id);
           if (tab) {
             tab.classList.toggle('gw-online', !!gw.reachable);
             tab.classList.toggle('gw-offline', !gw.reachable);

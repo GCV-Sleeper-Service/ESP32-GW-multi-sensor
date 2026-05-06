@@ -152,7 +152,6 @@ function loadStorageStats(attempt) {
 
 var importState = {
   active: false,
-  authHeader: '',
   startedAt: 0,
   mode: '',        // 'multi' or 'single'
   targetSensor: '' // sensor ID for single mode

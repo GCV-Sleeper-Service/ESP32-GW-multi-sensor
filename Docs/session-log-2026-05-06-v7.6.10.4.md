@@ -235,6 +235,42 @@ Result:
 - PR summary comment was posted successfully
 - PR was then marked ready for review
 
+### 9. Post-review follow-up: three substantive review findings were warranted
+
+After the PR was marked ready, three review sources raised actionable issues:
+
+- Codex review: auth-modal verification path could deadlock the modal if credential
+  verification hung, and the 401 re-auth retry path retried even when the second prompt
+  was cancelled
+- Copilot review: modal control state was not being safely reset, gateway selector sync
+  used raw IDs inside CSS selectors, and `importState.authHeader` had become dead state
+- Gemini review: confirmed the 401 retry cancellation issue in `postManagementAction()`
+
+Assessment:
+
+- the modal deadlock concern was warranted
+- the 401 retry-on-cancel concern was warranted
+- the raw gateway ID selector concern was warranted
+- the stale import auth-header state concern was warranted as cleanup, though low risk
+
+Recovery:
+
+- auth credential verification now keeps a live cancel path and aborts the in-flight
+  verification request when the modal is cancelled
+- modal verification UI state is reset centrally so re-auth opens with interactive
+  controls
+- management-action retry now treats cancelled re-auth as a cancelled action and avoids
+  sending a redundant unauthenticated POST
+- gateway-tab lookups now compare `data-gw` attributes directly instead of interpolating
+  raw IDs into `querySelector()` selectors
+- removed the dead `importState.authHeader` field and its assignments
+
+Validation:
+
+- reran the full ordered dashboard pipeline
+- reran `bash scripts/preflight.sh`
+- reran full `npx playwright test` successfully
+
 ## Prompt Recommendations
 
 The current prompt set worked, but several avoidable stops came from implicit repo
@@ -277,6 +313,11 @@ coupling that should be made explicit.
 
 9. Add a documented REST fallback for `gh pr edit` in case repository/project metadata
    causes GraphQL failures during PR maintenance.
+
+10. When PR reviews are expected on browser code, include a short post-review checklist in
+    the prompt:
+    modal cancellation, retry cancellation, dead state removal, and selector safety for
+    attribute-derived IDs.
 
 ## Notes
 

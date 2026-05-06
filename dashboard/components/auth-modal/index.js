@@ -44,7 +44,21 @@ function requestManagementCredentials(actionLabel) {
 
     var settled = false;
     var verifying = false;
+    var verifyController = null;
+    function setVerifyUiState(isBusy) {
+      verifying = !!isBusy;
+      submitBtn.disabled = !!isBusy;
+      toggleBtn.disabled = !!isBusy;
+      userInput.disabled = !!isBusy;
+      passInput.disabled = !!isBusy;
+      cancelBtn.disabled = false;
+    }
     function cleanup() {
+      if (verifyController && typeof verifyController.abort === 'function') {
+        try { verifyController.abort(); } catch (e) {}
+      }
+      verifyController = null;
+      setVerifyUiState(false);
       toggleBtn.removeEventListener('click', onToggle);
       cancelBtn.removeEventListener('click', onCancel);
       submitBtn.removeEventListener('click', onSubmit);
@@ -85,18 +99,16 @@ function requestManagementCredentials(actionLabel) {
         passInput.focus();
         return;
       }
-      verifying = true;
+      setVerifyUiState(true);
       errorEl.textContent = 'Verifying credentials...';
-      submitBtn.disabled = true;
-      cancelBtn.disabled = true;
-      toggleBtn.disabled = true;
-      userInput.disabled = true;
-      passInput.disabled = true;
       var authHeader = 'Basic ' + btoa(username + ':' + password);
-      fetch(ESP_HOST + '/api/status/full', {
+      verifyController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var requestOptions = {
         cache: 'no-store',
         headers: { 'Authorization': authHeader }
-      }).then(function(resp) {
+      };
+      if (verifyController) requestOptions.signal = verifyController.signal;
+      fetch(ESP_HOST + '/api/status/full', requestOptions).then(function(resp) {
         if (resp.ok) {
           setAuthCredentials(username, password);
           finish({ username: username, password: password, authHeader: authHeader }, false);
@@ -107,19 +119,18 @@ function requestManagementCredentials(actionLabel) {
           throw new Error(msg);
         });
       }).catch(function(err) {
-        verifying = false;
-        submitBtn.disabled = false;
-        cancelBtn.disabled = false;
-        toggleBtn.disabled = false;
-        userInput.disabled = false;
-        passInput.disabled = false;
+        verifyController = null;
+        if (settled || (err && err.name === 'AbortError')) return;
+        setVerifyUiState(false);
         errorEl.textContent = err && err.message ? err.message : 'Authentication failed';
         passInput.focus();
         passInput.select();
       });
     }
     function onCancel() {
-      if (verifying) return;
+      if (verifyController && typeof verifyController.abort === 'function') {
+        try { verifyController.abort(); } catch (e) {}
+      }
       finish(null, false);
     }
     function onSubmit() { validateAndSubmit(); }
@@ -131,14 +142,20 @@ function requestManagementCredentials(actionLabel) {
     }
     function onEscape(ev) {
       if (ev.key === 'Escape') {
-        if (verifying) return;
         ev.preventDefault();
+        if (verifyController && typeof verifyController.abort === 'function') {
+          try { verifyController.abort(); } catch (e) {}
+        }
         finish(null, false);
       }
     }
     function onBackdropClick(ev) {
-      if (verifying) return;
-      if (ev.target === modal) finish(null, false);
+      if (ev.target === modal) {
+        if (verifyController && typeof verifyController.abort === 'function') {
+          try { verifyController.abort(); } catch (e) {}
+        }
+        finish(null, false);
+      }
     }
 
     toggleBtn.addEventListener('click', onToggle);
@@ -170,7 +187,8 @@ function postManagementAction(path, busyText, actionLabel) {
         body: 'a=1'
       }).then(function(r) {
         if (r.status !== 401) return r;
-        return requestAuth(actionLabel).then(function() {
+        return requestAuth(actionLabel).then(function(creds) {
+          if (!creds || !isAuthenticated()) throw new Error('Authentication cancelled');
           return authFetch(ESP_HOST + path, {
             method: 'POST',
             cache: 'no-store',

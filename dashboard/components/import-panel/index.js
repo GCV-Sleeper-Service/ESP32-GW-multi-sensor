@@ -323,7 +323,6 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
       postFinishReloadDelayMs: 500
     };
 
-    importState.authHeader = getAuthHeader() || '';
     importState.mode = importMode || 'multi';
     importState.targetSensor = targetSensorId || '';
     suspendDashboardNetworkActivity(statusEl);
@@ -434,13 +433,11 @@ function executeImport(batches, statusEl, importMode, targetSensorId) {
       })
       .then(function(result) {
         if (isImportActive()) resumeDashboardNetworkActivity();
-        importState.authHeader = '';
         importState.mode = '';
         importState.targetSensor = '';
         return result;
       }, function(err) {
         if (isImportActive()) resumeDashboardNetworkActivity();
-        importState.authHeader = '';
         importState.mode = '';
         importState.targetSensor = '';
         throw err;
