@@ -1,0 +1,16 @@
+```markdown
+This is a session for development methodology improvements
+
+Please clone and understand the repo:
+https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/
+
+Checkout `main` (PR #202 should be merged, Phase VX complete at v7.6.10.4).
+
+Please first read `prompts/handoff/phaseVY/session-handoff-phaseVY.md` carefully
+```
+
+I am in addition attaching a text file that I wrote that would help to answer some questions that are in the `prompts/handoff/methodology-audit-session-prompt.md` document.
+
+Read all the documents and the text file I've attached very carefully. As mentioned, it will add some light but number of questions that are in the prompts/handoff/methodology-audit-session-prompt.md need to be answered from my side, so once you analyze these documents, please give me list of these remaining questions to fill gaps to have the complete picture.
+
+Always ask for clarifying questions if something is not clear.

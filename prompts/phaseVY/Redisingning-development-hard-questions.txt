@@ -1,0 +1,102 @@
+Better development - for discussion and adjusting/creating efficient agentic development plan and put this into documents.
+
+
+Part 1 - preface:
+This is result of several days writing and I would like to ask you to take this document seriously. Read it twice to understand and internalize the context and points I am trying to make. While at the same time I am asking NOT to take things that are written below as pure facts - you can and should check the validity of statements and point me if they are not correct.
+
+I am writing this based on my own understanding of development of this project, however, you should read all the phased architectural documents from phaseY and phaseV minimum, plus corresponding prompts that are in the prompts/ folders.
+
+
+Part 2 - the evolved reality:
+Background - previous phases to take into consideration - over the course of the development of this project (already into two months), the following pattern was emerged:
+
+First a proposal for new features and implementations is discussed here with you. 
+As a result of the discussion it is either a document for the phased (phases 3/4/5/6, D/X/V, 7...) architectural scope/implementation is created, or, as a preliminary step, a prompt is created based on research that would create such a document. The phased architectural document in its turn is used to produce prompts for each step for each phase. 
+
+How development has evolved: first the code was produce by Claude and run/tested/deployed locally. Then development moved into GitHub, with proper documentation and step planning. Then bugs/issues have been started documented, then usage of multi-LLMs both for agent and review purposes have been introduced. This both made things easier and more complicated at the same time. 
+
+Over the course the another pattern has emerged: for each step in the phase, minimum three prompts need to be produced:
+
+- An very detailed agent prompt that follows strict DO and DO NOTs procedure as well as have checkpoints in it to make sure that prompt assumptions do match the reality at this moment. DO/DO NOTs on its own are based on prompt writing guide from Docs/writing-guide as well as rules that have been learned/discovered and listed in prompts/prompt-index-and-workflow.md
+- A handoff document from the previous step that has detailed outlines what this step is doing, risk level, as well as deliverables and also outlines if next step prompts need to be updated and inspected as well
+- A two-step prompt that is produced for Claude environment that has checkpoints in them for Agent prompts as well as detailed list what review prompt for this particular step needs to check, confirm and greenlight.
+
+The two-step Claude prompt itself is a base to create review prompts for non-Claude environments, like for Copilot, Perplexity and others that have different tools to access GitHub and need to be rewritten accordingly. So it emerged that it is critical as agent's prompt to be specific, the review prompt to be specific in the review scoping to produce the real consolidated PR audit file, as well as based on these files - the phase conclusion results.
+
+It also emerged that after agent's implementation it is critical to have code reviews by inline reviewers (Copilot, Codex, Gemini) and external reviewers (GPT, Codex) as well. 
+It has emerged that number of reviewers matter - some of them can caught things that others do not. 
+It also matters how the questions for PR review are phased to external reviewers - what exactly they need to look at.
+
+And after conclusion of phaseY a very detailed phase assessment document was created by Copilot that should be used as a template/guideline how phase conclusion should happen.
+
+PhaseY and phaseV that mostly addressed code refactoring, bug fixing and optimization - they did not introduce any new features or architectural changes. This is the scope for phase 7, 8 and beyond and to adequately prepare for it - that's why I am presenting this text to you for mutual discussion, understanding and finding the best, optimal plan to move forward. I am not saying that the current plan is not working. It is, but I think it CAN be made better.
+
+
+Part 3: asking questions about reality
+
+I need to point on two things at the beginning:
+
+First - the C3 board missing external components is just sticking out - whole plausible explanation was invented that sounded right (sorry about that) to justify a thing when much easier explanation was in place - I detected it when I looked on two different outputs from different versions when a single parameter was changed and it did not change the outcome - this did not looked right and it was the case. 
+I would like to have this particular occurrence/case to be documented separately as a specific case - 'looking for a black cat in dark room when there is no cat there'. In other words the principle - don't complicate things beyond necessity should be a primary driving force to explain bugs or why things are working this way. YOUR PRIMARY OBJECTIVE MUST BE TRUTH SEEKING. Before moving to more complex explanations, ALL simpler explanation need to be eliminated first.
+
+Next - the mere fact that whole phaseY and phaseV were called was due me releasing that even 200K tokens context window is tight call for coding agents and reviewers.  If we would know about this from the beginning, would we design the whole phases differently? If yes, how? 
+
+The question for me to understand is - how this fact was not released in the early stages of development - what was the information that was available but was not understood because the right questions were not asked? 
+
+After phaseY, phaseV and this http stack with C3 board case this question came to my mind: 
+
+First - how often did it happen that you acted after my prompt/questions on assumptions and did not check if you had ALL the necessary information in hand to make a right call and how can we have this kind of occurrences eliminated?
+
+HOW OFTEN did we make architectural calls with incomplete information and having sessions with you based on assumptions or stale information/memory/session? And how can we have this kind of occurrences eliminated?
+
+
+Other questions pop up as well that we should be thinking in advance. Examples: 
+- ESPHome version/SDK and boards support - did we check frequently enough when designing phases what situation with current ESPHome/SDK versions looks like and how it is affecting out project? 
+- The HTTP stack situation with C3 surfaced suddenly or semi-suddenly. Did we know or could predict this situation several steps/phases before? If we did - why we did not ask ourselves these questions and how do we avoid repeating this experience in future? 
+
+We did research about unknown things in past after bug 075-076. Let me quote Docs/archive/postmortems/postmortem-BUG-075-076-httpd-stack.md that you wrote:
+-
+This investigation exposed a class of problem: ESPHome/ESP-IDF defaults that are insufficient for non-trivial projects but invisible until they crash. Similar potential landmines: 
+
+FreeRTOS task stacks - Risk: Other tasks (main, WiFi, lwIP) may also be undersized for our workload. How to check - Add uxTaskGetStackHighWaterMark() logging to all custom tasks 
+
+lwIP socket pool - Risk: CONFIG_LWIP_MAX_SOCKETS is effective, but the default (10) may be low for aggregator + SSE + satellite polling. How to check - Monitor socket exhaustion under load
+
+NVS partition size - Risk: Default 16 KB may be tight with satellite persistence + history metadata. How to check - Monitor nvs_get_stats()
+
+ESP-IDF heap fragmentation - Risk: Long-running allocations on the internal heap may fragment over days. How to check - Periodic heap_caps_get_info() logging
+
+ESPHome component defaults - Risk: Other components may have similar hardcoded-too-small defaults. How to check - Audit any component where we override behavior
+
+Recommendation: Add a periodic health-check task that logs stack HWM, heap stats, socket usage, and NVS stats. This catches the next landmine before it becomes a three-day investigation.
+-
+
+Did we implement any of above or other things that might caused problems in future? If not, why did we forget about it?
+
+In addition, whole list of things needs to be thought about came to my mind:
+
+1. What questions I am not asking that I should, or other skilled professionals in my position and with this experience (doing agenting based software development, but other things as well) may ask?
+2. How often do we need to do retrospectives or asking ourselves what we know/do not know now? 
+3. How often do we need to revisit design of future phases to confirm the reality? Should it be done at the end of every single phase?   
+4. When designing a feature/phase or even a step, what are the questions we ARE NOT asking? What would be the result that would come and bite us down the road? What are these hard questions? Like not thinking ahead/pre-mortem - when designing or implementing ABC, what would be the consequences/tech debt down in the road?
+5. Do we keep and refresh frequently/all the time why a particular architectural decision was made? Do we understand the failure history of a system and keep adequate records? If not, what needs to be changed to have this incorporated into development process?
+6. How do we keep the knowledge about past experience handy and have it readily referenced/accessible? 
+7. We designed prompt writing guide but do we actually update it or use it as vigorously a necessary? How frequently do we update it? 
+8. Do agent and review prompts become better for the result we want to archive - iterate on prompts and make it order of magnitude better and professional, maximizing chances of positive outcome and minimizing risks? If not what can be done to do it? 
+9. How do we assess the quality of the prompts - architecture/phase planning, agent, reviewer, two-step, phase results? what is the KPI? How do we define and measure it?
+10. How do we make agentic workflows more efficient? Would frameworks like LangGraph help? How? 
+11. What would be use case of agentic workflows for our own to make this system production-grade and can be used as an example when designing agentic based development process? 
+
+I know these above are hard, sometimes, very hard questions, but I am sure we can find right answers.
+
+This is what I want as a result of this discussion/analysis in addition to answering on questions above - based on what we have done to create/update this project/software development plan. Not implementation phases itself but HOW the development is done with this project and how to make it better. 
+Moreover, this resulting plan should be reusable and can be used as a blueprint/handbook how this kind of development can be designed, implemented, executed and perfected. So I can teach and showcase this project as a perfectly reusable case using the plan as blueprint. 
+
+We pretty much have all the building blocks of the plan that we have learned and experienced - we have phase scoping documents (as sprints), feature scoping, prompt writing guide, implementation trace (changelog, session logs), bugs/issues entered, lessons learned - including context window constrains that led to two refactoring phases, actual development with multiple LLM agents in different environments. We jun need to formalize it and stick and iterate with it to perfect it.
+
+
+- don't skimp on compute and do deep research, spinning up as many sub agents as it takes for top quality answer.
+
+- don't just look for confirmations of hypothesis. Look for ways to disprove the assumptions and conclusions. Then present confidence interval with all answers, along with note on what would invalidate the assumptions or answers
+
+Keep it real and grounded on first principles and truth. Along with opinions cite rationale, sources and assessment of chances being wrong. Look for possible evidence that some assertion you are making is wrong. When doing a research, first do meta-research on strategy of research.

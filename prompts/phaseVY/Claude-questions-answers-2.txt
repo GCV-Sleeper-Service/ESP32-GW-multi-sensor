@@ -1,0 +1,95 @@
+et me separate the questions/answers get more clarity.
+
+Here what I think I need to have as an outcome of this conversation/session - two/three documents - I am outlining my thoughts, it can be refined further:
+
+
+1. First - a document for this particular project that improves the current process by accelerating it, making it easier to understand, deploy, evolve - that cuts time to run steps or do planning, running and verifying but without compromising on quality.
+This document should streamline the current development and make phases sprint, not marathon. Identify what is redundant, what is missing to make it happen. 
+The ideal outcome for example would be that for phase E/8 (provisioning portal/cloud storage and notification support) - I can run the a prompt that starts chain of prompts (in parallel, if necessary/possible) and half of the phase can be done without my handholding where my feedback is not critical. 
+
+This document also should include the analysis if the current state, what went wrong, why and then conclusion on the best way HOW to change the process that you can discover and understand the current state without me typing or filling bug escalation prompt - if there is a way to automate/semi-automate this that you have the comprehensive view of the project with a single line that says 'Read XYZ in here' where XYZ has all the related into.
+
+
+2. Second - a document - 'How to do LLM assisted development PROPERLY' - how to plan, how to execute, what are pitfalls, how to recognize these pitfalls early based on patterns, how to iterate and improve process. I am envisioning this document to be a guideline when I (or someone else) will do another LLM assisted project and this time build this on the knowledge on this process.
+
+
+3. Third - whatever is the outcome of this session (especially the first document) - this needs to be fed/supplemented into multi-phase planning prompt to make sure that we are doing this right from now on.
+
+
+
+
+Here is what I caught my attention in your previous reply. I am pointing on these and with other points - consider that I am agreeing with you. 
+
+1. The C3 external_components case and Occam's Razor - Confidence that this pattern recurred beyond the C3 case: high (85%) - plausible narrative accepted without falsification — is a known failure mode of LLM advisors, and I'd be surprised if the C3 case was the only instance.
+Q: Do we need to put checkpoints like in agent prompt in such sessions to reduce such occurrences? Put specific language in the custom instruction that apply to all or specific planning prompts? If yes, how without compromising quality of the result? 
+
+2. "Would we have designed phases differently if we knew about context window limits?" - Phase X (dashboard refactor) would have been scoped earlier and differently — 90% confident.
+Q: OK, but you now know WHY would you do it and what are patterns that would trigger that outcome. So how can we know about this - what are triggers and not repeat the same problem again? 
+This question will be asked a lot until we know that we have a way to answer/address this.
+
+3. Phase Y (firmware refactor) same story — 85% confident.  By Phase 4, both files were over 2,000 lines.
+Q: So this kind of codebase growth can be identified as pattern that needs to be avoided and planned accordingly? What else?
+
+
+4. "How often did I act on assumptions without all necessary information?" - Memory-based file path references. Estimate: this affected 15-20% of advisory sessions before the rule was added.
+Q: can we make it better - goes in line with what I wrote above - how to give you an accurate state at any given time?
+
+5. Stale state assumptions in prompt production. Prompts were produced based on the architectural plan rather than the current code state.
+Q: So before creating prompts, the planning prompt should include mandatory reading of the code state and compare it to the architectural plan? Or moreover - architectural plan needs to update in line with the code state?
+
+6. Architectural decisions without measurement - ... - None of that was implemented. 
+A: How do we avoid this kind of thing in future by implementing this into redesigned/updated process management?
+
+First, I don't have persistent state between sessions. 
+Second, the advisory session format incentivizes forward motion.
+Third, there's no "assumption audit" gate in the current process. 
+Q: how do we address all these?
+
+
+Now about The 11 hard questions 
+
+The biggest one: "What is the operational cost of this methodology per feature delivered?" - But the cost per delivered feature is high. "Where on the speed-quality-documentation tradeoff curve do I actually want to be?"
+Second missing question: "Am I over-documenting process and under-documenting decisions?"  - no process ensures past recommendations feed forward into future plans.
+Hard Q: How do we address these? The current process was driven and developed with your input. 
+
+"How often do we need retrospectives?"  The issue isn't frequency — it's structure. What's missing is the forward-looking component: "what did we recommend last time that hasn't been implemented yet?"
+Q/A: so how do we add this to the redesigned process? And how do we know it is working?
+
+"How often do we revisit future phase designs?" The gap is that the revisit focuses on scope changes (what to add/remove) rather than assumption validation 
+Q: How do we validate/confirm scope changes, if any?
+
+"What are the hard questions we're NOT asking when designing?" Here are five I'd add to every phase planning session (list follows)
+Q: So, can we add these to the updated process/methodology documents? Can these questions have answers in the form of running tests (automated or not) that would validate assumptions/proposals? How do we make sure that post/pre-mortem analysis are not archived as previously?
+
+"Do we keep and refresh why architectural decisions were made?" A decision log (lightweight — one-line summary + link to source document) indexed by topic would make these retrievable.
+Q: Could we implement this as well?
+
+"How do we keep past experience handy?" The most impactful single change would be a pre-planning checklist
+Q: So, we need to put this into process document
+
+"Do we update the prompt writing guide vigorously enough?" - Update cadence should be: every phase closure adds at least the new gap categories and checkpoint learnings.
+Q: How do we make sure that is happening and at the same time make sure that it is not growing into 1M+ doc file that itself would not fit into context window? How do we keep the most important rules?
+
+"Do prompts get better over time?" content quality improvement has plateaued because they're content-level errors requiring current-state verification.
+Q: So it goes back to the hard question - how do we ensure the current state is adequately reflected before producing prompts and documentation?
+
+"How do we measure prompt quality?" "Prompt Quality Score: fix cycles / checkpoint saves / preventable review findings."
+Q: Ok, but the question goes again, like question about consolidated audit files - how do we use what is written in them properly for future prompts?
+
+"Would frameworks like LangGraph help?" not yet - Your workflow is operator-directed. Where orchestration could help: the mechanical parts of the review pipeline
+Q: How can we implement these changes? What would help in addition to answering to the questions above?
+
+"Production-grade agentic workflow use case?"  it's GitHub Actions with a structured output step. 
+Q: so this needs to be changed
+
+-----
+Do you want the methodology documents to include a cost optimization section?  Should the practitioner's guide include a "budget tier" model showing how to distribute work across free/cheap/expensive LLMs?
+Yes. 
+
+BUG-082 severity. This seems like it should be the first thing Phase 7 addresses
+Yes, but if you inspect this phase7 documents as well currently open issues - 137, 139, 166, 171 - THAT should be addressed. The question is - how and how properly to do it. Could you analyze these issues as well correlate it with the phase7 plans?
+
+The "one month on refactoring" concern.
+I hope that this is not gonna needed to be again but I consider this as net gain as an experience. This is why I am thinking that the second document that I mentioned earlier should analyze this phenomenon. Also want this situation to be avoided in future and multi-phase planning should have this into core.
+
+P.S. You should also check Discussions section in repo where I started to put questions/ideas to document them instead of having them only in the architectural documents. 

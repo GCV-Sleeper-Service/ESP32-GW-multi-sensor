@@ -1,0 +1,148 @@
+Let me answer these questions:
+
+One note giving in advance - I have a non-profit organization and was approved with discounted use of Anthropic and OpenAI models. Also, microsoft gives $2000 Azure creditsI would like to take advantage of this situation in light of the development of this project. 
+
+Claude: how many conversations/messages per day do you typically get before hitting limits? Are you on Pro or a team plan?
+A: Pro plan currently but plan to switch to team plan that will have two users with the same limits - see the non-profit usage above.
+Currently with Opus 4.6 extended - a single prompt (especially the one that produces prompts for whole phse) might take whole allocation session than I have to wait 5 hours until next one. I am running out my weekly session limits within 3-4 days
+
+GitHub Copilot: which tier (Individual, Business, Enterprise)? Is it the Copilot Workspace agent or just chat/inline?
+A: Individual Copilot Pro+ chat/inline yearly plan but planning to cancel. Background - I was planning to heavily use Github both for agentic and review sessions but Github made very drastic changes in last several weeks (check it) with Pro and Pro+ pluns and canceled model availability for these plans - that would make the current Pro+ useless for cost perspective.
+What I want - to have ability to do PR code reviews with gemini, copilot and codex that currently I am doing and need to continue. So the goal is to switch to the plan with github that would continue allow this with this pace of development.
+
+Also, it it is possible to take advantage of non-profit status with copilot - it would be great.
+
+Codex: are you using the OpenAI Codex CLI agent, the ChatGPT Plus Codex, or the API? What's the context window you're practically working with?
+A: On Plus plan but plan to switch to discounted plan for non-profit. ChatGPT Plus Codex - codex does agent prompts in VSC and Gpt does code reviews (see past PRs from phase V). Context window is 250K
+
+Kiro: still in the picture at all, or dropped?
+A: Dropped, but if there is a way to use non-profit status with Amazon, should be evaluated
+
+Perplexity: Pro? Is the GitHub MCP still reliable or has it been flaky?
+A: Pro. GitHub MCP is not entirely reliable, this is why three turn protocol was implemented to reduce token usage but it does not help in 50% of cases - perplexity can't post comment to PR or create consolidated audit files - I have to ask to provide files for download and then upload them.
+
+
+A3 — Wall-clock time per step. Even rough estimates help enormously. For a typical Phase V step (like v7.6.9.2 which had 0 fix cycles):
+
+How long does the Claude advisory session take to produce the agent prompt?
+A: Opus 4.6 - a single three prompt bundle (handoff, 2-step and agent) - 3-4 minutes. Whole phase can take 10-20 minutes and consume whole session allocation
+
+How long does the agent (Copilot/Codex on VSC) take to execute?
+A: Varies. Copilot - 15-45 minutes depending on prompt. Codex - slightly less, with GPT 5.4 as model and Medium thinking process. However, Codex agent is interrupted frequently, last case - v7.6.10.4
+
+How long does the review cycle take (inline reviews + external + Perplexity)?
+A: Five reviews - inline in github: copilot, codex, gemini + 2 external reviewers - ChatGPT + Codex (via web interface) - 30-60 minutes. Perplexity review (without MCP problems) - 10-15 min.
+
+How long does device testing take (compile + flash + curl)?
+A: 5-20 min depending number of boards 
+
+How long do post-merge deliverables take?
+A: 10-30 min, especially with Perplexity MCP problems.
+
+Total wall-clock — are we talking 2 hours? 4? 8?
+A: In a good day it was possible  to run 3-4 steps in a phase over 8 hour period. But good number of times it took longer.
+
+
+A4 — Where do you lose the most time? Your document implies some answers (sync overhead is gone now with local execution, which is good), but I want your explicit ranking. Which of these eats the most hours:
+
+Agent fix cycles after review findings?
+A: it is not that long. Most time is taken on agent's exection of the prompt and reviews.
+
+Claude context exhaustion mid-session (having to start a new conversation)?
+A: ALL THE TIME
+
+Compile/flash/test turnaround?
+A: Yes, takes time.
+
+Manual documentation work (audit files, session logs, changelog entries)?
+A: It takes time but mostly not on that but rather on to keep documentation and planning on track. 
+Biggest time wasting is to write a first/intro prompt that explains current state and my goals because I want make sure that I give the accurate information.
+
+Context rebuilding when switching tools?
+A: It was a problem
+
+Something else entirely?
+A: It is. Please read very carefully the Redisingning-development-hard-questions.txt document I am attaching. Read twice and internalize it. it will help to understand my concerns.
+
+
+B5 — GitHub features in use. Your repo has 202+ PRs but I can't tell from the code alone:
+
+Do you create GitHub Issues for bugs/tasks, or just track them in markdown files (BUG-NNN in lessons/)?
+A: I recently started entering/documenting every new issue/bug/feature that is discovered outside of the prompt execution and want to adopt the this methodology going forward. BUG/Lesson-NNN developed in past with Claude when certain things during the development was discovered. So it is all Claude's entries as documentation, not issues.
+
+Are labels applied to PRs systematically?
+A: No but I want to make this as a standard process going forward, as well as standard naming in the issues.
+
+Branch protection rules on main — any required reviewers or status checks configured?
+A: required reviews for PR are inline reviews (copiot, codex, gemini), not sure about status checks
+
+Any GitHub Actions CI beyond the Playwright browser-tests workflow?
+A: Not at this moment but would like to know the other options/possibilities
+
+
+B6 — What GitHub features would you want? Your suggestion #3 (.github/agents.md) is one. But also:
+
+Would milestone-per-phase tracking be useful to you?
+A: Yes, if it helps with development and documentation
+
+Would auto-created issues from agent prompts help, or would that be overhead?
+A: I think it is overhead, but what it would help is to do analysis after every phase and create issues if needed. I am doing this now manually
+
+Would CI enforcement of preflight checks (as a required status check) be worth setting up?
+A: as far as CI goes - this is one of the main time consumers - it runs even when changes are in documentation, not in codebase. Can this somehow changed that only codebase change triggers CI? CI even runs when I do tagging
+
+
+The quality/planning questions that inform the analysis
+C7 — Which phase had the smoothest execution? My read from the data is Phase Y (9 steps, SHA-256 identity gates throughout, 0-1 fix cycles per step, clean closure) — but you might have a different experience of it.
+A: Correct. Phase Y that was with heavy copilot usage
+
+C8 — Which phase had the most rework? My guess from the gap catalog and fix-cycle counts is Phase 4 or Phase 6, but the phase results don't all break down fix cycles the same way.
+A: After post-commit - that was before phase V/Y. V/Y had steps that required multiple fixup prompts for agents before merge and number of times it was necessary to bring issues back to Claude (see escalation prompt) to produce either final agent prompt or codechange directly.
+
+C9 — Lingering bugs/tech debt. The text I have from memory and results docs says:
+
+BUG-082 (WROOM history export crash) → deferred to Phase 7
+A: Still here both for WROOM and C3 - after about 3 weeks of data both boards dashboards crash on open when trying to load history data and it is unusable. The only way is to dump content of the flash of the boards and then extrct sensor data from there.
+
+C5 BLE antenna re-test pending
+A: Will be done soon
+
+v7.6.9.6 (Cloudflare polling) was dropped as self-resolved
+A: Resolved
+
+Is there anything else that nags at you?
+A: bug-wise - no, but one month was spent on phase V/Y/VX that was not a feature implementation, but refactoring. I want to avoid this happening in future.
+
+C10 — What info do you wish you had earlier when planning phases? This shapes the phase planning checklist.
+A: Avoid landmines that blew up later. This is why the second text I've attached is so important.
+
+C11 — Parallelism. Your document doesn't address this. In PhaseVX, could Steps 0-1 (ESPHome upgrade + board profiles) have run in parallel, or was that truly sequential? Could documentation updates run parallel to code PRs?
+A: That could run in parallel. Documentation update should run in parallel.  
+
+C12 — How do you decide "done enough"? Phase V had a formal closure process with a closure analysis doc and issue sweep. Was that ceremony worth the cost? Would you do it again for every phase, or only for stabilization phases?
+A: Yes until we know that we do not have landmines that will blow up in future. 
+
+Documentation questions that shape the deliverables
+D13 — Audience. Is this methodology document for:
+
+Just you (operational reference)?
+A: Yes at this moment. But I want to use this document as a guideline how to plan project like this in future and avoid the problems that have been with this project so far.
+
+Future contributors to this specific project?
+A: Yes, but above is more important.
+
+Anyone wanting to replicate AI-driven development for their own projects?
+A: YES. It should be a handbook for future projects.
+
+All of the above?
+A: Yes
+
+
+D14 — Which documents do you actually open during development? Of the 20+ docs in the repo, which ones do you actually reference while working? My guess is: prompt-index-and-workflow.md, the session handoffs, and maybe lessons/firmware.md — but I want your real answer.
+A: Correct, plus I actually read every single agent, 2-step and session handoff prompts because in past 'operator actions' have been spread in all of these. 
+
+D15 — Which documents feel like overhead? Are the consolidated audit files worth the effort? Are the session logs? The closure analyses?
+A: My goal is - create as much documentation as necessary to advance the quality and speed of development and have audit trail - what was done, why and how. The prompt writing guide was created for the purpose to create better prompts. Do you think it worked?
+
+D16 — What would take longest to explain to a new contributor? This identifies the knowledge that's in your head but not yet documented.
+A: basically - how THIS works. This is why I want to make it formalized, documented, predictable, replicable, easy to understand. 

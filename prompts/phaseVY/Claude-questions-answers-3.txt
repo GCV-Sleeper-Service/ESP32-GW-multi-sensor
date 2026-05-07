@@ -1,0 +1,144 @@
+Multi-Dimensional Analysis
+
+Phase 7 Plan and multi-phase planning session 
+
+
+
+Optimization 1: Create a single machine-maintained file — call it CURRENT-STATE.md — that is updated after every merge. 
+Make it a mandatory post-merge deliverable — the agent's consolidated audit generates the updated CURRENT-STATE.md section.
+
+Q: This is good. So this file needs to be created REGARDLESS of the question asked because it should provide the (most) of answers for the questions. But will the prompt/instruction to create such a file change over time?
+How to do the revisions?
+
+Optimization 2: Drop to 3 reviewers from 5. (75% confident this saves 15-20 min per step without quality loss)
+Q: No, there were number of cases when one from three reviewers found something that others could not. Perplexity/Copilot (if stays) will remain as an external reviewer. I just need to have means automate GPT/Codex reviews
+
+Optimization 3: Automate flash/test pipeline in agent prompts. (85% confident this saves 5-15 min per step)
+Parse curl output for expected values. Post results to PR comment
+Q: will running tests via curl be a standard procedure via agent prompts as well?
+
+
+Dimension 2 — Parallelism Opportunities
+Practical parallel model for Phase 7:
+Q: Can you for this example provide a scenario how this parallelism would work? Like run two different sessions?
+
+Dimension 3 — GitHub Integration. Recommended changes (ordered by impact):
+1. CI path filtering (95% confident this is purely beneficial):
+A: Agree
+
+2. .github/agents.md for inline reviewers (80% confident):
+This requires Copilot Business or Enterprise tier. 
+Q: Is this a fact? I don't see these instructions in this two URLs:
+https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions
+https://docs.github.com/en/enterprise-cloud@latest/copilot/tutorials/cloud-agent/get-the-best-results
+Could you actually read the documentation and confirm?
+
+
+3. Milestones per phase (70% confident this helps):
+Q/A: Agree
+
+4. Labels (75% confident): Don't over-label. The goal is filtering, not taxonomy. 
+Q/A: agree. In this case labels should be defined and documented as well
+
+
+Dimension 4 — Bug and Tech Debt Prevention
+
+ESPHome/IDF defaults - audit defaults before using a component
+Q: So... can an investigating session be done that discovers all the defauls, documents them and makes this accessible for future and if ESPhome version needs to be updated, then re-run discovery? Does this worth to do?
+
+
+Checkpoint pattern — Reduced fix cycles from 2-6 to 0-1 per step. This is the highest-ROI process innovation. (90% confident)
+Q: in v7.6.10.4 agent stumbled on checkpoints several times. How this can be thought afater?
+
+What's still missing:
+
+Proactive measurement before design. 
+Q/A: completely agree. How can this be a standard procedure?
+
+Long-duration testing. A weekly health-check curl script that logs heap/NVS stats would have caught it. 
+Q/A: can this script be part of above mentioned CURRENT-STATE.md that needs to be updated if something has been up and running something like >1 week (arbitrary time)
+
+Recommendation tracking. The fix is structural: every postmortem recommendation becomes either (a) an issue, or (b) a step in the next phase plan. No third option.
+Q/A: Completely agree.
+
+Dimension 5 — Knowledge Architecture
+Proposed knowledge architecture:
+Q/A: I would agree with one note - this will work only in case if the process updates the documentation accordingly and does not ever deviate. So when producing prompts for example, these prompt producing prompt should have its own rules/checkpoints that would make sure than in prompt will go section that would update documenation.
+
+
+Dimension 6 — The Hard Questions (Your Document)
+"How do we add assumption-audit checkpoints to planning sessions?"
+Yes. Before any phase plan or prompt set is produced, the planning session runs this gate:
+Q/A: agree. This is a good set of checkpoints
+
+"How do we ensure forgotten recommendations feed into future plans?" The structural fix:
+Q/A: Agree
+
+"How do we keep the writing guide from growing unbounded?"
+Q/A: OK because it is what you would be producing, then I would default this to you
+
+"How do we measure whether the process is working?"
+Three KPIs, tracked per phase:
+Steps-per-feature ratio.
+Fix cycles per step. 
+Wall-clock hours per step. 
+
+Q/A: agree but need to understand how to keep track of these and do analysis.
+
+Proposed Phase 7 reordering:
+Q/A: agree.
+
+
+Summary of Recommended Actions
+Immediate (before Phase 7 starts):
+
+
+P.S. This is what I just found in my notes that you wrote about prompt writing after discovering that agent prompt was away from reality (again - reality check):
+--
+This is a real process finding that should go into the Phase V closure analysis (Q6) and into future prompt-writing guidance. Line number references in step prompts decay every time a prior step merges, and the decay is worst in shared files like firmware/core/web-handler.h where every Phase V sub-phase added code. A few options for Phase 7 prompt authoring:
+
+Prefer function/identifier anchors over line numbers. find the loop in handle_aggregator_gateways_ that iterates satellite_caches[] is stable across commits. line ~1431 is not.
+When line numbers are used, tag them as-of-plan-write-date explicitly. E.g. line ~1431 (as of 2026-04-13) — at least makes the staleness visible.
+Regenerate line references immediately before execution. A cheap script could grep -n the anchors the prompt cares about and patch the prompt right before the operator hands it to an agent. One line of work vs. full-session stall.
+
+This is exactly the class of finding that Phase Y's closure analysis called out in its Q6 ("agent behaviour patterns — summary") — guardrails that work reliably across prompt drift. Worth carrying forward.
+--
+
+
+Addressing the follow-up after I pointed you to multi-phase planning session prompts:
+
+Three specific findings from reading these supplements:
+a) believe chunked streaming can be implemented against the existing NVS key scheme first (fixing BUG-082 now) and then updated for the new key scheme later. But this is an architectural call that should be validated during the planning session, not assumed.
+What info you need to decide?
+
+b) he post-VX supplement's Question 13 about BUG-084 -  Phase 7 plan should document the expected task queue depth.
+So this need to be added into documentation as well?
+
+c) produce a prompts/handoff/methodology-audit-findings-for-planning.md
+
+
+So my questions:
+
+#1 any change on the plan below?
+--
+Create CURRENT-STATE.md — the universal session context file
+Rewrite Phase 7 implementation plan against current codebase (firmware/core/ fragments, dashboard components, auth module, 6-board fleet)
+Create Docs/decisions/decision-log.md — lightweight decision index
+Add CI path filtering to stop docs-only CI runs
+Promote BUG-075-076 health-check recommendation to Phase 7 step 0
+
+Process changes (ongoing):
+6. Add assumption-audit gate to planning sessions (custom instructions or prompt preamble)
+7. Every postmortem recommendation → Issue OR CURRENT-STATE.md entry (no third option)
+8. Update writing guide at every phase closure
+9. Drop to 3 reviewers default, 5 for high-risk steps
+10. Agent prompts include flash/test automation where possible
+Deliverable documents:
+11. Document 1: Project-specific process acceleration guide
+12. Document 2: "LLM-Assisted Development Practitioner's Guide"
+13. Document 3: Updated multi-phase planning supplement
+--
+
+And then - how to proceed with phase7 and consequent phases planning? What information is missing to plan these phases, if any? I have old documentation/features document (again - as you would say - 'forgotten') that assessed the feature implementation priority. 
+
+How should we proceed?

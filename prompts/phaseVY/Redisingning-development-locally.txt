@@ -1,0 +1,176 @@
+Better development - for discussion and adjusting/creating efficient agentic development plan and put this into documents.
+
+
+Part 1 - preface:
+This is result of several days writing and I would like to ask you to take this document seriously. Read it twice to understand and internalize the context and points I am trying to make. While at the same time I am asking NOT to take things that are written below as pure facts - you can and should check the validity of statements and point me if they are not correct.
+
+I am writing this based on my own understanding of development of this project, however, you should read all the phased architectural documents from phaseY and phaseV minimum, plus corresponding prompts that are in the prompts/ folders.
+
+
+Part 2 - the evolved reality:
+Background - previous phases to take into consideration - over the course of the development of this project (already into two months), the following pattern was emerged:
+
+First a proposal for new features and implementations is discussed here with you. 
+As a result of the discussion it is either a document for the phased (phases 3/4/5/6, D/X/V, 7...) architectural scope/implementation is created, or, as a preliminary step, a prompt is created based on research that would create such a document. The phased architectural document in its turn is used to produce prompts for each step for each phase. 
+
+How development has evolved: first the code was produce by Claude and run/tested/deployed locally. Then development moved into GitHub, with proper documentation and step planning. Then bugs/issues have been started documented, then usage of multi-LLMs both for agent and review purposes have been introduced. This both made things easier and more complicated at the same time. 
+
+Over the course the another pattern has emerged: for each step in the phase, minimum three prompts need to be produced:
+
+- An very detailed agent prompt that follows strict DO and DO NOTs procedure as well as have checkpoints in it to make sure that prompt assumptions do match the reality at this moment. DO/DO NOTs on its own are based on prompt writing guide from Docs/writing-guide as well as rules that have been learned/discovered and listed in prompts/prompt-index-and-workflow.md
+- A handoff document from the previous step that has detailed outlines what this step is doing, risk level, as well as deliverables and also outlines if next step prompts need to be updated and inspected as well
+- A two-step prompt that is produced for Claude environment that has checkpoints in them for Agent prompts as well as detailed list what review prompt for this particular step needs to check, confirm and greenlight.
+
+The two-step Claude prompt itself is a base to create review prompts for non-Claude environments, like for Copilot, Perplexity and others that have different tools to access GitHub and need to be rewritten accordingly. So it emerged that it is critical as agent's prompt to be specific, the review prompt to be specific in the review scoping to produce the real consolidated PR audit file, as well as based on these files - the phase conclusion results.
+
+It also emerged that after agent's implementation it is critical to have code reviews by inline reviewers (Copilot, Codex, Gemini) and external reviewers (GPT, Codex) as well. 
+It has emerged that number of reviewers matter - some of them can caught things that others do not. 
+It also matters how the questions for PR review are phased to external reviewers - what exactly they need to look at.
+
+And after conclusion of phaseY a very detailed phase assessment document was created by Copilot that should be used as a template/guideline how phase conclusion should happen.
+
+PhaseY and phaseV that mostly addressed code refactoring, bug fixing and optimization - they did not introduce any new features or architectural changes. This is the scope for phase 7, 8 and beyond and to adequately prepare for it - that's why I am presenting this text to you for mutual discussion, understanding and finding the best, optimal plan to move forward. I am not saying that the current plan is not working. It is, but I think it CAN be made better.
+
+
+Part 3: the current development environment and the process
+
+I am now going to detail the current, phaseV development plan - how each step was performed. 
+
+PhaseY:
+PhaseY was using web interfaces/portal to run agent prompts - the prompts was pasted to the portal (mostly Copilot, but sometimes - Codex or GPT), agent was running the prompt, updating github repo directly (on github.com), then after finishing working the PR had to be made ready for review and then call inline revivers.  
+After PR was opened, the fix-up prompt (when needed) also was posted via web portal for additional commits. Then these commits were synced with the local repo that is running ESPhome on LXC container, and operator (I) run additional actions - flashing, testing, etc. Number of times this process repeated - fix is done on github.com, needs to be synced locally, until PR is ready to be merged.
+The reviews were also using web interfaces - Perplexity, Codex and GPT and again, the post merge changes needed to be synced locally as well - for documentation updates/edits, etc.
+
+PhaseV:
+PhaseV moved execution of agent's prompts locally on Visual Studio Code (VSC) by installing github, codex, github remote, remote explorer extensions. So now VSC opens remote repo on LXC container that has ESPHome installed. Codex or Copilot extensions that are used for agent's prompts execution locally - they directly work with the content of the repo on the LXC container - they can read all the files locally, no need to use github tools and access the data on github.com. 
+Also, the coudflared tunnel allows to access the LSX container with the ESPhome/local repo via internet - regardless if access is via local network or via cloudflared tunnel, codex and copilot on VSC have direct access to the local repo.
+
+As a result, when copy/pasting the agent's prompt section from Claude two-step prompts, it works - I do not need to alter prompt to account agent's tools.
+
+Action is following:
+
+a) The particular instruction that is given to the Agent before running the prompt is following: 
+
+1) Before any code changes:
+   - sync latest main and branch from it:  
+     `git -C /root/config/ESP32-GW-multi-sensor fetch origin main`  
+     `git -C /root/config/ESP32-GW-multi-sensor checkout -b <feature-branch> origin/main`
+   - create empty bootstrap commit
+   - push branch
+   - open DRAFT PR to `main`
+
+2) Post PR URL immediately.
+
+3) Only then read required files/prompts in order, run pre-implementation gates, and start edits.
+
+4) Commit only to that branch and push to same PR.
+
+5) Never commit to `main`.
+
+6) End by marking PR “Ready for review”:
+   - primary: `gh pr ready <PR#> --repo GCV-Sleeper-Service/ESP32-GW-multi-sensor`
+   - fallback: `gh api -X PATCH repos/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pulls/<PR#> -f draft=false`
+   
+7) Once you finish working, change PR description to be meaningful and descriptive, use PR176-178 as a reference (here the PR176-178 are examples how to properly describe the PR based on prompt and actions)
+ 
+b) After the above instruction agent is given the agent's section from claude's two-step prompt. Agent runs the prompt then posts results into PR and comment. 
+
+c) after PR is open, Codex, Copilot and Gemini are doing inline reviews
+
+d) Once inline reviews are done, the codex agent on VSC is given following prompt:
+--
+Please analyze the code reviews and comments for the PR. Assess if they are warranted, if yes, implement necessary fixes.
+Once fixes are implemented, please post additional comment of your assessment of the comments, summary, what was changed/fixed, why and how.
+--
+e) Once Codex agent finishes implementing fixes with new commit, external reviewers - GPT and Codex are given following prompt (using as an example for the v7.6.9.4 step )
+
+--
+Repo - https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
+Read thoughtfully `prompts/handoff/phaseV/session-handoff-v7.6.9.4.md` to understand the current stage and deliveries
+
+Current task - implement v7.6.9.4.
+
+Coding agent has executed prompt for v7.6.9.4 using this prompt - `prompts/phaseV/v7.6.9.4-agent-prompt-gpt-codex.md`
+
+PR for v7.6.9.4 is PR191.
+
+Please do comprehensive analysis of the PR191:
+- Understand what is the current result of the implementation
+- Check diffs (ignore dashboard.h and sensor_history_multi.h because they are generated artifacts)
+- Read code audit/comments posted in the PR - do you agree with assessment, anything they've missed?
+- Check follow-up and the last commits and understand what issues have been fixed after code reviews and what are remaining, if any.
+
+Please post your code quality and deliverables analysis findings as a comment for the PR191 with instructions what to fix and how.
+DO NOT open a new PR, just post additional comment for the existing PR191.
+
+On the first line annotate - PR review by CODEX/GPT
+
+In the comment, answer following questions:
+- Annotate problems with severity: Blocking / High / Medium / Low / Cosmetic.
+- Did the agent deliver what the prompt required? Where it didn't, classify the cause: prompt ambiguity, codebase drift, or autonomous decision.
+- Are all acceptance criteria from §6 of the implementation prompt met?
+- Were any autonomous decisions made that should be back-ported into the prompt for reproducibility?
+- What carries forward as required context for the next step?
+
+Also include in your review answers to questions that are defined in the document `prompts/phaseV/v7.6.9.4-claude-two-step.md` after heading:
+`After the agent creates its PR, open a second fresh session and review specifically checking:`
+
+Provide answers to these questions as as a table
+
+Please make your comment not too verbose, be brief, stress on facts
+--
+
+f) After external reviewers, the operator posts additional comments in PR if needed - like curl command outputs from device testing
+
+g) At the end, Perplexity (or Copilot) runs second section of Claude two-step reviewer prompt adopted for the environment - Perplexity or Copilot.
+
+
+Main question for this document - can the above made more efficient? If yes how? 
+
+I though about following improvements/suggestions:
+
+1. Automate local testing with boards that rely on curl/non-visual interface commands:
+
+ANY such command can and should be built into the agent's prompt so agent can run compile, flash (wait, if necessary), run curl/test commands and post results. Operator should do manual testing only when only operator can do such action.
+
+Codex agent actually did flashing the boards, but it used esphome run which led that esphome was outputting the logs and had the session hang. Instead it needs to use esphome clean, esphome compile, esphome upload commands as well as have built-in capability to detect if something went wrong and what exactly.
+
+So the suggestion is - because now coding agent executes commands against local repo, it should be able to run full pipeline with flashing firmware to devices as well. 
+The pipeline should look as following AFTER running provision.sh script
+
+Aggregator:
+bash scripts/provision.sh aggregator
+esphome clean   firmware/esp32-s3-devkitc1-n16r8-gw.yaml
+esphome compile firmware/esp32-s3-devkitc1-n16r8-gw.yaml
+esphome upload  firmware/esp32-s3-devkitc1-n16r8-gw.yaml --device=192.168.120.191
+esphome clean   firmware/esp32-c3-multi-sensor.yaml
+
+Satellite C3 - .189:
+bash scripts/provision.sh satellite
+esphome clean   firmware/esp32-c3-multi-sensor.yaml
+esphome compile firmware/esp32-c3-multi-sensor.yaml
+esphome upload  firmware/esp32-c3-multi-sensor.yaml --device=192.168.120.189
+esphome clean   firmware/esp32-c3-multi-sensor.yaml
+
+Satellite WROOM - .190:
+bash scripts/provision.sh wroom
+esphome clean   firmware/esp32-wroom-32d-gw.yaml
+esphome compile firmware/esp32-wroom-32d-gw.yaml
+esphome upload  firmware/esp32-wroom-32d-gw.yaml --device=192.168.120.190
+esphome clean   firmware/esp32-wroom-32d-gw.yaml
+
+Above will ensure that esphome environment is cleaned both before and after flashing the firmware.
+
+The corresponding scripts should be updated as well
+
+2. The consolidated audit files, update of next step handoff and agent prompts should be posted in the PR itself and PR should be merged when all goals of the step has been accomplished and it is ready to be merged with all deliverables.
+
+
+How agent prompt can be altered to take into account the local IDE/agentic development? The reviewers from Perplexity need to be run via web portal regardless, but review from Copilot can be executed/run locally as well - how this can be implemented - can Clade two-step prompts with reviewer prompts used as is or they need to be modified?
+
+What else can be done to make the development/agentic run and reviews more efficient? Can agent be instructed in the prompt to wait for reviews to be posted and act on these and fix them automatically? 
+
+Can anything be improved on VSC with Codex/Copilot, on LXC container itself? The whole process with PR/merging/review?
+
+3. How agents.md can be used on github so inline reviewers know what to look at? Some other rules can be defined?
+
