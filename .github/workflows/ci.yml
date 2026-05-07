@@ -4,8 +4,28 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - 'firmware/**'
+      - 'dashboard/**'
+      - 'config/**'
+      - 'scripts/**'
+      - 'partitions/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'firmware/**'
+      - 'dashboard/**'
+      - 'config/**'
+      - 'scripts/**'
+      - 'partitions/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/ci.yml'
 
 jobs:
   preflight-and-compile:
@@ -33,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          pip install esphome==2026.2.1
+          pip install esphome==2026.4.1
           npm install -g html-minifier-terser
           echo "node=$(node --version) npm=$(npm --version) python=$(python --version) esphome=$(esphome version)" >> "$GITHUB_STEP_SUMMARY"
 
