@@ -1,8 +1,19 @@
 # Multi-Phase Planning Session — Methodology Audit Supplement
 
 _Append this supplement to `prompts/handoff/multi-phase-planning-prompt.md` AFTER the post-VX supplement._
-_Source: Phase VY methodology audit session (2026-05-06)_
+_Source: Phase VY methodology audit session (2026-05-07)_
 _Prerequisite: `CURRENT-STATE.md` exists at repo root._
+
+---
+
+## Additional Mandatory Reading (appended to the 18-document list in the main prompt)
+
+In addition to the documents listed in the main planning prompt, this session must also read:
+
+19. `CURRENT-STATE.md` — current version, open issues, board measurements, unimplemented recommendations, stale documents
+20. `Docs/feature-roadmap.md` — feature priority ordering and phase numbering
+21. `AGENTS.md` — agent instructions file (to understand what inline reviewers now see)
+22. `Docs/development-process-guide.md` — skim Sections 2-4 for process changes that affect prompt production
 
 ---
 
@@ -49,7 +60,7 @@ Recommended Phase 7 step order:
 | Step 2+ | Per-device persistence engine (structs, persist, restore, wire) | Original Phase 7 scope, rewritten against current codebase |
 | Step N | Export/import v2, regression, phase closure | Original Phase 7 tail |
 
-**Validation needed:** Confirm chunked streaming can be decoupled from per-device persistence by checking whether `/history/` handlers use `seg_NNN` keys directly or through an abstraction that Phase 7 replaces.
+**Validation needed:** Confirm chunked streaming can be decoupled from per-device persistence by checking whether `/history/` handlers use `seg_NNN` keys directly or through an abstraction that Phase 7 replaces. Run: `grep -n 'seg_' firmware/core/nvs-persistence.h | head -20`
 
 ---
 
@@ -71,9 +82,9 @@ The Phase 7 review (Deliverable 1 of the planning prompt) should flag these spec
 
 ---
 
-## Process Requirements for Phase 7 Prompts
+## Process Requirements for All Future Phase Prompts
 
-Based on Phase VY findings, all Phase 7 agent prompts must include:
+Based on Phase VY findings, all future agent prompts must include:
 
 1. **`CURRENT-STATE.md` as first mandatory read** — replaces the ad-hoc "read these 10 files" pattern.
 
@@ -93,9 +104,58 @@ Based on Phase VY findings, all Phase 7 agent prompts must include:
 
 ---
 
+## GitHub Project Management
+
+### Milestones
+
+Create a GitHub Milestone for each implementation phase. Link every PR to its phase milestone. The milestone progress bar provides a visual completion percentage without maintaining a separate tracker.
+
+When creating the Phase 7 plan, also create the Phase 7 milestone. Each step's PR gets linked to it at PR creation time.
+
+### Labels
+
+Standardized label set (create once, use consistently):
+
+**Phase labels:** `phase/7`, `phase/E`, `phase/8`, `phase/9`
+**Type labels:** `type/firmware`, `type/dashboard`, `type/docs`, `type/tests`, `type/infra`
+**Risk labels:** `risk/high`, `risk/medium`, `risk/low`
+**Status labels:** `status/review-in-progress`, `status/device-test-needed`, `status/blocked`
+
+Agent prompts should include: "Apply labels `phase/7`, `type/firmware`, `risk/medium` to the PR."
+
+### Issue Management
+
+After every phase closure, run an issue sweep. New issues discovered during execution become GitHub Issues (not just LESSON-OPS or BUG entries in markdown files). Every issue gets a phase label for when it's expected to be addressed.
+
+---
+
+## Health-Check and Long-Duration Monitoring
+
+### Weekly Health-Check Script
+
+Create a cron job or manual script on the LXC container that logs board health:
+
+```bash
+#!/bin/bash
+# scripts/weekly-health-check.sh
+DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+for board in 192.168.120.189 192.168.120.190 192.168.120.191; do
+  echo "$DATE $board $(curl -s -u ESPadmin:ESPpass100 http://$board/api/status/full | \
+    python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({k:d.get(k,'N/A') for k in ['version','free_heap','min_free_heap','uptime_seconds']}))" 2>/dev/null || echo 'UNREACHABLE')"
+done >> Docs/health-check-log.jsonl
+```
+
+This log is consumed when updating `CURRENT-STATE.md` — if any board shows `min_free_heap` below 15,000, flag it in the open issues section.
+
+### Pre-Design Measurement Protocol
+
+Before any phase that modifies firmware behavior, record baseline measurements from all production boards. The Phase 7 Step 0 (health-check telemetry task) makes this easier going forward by adding runtime logging. Until then, use `curl` + `scripts/stress-test-httpd-stack.sh` to collect baselines manually.
+
+---
+
 ## Parallelism Model
 
-Phase 7 can use two parallel tracks where dependencies allow:
+Phase 7 (and future phases) can use two parallel tracks where dependencies allow:
 
 ```
 Track A (firmware):   Step 0 → Step 1 → Step 2 → ... → Step N
@@ -110,20 +170,18 @@ Documentation-only PRs should be merged independently and should not trigger the
 
 ## Feature Priority Context
 
-The planning session should also read `Docs/feature-roadmap.md` (if present) or the operator's feature priority notes. The original feature plan (v7.4-era) ordered priorities as:
+The planning session should read `Docs/feature-roadmap.md` for the full feature ordering. Summary of priorities:
 
-1. Per-device persistence (Phase 7) — **highest, addresses production crash**
-2. Notifications — Telegram first, then ntfy.sh, then email (Phase 8.x)
-3. Cloud data upload — InfluxDB Cloud first (Phase 8.5+)
-4. Captive portal provisioning (Phase E / 8.0)
-5. Dynamic dashboard sizing (Phase 9.0)
-6. Multi-language, AI analytics (Phase 9.1, 10.x) — lowest priority
-
-The operator's guiding principle: "Don't complicate things beyond necessity. Only things that incrementally improve should be adopted."
+1. Per-device persistence (Phase 7) — **highest, addresses production crash BUG-082**
+2. Captive portal provisioning (Phase E) — runtime board detection, WiFi setup
+3. Notifications — Telegram first, then ntfy.sh, then email (Phase 8)
+4. Cloud data upload — InfluxDB Cloud first (Phase 9)
+5. Dashboard UI enhancements — dynamic sizing, multi-language (Phase 10)
+6. Analytics — browser-side statistics (Phase 11) — lowest priority
 
 ---
 
-## Cost Optimization Note
+## Cost Optimization
 
 The operator has non-profit discounts for Anthropic and OpenAI, plus $2000 Microsoft Azure credits. The planning session should consider LLM cost allocation when recommending phase scope:
 
