@@ -121,7 +121,7 @@ A complete agent prompt has these sections:
 7. **Acceptance criteria** — checkable conditions for completion
 8. **Pipeline commands** — exact build/test commands to run
 9. **Post-implementation verification** — final checks before marking PR ready
-10. **Post-merge deliverables** — documentation updates, state file updates
+10. **"Step deliverables (in-PR)** — documentation updates, state file updates
 
 ### 3.3 Checkpoint Design
 
