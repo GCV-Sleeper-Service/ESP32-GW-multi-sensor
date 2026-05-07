@@ -98,15 +98,28 @@ External reviewers get a structured prompt (see prompt templates) that asks them
 
 Perplexity runs the structured three-turn review protocol as the final quality gate when MCP cooperates. When MCP fails, operator downloads the review output manually.
 
-### 2.5 Post-Merge Deliverables
+### 2.5 Step Deliverables (in-PR, before merge)
 
-After PR merges, these are mandatory:
+The PR is the single source of truth for a step. A step is not "done" until the PR contains all of its deliverables. Post-merge work is limited to mechanical bookkeeping that depends on the merge commit SHA.
 
-1. Update `CURRENT-STATE.md` — "What Just Shipped" section + any new open issues
-2. Update `Docs/changelog.md` — version entry with changes
-3. Session log (if significant debugging or decisions occurred)
-4. Consolidated audit file (for non-trivial steps)
-5. Update session handoff for next step (if applicable)
+**In-PR mandatory deliverables (merge gate):**
+
+Before a PR may be marked "Ready to merge," the branch MUST contain:
+
+1. **Code changes** — the actual implementation, with all checkpoints satisfied (or a checkpoint-failure comment posted and accepted by the operator).
+2. **`CURRENT-STATE.md` update** — bump "Last verified" date, append to "What Just Shipped," update "What's Next," add/remove "Open Issues" and "Unimplemented Recommendations."
+3. **Changelog entry** — `Docs/changelog.md` entry under the new version.
+4. **Consolidated audit file** — for non-trivial steps. Includes all review findings with severity, agent autonomous decisions, and prompt quality score.
+5. **Next-step session handoff updates** — if the next step's prompts need changes based on what this step discovered, edit them in this PR.
+6. **Recommendation routing** — if this step produced new recommendations, each one is recorded in CURRENT-STATE.md "Unimplemented Recommendations" OR opened as a GitHub Issue. No third option.
+
+**Post-merge bookkeeping only:**
+
+- Tag the release if this step is a version increment
+- Close resolved GitHub Issues (linked via "Fixes #N")
+- Move milestone progress bar (automatic if PRs are linked)
+
+If you find yourself opening "documentation update" PRs the day after a merge, that is the drift this rule prevents.
 
 ---
 
@@ -130,6 +143,18 @@ Checkpoints prevent agent drift. Rules for writing them:
 - **Use function/identifier anchors:** "Find the loop in `handle_aggregator_gateways_` that iterates `satellite_caches[]`" is stable. "Line ~1431" is not.
 - **Stop-don't-fix semantics:** "If this check fails, STOP and post actual vs expected values as a PR comment. Do NOT modify code to pass the checkpoint."
 - **Verify current state before applying:** If a checkpoint says "file X should contain Y," the agent must `grep` first, not assume.
+
+**When a checkpoint fails, the agent posts this exact comment:**
+
+```
+⛔ CHECKPOINT FAILED — <checkpoint name>
+Expected: <expected value or condition>
+Actual:   <command output>
+Command:  <verbatim command>
+Action:   STOPPING. NO code changes made. Awaiting operator decision.
+```
+
+Agents that "explain away" a checkpoint failure instead of posting this template are exhibiting the plausible-narrative trap. The comment forces structured reporting.
 
 ### 3.3 Scope Guards
 

@@ -29,6 +29,17 @@ LLM-assisted development is not "AI writes code for you." It is **operator-direc
 
 The methodology's entire purpose is to provide these three things reliably.
 
+### 1.4 The Truth-Seeking Discipline
+
+The most expensive failures in this project's history came from accepting plausible explanations without verification. Truth-seeking is the primary objective of every advisory, planning, and debugging session. Four rules:
+
+1. **Confirm WHAT before hypothesizing WHY.** Run a single diagnostic command before accepting any explanation for unexpected behavior. The C3 httpd stack investigation (BUG-083) cost days; one `grep` would have solved it in seconds.
+2. **Eliminate the simplest explanation first.** Sophisticated theories are satisfying. Simple checks are faster. If an explanation sounds elegant, that is the signal to run the basic diagnostic first.
+3. **State assumptions explicitly and verify each one.** "I assume X because Y" — then test X with a command. If verification is impossible, label it `UNVERIFIED ASSUMPTION`.
+4. **When evidence and narrative diverge, evidence wins** — even when the narrative is yours.
+
+When classifying evidence, direct measurements (curl output, compiler logs, device telemetry) outweigh source inspection (grep results), which outweigh current documentation, which outweigh historical documentation, which outweigh human memory, which outweigh model inference. Production-impacting decisions require measurement or source inspection. Model inference is hypothesis, not fact.
+
 ---
 
 ## 2. Planning Phase
@@ -66,6 +77,22 @@ Example from real experience: A postmortem recommended adding health-check loggi
 Maintain a single `CURRENT-STATE.md` file that contains: current version, recent changes, what's next, open issues, current measurements, unimplemented recommendations, and stale documents. This file is the universal "read this first" for every session.
 
 Update it after every merge. If it's stale, every session built on it is built on wrong assumptions.
+
+### 2.5 Source-of-Truth Hierarchy
+
+When sources disagree, resolve by this order:
+
+1. Live code on `main`
+2. Build output, test results, telemetry, and device measurements
+3. `CURRENT-STATE.md`
+4. Decision log
+5. Current phase implementation plan
+6. Current step prompt and handoff
+7. Changelog and recent phase closure
+8. Historical postmortems and archived handoffs
+9. Model memory or conversational memory
+
+Archived documents are evidence, not instructions. Any plan older than the last refactoring phase must be treated as stale until verified. Generated artifacts are never the source of truth when source fragments exist.
 
 ---
 
@@ -107,6 +134,16 @@ Checkpoints are the highest-ROI innovation in the methodology. They reduced fix 
 - Stop-don't-fix semantics: When a checkpoint fails, the agent should REPORT, not silently "fix" it. Fixing a checkpoint to make it pass defeats its purpose.
 - Verify before modifying: The agent must check current state before applying changes. "If line 47 has X, change it to Y" — but first confirm line 47 actually has X.
 
+When a checkpoint fails, the agent must post a structured comment — not explain away the discrepancy:
+
+```
+⛔ CHECKPOINT FAILED — <checkpoint name>
+Expected: <expected value or condition>
+Actual:   <command output>
+Command:  <verbatim command>
+Action:   STOPPING. NO code changes made. Awaiting operator decision.
+```
+
 ### 3.4 The Stale Prompt Problem
 
 Prompts reference file paths, function names, line numbers, and version strings. All of these change with every merge. A prompt written for Step 3 references the codebase as of Step 2's merge. By Step 5, half the references may be wrong.
@@ -140,7 +177,7 @@ In practice, different LLM reviewers catch different defect categories. A securi
 
 One reviewer catches ~60% of defects. Three catch ~85%. Five catch ~92%. The incremental value of reviewer 4 and 5 is small but non-zero, and occasionally critical (example: one reviewer found a socket function security defect that all others missed).
 
-**Recommendation:** Use 3 reviewers as default, expand to 5 for high-risk steps (NVS writes, auth changes, new API endpoints).
+**Recommendation:** Use 5 reviewers as default, automated where possible. Reduce to 2-3 only when the phase declares a Sprint operating point (docs-only, cosmetic, isolated fixes). The optimization target is review orchestration automation, not reviewer reduction.
 
 ### 4.3 The "Optimized Prompt" Trap
 
@@ -179,7 +216,7 @@ This protocol prevents the agent from working on stale code and ensures the PR e
 After agent execution:
 
 1. Mark PR ready for review
-2. Trigger inline reviews (3-5 reviewers simultaneously)
+2. Trigger inline reviews (5 reviewers — 3 inline simultaneously, 2 external)
 3. Agent addresses inline findings (new commit)
 4. External reviewers analyze the full PR
 5. Operator posts device testing results (if applicable)
@@ -262,6 +299,8 @@ Every phase ends with:
 4. Writing guide update — new patterns, new gap categories
 5. Recommendation tracking — every action item has a destination
 6. KPI recording — steps, fix cycles, wall-clock time
+7. Model/tool recording — which models were used for planning, execution, and review; any notable behavior changes or drift observed during the phase
+8. `CURRENT-STATE.md` validation — confirm the "Last verified" date, open issues, stale documents list, and unimplemented recommendations are all current. If `CURRENT-STATE.md` is stale at phase closure, the next phase starts on wrong assumptions. Treat a stale state file with the same urgency as a failing test.
 
 ### 7.2 Process KPIs
 
@@ -278,6 +317,10 @@ Every phase ends with:
 This methodology itself is subject to improvement. The rule: every phase closure is an opportunity to update the process guide. But updates must be driven by evidence (a measured improvement or a documented failure), not by speculation about what "should" work better.
 
 The writing guide, prompt templates, and review checklists are living documents. They grow with each phase — but they must also be pruned. When the writing guide exceeds what fits in a single planning session's context, split it into core (always-read) and reference (search-when-needed) sections.
+
+**Tool and dependency changes:** Any ESPHome version bump requires re-running the component defaults audit and committing the diff. Model behavior also changes over time — if fix cycles suddenly increase without codebase explanation, check whether the execution or review model changed behavior.
+
+**Operator load:** The methodology depends on a human operator to write prompts, judge findings, and maintain continuity. Prompt quality degrades under fatigue. Avoid writing high-risk prompts during long uninterrupted planning blocks, and defer major process changes when multiple context-heavy tasks are active.
 
 ---
 
