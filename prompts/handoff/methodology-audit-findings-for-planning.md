@@ -38,6 +38,9 @@ Before producing ANY planning output, run this gate:
 6. Simplest explanation first (Occam's Razor):
    - Before hypothesizing WHY something behaves unexpectedly, confirm WHAT is happening.
    - One diagnostic command eliminates hours of investigation.
+7. Scan recent GitHub Discussions:
+   - List the 3 most recent Discussions threads.
+   - For each: become an Issue / become a CURRENT-STATE entry / dismiss with rationale.
 ```
 
 This gate catches the class of error documented in BUG-083 (plausible but wrong explanation accepted without a single `grep` check) and the BUG-075-076 postmortem gap (recommendations written, archived, forgotten).
@@ -61,6 +64,12 @@ Recommended Phase 7 step order:
 | Step N | Export/import v2, regression, phase closure | Original Phase 7 tail |
 
 **Validation needed:** Confirm chunked streaming can be decoupled from per-device persistence by checking whether `/history/` handlers use `seg_NNN` keys directly or through an abstraction that Phase 7 replaces. Run: `grep -n 'seg_' firmware/core/nvs-persistence.h | head -20`
+
+**Open issue mapping:**
+- Issue #137 — cosmetic (board-type SVG diagrams), deferred indefinitely.
+- Issue #139 / BUG-082 — addressed by Phase 7 Step 1 (chunked streaming).
+- Issue #166 — manifest-driven CSV columns, partially implemented. Fully superseded by Phase 7 export v2; close on merge of the export step.
+- Issue #171 — import crash fix, delivered in Phase VX; close on merge of Phase VX closure PR.
 
 ---
 

@@ -1,7 +1,7 @@
 # Current Project State
 
-_Last verified: 2026-05-06 — Phase VX complete (v7.6.10.4, PR #202 merged)_
-_Next action: Phase VY methodology audit → multi-phase planning session → Phase 7_
+_Last verified: 2026-05-07 — Phase VY complete (review incorporation done)_
+_Next action: Multi-phase planning session → Phase 7_
 
 ---
 
@@ -23,9 +23,9 @@ _Next action: Phase VY methodology audit → multi-phase planning session → Ph
 
 ## What's Next
 
-1. **Phase VY** — Methodology audit (this session). Produces process guide, practitioner's handbook, planning supplement.
-2. **Multi-phase planning session** — Rewrites Phase 7 plan against current codebase, scopes Phases 8-10.
-3. **Phase 7 Step 0** — Measurement baseline + health-check telemetry task (BUG-075-076 recommendation, never implemented).
+1. **Multi-phase planning session** — Rewrites Phase 7 plan against current codebase, scopes Phases 8-10. Reads planning supplement, feature roadmap, CURRENT-STATE.md.
+2. **Phase 7 Step -1** — ESPHome component defaults audit (new template to be created).
+3. **Phase 7 Step 0** — Measurement baseline + health-check telemetry task (BUG-075-076 recommendation, never implemented). Also: file-size watchdog, KPI log schema, PR template, prompt-production rules.
 4. **Phase 7 Step 1** — Chunked HTTP streaming for history (fixes BUG-082 / issue #139).
 5. **Phase 7 Steps 2+** — Per-device persistence engine (rewritten plan, original from 2026-03-19 is stale).
 
