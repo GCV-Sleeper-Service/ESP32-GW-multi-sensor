@@ -127,7 +127,7 @@ external_components:
     components: ['web_server_idf']
 
 logger:
-  level: WARN
+  level: INFO
   logs:
     wifi: ERROR
     api: ERROR

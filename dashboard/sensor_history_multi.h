@@ -1158,8 +1158,8 @@ static void health_check_task_(void *param) {
              (unsigned) uptime_h, (unsigned) uptime_m);
 
     ESP_LOGI(TAG, "HEALTH: httpd_stack_wm=%u hc_stack_wm=%u",
-             (unsigned) (httpd_stack_wm * sizeof(StackType_t)),
-             (unsigned) (hc_stack_wm * sizeof(StackType_t)));
+             (unsigned) httpd_stack_wm,
+             (unsigned) hc_stack_wm);
 
     if (nvs_err == ESP_OK) {
       ESP_LOGI(TAG, "HEALTH: nvs_used=%u nvs_free=%u nvs_total=%u "
