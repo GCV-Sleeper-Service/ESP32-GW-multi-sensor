@@ -2,6 +2,23 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.7.1.1] - 2026-05-08 - Phase 7: Chunked HTTP Streaming (BUG-082 Fix)
+
+### Fixed
+- BUG-082 / #139: history endpoints no longer build full CSV payloads in RAM before sending, removing the heap-growth pattern that crashed C3 and WROOM boards with larger retained history.
+
+### Changed
+- Rewrote `handle_history_()` in `firmware/core/web-handler.h` to stream persisted NVS segments and newer RAM-buffer entries directly through `httpd_resp_send_chunk()`.
+- Rewrote `handle_api_v2_history_()` in `firmware/core/web-handler.h` to stream RAM history through `httpd_resp_send_chunk()` instead of constructing a complete response string first.
+- Bumped version sources to `7.7.1.1` and regenerated the assembled firmware header, dashboard artifacts, manifest outputs, and fixture variants required by the repo pipeline.
+- Updated `CURRENT-STATE.md` and the Phase 7 step table in `prompts/prompt-index-and-workflow.md` to reflect the actual Phase 7 execution order and BUG-082 resolution.
+
+### Technical
+- Added local chunked-response helpers for persisted `SegmentSnapshot` series data and `HistoryBuffer` data without modifying `nvs-persistence.h` or `data-model.h`.
+- Preserved the existing CSV wire format exactly: `epoch,value\\n`.
+- Kept `maybe_yield_nvs_scan_()` in the NVS segment loop and retained explicit `SegmentSnapshot` allocation/freeing in `handle_history_()`.
+- Uses the raw `httpd_req_t *` conversion operator exposed by the local `web_server_idf` component to issue chunked responses inside the AsyncWebServer handler flow.
+
 ## [v7.7.1.0] - 2026-05-07 - Phase 7: Health-Check Telemetry Task
 
 ### Added

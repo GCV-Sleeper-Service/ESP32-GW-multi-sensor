@@ -1,13 +1,13 @@
 # Current Project State
 
-_Last verified: 2026-05-07 — v7.7.1.0 validation complete_
-_Next action: Phase 7 Step v7.7.1.1 — chunked HTTP streaming for history endpoints_
+_Last verified: 2026-05-08 — v7.7.1.1 validation complete_
+_Next action: Phase 7 Step v7.7.1.2 — per-device structs, key scheme, and hash function_
 
 ---
 
 ## Version and Phase
 
-- **Current version:** 7.7.1.0
+- **Current version:** 7.7.1.1
 - **Active phase:** Phase 7 implementation underway
 - **Last completed phase:** Phase VX (board onboarding + auth refactor, 4 steps, 3 PRs)
 - **Next implementation phase:** Phase 7 (per-device persistence engine)
@@ -17,28 +17,32 @@ _Next action: Phase 7 Step v7.7.1.1 — chunked HTTP streaming for history endpo
 
 | Step | PR | Summary |
 |---|---|---|
+| v7.7.1.1 | #226 | History endpoints now stream CSV with `httpd_resp_send_chunk()`, fixing BUG-082 heap exhaustion on larger retained history sets |
 | v7.7.1.0 | #225 | Health-check telemetry task added as a ninth firmware fragment; boot startup, assembly, and preflight updated for periodic heap/NVS/stack telemetry |
 | v7.6.10.4 | #202 | Dashboard auth refactor: `authFetch()` wrapper, auth modal, eliminated browser native auth dialogs |
-| v7.6.10.1 | #201 | Board profiles for S3 SuperMini, C6 SuperMini, C5 WROOM-1U; partition tables for all 6 boards |
 
 ## What's Next
 
-1. **Phase 7 Step v7.7.1.1** — Chunked HTTP streaming for history endpoints (BUG-082 fix).
-2. **Phase 7 Step v7.7.1.2** — Per-device structs, key scheme, hash function.
-3. **Phase 7 Step v7.7.1.3** — Per-device persist engine (write path).
-4. **Phase 7 Step v7.7.1.4** — Per-device restore engine (boot path) + retention budget.
-5. **Phase 7 Steps v7.7.2.1–v7.7.3.3** — Engine switchover, migration, export/import, and closure.
-6. **Phase 7 optimization sprint v7.7.5.x** — NVS dedup study, RAM window reduction.
+1. **Phase 7 Step v7.7.1.2** — Per-device structs, key scheme, hash function.
+2. **Phase 7 Step v7.7.1.3** — Per-device persist engine (write path).
+3. **Phase 7 Step v7.7.1.4** — Per-device restore engine (boot path) + retention budget.
+4. **Phase 7 Steps v7.7.2.1–v7.7.3.3** — Engine switchover, migration, export/import, and closure.
+5. **Phase 7 optimization sprint v7.7.5.x** — NVS dedup study, RAM window reduction.
 
 ## Open Issues (by severity)
 
 | Issue | Severity | Description | Target |
 |---|---|---|---|
-| #139 / BUG-082 | **Critical** | History export crashes C3 and WROOM after ~3 weeks of data. `csv.reserve()` doesn't truncate; NVS scan grows string past cap. Both boards' dashboards unusable when history is large. | Phase 7 Step 1 |
 | BUG-084 | High | Non-PSRAM boards crash under 8 concurrent HTTP connections. Safe limit: 4 concurrent. | Phase 7 (socket limit config) |
 | #137 | Low | Board-type SVG diagrams for documentation. Cosmetic. | Phase 7+ or standalone |
 | A-004 | Medium | C5 WROOM-1U BLE non-functional — external IPEX antenna not attached. Re-test pending. | Before Phase 7 |
 | C6 flash | Medium | C6 SuperMini uses 91.6% of OTA partition on 4MB flash. Phase 7 firmware growth may exceed. | Phase 7 planning |
+
+## Recently Resolved
+
+| Issue | Version | Resolution |
+|---|---|---|
+| #139 / BUG-082 | v7.7.1.1 | Replaced full-CSV-in-RAM history responses with chunked HTTP streaming in `handle_history_()` and `handle_api_v2_history_()`. |
 
 ## Board Fleet and Measurements
 
