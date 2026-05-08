@@ -303,3 +303,141 @@ actual baseline values.
 - `nvs_used`, `nvs_free`, and `nvs_total` are all non-zero and sane
 - `hc_stack_wm=2176` indicates comfortable remaining headroom inside the 4096-byte
   task stack
+
+## Additional Multi-Board Device Testing (2026-05-08)
+
+Per follow-up operator request, §10-style testing was also run on the WROOM
+satellite and S3 aggregator, then the repo was restored to the CI-safe C3
+satellite configuration with `bash scripts/provision.sh satellite`.
+
+### WROOM satellite — `192.168.120.170`
+
+Commands run:
+
+- `bash scripts/provision.sh wroom`
+- `esphome clean firmware/esp32-wroom-32d-gw.yaml`
+- `esphome compile firmware/esp32-wroom-32d-gw.yaml`
+- `timeout 300 esphome upload firmware/esp32-wroom-32d-gw.yaml --device=192.168.120.170`
+- `esphome clean firmware/esp32-wroom-32d-gw.yaml`
+- `sleep 90`
+- `curl -s http://192.168.120.170/api/status | python3 -m json.tool`
+- `curl -s -u ESPadmin:ESPpass100 http://192.168.120.170/api/status/full | python3 -m json.tool`
+- `esphome logs firmware/esp32-wroom-32d-gw.yaml --device=192.168.120.170`
+
+Results:
+
+- Provisioning: PASS
+- Compile: PASS
+- OTA upload: PASS
+- `/api/status`: PASS
+- `/api/status/full`: PASS
+- `HEALTH:` log capture within a 130-second window: NOT OBSERVED
+
+Captured runtime values:
+
+- `/api/status/full`
+  - `role`: `satellite`
+  - `id`: `sat-esp32-4m-170`
+  - `version`: `v7.7.1.0`
+  - `uptime_seconds`: `96`
+  - `free_heap`: `36928`
+  - `free_heap_internal`: `36928`
+  - `free_heap_total`: `36928`
+  - `min_free_heap`: `20472`
+  - `httpd_stack_watermark_bytes`: `13188`
+  - `ping_stack_watermark_bytes`: `1664`
+
+Additional raw-log observation:
+
+- On connection, the log stream reported:
+  - `*** CRASH DETECTED ON PREVIOUS BOOT ***`
+  - `Reason: Fault - IllegalInstruction`
+
+Interpretation:
+
+- The flashed WROOM firmware is alive and responds correctly over HTTP after OTA.
+- The device API exposes valid health counters, so the runtime health state is being
+  tracked.
+- However, expected periodic serial/API log lines containing `HEALTH:` were not seen
+  during a 130-second capture window despite `logger.level: INFO` being present in the
+  generated YAML.
+- The previous-boot crash marker means WROOM operator validation is not fully clean and
+  should be treated as a follow-up investigation item rather than a fully green result.
+
+### S3 aggregator — `192.168.120.191`
+
+Commands run:
+
+- `bash scripts/provision.sh aggregator`
+- `esphome clean firmware/esp32-s3-devkitc1-n16r8-gw.yaml`
+- `esphome compile firmware/esp32-s3-devkitc1-n16r8-gw.yaml`
+- `timeout 300 esphome upload firmware/esp32-s3-devkitc1-n16r8-gw.yaml --device=192.168.120.191`
+- `esphome clean firmware/esp32-s3-devkitc1-n16r8-gw.yaml`
+- `sleep 90`
+- `curl -s http://192.168.120.191/api/status | python3 -m json.tool`
+- `curl -s -u ESPadmin:ESPpass100 http://192.168.120.191/api/status/full | python3 -m json.tool`
+- `esphome logs firmware/esp32-s3-devkitc1-n16r8-gw.yaml --device=192.168.120.191`
+
+Results:
+
+- Provisioning: PASS
+- Compile: PASS
+- OTA upload: PASS
+- `/api/status`: PASS
+- `/api/status/full`: PASS
+- `HEALTH:` log capture within a 90-second window: NOT OBSERVED
+
+Captured runtime values:
+
+- `/api/status/full`
+  - `role`: `aggregator`
+  - `id`: `agg-s3-16m-1`
+  - `version`: `v7.7.1.0`
+  - `uptime_seconds`: `95`
+  - `free_heap`: `68392`
+  - `free_heap_internal`: `68392`
+  - `free_heap_total`: `8462332`
+  - `min_free_heap`: `8457424`
+  - `httpd_stack_watermark_bytes`: `13152`
+  - `ping_stack_watermark_bytes`: `1480`
+
+Interpretation:
+
+- The flashed S3 aggregator firmware is alive and responds correctly over HTTP after
+  OTA.
+- The API reports sane PSRAM-aware totals (`free_heap_total` / `min_free_heap`) and an
+  expected `httpd_stack_watermark_bytes` value.
+- As with WROOM, the expected periodic `HEALTH:` log lines were not observed during the
+  capture window, so operator validation is only partially green for this board.
+
+### Restore to default satellite
+
+Commands run:
+
+- `bash scripts/provision.sh satellite`
+- `bash scripts/preflight.sh`
+
+Results:
+
+- C3 default provisioning restore: PASS
+- Preflight after restore: PASS
+
+Final state:
+
+- Repo returned to CI-safe default C3 satellite mode
+- `config/gateway.json` absent
+- `config/aggregator.json` absent
+
+### Acceptance-criteria assessment
+
+- Strictly against §7 of the implementation prompt: PASS
+- Additional operator device testing beyond §7 exposed two follow-up findings:
+  - WROOM previous-boot `IllegalInstruction` crash marker
+  - WROOM and S3 aggregator did not emit observable `HEALTH:` log lines during the
+    capture windows even though their APIs reported health metrics
+
+Recommendation:
+
+- Treat the PR as satisfying the written §7 implementation criteria, but do not treat
+  cross-board operator validation as fully closed until the missing non-C3 `HEALTH:`
+  log evidence and WROOM crash marker are explained.
