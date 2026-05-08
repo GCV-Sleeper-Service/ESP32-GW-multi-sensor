@@ -285,3 +285,103 @@ Future prevention:
   the old full-string behavior.
 - It improves error-path behavior without changing endpoint contracts or
   aggregator proxy behavior.
+
+## Post-Merge Operator Findings
+
+### Prompt/device-test drift identified after WROOM validation
+
+Operator-provided WROOM validation exposed three separate guidance problems that
+were not firmware regressions in the chunked-history change itself:
+
+- the active v7.7.1.1 Phase 7 prompt still referenced WROOM IP
+  `192.168.120.190`, while the production WROOM is `192.168.120.170`
+- the prompt used stale WROOM YAML name
+  `firmware/esp32-wroom-32d-multi-sensor.yaml`, while the generated production
+  file is `firmware/esp32-wroom-32d-gw.yaml`
+- NI-002 treated missing `HEALTH:` output as a capture-window problem only,
+  without first verifying that the flashed WROOM config still started the
+  health-check task and still exposed serial/INFO logging
+
+### WROOM operator evidence review
+
+Observed from the operator run:
+
+- `bash scripts/stress-test-httpd-stack.sh 192.168.120.170` passed on WROOM
+- `curl http://192.168.120.170/history/office/temp` returned CSV data
+- `curl http://192.168.120.170/api/v2/history/office/temp` returned CSV data
+- `curl http://192.168.120.190/api/v2/history/office/temp` failed to connect,
+  confirming the `.190` prompt address was stale
+- both the USB serial capture and OTA/API log capture showed no `HEALTH:` line
+
+### NI-002 conclusion
+
+The provided WROOM logs do **not** satisfy NI-002. No `HEALTH:` line appears in
+the supplied capture.
+
+The most likely cause is not the capture duration and not the global logger
+level:
+
+- the generated WROOM YAML used in the operator run has `logger.level: INFO`
+- the same generated WROOM YAML does **not** show a
+  `start_health_check_task_()` call in `on_boot`
+- the supplied logs also do not contain the startup log line from
+  `start_health_check_task_()`
+
+That combination makes the absence of `HEALTH:` output explainable without
+claiming a runtime crash in the chunked-history code: the health-check task does
+not appear to be started in the flashed WROOM config that was tested.
+
+### Serial-output assessment
+
+The supplied WROOM USB capture shows that serial output was active for this
+operator run. This session therefore does **not** support the narrower claim
+that WROOM serial output was disabled during the captured validation.
+
+However, branch-tip repo state still justified adding a serial-config gate to
+the prompt:
+
+- `firmware/boards/esp32-wroom-32d.yaml` on branch tip still carried
+  `logger.baud_rate: 0`, which can suppress UART serial logging
+- serial-gated instructions should therefore explicitly verify the generated
+  board config before using missing serial output as a product signal
+
+### OTA log warnings during concurrent curl
+
+The OTA/API log stream showed:
+
+- `Chunked send failed at segment ...: ESP_ERR_HTTPD_RESP_SEND`
+- `History stream final chunk failed: ESP_ERR_HTTPD_RESP_SEND`
+
+These warnings are consistent with the operator's test method:
+
+- the history requests were issued as `curl ... | head -20`
+- `head -20` closes the client connection early once enough lines are read
+- the server then sees an expected client-abort while still sending later
+  chunks
+
+This should not be interpreted as a BUG-082 regression by itself. It is an
+expected artifact of truncated client reads during chunked transfer.
+
+### Remediation applied to repo guidance
+
+To prevent this drift from repeating in later runs, the following docs were
+updated in this session:
+
+- `AGENTS.md`
+- `CURRENT-STATE.md`
+- `prompts/phase7/v7.7.1.1-agent-prompt-gpt-codex.md`
+- `prompts/phase7/v7.7.1.1-claude-two-step.md`
+- `prompts/phase7/phase7-review-prompts-perplexity.md`
+- `prompts/handoff/phase7/session-handoff-v7.7.1.1.md`
+
+The remediation added these rules:
+
+- use WROOM IP `192.168.120.170` for this production satellite
+- use `firmware/esp32-wroom-32d-gw.yaml` for WROOM operator validation
+- before relying on NI-001/NI-002 serial gates, verify:
+  - production IP / YAML target
+  - `logger.level: INFO`
+  - serial output not disabled for the flashed board/profile
+  - `start_health_check_task_()` present in generated WROOM `on_boot`
+- treat `ESP_ERR_HTTPD_RESP_SEND` during `curl ... | head -20` as an expected
+  client-abort artifact unless accompanied by a reset/crash

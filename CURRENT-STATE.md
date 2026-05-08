@@ -51,7 +51,7 @@ _Source: `Docs/board-measurement-log-v7.6.10.md` (2026-05-05)_
 | Board | IP | Chip | PSRAM | free_heap (boot) | min_free_heap | httpd_wm | Role |
 |---|---|---|---|---|---|---|---|
 | C3 SuperMini | .189 | ESP32-C3 | None | 58,456 | 47,616 | 12,924 | Satellite (production) |
-| WROOM-32D | .190 | ESP32 | None | 38,760 | 15,936 | 13,188 | Satellite (production) |
+| WROOM-32D | .170 | ESP32 | None | 38,760 | 15,936 | 13,188 | Satellite (production) |
 | S3 DevKitC N16R8 | .191 | ESP32-S3 | 8 MB | 53,432 | 8,398,704 | 10,036 | Aggregator (production) |
 | S3 SuperMini | .173 | ESP32-S3 | 2 MB | 123,156 | 2,209,636 | 12,512 | Test (marginal aggregator) |
 | C6 SuperMini | .184 | ESP32-C6 | None | 150,332 | 152,820 | 12,820 | Test (flash-constrained) |
