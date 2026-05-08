@@ -27,14 +27,14 @@ Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 
 Read these files from the repo in this order:
 
-1. `prompts/handoff/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md`
+1. `prompts/phaseV/Perplexity-Session-Context-Protocol-Three-Turn.md`
    — the shared three-turn review protocol (your output must reference this file,
      not inline it)
 
 2. `prompts/handoff/phaseY/phase-y-two-session-prompts-PR-Optimized.md`
    — the Phase Y Perplexity-optimized file; this is your structural template
 
-3. `prompts/phaseV/phase-v-review-prompts-perplexity.md`
+3. `prompts/phaseV/phaseV-review-prompts-perplexity.md`
    — the Phase V file you produced previously; this is your style and quality reference
 
 4. `Docs/phase-[X]-implementation-plan.md`

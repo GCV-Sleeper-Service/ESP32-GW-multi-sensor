@@ -18,6 +18,7 @@ MODULES=(
   "firmware/core/config.h"
   "firmware/core/data-model.h"
   "firmware/core/nvs-persistence.h"
+  "firmware/core/health-check.h"
   "firmware/core/deferred-management.h"
   "firmware/core/ping-adapter.h"
   "firmware/core/aggregator-runtime.h"

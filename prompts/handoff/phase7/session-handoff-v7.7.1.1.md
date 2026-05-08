@@ -1,6 +1,6 @@
 # Session Handoff — v7.7.1.1: Chunked HTTP Streaming (BUG-082 Fix)
 
-_Date: 2026-05-07_
+_Date: 2026-05-08 (updated post-PR-225 audit)_
 _Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
 _Status: v7.7.1.0 on `main`. Health-check task delivering runtime telemetry._
 
@@ -12,6 +12,26 @@ _Status: v7.7.1.0 on `main`. Health-check task delivering runtime telemetry._
 
 **BUG-082 is still open.** WROOM and C3 boards crash when serving history after ~3 weeks of data accumulation. The dashboard is unusable on those boards. This step fixes it.
 
+### v7.7.1.0 baseline values (C3 satellite — operator device testing, pre-merge)
+
+| Metric | Value |
+|--------|-------|
+| `heap_free` (serial HEALTH:) | 39,704 B |
+| `heap_free_total` (serial HEALTH:) | 47,460 B |
+| `min_free` internal | 29,776 B |
+| `httpd_stack_wm` | 12,932 B |
+| `hc_stack_wm` | 2,176 B |
+| `nvs_used` | 5,274 entries |
+| `nvs_free` | 10,854 entries |
+| `nvs_total` | 16,128 entries |
+
+Use these as the "before" comparison baseline in v7.7.1.1 device testing.
+
+### Open follow-up items from v7.7.1.0 (non-blocking for merge, required before v7.7.1.1 closes)
+
+- **NI-001 (Medium) — WROOM previous-boot `IllegalInstruction` crash:** The WROOM satellite emitted `*** CRASH DETECTED ON PREVIOUS BOOT *** Fault - IllegalInstruction` after v7.7.1.0 OTA flash. HTTP API responded correctly post-reboot. Root cause unknown — may be pre-existing, may be related to health-check task on WROOM. **Investigate during v7.7.1.1 WROOM device testing.** If the crash recurs or the fault is linked to the health-check task, escalate before merging v7.7.1.1.
+- **NI-002 (Low) — WROOM + S3 `HEALTH:` log lines not observed:** Neither WROOM (130s window) nor S3 (90s window) emitted observable `HEALTH:` serial lines after v7.7.1.0 flash. The C3 confirmed HEALTH: output at the expected interval. Use a >150s capture window for WROOM and S3 in v7.7.1.1 device testing. A confirmed `HEALTH:` line on WROOM is a gate for v7.7.1.1.
+
 ---
 
 ## Phase 7 Progress Table
@@ -19,7 +39,7 @@ _Status: v7.7.1.0 on `main`. Health-check task delivering runtime telemetry._
 | Version | Scope | Status |
 |---------|-------|--------|
 | v7.7.0.0 | ESPHome component defaults audit (research) | Complete |
-| v7.7.1.0 | Health-check telemetry task | Complete |
+| v7.7.1.0 | Health-check telemetry task | Complete (PR #225) |
 | **v7.7.1.1** | **Chunked HTTP streaming (BUG-082 fix)** | **⬅️ Current** |
 | v7.7.1.2 | Per-device structs, key scheme, hash | Pending |
 | v7.7.1.3 | Per-device persist engine (write path) | Pending |
@@ -70,12 +90,41 @@ On WROOM (~34 KB free heap):
 
 - `firmware/core/web-handler.h` — add helpers, rewrite two handlers
 - `Docs/changelog.md` — v7.7.1.1 entry
-- `CURRENT-STATE.md` — resolve BUG-082
+- `CURRENT-STATE.md` — resolve BUG-082, update version
 - `VERSION` — via bump-version.sh
+- Session log `Docs/session-log-<DATE>-v7.7.1.1.md`
 
 ### Acceptance criteria
 
 See `prompts/phase7/v7.7.1.1-agent-prompt-gpt-codex.md` §7 for the full checklist.
+
+---
+
+## Codebase state entering v7.7.1.1
+
+### Logger level (important — do not revert)
+
+`firmware/esp32-c3-multi-sensor.yaml` now has:
+
+```yaml
+logger:
+  level: INFO
+  logs:
+    wifi: ERROR
+    api: ERROR
+```
+
+This was changed from `WARN` in v7.7.1.0 to make `HEALTH:` telemetry visible. ESPHome does not allow per-tag levels more verbose than the global level — `WARN` global would silently suppress all `ESP_LOGI` output. **Do not revert this change.** If noise from other subsystems becomes a problem, add additional per-tag suppressors.
+
+### Fragment count
+
+The assembly pipeline now expects **9 fragments**. Any checkpoint grep referencing "8 fragments" is stale. Use:
+- `bash scripts/assemble-sensor-history.sh --list | grep -c 'firmware/core/'` → `9`
+- `grep -c '^  "firmware/core/.*\.h"$' scripts/assemble-sensor-history.sh` → `9`
+
+### Step Index table
+
+The Phase 7 step table in `prompts/prompt-index-and-workflow.md` still shows the pre-planning version mapping (NI-003 from v7.7.1.0 audit). Update the table in this PR to reflect the actual executed sequence.
 
 ---
 
@@ -90,8 +139,11 @@ See `prompts/phase7/v7.7.1.1-agent-prompt-gpt-codex.md` §7 for the full checkli
 - [ ] CURRENT-STATE.md updated (mandatory — version, What Just Shipped, BUG-082 resolved)
 - [ ] PR body contains `Fixes #139` (auto-closes BUG-082 issue on merge)
 - [ ] PR body references Phase 7 step tracking issue for v7.7.1.1
-- [ ] Session log created
+- [ ] Session log created (Rule 63)
 - [ ] Instruction Compliance Output table in PR description
+- [ ] NI-001: WROOM `IllegalInstruction` crash status confirmed or tracked
+- [ ] NI-002: WROOM `HEALTH:` log lines confirmed (>150s capture window)
+- [ ] Step Index table updated in `prompt-index-and-workflow.md` (NI-003)
 
 ---
 
@@ -100,12 +152,13 @@ See `prompts/phase7/v7.7.1.1-agent-prompt-gpt-codex.md` §7 for the full checkli
 | # | Rule | Why Relevant |
 |---|------|-------------|
 | 8 | No beginResponseStream >10 KB | This step eliminates beginResponse too |
-| 11 | NVS scan loops must yield | maybe_yield_nvs_scan_ in chunked loop |
+| 11 | NVS scan loops must yield | `maybe_yield_nvs_scan_()` in chunked loop |
+| 24 | Report internal and total heap separately | Health-check already does this; verify chunked handler doesn't break it |
 | 40 | Deferred task for NVS writes | NOT applicable — handlers are read-only |
-| 58 | Edit fragments, not assembled artifact | web-handler.h is a fragment |
+| 58 | Edit fragments, not assembled artifact | `web-handler.h` is a fragment |
 | 62 | Assembly order unchanged | No new fragments, no reorder |
 | 63 | Session log is pre-merge acceptance criterion | Mandatory |
-| 64 | Checkpoint greps mechanically derived | All greps match code changes |
+| 64 | Checkpoint greps mechanically derived | All greps must match code changes |
 
 ---
 
@@ -121,6 +174,8 @@ See `prompts/phase7/v7.7.1.1-agent-prompt-gpt-codex.md` §7 for the full checkli
 - Device testing on WROOM (the crash board) is mandatory post-merge
 
 **Secondary risk:** CSV format regression. The dashboard's `parseCompactHistory()` expects exact `epoch,value\n` format. The chunked helpers produce identical line format — same `snprintf` patterns as the existing code.
+
+**Additional risk (NI-001):** WROOM had an `IllegalInstruction` crash on previous boot after v7.7.1.0 OTA. If the root cause is still live, the WROOM device testing for this step may be unreliable. Investigate and resolve before treating WROOM results as valid.
 
 ---
 
@@ -143,7 +198,7 @@ See `prompts/phase7/v7.7.1.1-agent-prompt-gpt-codex.md` §7 for the full checkli
 
 | Board | IP | Role | Why |
 |-------|-----|------|-----|
-| WROOM-32D | `192.168.120.190` | Satellite | **Tightest heap — original crash board** |
+| WROOM-32D | `192.168.120.190` | Satellite | **Tightest heap — original crash board; also NI-001 crash to investigate** |
 | ESP32-C3 SuperMini | `192.168.120.189` | Satellite | Second crash board |
 
 After flash:
@@ -153,6 +208,8 @@ After flash:
 - [ ] Dashboard history charts render correctly on both boards
 - [ ] Health-check logs show peak heap usage < 5 KB during history serve
 - [ ] `scripts/stress-test-httpd-stack.sh` passes on at least C3
+- [ ] **NI-002 gate:** WROOM serial log confirms `HEALTH:` lines within 150s capture window
+- [ ] **NI-001 gate:** WROOM does NOT report `*** CRASH DETECTED ON PREVIOUS BOOT ***` after v7.7.1.1 OTA
 
 **If WROOM crashes:** capture serial log immediately. This means the chunked approach has a bug. Do NOT close the PR as resolved.
 
@@ -165,7 +222,9 @@ After flash:
 - The `SegmentSnapshot` struct is still the NVS read format — v7.7.1.2 introduces `DeviceSegment`
 - `csv.reserve()` pattern is gone from web-handler.h — no regression risk for new endpoints
 - `httpd_resp_send_chunk()` pattern is now proven — reusable for future per-device history endpoints
-- Health-check baseline measurements from v7.7.1.0 + v7.7.1.1 device tests establish the "before" and "after" comparison
+- Health-check baseline measurements from v7.7.1.0 establish the "before" comparison; v7.7.1.1 device tests provide the "after"
+- Logger level is `INFO` with per-tag suppressors — this is intentional and must be maintained
+- Fragment count is 9 — all future checkpoint greps must use anchored patterns counting 9
 
 ---
 

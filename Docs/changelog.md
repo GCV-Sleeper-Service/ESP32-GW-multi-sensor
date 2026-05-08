@@ -2,6 +2,23 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.7.1.0] - 2026-05-07 - Phase 7: Health-Check Telemetry Task
+
+### Added
+- `firmware/core/health-check.h`: periodic FreeRTOS task logging heap stats, stack watermarks, NVS usage, and uptime every 60 seconds.
+- Assembly pipeline support for a ninth firmware fragment between `nvs-persistence.h` and `deferred-management.h`.
+- Preflight guard for `firmware/core/health-check.h` existence.
+
+### Changed
+- Added a priority-600 `on_boot` startup hook in `firmware/esp32-c3-multi-sensor.yaml` to launch the health-check task after WiFi and SNTP are available.
+- Bumped version sources to `7.7.1.0` and regenerated dashboard, firmware assembly, manifest, and fixture artifacts.
+
+### Technical
+- Health-check task stack: `4096` bytes, priority `1`, 30-second initial delay.
+- Reports internal heap separately from total heap so PSRAM-inclusive values do not mask pressure on non-PSRAM boards.
+- Uses `nvs_get_stats()` against the history partition for read-only partition utilization telemetry.
+- Implements the BUG-075/076 postmortem recommendation for periodic runtime health telemetry.
+
 ## [v7.6.10.4] - 2026-05-06 - Phase VX: Dashboard Authentication Refactor
 
 ### Added

@@ -1,14 +1,14 @@
 # Current Project State
 
-_Last verified: 2026-05-07 — Multi-phase planning session complete_
-_Next action: Phase 7 prompt production → v7.7.0.0 execution_
+_Last verified: 2026-05-07 — v7.7.1.0 validation complete_
+_Next action: Phase 7 Step v7.7.1.1 — chunked HTTP streaming for history endpoints_
 
 ---
 
 ## Version and Phase
 
-- **Current version:** 7.6.10.4
-- **Active phase:** Phase 7 planning complete — prompt production next
+- **Current version:** 7.7.1.0
+- **Active phase:** Phase 7 implementation underway
 - **Last completed phase:** Phase VX (board onboarding + auth refactor, 4 steps, 3 PRs)
 - **Next implementation phase:** Phase 7 (per-device persistence engine)
 - **ESPHome version:** 2026.4.1 (ESP-IDF 5.5.4, upgraded in Phase VX v7.6.10.0)
@@ -17,18 +17,17 @@ _Next action: Phase 7 prompt production → v7.7.0.0 execution_
 
 | Step | PR | Summary |
 |---|---|---|
+| v7.7.1.0 | #225 | Health-check telemetry task added as a ninth firmware fragment; boot startup, assembly, and preflight updated for periodic heap/NVS/stack telemetry |
 | v7.6.10.4 | #202 | Dashboard auth refactor: `authFetch()` wrapper, auth modal, eliminated browser native auth dialogs |
 | v7.6.10.1 | #201 | Board profiles for S3 SuperMini, C6 SuperMini, C5 WROOM-1U; partition tables for all 6 boards |
-| v7.6.10.0 | #200 | ESPHome 2026.4.1 upgrade; local component override re-applied; measurement protocol |
-| Multi-phase planning | — | Multi-phase architecture review: Phase 7 rewrite, Phases E/8/9/10 scoping, board guide expansion, 11 decision log entries |
 
 ## What's Next
 
-1. **Phase 7 prompt production** — Produce agent prompt bundles for v7.7.0.0 (research) and v7.7.1.0 (health-check telemetry). Uses `Docs/phase-7-review-and-rewrite.md` as input.
-2. **Phase 7 Step v7.7.0.0** — ESPHome component defaults audit (research, no code changes).
-3. **Phase 7 Step v7.7.1.0** — Health-check telemetry task (first implementation step).
-4. **Phase 7 Step v7.7.1.1** — Chunked HTTP streaming for history endpoints (BUG-082 fix).
-5. **Phase 7 Steps v7.7.1.2–v7.7.3.3** — Per-device persistence engine, migration, export/import.
+1. **Phase 7 Step v7.7.1.1** — Chunked HTTP streaming for history endpoints (BUG-082 fix).
+2. **Phase 7 Step v7.7.1.2** — Per-device structs, key scheme, hash function.
+3. **Phase 7 Step v7.7.1.3** — Per-device persist engine (write path).
+4. **Phase 7 Step v7.7.1.4** — Per-device restore engine (boot path) + retention budget.
+5. **Phase 7 Steps v7.7.2.1–v7.7.3.3** — Engine switchover, migration, export/import, and closure.
 6. **Phase 7 optimization sprint v7.7.5.x** — NVS dedup study, RAM window reduction.
 
 ## Open Issues (by severity)
@@ -62,8 +61,8 @@ _Items from postmortems or phase closures that have NOT been acted on._
 
 | Source | Recommendation | Status |
 |---|---|---|
-| BUG-075-076 postmortem | Add periodic health-check task logging stack HWM, heap stats, socket usage, NVS stats | **Not implemented** — promote to Phase 7 Step 0 |
-| BUG-075-076 postmortem | Monitor `nvs_get_stats()` for partition pressure | **Not implemented** |
+| BUG-075-076 postmortem | Add periodic health-check task logging stack HWM, heap stats, socket usage, NVS stats | **Partially implemented in v7.7.1.0** — heap, stack HWM, NVS stats, and uptime now logged; socket counters remain deferred |
+| BUG-075-076 postmortem | Monitor `nvs_get_stats()` for partition pressure | **Implemented in v7.7.1.0** |
 | BUG-075-076 postmortem | Monitor socket exhaustion under load via lwIP counters | **Not implemented** |
 | BUG-075-076 postmortem | Audit ESPHome component defaults for hardcoded-too-small values | **Not implemented** — proposed as Phase 7 Step -1 |
 | Phase V closure | Show `min_free_heap` instead of `free_heap` on dashboard | **Not implemented** — deferred post-v7.6.9.0 |
@@ -79,7 +78,7 @@ _Items from postmortems or phase closures that have NOT been acted on._
 
 ## Architecture Quick Reference
 
-- **Firmware:** 8 C++ fragments in `firmware/core/`, assembled by `scripts/assemble-sensor-history.sh` → `dashboard/sensor_history_multi.h` (generated, never edit directly)
+- **Firmware:** 9 C++ fragments in `firmware/core/`, assembled by `scripts/assemble-sensor-history.sh` → `dashboard/sensor_history_multi.h` (generated, never edit directly)
 - **Dashboard:** 12 core modules in `dashboard/core/`, 9 component directories in `dashboard/components/`, built by `scripts/bundle-dashboard.sh` → `dashboard/dashboard.js` and `dashboard/dashboard.html` (generated, never edit directly)
 - **Pipeline:** `provision.sh <role>` → `assemble-sensor-history.sh` → `render_sensor_config.py` → `bundle-dashboard.sh` → `build-dashboard.sh` → `minify-dashboard.sh` → `generate-header.sh` → `esphome compile` → `esphome upload`
 - **Auth:** Application-level via `dashboard/core/auth.js` with `authFetch()` wrapper. Management endpoints require Basic Auth. `/api/status` is public.

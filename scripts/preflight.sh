@@ -55,6 +55,12 @@ for f in "${REQUIRED_FILES[@]}"; do
   [[ -f "$f" ]] || { echo "Missing $f"; exit 1; }
 done
 
+if [[ ! -f "firmware/core/health-check.h" ]]; then
+  fail "health_check_fragment_exists"
+else
+  pass "health_check_fragment_exists"
+fi
+
 check_contains "version_file_present" VERSION "${VER_RAW}"
 check_contains "dashboard_js_version_matches" dashboard/dashboard.js "App.version = '${VER_TAG}'"
 # dashboard.h is now gzip-compressed binary data; version appears in the header comment
@@ -575,6 +581,7 @@ firmware_core_fragments_exist() {
     "firmware/core/config.h"
     "firmware/core/data-model.h"
     "firmware/core/nvs-persistence.h"
+    "firmware/core/health-check.h"
     "firmware/core/deferred-management.h"
     "firmware/core/ping-adapter.h"
     "firmware/core/aggregator-runtime.h"
@@ -626,6 +633,7 @@ firmware_core_fragment_line_sum() {
     "firmware/core/config.h"
     "firmware/core/data-model.h"
     "firmware/core/nvs-persistence.h"
+    "firmware/core/health-check.h"
     "firmware/core/deferred-management.h"
     "firmware/core/ping-adapter.h"
     "firmware/core/aggregator-runtime.h"
@@ -672,6 +680,7 @@ firmware_core_fragment_count() {
     "firmware/core/config.h"
     "firmware/core/data-model.h"
     "firmware/core/nvs-persistence.h"
+    "firmware/core/health-check.h"
     "firmware/core/deferred-management.h"
     "firmware/core/ping-adapter.h"
     "firmware/core/aggregator-runtime.h"
