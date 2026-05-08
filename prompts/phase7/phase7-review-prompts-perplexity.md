@@ -123,20 +123,21 @@ For each gate: record PASS / FAIL / UNCLEAR with one-line evidence. Only open so
 
 **Turn 3 — Verdict + output**
 
-Produce the standard Turn 3 output format from the shared protocol. Post as a PR comment.
+Produce the standard Turn 3 output format from the shared protocol. Post as a PR225 comment. PR branch - `feature/v7.7.1.0-health-check`
 
 If verdict is **NEEDS-FIX or BLOCKED**: produce a targeted fix prompt that addresses ONLY the remaining failing/unclear gates. Do-NOT list must explicitly exclude all already-passing gates. Use `prompts/phase7/v7.7.1.0-agent-prompt-gpt-codex.md` as the style reference for the fix prompt.
 
-**Post-merge deliverables (if MERGE-READY):**
-- Create `prompts/phase7/v7.7.1.0-PR<NN>-consolidated-audit-and-lessons.md`
-- Review and update `prompts/handoff/phase7/session-handoff-v7.7.1.1.md`
-- Review and update `prompts/phase7/v7.7.1.1-agent-prompt-gpt-codex.md`
-- Apply version tag: `git tag -a v7.7.1.0 -m "Phase 7: Health-check telemetry task" && git push origin v7.7.1.0`
-
-Operator device testing (post-merge — results go in consolidated audit):
+Operator device testing:
 - Flash C3, wait 90s, check serial logs for `HEALTH:` lines
 - Record `heap_free`, `min_free`, `httpd_stack_wm`, `nvs_used` values as v7.7.1.0 baseline
 - Verify health-check task does not measurably reduce free_heap (task stack is only 4096 B)
+
+**Deliverables (if MERGE-READY):** -  the the following actions one by one pushing updates and checking if the push was successful:
+- Create `prompts/phase7/v7.7.1.0-PR225-consolidated-audit-and-lessons.md` 
+- Review and update `prompts/handoff/phase7/session-handoff-v7.7.1.1.md`
+- Review and update `prompts/phase7/v7.7.1.1-agent-prompt-gpt-codex.md`
+- Apply version tag: `git tag -a v7.7.1.0 -m "Phase 7: Health-check telemetry task" && git push origin v7.7.1.0`
+- Ask operator to merge and confirm that next step execution is ready.
 
 ---
 
