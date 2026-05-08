@@ -1581,6 +1581,81 @@ static void set_aggregator_poll_basic_auth_(const char *username,
 // Avoids esp_http_client.h, which is not in ESPHome's IDF PRIV_REQUIRES.
 // Uses lwip/sockets.h and lwip/netdb.h (both already available).
 // Returns true and sets *out_len on HTTP 200; false otherwise.
+static bool recv_exact_(int sock, char *dst, int len) {
+  int total = 0;
+  while (total < len) {
+    int n = lwip_recv(sock, dst + total, len - total, 0);
+    if (n <= 0) return false;
+    total += n;
+  }
+  return true;
+}
+
+static bool recv_crlf_line_(int sock, char *dst, size_t dst_size, int *out_len) {
+  if (dst == nullptr || dst_size < 3 || out_len == nullptr) return false;
+
+  int total = 0;
+  while (total < static_cast<int>(dst_size - 1)) {
+    int n = lwip_recv(sock, dst + total, 1, 0);
+    if (n <= 0) return false;
+    total += n;
+    if (total >= 2 && dst[total - 2] == '\r' && dst[total - 1] == '\n') {
+      dst[total] = '\0';
+      *out_len = total;
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool read_chunked_body_(int sock, char *buf, uint16_t buf_size, uint16_t *out_len) {
+  if (buf == nullptr || out_len == nullptr || buf_size == 0) return false;
+
+  int total = 0;
+  char line[64];
+  for (;;) {
+    int line_len = 0;
+    if (!recv_crlf_line_(sock, line, sizeof(line), &line_len)) return false;
+
+    char *end = nullptr;
+    long chunk_size = strtol(line, &end, 16);
+    if (end == line || chunk_size < 0) return false;
+
+    if (chunk_size == 0) {
+      do {
+        if (!recv_crlf_line_(sock, line, sizeof(line), &line_len)) return false;
+      } while (!(line_len == 2 && line[0] == '\r' && line[1] == '\n'));
+      break;
+    }
+
+    if (total >= static_cast<int>(buf_size - 1)) {
+      *out_len = static_cast<uint16_t>(buf_size - 1);
+      buf[buf_size - 1] = '\0';
+      return true;
+    }
+
+    int remaining = static_cast<int>(buf_size - 1) - total;
+    if (chunk_size > remaining) {
+      if (!recv_exact_(sock, buf + total, remaining)) return false;
+      total += remaining;
+      *out_len = static_cast<uint16_t>(total);
+      buf[total] = '\0';
+      return true;
+    }
+
+    if (!recv_exact_(sock, buf + total, static_cast<int>(chunk_size))) return false;
+    total += static_cast<int>(chunk_size);
+
+    char crlf[2];
+    if (!recv_exact_(sock, crlf, sizeof(crlf))) return false;
+    if (crlf[0] != '\r' || crlf[1] != '\n') return false;
+  }
+
+  buf[total] = '\0';
+  *out_len = static_cast<uint16_t>(total);
+  return true;
+}
+
 static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint16_t* out_len,
                             int timeout_s = 5, int* out_http_status = nullptr,
                             const char* basic_auth = nullptr) {
@@ -1678,6 +1753,7 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
     }
   }
   if (!hdr_done) { lwip_close(sock); return false; }
+  hdr[hdr_len] = '\0';
 
   // Parse and check HTTP status (bounded; no reliance on NUL terminator).
   if (strncmp(hdr, "HTTP/", 5) != 0) { lwip_close(sock); return false; }
@@ -1697,6 +1773,13 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
                          (status[2] - '0');
   if (out_http_status != nullptr) *out_http_status = http_status_code;
   if (http_status_code != 200) { lwip_close(sock); return false; }
+
+  bool is_chunked = strstr(hdr, "\r\nTransfer-Encoding: chunked\r\n") != nullptr;
+  if (is_chunked) {
+    bool ok = read_chunked_body_(sock, buf, buf_size, out_len);
+    lwip_close(sock);
+    return ok;
+  }
 
   // ── Read body directly into caller's buffer ────────────────────
   int total = 0;
@@ -2379,7 +2462,6 @@ static void start_aggregator_task() {
 // ═══════════════════════════════════════════════════════════════════
 // HistoryWebHandler — custom endpoints on ESPHome web server
 // ═══════════════════════════════════════════════════════════════════
-
 static volatile bool s_import_ready = false;
 
 #if AGGREGATOR_ENABLED
@@ -2933,11 +3015,16 @@ class HistoryWebHandler : public AsyncWebHandler {
     return ESP_OK;
   }
 
-  static void finalize_chunked_response_(httpd_req_t *req, const char *context) {
+  static void finalize_chunked_response_(httpd_req_t *req, const char *context,
+                                         esp_err_t prior_err = ESP_OK) {
     esp_err_t err = httpd_resp_send_chunk(req, nullptr, 0);
     if (err != ESP_OK) {
-      ESP_LOGW(TAG, "%s final chunk failed: %s",
-               context, esp_err_to_name(err));
+      if (prior_err == ESP_ERR_HTTPD_RESP_SEND && err == ESP_ERR_HTTPD_RESP_SEND) {
+        ESP_LOGD(TAG, "%s final chunk skipped after client disconnect", context);
+      } else {
+        ESP_LOGW(TAG, "%s final chunk failed: %s",
+                 context, esp_err_to_name(err));
+      }
     }
   }
 
@@ -3046,7 +3133,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     esp_err_t err = send_history_buffer_chunk_(raw_req, *buf);
     if (err != ESP_OK) {
       ESP_LOGW(TAG, "V2 history chunked send failed: %s", esp_err_to_name(err));
-      finalize_chunked_response_(raw_req, "V2 history");
+      finalize_chunked_response_(raw_req, "V2 history", err);
       return;
     }
 
@@ -3997,7 +4084,7 @@ class HistoryWebHandler : public AsyncWebHandler {
                        n, esp_err_to_name(err));
               delete snapshot;
               nvs_close(handle);
-              finalize_chunked_response_(raw_req, "History stream");
+              finalize_chunked_response_(raw_req, "History stream", err);
               return;
             }
 
@@ -4015,7 +4102,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (err != ESP_OK) {
       ESP_LOGW(TAG, "Chunked send failed for RAM buffer: %s",
                esp_err_to_name(err));
-      finalize_chunked_response_(raw_req, "History stream");
+      finalize_chunked_response_(raw_req, "History stream", err);
       return;
     }
 

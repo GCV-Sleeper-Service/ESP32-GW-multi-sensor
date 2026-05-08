@@ -551,11 +551,16 @@ class HistoryWebHandler : public AsyncWebHandler {
     return ESP_OK;
   }
 
-  static void finalize_chunked_response_(httpd_req_t *req, const char *context) {
+  static void finalize_chunked_response_(httpd_req_t *req, const char *context,
+                                         esp_err_t prior_err = ESP_OK) {
     esp_err_t err = httpd_resp_send_chunk(req, nullptr, 0);
     if (err != ESP_OK) {
-      ESP_LOGW(TAG, "%s final chunk failed: %s",
-               context, esp_err_to_name(err));
+      if (prior_err == ESP_ERR_HTTPD_RESP_SEND && err == ESP_ERR_HTTPD_RESP_SEND) {
+        ESP_LOGD(TAG, "%s final chunk skipped after client disconnect", context);
+      } else {
+        ESP_LOGW(TAG, "%s final chunk failed: %s",
+                 context, esp_err_to_name(err));
+      }
     }
   }
 
@@ -664,7 +669,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     esp_err_t err = send_history_buffer_chunk_(raw_req, *buf);
     if (err != ESP_OK) {
       ESP_LOGW(TAG, "V2 history chunked send failed: %s", esp_err_to_name(err));
-      finalize_chunked_response_(raw_req, "V2 history");
+      finalize_chunked_response_(raw_req, "V2 history", err);
       return;
     }
 
@@ -1615,7 +1620,7 @@ class HistoryWebHandler : public AsyncWebHandler {
                        n, esp_err_to_name(err));
               delete snapshot;
               nvs_close(handle);
-              finalize_chunked_response_(raw_req, "History stream");
+              finalize_chunked_response_(raw_req, "History stream", err);
               return;
             }
 
@@ -1633,7 +1638,7 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (err != ESP_OK) {
       ESP_LOGW(TAG, "Chunked send failed for RAM buffer: %s",
                esp_err_to_name(err));
-      finalize_chunked_response_(raw_req, "History stream");
+      finalize_chunked_response_(raw_req, "History stream", err);
       return;
     }
 

@@ -385,3 +385,165 @@ The remediation added these rules:
   - `start_health_check_task_()` present in generated WROOM `on_boot`
 - treat `ESP_ERR_HTTPD_RESP_SEND` during `curl ... | head -20` as an expected
   client-abort artifact unless accompanied by a reset/crash
+
+## Additional Codex Review And Device Follow-Up
+
+### Additional Codex review assessment
+
+The later `chatgpt-codex-connector` review on PR #226 was warranted.
+
+Review claim:
+
+- switching `/api/v2/history` to chunked transfer breaks aggregator proxy
+  because `handle_aggregator_proxy_()` reads upstream responses through
+  `fetch_to_buffer()`, which previously copied raw body bytes and did not
+  decode HTTP chunk framing
+
+Why this was correct:
+
+- `handle_aggregator_proxy_()` serves proxied history from
+  `firmware/core/aggregator-runtime.h`
+- `fetch_to_buffer()` issued raw socket HTTP requests and returned the body as
+  received
+- once satellites started returning `Transfer-Encoding: chunked` for
+  `/api/v2/history`, aggregator mode could ingest chunk-size framing instead of
+  plain `epoch,value` CSV lines
+
+### Additional code changes
+
+Applied follow-up fixes:
+
+- `firmware/core/aggregator-runtime.h`
+  - added `recv_exact_()`
+  - added `recv_crlf_line_()`
+  - added `read_chunked_body_()`
+  - updated `fetch_to_buffer()` to detect
+    `Transfer-Encoding: chunked` and dechunk upstream history responses before
+    handing them to proxy consumers
+- `firmware/core/web-handler.h`
+  - `finalize_chunked_response_()` now accepts the prior send error
+  - suppresses the second warning when both the body send and the terminating
+    zero-length chunk fail with `ESP_ERR_HTTPD_RESP_SEND` after client abort
+- `scripts/render_sensor_config.py`
+  - now emits a generated `on_boot` step that starts
+    `start_health_check_task_()` for production board YAML output
+- `firmware/boards/esp32-wroom-32d.yaml`
+  - removed `logger.baud_rate: 0` so serial-gated validation is not suppressed
+    at the board-profile source
+
+### HEALTH log requirement conclusion
+
+Yes. NI-002 requires a `HEALTH:` line to appear in logs, so the earlier WROOM
+operator evidence did **not** satisfy the step.
+
+What was needed to make `HEALTH:` appear reliably:
+
+- the generated board YAML must start `start_health_check_task_()` in `on_boot`
+- the flashed board/profile must not suppress UART serial output when serial
+  capture is part of the gate
+- logs must be captured long enough to pass the 60-second health interval
+
+This session validated that after the generated `on_boot` health hook was added
+and WROOM serial suppression was removed at the board-profile source, `HEALTH:`
+appears on both production targets.
+
+### WROOM evidence after fix
+
+Provision/flash path:
+
+- `bash scripts/provision.sh wroom`
+- `esphome clean firmware/esp32-wroom-32d-gw.yaml`
+- `esphome compile firmware/esp32-wroom-32d-gw.yaml`
+- `esphome upload firmware/esp32-wroom-32d-gw.yaml --device=/dev/ttyUSB0`
+
+Generated-config confirmation:
+
+- `firmware/esp32-wroom-32d-gw.yaml` contains `start_health_check_task_();`
+- generated WROOM YAML no longer suppresses UART with `baud_rate: 0`
+
+Observed WROOM log evidence:
+
+- `Health-check task started (interval=60s, stack=4096B)`
+- `HEALTH: heap_free=31396 heap_free_total=31396 min_free=51776 min_free_total=27908 uptime=0h00m`
+- `HEALTH: httpd_stack_wm=15444 hc_stack_wm=3596`
+- `HEALTH: nvs_used=10394 nvs_free=5734 nvs_total=16128 nvs_ns_count=1`
+
+Observed WROOM endpoint evidence:
+
+- `curl -s http://192.168.120.170/history/office/temp | head -20` -> CSV data
+- `curl -s http://192.168.120.170/api/v2/history/office/temp | head -20` -> CSV data
+- `curl -si -u ESPadmin:ESPpass100 http://192.168.120.170/api/status/full`
+  -> `HTTP/1.1 200 OK`, `version":"v7.7.1.1"`,
+  `httpd_stack_watermark_bytes":12260`
+
+### C3 evidence after flash
+
+To keep the repo CI-safe after WROOM validation, WROOM was provisioned/flashed
+first and the repo was then returned to satellite mode before C3 flash.
+
+C3 flash path:
+
+- `bash scripts/provision.sh satellite`
+- `esphome clean firmware/esp32-c3-multi-sensor.yaml`
+- `esphome compile firmware/esp32-c3-multi-sensor.yaml`
+- `esphome upload firmware/esp32-c3-multi-sensor.yaml --device=/dev/ttyACM0`
+
+Observed C3 log evidence:
+
+- `Health-check task started (interval=60s, stack=4096B)`
+- `HEALTH: heap_free=52080 heap_free_total=59836 min_free=48096 min_free_total=48096 uptime=0h02m`
+- `HEALTH: httpd_stack_wm=11976 hc_stack_wm=2308`
+- `HEALTH: nvs_used=5344 nvs_free=10784 nvs_total=16128 nvs_ns_count=1`
+
+Observed C3 endpoint evidence:
+
+- `curl -s http://192.168.120.189/history/office/temp | head -20` -> CSV data
+- `curl -s http://192.168.120.189/api/v2/history/office/temp | head -20` -> CSV data
+- `curl -si -u ESPadmin:ESPpass100 http://192.168.120.189/api/status/full`
+  -> `HTTP/1.1 200 OK`, `version":"v7.7.1.1"`,
+  `httpd_stack_watermark_bytes":11976`
+
+### `ESP_ERR_HTTPD_RESP_SEND` warning assessment
+
+These warnings are real but, in the supplied operator scenario, they are
+expected.
+
+Why they appear:
+
+- the history endpoints were queried as `curl ... | head -20`
+- `head -20` terminates the client side after receiving enough lines
+- the server is still streaming later CSV chunks and receives a disconnected
+  peer
+- `httpd_resp_send_chunk()` therefore returns `ESP_ERR_HTTPD_RESP_SEND`
+
+What was incorrect before this follow-up:
+
+- after the first send failure, the server also logged a second
+  `History stream final chunk failed: ESP_ERR_HTTPD_RESP_SEND`
+- that second line was redundant noise for the same client-abort event
+
+What was changed:
+
+- the initial send-failure warning is retained because it reflects a real
+  socket-send failure
+- the duplicate final-chunk warning is now suppressed when it is just the same
+  `ESP_ERR_HTTPD_RESP_SEND` caused by the same disconnected client
+
+Post-fix confirmation:
+
+- WROOM and C3 logs still show the primary
+  `Chunked send failed at segment ...: ESP_ERR_HTTPD_RESP_SEND` warning during
+  `curl ... | head -20`
+- the extra `History stream final chunk failed: ESP_ERR_HTTPD_RESP_SEND` line
+  no longer appears in the reproduced device logs
+
+### Aggregator live verification note
+
+Direct live aggregator verification from this container remained blocked during
+this follow-up:
+
+- `curl http://192.168.120.191/...` returned `No route to host`
+
+So the aggregator compatibility fix was validated by code-path inspection and
+local repo tests, but not by a successful live `.191` proxy request from this
+environment.

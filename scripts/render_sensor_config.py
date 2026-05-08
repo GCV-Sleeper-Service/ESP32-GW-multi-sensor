@@ -792,6 +792,14 @@ def generate_board_yaml(
         lines.append("            start_aggregator_task();")
         lines.append("            #endif")
 
+    # Priority 600: health-check task
+    lines.append("    - # Priority 600: start health-check telemetry task.")
+    lines.append("      # Logs heap, stack watermarks, NVS stats every 60s.")
+    lines.append("      priority: 600")
+    lines.append("      then:")
+    lines.append("        - lambda: |-")
+    lines.append("            start_health_check_task_();")
+
     lines.append("")
 
     # ─── Chip and framework ─────────────────────────────────────────
