@@ -1,14 +1,14 @@
 # Current Project State
 
-_Last verified: 2026-05-07 — Phase VY complete (review incorporation done)_
-_Next action: Multi-phase planning session → Phase 7_
+_Last verified: 2026-05-07 — Multi-phase planning session complete_
+_Next action: Phase 7 prompt production → v7.7.0.0 execution_
 
 ---
 
 ## Version and Phase
 
 - **Current version:** 7.6.10.4
-- **Active phase:** Phase VY (methodology audit — in progress)
+- **Active phase:** Phase 7 planning complete — prompt production next
 - **Last completed phase:** Phase VX (board onboarding + auth refactor, 4 steps, 3 PRs)
 - **Next implementation phase:** Phase 7 (per-device persistence engine)
 - **ESPHome version:** 2026.4.1 (ESP-IDF 5.5.4, upgraded in Phase VX v7.6.10.0)
@@ -20,14 +20,16 @@ _Next action: Multi-phase planning session → Phase 7_
 | v7.6.10.4 | #202 | Dashboard auth refactor: `authFetch()` wrapper, auth modal, eliminated browser native auth dialogs |
 | v7.6.10.1 | #201 | Board profiles for S3 SuperMini, C6 SuperMini, C5 WROOM-1U; partition tables for all 6 boards |
 | v7.6.10.0 | #200 | ESPHome 2026.4.1 upgrade; local component override re-applied; measurement protocol |
+| Multi-phase planning | — | Multi-phase architecture review: Phase 7 rewrite, Phases E/8/9/10 scoping, board guide expansion, 11 decision log entries |
 
 ## What's Next
 
-1. **Multi-phase planning session** — Rewrites Phase 7 plan against current codebase, scopes Phases 8-10. Reads planning supplement, feature roadmap, CURRENT-STATE.md.
-2. **Phase 7 Step -1** — ESPHome component defaults audit (new template to be created).
-3. **Phase 7 Step 0** — Measurement baseline + health-check telemetry task (BUG-075-076 recommendation, never implemented). Also: file-size watchdog, KPI log schema, PR template, prompt-production rules.
-4. **Phase 7 Step 1** — Chunked HTTP streaming for history (fixes BUG-082 / issue #139).
-5. **Phase 7 Steps 2+** — Per-device persistence engine (rewritten plan, original from 2026-03-19 is stale).
+1. **Phase 7 prompt production** — Produce agent prompt bundles for v7.7.0.0 (research) and v7.7.1.0 (health-check telemetry). Uses `Docs/phase-7-review-and-rewrite.md` as input.
+2. **Phase 7 Step v7.7.0.0** — ESPHome component defaults audit (research, no code changes).
+3. **Phase 7 Step v7.7.1.0** — Health-check telemetry task (first implementation step).
+4. **Phase 7 Step v7.7.1.1** — Chunked HTTP streaming for history endpoints (BUG-082 fix).
+5. **Phase 7 Steps v7.7.1.2–v7.7.3.3** — Per-device persistence engine, migration, export/import.
+6. **Phase 7 optimization sprint v7.7.5.x** — NVS dedup study, RAM window reduction.
 
 ## Open Issues (by severity)
 
@@ -71,9 +73,9 @@ _Items from postmortems or phase closures that have NOT been acted on._
 
 | Document | Written | Issue |
 |---|---|---|
-| `Docs/v7.7-implementation-plan.md` | 2026-03-19 | References `dashboard/sensor_history_multi.h` directly (now generated artifact). References `dashboard/dashboard.js` (now generated). Does not know about `firmware/core/` fragments, `authFetch()`, 6-board fleet, `external_components` requirement. **Must be rewritten before Phase 7.** |
-| `Docs/v7.7-v7.8-persistence-architecture.md` | 2026-03-19 | Memory budget uses pre-Phase-V estimates. Struct sizes may need recalculation against current data model. |
-| Feature roadmap (`future-plans.md`) | 2026-03-12 | Not in repo. v7.4-7.6 items are complete. Needs reconciliation with current phase numbering. |
+| `Docs/v7.7-implementation-plan.md` | 2026-03-19 | **Superseded** by `Docs/phase-7-review-and-rewrite.md` (2026-05-07). Keep for historical reference. |
+| `Docs/v7.7-v7.8-persistence-architecture.md` | 2026-03-19 | Architecture decisions still valid. Memory budget (§15) needs measured values from board-measurement-log. Update during Phase 7 prompt production. |
+
 
 ## Architecture Quick Reference
 
@@ -83,6 +85,20 @@ _Items from postmortems or phase closures that have NOT been acted on._
 - **Auth:** Application-level via `dashboard/core/auth.js` with `authFetch()` wrapper. Management endpoints require Basic Auth. `/api/status` is public.
 - **Tests:** ~370+ Playwright tests across 12 spec files, 4 fixture sets (3sensor, mixed, system, aggregator)
 - **Httpd stack:** Uniform 16 KB via local component override in `firmware/local_components/web_server_idf/`. Must re-apply after ESPHome upgrades via `scripts/patch-esphome-httpd-stack.sh`.
+
+
+## Planning Documents (2026-05-07 Multi-Phase Session)
+
+| Document | Purpose |
+|---|---|
+| `Docs/phase-7-review-and-rewrite.md` | Rewritten Phase 7 plan (supersedes v7.7-implementation-plan.md) |
+| `Docs/phase-E-captive-portal-plan.md` | Phase E scoping — WiFi provisioning, sensor discovery |
+| `Docs/phase-8-notifications-plan.md` | Phase 8 scoping — Telegram, ntfy.sh, threshold alerts |
+| `Docs/phase-9-cloud-upload-plan.md` | Phase 9 scoping — InfluxDB, MQTT, store-and-forward |
+| `Docs/phase-10-dashboard-ui-plan.md` | Phase 10 scoping — responsive UI, i18n |
+| `Docs/board-selection-guide-expansion.md` | Board capability matrix with Phase 7 retention numbers |
+| `Docs/multi-phase-planning-session-summary.md` | Full session record including operator feedback incorporation |
+
 
 ## KPI Baselines (for tracking)
 

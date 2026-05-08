@@ -36,6 +36,17 @@ When making a new architectural decision during any session, add a line here as 
 | 2026-04-26 | STACK-001 | Uniform 16 KB httpd stack for all boards via local component override | `Docs/lessons/firmware.md` (BUG-083, LESSON-OPS-128) |
 | 2026-05-05 | BOARD-001 | 6-board fleet: C3, WROOM, S3-16M, S3-4M, C6, C5. All compile. C5 BLE pending antenna retest. | `Docs/board-measurement-log-v7.6.10.md` |
 | 2026-05-06 | AUTH-001 | Application-level auth via `dashboard/core/auth.js` with `authFetch()` wrapper. Browser native dialogs eliminated. | `Docs/session-log-2026-05-06-v7.6.10.4.md` |
+| 2026-05-07 | PLAN-001 | Phase 7 reordering: chunked streaming (BUG-082) before persistence engine | `Docs/phase-7-review-and-rewrite.md` |
+| 2026-05-07 | PLAN-002 | Binary sensors use state-change-only deduplication (EventLog, not HistoryBuffer) | `Docs/phase-7-review-and-rewrite.md` §binary-sensors |
+| 2026-05-07 | PLAN-003 | TLS/notifications enabled only on PSRAM + C6 boards | `Docs/phase-8-notifications-plan.md` |
+| 2026-05-07 | PLAN-004 | Four partition table layouts: 4MB-std (640KB), 4MB-C6 (480KB), 8MB (1MB), 16MB (4MB) | `Docs/phase-7-review-and-rewrite.md` §partitions |
+| 2026-05-07 | PLAN-005 | Phase ordering: 7 → E → 8 → 9 → 10 | `Docs/phase-7-review-and-rewrite.md` §ordering |
+| 2026-05-07 | PLAN-006 | Version numbering: .0 = research (no bump), .1+ = implementation | `Docs/phase-7-review-and-rewrite.md` §versioning |
+| 2026-05-07 | PLAN-007 | MQTT bridge included in Phase 9 (not deferred) | `Docs/phase-9-cloud-upload-plan.md` |
+| 2026-05-07 | PLAN-008 | Aggregator-first notification/cloud architecture (satellites don't need TLS) | `Docs/phase-8-notifications-plan.md` |
+| 2026-05-07 | PLAN-009 | C6 8MB is the intended standard satellite; C6 4MB is binary-sensor-only satellite | `Docs/board-selection-guide-expansion.md` |
+| 2026-05-07 | PLAN-010 | NVS deduplication study (value-dictionary for environmental sensors) deferred to v7.7.5.0 | `Docs/phase-7-review-and-rewrite.md` §optimization |
+| 2026-05-07 | PLAN-011 | RAM window reduction (24h→2h on non-PSRAM) deferred to v7.7.5.1, after chunked streaming | `Docs/phase-7-review-and-rewrite.md` §optimization |
 
 ---
 
