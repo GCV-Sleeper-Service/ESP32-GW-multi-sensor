@@ -345,6 +345,9 @@ These come from bugs and lessons learned and are baked into every prompt. They a
 | 62 | The assembly fragment order in `assemble-sensor-history.sh` is the dependency order. Never reorder fragments. | Phase Y v7.6.6.1 |
 | 63 | Session log is a **pre-merge acceptance criterion** (§6), not a post-merge deliverable (§9). Required sections: ESPHome output (or documented absence), Playwright fixture table, evidence summary. Agents treat §9 as optional — placing the session log there caused 4/9 Phase Y steps to ship without it. | Phase Y closure analysis — 44% omission rate when in §9 |
 | 64 | Checkpoint grep assertions in agent prompts must be mechanically derived from the replacement block in the same prompt — never estimated from memory or a prior session. Mismatched counts cause agents to loop on phantom failures or silently accept wrong state. | LESSON-OPS-126 / v7.6.9.4 |
+| 65 | All new HTTP endpoints must include `authenticate_management_()` for write/management operations and `authFetch()` in dashboard fetch calls | Phase 7 planning review |
+| 66 | After adding new HTTP handlers, run `scripts/stress-test-httpd-stack.sh` on at least one board per architecture. Minimum watermark ≥ 2,000 B. | Phase 7 planning review |
+| 67 | Binary sensor metrics use `EventLog` (state-change-only deduplication), not `HistoryBuffer` (periodic readings) | PLAN-002 |
 
 ---
 
