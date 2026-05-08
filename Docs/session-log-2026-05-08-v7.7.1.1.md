@@ -547,3 +547,64 @@ this follow-up:
 So the aggregator compatibility fix was validated by code-path inspection and
 local repo tests, but not by a successful live `.191` proxy request from this
 environment.
+
+### Baseline comparison required by the Phase 7 prompt
+
+The prompt explicitly required recording the C3 `HEALTH:` values against the
+v7.7.1.0 baseline after confirming the fix.
+
+Observed C3 `HEALTH:` values for v7.7.1.1:
+
+- `heap_free=52080`
+- `min_free=48096`
+- `httpd_stack_wm=11976`
+- `hc_stack_wm=2308`
+
+Comparison table:
+
+| Metric | v7.7.1.0 baseline (C3) | v7.7.1.1 observed (C3) | Delta |
+|---|---|---|---|
+| `heap_free` | 39,704 B | 52,080 B | +12,376 B |
+| `min_free` | 29,776 B | 48,096 B | +18,320 B |
+| `httpd_stack_wm` | 12,932 B | 11,976 B | -956 B |
+| `hc_stack_wm` | 2,176 B | 2,308 B | +132 B |
+
+Interpretation:
+
+- heap headroom improved materially relative to the v7.7.1.0 baseline
+- the httpd task still retains >11 KB watermark on C3 after the chunked
+  history rewrite
+- the health-check task watermark is effectively unchanged in practical terms
+
+### Late review sweep after device validation
+
+Reviewed:
+
+- Gemini review `#pullrequestreview-4253471511`
+- issue comment `#issuecomment-4407769375`
+- issue comment `#issuecomment-4407788908`
+
+Assessment:
+
+- Warranted:
+  - Gemini's snapshot-allocation logging comment was valid. The chunked
+    history path could skip persisted history under allocation failure without
+    leaving an explicit log record.
+- Not warranted:
+  - Gemini's `NaN` wire-format comment was incorrect for this repo. The
+    pre-chunking implementation in `append_snapshot_series_csv_()` already
+    emitted `epoch,` for `NaN`, so the current chunked code did not introduce a
+    wire-format regression.
+  - Gemini's case-insensitive `Transfer-Encoding` search suggestion was a
+    robustness improvement, not a demonstrated branch-tip defect, because the
+    only upstream producer in this path is the project's own firmware with a
+    stable header format.
+- Not actionable:
+  - issue comments `4407769375` and `4407788908` were review summaries
+    concluding the PR was ready; they did not request additional changes.
+
+Additional fix applied from that sweep:
+
+- `firmware/core/web-handler.h`
+  - now logs `History stream: failed to allocate snapshot buffer` when the
+    persisted-history chunked stream cannot allocate the snapshot buffer

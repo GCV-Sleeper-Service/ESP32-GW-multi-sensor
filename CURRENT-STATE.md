@@ -17,7 +17,7 @@ _Next action: Phase 7 Step v7.7.1.2 — per-device structs, key scheme, and hash
 
 | Step | PR | Summary |
 |---|---|---|
-| v7.7.1.1 | #226 | History endpoints now stream CSV with `httpd_resp_send_chunk()`, fixing BUG-082 heap exhaustion on larger retained history sets |
+| v7.7.1.1 | #226 | History endpoints now stream CSV with `httpd_resp_send_chunk()`, fixing BUG-082 heap exhaustion on larger retained history sets; follow-up preserved aggregator proxy compatibility and restored NI-002 `HEALTH:` evidence on WROOM/C3 |
 | v7.7.1.0 | #225 | Health-check telemetry task added as a ninth firmware fragment; boot startup, assembly, and preflight updated for periodic heap/NVS/stack telemetry |
 | v7.6.10.4 | #202 | Dashboard auth refactor: `authFetch()` wrapper, auth modal, eliminated browser native auth dialogs |
 
@@ -42,7 +42,18 @@ _Next action: Phase 7 Step v7.7.1.2 — per-device structs, key scheme, and hash
 
 | Issue | Version | Resolution |
 |---|---|---|
-| #139 / BUG-082 | v7.7.1.1 | Replaced full-CSV-in-RAM history responses with chunked HTTP streaming in `handle_history_()` and `handle_api_v2_history_()`. |
+| #139 / BUG-082 | v7.7.1.1 | Replaced full-CSV-in-RAM history responses with chunked HTTP streaming in `handle_history_()` and `handle_api_v2_history_()`, kept aggregator proxy compatibility by dechunking upstream `/api/v2/history`, and restored NI-002 `HEALTH:` validation coverage on WROOM/C3. |
+
+## Phase 7 Device Validation Snapshot
+
+_Observed on 2026-05-08 after flashing v7.7.1.1 production builds._
+
+| Metric | v7.7.1.0 baseline (C3) | v7.7.1.1 (C3 observed) | Delta |
+|---|---|---|---|
+| `heap_free` | 39,704 B | 52,080 B | +12,376 B |
+| `min_free` | 29,776 B | 48,096 B | +18,320 B |
+| `httpd_stack_wm` | 12,932 B | 11,976 B | -956 B |
+| `hc_stack_wm` | 2,176 B | 2,308 B | +132 B |
 
 ## Board Fleet and Measurements
 

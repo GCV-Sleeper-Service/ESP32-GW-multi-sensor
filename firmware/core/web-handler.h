@@ -1629,6 +1629,8 @@ class HistoryWebHandler : public AsyncWebHandler {
             }
           }
           delete snapshot;
+        } else {
+          ESP_LOGE(TAG, "History stream: failed to allocate snapshot buffer");
         }
       }
       nvs_close(handle);
