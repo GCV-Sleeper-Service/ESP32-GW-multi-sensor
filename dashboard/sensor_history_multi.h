@@ -2897,6 +2897,50 @@ class HistoryWebHandler : public AsyncWebHandler {
 
   // send_snapshot_series_chunk_ formats one persisted snapshot series and sends
   // it via httpd_resp_send_chunk() without building a full response string.
+  static esp_err_t flush_chunk_buffer_(httpd_req_t *req, char *buf, int *buf_pos) {
+    if (buf_pos == nullptr || *buf_pos <= 0) return ESP_OK;
+    esp_err_t err = httpd_resp_send_chunk(req, buf, *buf_pos);
+    if (err == ESP_OK) *buf_pos = 0;
+    return err;
+  }
+
+  static esp_err_t append_csv_line_chunk_(httpd_req_t *req, char *buf,
+                                          size_t buf_size, int *buf_pos,
+                                          const HistEntry &entry) {
+    if (buf == nullptr || buf_pos == nullptr) return ESP_ERR_INVALID_ARG;
+
+    char line[96];
+    int len;
+    if (std::isnan(entry.value)) {
+      len = snprintf(line, sizeof(line), "%u,\n", (unsigned) entry.epoch);
+    } else {
+      len = snprintf(line, sizeof(line), "%u,%.2f\n",
+                     (unsigned) entry.epoch, entry.value);
+    }
+
+    if (len <= 0) return ESP_OK;
+    if (len >= (int) sizeof(line) || len > (int) buf_size) {
+      return ESP_ERR_INVALID_SIZE;
+    }
+
+    if (*buf_pos + len > (int) buf_size) {
+      esp_err_t err = flush_chunk_buffer_(req, buf, buf_pos);
+      if (err != ESP_OK) return err;
+    }
+
+    memcpy(buf + *buf_pos, line, len);
+    *buf_pos += len;
+    return ESP_OK;
+  }
+
+  static void finalize_chunked_response_(httpd_req_t *req, const char *context) {
+    esp_err_t err = httpd_resp_send_chunk(req, nullptr, 0);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "%s final chunk failed: %s",
+               context, esp_err_to_name(err));
+    }
+  }
+
   static esp_err_t send_snapshot_series_chunk_(httpd_req_t *req,
                                                const SegmentSnapshot &snapshot,
                                                int sensor_idx,
@@ -2920,31 +2964,11 @@ class HistoryWebHandler : public AsyncWebHandler {
       const HistEntry &entry = entries[i];
       if (entry.epoch == 0) continue;
 
-      int len;
-      if (std::isnan(entry.value)) {
-        len = snprintf(buf + buf_pos, sizeof(buf) - buf_pos,
-                       "%u,\n", (unsigned) entry.epoch);
-      } else {
-        len = snprintf(buf + buf_pos, sizeof(buf) - buf_pos,
-                       "%u,%.2f\n", (unsigned) entry.epoch, entry.value);
-      }
-
-      if (len > 0 && buf_pos + len < (int) sizeof(buf)) {
-        buf_pos += len;
-      }
-
-      if (buf_pos > (int) sizeof(buf) - 48) {
-        esp_err_t err = httpd_resp_send_chunk(req, buf, buf_pos);
-        if (err != ESP_OK) return err;
-        buf_pos = 0;
-      }
-    }
-
-    if (buf_pos > 0) {
-      esp_err_t err = httpd_resp_send_chunk(req, buf, buf_pos);
+      esp_err_t err = append_csv_line_chunk_(req, buf, sizeof(buf), &buf_pos, entry);
       if (err != ESP_OK) return err;
     }
-    return ESP_OK;
+
+    return flush_chunk_buffer_(req, buf, &buf_pos);
   }
 
   // send_history_buffer_chunk_ formats RAM history entries and sends them via
@@ -2959,31 +2983,12 @@ class HistoryWebHandler : public AsyncWebHandler {
       HistEntry entry = buf.at_logical(i);
       if (entry.epoch == 0 || entry.epoch <= min_epoch_exclusive) continue;
 
-      int len;
-      if (std::isnan(entry.value)) {
-        len = snprintf(line_buf + buf_pos, sizeof(line_buf) - buf_pos,
-                       "%u,\n", (unsigned) entry.epoch);
-      } else {
-        len = snprintf(line_buf + buf_pos, sizeof(line_buf) - buf_pos,
-                       "%u,%.2f\n", (unsigned) entry.epoch, entry.value);
-      }
-
-      if (len > 0 && buf_pos + len < (int) sizeof(line_buf)) {
-        buf_pos += len;
-      }
-
-      if (buf_pos > (int) sizeof(line_buf) - 48) {
-        esp_err_t err = httpd_resp_send_chunk(req, line_buf, buf_pos);
-        if (err != ESP_OK) return err;
-        buf_pos = 0;
-      }
-    }
-
-    if (buf_pos > 0) {
-      esp_err_t err = httpd_resp_send_chunk(req, line_buf, buf_pos);
+      esp_err_t err = append_csv_line_chunk_(req, line_buf, sizeof(line_buf),
+                                             &buf_pos, entry);
       if (err != ESP_OK) return err;
     }
-    return ESP_OK;
+
+    return flush_chunk_buffer_(req, line_buf, &buf_pos);
   }
 
   void handle_api_v2_history_(AsyncWebServerRequest *request, const char *rest) const {
@@ -3041,10 +3046,11 @@ class HistoryWebHandler : public AsyncWebHandler {
     esp_err_t err = send_history_buffer_chunk_(raw_req, *buf);
     if (err != ESP_OK) {
       ESP_LOGW(TAG, "V2 history chunked send failed: %s", esp_err_to_name(err));
+      finalize_chunked_response_(raw_req, "V2 history");
       return;
     }
 
-    httpd_resp_send_chunk(raw_req, nullptr, 0);
+    finalize_chunked_response_(raw_req, "V2 history");
   }
 
   void handle_api_ingest_(AsyncWebServerRequest *request) const {
@@ -3991,6 +3997,7 @@ class HistoryWebHandler : public AsyncWebHandler {
                        n, esp_err_to_name(err));
               delete snapshot;
               nvs_close(handle);
+              finalize_chunked_response_(raw_req, "History stream");
               return;
             }
 
@@ -4008,10 +4015,11 @@ class HistoryWebHandler : public AsyncWebHandler {
     if (err != ESP_OK) {
       ESP_LOGW(TAG, "Chunked send failed for RAM buffer: %s",
                esp_err_to_name(err));
+      finalize_chunked_response_(raw_req, "History stream");
       return;
     }
 
-    httpd_resp_send_chunk(raw_req, nullptr, 0);
+    finalize_chunked_response_(raw_req, "History stream");
 
     ESP_LOGD(TAG, "History streamed for sensor %d/%s (%d NVS segments + RAM)",
              sensor_idx, type, have_nvs ? meta.valid_segments : 0);

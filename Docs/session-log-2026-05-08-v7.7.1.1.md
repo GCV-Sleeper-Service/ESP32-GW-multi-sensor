@@ -102,6 +102,19 @@ Completed in repo order:
 | System Chromium | `FIXTURE_SET=system npx playwright test tests/browser/system-devices.spec.js --project=chromium` | `8 passed` |
 | Aggregator Chromium | `FIXTURE_SET=aggregator npx playwright test tests/browser/aggregator.spec.js --project=chromium` | `11 passed` |
 
+### Review Follow-Up Validation
+
+After addressing the PR review comments:
+
+- `bash scripts/assemble-sensor-history.sh --write` -> PASS
+- `bash scripts/assemble-sensor-history.sh --check` -> PASS
+- `bash scripts/preflight.sh` -> PASS
+- `FIXTURE_SET=3sensor npx playwright test --project=chromium` -> `96 passed`, `53 skipped`
+- `FIXTURE_SET=3sensor npx playwright test --project=firefox` -> `96 passed`, `53 skipped`
+- `FIXTURE_SET=mixed npx playwright test tests/browser/sensor-cards.spec.js --project=chromium` -> `22 passed`, `5 skipped`
+- `FIXTURE_SET=system npx playwright test tests/browser/system-devices.spec.js --project=chromium` -> `8 passed`
+- `FIXTURE_SET=aggregator npx playwright test tests/browser/aggregator.spec.js --project=chromium` -> `11 passed`
+
 ### ESPHome Output
 
 No `esphome compile` was run in this session.
@@ -236,3 +249,39 @@ Future prevention:
   current spec paths
 - no dashboard source modules or firmware fragments outside the intended scope
   were manually edited for logic changes
+
+## Review Follow-Up
+
+### Review assessment
+
+- Warranted:
+  - Copilot inline comments on `send_snapshot_series_chunk_()` and
+    `send_history_buffer_chunk_()` identified a real dropped-line risk when the
+    chunk buffer was nearly full and the next `snprintf()` result was not
+    retried after flush.
+  - Copilot inline comments on both handlers identified a valid cleanup gap:
+    once chunked-response headers had been started, error returns did not
+    explicitly attempt to terminate the chunked response.
+  - The top-level `openai-code-agent` review comment repeated the same two
+    underlying issues and also correctly called out the fragility of the
+    original fixed free-space heuristic.
+- Not actionable:
+  - Gemini's summary review was accurate but did not request code changes.
+  - The `chatgpt-codex-connector` comment was connector guidance, not a code
+    review finding.
+
+### What changed
+
+- Added `flush_chunk_buffer_()` to centralize buffered chunk flushing.
+- Added `append_csv_line_chunk_()` to format each CSV line into a dedicated
+  per-line buffer, flush-before-copy when needed, and avoid silent point loss.
+- Added `finalize_chunked_response_()` and used it on all started-response
+  success/error exits in both history handlers.
+
+### Why this fix was chosen
+
+- It keeps the existing chunked-response design and CSV format intact.
+- It removes the silent data-loss path without regressing heap usage back toward
+  the old full-string behavior.
+- It improves error-path behavior without changing endpoint contracts or
+  aggregator proxy behavior.
