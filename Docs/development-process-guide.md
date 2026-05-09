@@ -5,7 +5,32 @@ _This document governs how development is executed on this project._
 
 ---
 
+## Table of Contents
+
+- [1. Process Overview](#1-process-overview)
+- [2. Step Execution Workflow](#2-step-execution-workflow)
+  - [2.1 Pre-Step Checklist](#21-pre-step-checklist)
+  - [2.2 Agent Execution](#22-agent-execution)
+  - [2.3 Device Testing (When Applicable)](#23-device-testing-when-applicable)
+  - [2.4 Review Pipeline](#24-review-pipeline)
+  - [2.5 Step Deliverables — **(CRITICAL — merge gate)**](#25-step-deliverables-in-pr-before-merge)
+- [3. Prompt Production](#3-prompt-production)
+  - [3.1 Prompt Bundle Structure](#31-prompt-bundle-structure)
+  - [3.2 Checkpoint Authoring Rules](#32-checkpoint-authoring-rules)
+  - [3.3 Scope Guards](#33-scope-guards)
+- [4. Planning Sessions](#4-planning-sessions)
+  - [4.1 Assumption Audit Gate](#41-assumption-audit-gate)
+  - [4.2 Phase Sizing](#42-phase-sizing)
+  - [4.3 Phase Closure](#43-phase-closure)
+- [5. Knowledge Architecture](#5-knowledge-architecture)
+- [6. Quality Measurement](#6-quality-measurement)
+- [7. CI and Automation](#7-ci-and-automation)
+
+---
+
 ## 1. Process Overview
+
+> **Doctrinal precedence.** Where this document and `Docs/writing-guide/methodology.md` conflict, **this document governs**. Methodology describes prompt anatomy; this document describes execution authority and merge gates.
 
 Development follows a phased sprint model where each phase is a self-contained scope of work (feature, refactor, or stabilization) broken into numbered steps. Each step produces a PR that is reviewed, tested, and merged before the next step begins (with parallelism exceptions noted below).
 
@@ -100,6 +125,8 @@ Perplexity runs the structured three-turn review protocol as the final quality g
 
 ### 2.5 Step Deliverables (in-PR, before merge)
 
+> ⚠️ **MERGE GATE** — This section defines the in-PR deliverables required before any PR may be marked "Ready for Review". A PR that ships without these has merged a defect by definition. Reviewers MUST verify each item explicitly.
+
 The PR is the single source of truth for a step. A step is not "done" until the PR contains all of its deliverables. Post-merge work is limited to mechanical bookkeeping that depends on the merge commit SHA.
 
 **In-PR mandatory deliverables (merge gate):**
@@ -109,7 +136,7 @@ Before a PR may be marked "Ready to merge," the branch MUST contain:
 1. **Code changes** — the actual implementation, with all checkpoints satisfied (or a checkpoint-failure comment posted and accepted by the operator).
 2. **`CURRENT-STATE.md` update** — bump "Last verified" date, append to "What Just Shipped," update "What's Next," add/remove "Open Issues" and "Unimplemented Recommendations."
 3. **Changelog entry** — `Docs/changelog.md` entry under the new version.
-4. **Consolidated audit file** — for non-trivial steps. Includes all review findings with severity, agent autonomous decisions, and prompt quality score.
+4. **Consolidated audit file** — required for any **non-trivial** step. A step is non-trivial if any of the following is true: it introduces a new firmware feature, modifies a runtime data path, modifies the dashboard, modifies a build script, or aggregates ≥3 sub-fixes. The minimum consolidated audit must contain: (a) review findings grouped by severity, (b) agent autonomous decisions taken without human input, (c) a prompt quality score (1–5) with a one-line rationale, (d) a list of unimplemented recommendations and where each was routed (issue # / `CURRENT-STATE.md` entry / explicitly closed-as-wontfix with reason).
 5. **Next-step session handoff updates** — if the next step's prompts need changes based on what this step discovered, edit them in this PR.
 6. **Recommendation routing** — if this step produced new recommendations, each one is recorded in CURRENT-STATE.md "Unimplemented Recommendations" OR opened as a GitHub Issue. No third option.
 
@@ -176,6 +203,8 @@ You MUST NOT: [list of forbidden actions]
 
 This prevents agent sprawl — the pattern where agents "helpfully" fix things outside the step's scope, breaking other steps' assumptions.
 
+> **Self-containedness rule.** Every agent prompt must be independently executable. If a prompt's §3 (Scope) references another prompt for scope or constraint information, that is a blocking defect. Inline the full list. The CI prompt-lint rule **L3** detects this class of cross-prompt reference automatically.
+
 ---
 
 ## 4. Planning Sessions
@@ -188,6 +217,13 @@ Before producing any phase plan or prompt set, run the assumption audit (documen
 - What did the last postmortem recommend that hasn't been implemented?
 - What is the simplest thing that could go wrong, and have we checked for it?
 - What happens to this feature after 3 weeks of continuous operation?
+
+> **Required output — Pre-Batch Assumption Audit.** Before producing prompts, the prompt producer MUST commit a file `prompts/handoff/<phase>/<phase>-batch<N>-assumption-audit.md` containing answers to:
+>
+> 1. **Unverified assumptions** — list each assumption (board IPs, file paths, function signatures, partition layouts) made while drafting the prompts, with the source-of-truth file each was checked against.
+> 2. **Unimplemented postmortem items** — list every recommendation from the previous batch's consolidated audit, and for each: implemented / deferred-to-issue-#N / explicitly-rejected (with reason).
+> 3. **Simplest thing that could go wrong** — name the single failure mode most likely to surface during execution and how the prompt's checkpoints would catch it.
+> 4. **3-week continuous-operation impact** — if this batch's changes ran for 3 weeks unattended on the fleet, what would degrade (memory, NVS wear, partition fill, log volume)?
 
 ### 4.2 Phase Sizing
 

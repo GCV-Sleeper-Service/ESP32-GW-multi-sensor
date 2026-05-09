@@ -37,6 +37,7 @@ EXCLUDED_FILES=(
   "prompts/handoff/phase7/new-prompts-audit-report-Perplexity.md"
   "prompts/handoff/phase7/new-prompts-audit-report-Opus4.7.md"
   "prompts/handoff/phase7/phase7-batch2-prompt-audit-report-GPT.md"
+  "prompts/handoff/phase7-prompt-production-instructions.md"
   "Docs/lessons-by-phase.md"
 )
 

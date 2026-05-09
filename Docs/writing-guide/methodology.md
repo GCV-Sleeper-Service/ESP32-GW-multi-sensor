@@ -15,6 +15,8 @@ _Based on real prompt failures and revisions from the ESP32-GW Multi-Sensor Gate
 
 ## 1. Why This Document Exists
 
+> **Doctrinal precedence.** Where this document and `Docs/development-process-guide.md` conflict, **the development-process-guide governs**. This document describes prompt anatomy; the development-process-guide describes execution authority and merge gates.
+
 During Phase 4 (v7.5.4.x) and Phase 5 (v7.5.5.x) of the ESP32-GW Multi-Sensor Gateway project, implementation prompts were written to guide AI coding agents through each development step. These prompts went through three iterations:
 
 1. **Original prompts** — high-level scope and acceptance criteria, written from the implementation plan
@@ -136,8 +138,25 @@ Which docs to update and what to write. Without this, documentation drifts from 
 ### 3.9 Review Checklist
 A verification list the agent runs before creating a PR. Each item should be a concrete, testable assertion — not a subjective judgment.
 
-### 3.10 Device Testing (for Human)
-Step-by-step verification the human performs after merge. Includes expected outputs for each command. Any deviation from expected output is a signal.
+### 3.10 Device Testing — Agent-Performed by Default; Operator Items Listed Separately
+
+> See `Docs/development-process-guide.md` §2.3 for the canonical workflow. This methodology section is the **prompt-anatomy** view; the dev-process-guide is the **execution** view. Where these two conflict, the dev-process-guide governs (see §3.X "Doctrinal Precedence" below).
+
+The agent performs device testing by default. The prompt must include device commands for **every board** in the current fleet. Do not omit any board; omitting a board is a silent gap identical to omitting a test case.
+
+**Agent-performed (required in every firmware prompt):**
+- Compile: `esphome compile <yaml>` — run after all code changes
+- Upload: `esphome upload <yaml> --device=<ip>` — wrapped in `timeout 300`; never use `esphome run`
+- Clean before AND after compile to prevent stale artifacts
+- Curl smoke tests against `/api/status`, `/api/status/full`, `/api/history`, and any endpoint the step modifies
+- Post curl output as PR comment
+
+**Operator-performed (only what the agent cannot do):**
+- Visual browser checks (dashboard rendering, chart layout)
+- Serial-log inspection when no UART adapter is available
+- Final merge approval
+
+Every step that exercises a runtime path must include device commands covering every board in the fleet. Listing only one board while the fleet has three is the gap that issue #228 item A1/A2 found at the produced-prompt layer. The prompt author must enumerate boards explicitly — the agent cannot infer which boards exist.
 
 ### 3.11 Test Group Implementation Guardrails (required in every prompt that adds new test groups)
 
