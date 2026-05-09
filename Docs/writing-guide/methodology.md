@@ -140,7 +140,7 @@ A verification list the agent runs before creating a PR. Each item should be a c
 
 ### 3.10 Device Testing — Agent-Performed by Default; Operator Items Listed Separately
 
-> See `Docs/development-process-guide.md` §2.3 for the canonical workflow. This methodology section is the **prompt-anatomy** view; the dev-process-guide is the **execution** view. Where these two conflict, the dev-process-guide governs (see §3.X "Doctrinal Precedence" below).
+> See `Docs/development-process-guide.md` §2.3 for the canonical workflow. This methodology section is the **prompt-anatomy** view; the dev-process-guide is the **execution** view. Where these two conflict, the dev-process-guide governs (see §1 "Doctrinal Precedence" above).
 
 The agent performs device testing by default. The prompt must include device commands for **every board** in the current fleet. Do not omit any board; omitting a board is a silent gap identical to omitting a test case.
 

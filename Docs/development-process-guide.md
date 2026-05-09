@@ -136,7 +136,18 @@ Before a PR may be marked "Ready to merge," the branch MUST contain:
 1. **Code changes** — the actual implementation, with all checkpoints satisfied (or a checkpoint-failure comment posted and accepted by the operator).
 2. **`CURRENT-STATE.md` update** — bump "Last verified" date, append to "What Just Shipped," update "What's Next," add/remove "Open Issues" and "Unimplemented Recommendations."
 3. **Changelog entry** — `Docs/changelog.md` entry under the new version.
-4. **Consolidated audit file** — required for any **non-trivial** step. A step is non-trivial if any of the following is true: it introduces a new firmware feature, modifies a runtime data path, modifies the dashboard, modifies a build script, or aggregates ≥3 sub-fixes. The minimum consolidated audit must contain: (a) review findings grouped by severity, (b) agent autonomous decisions taken without human input, (c) a prompt quality score (1–5) with a one-line rationale, (d) a list of unimplemented recommendations and where each was routed (issue # / `CURRENT-STATE.md` entry / explicitly closed-as-wontfix with reason).
+4. **Consolidated audit file** — required for any **non-trivial** step. A step is non-trivial if any of the following is true:
+   - It introduces a new firmware feature
+   - It modifies a runtime data path
+   - It modifies the dashboard
+   - It modifies a build script
+   - It aggregates ≥3 sub-fixes
+
+   The minimum consolidated audit must contain:
+   - **(a)** Review findings grouped by severity
+   - **(b)** Agent autonomous decisions taken without human input
+   - **(c)** A prompt quality score (1–5) with a one-line rationale
+   - **(d)** A list of unimplemented recommendations and where each was routed (issue # / `CURRENT-STATE.md` entry / explicitly closed-as-wontfix with reason)
 5. **Next-step session handoff updates** — if the next step's prompts need changes based on what this step discovered, edit them in this PR.
 6. **Recommendation routing** — if this step produced new recommendations, each one is recorded in CURRENT-STATE.md "Unimplemented Recommendations" OR opened as a GitHub Issue. No third option.
 
