@@ -98,9 +98,12 @@ check_file() {
   done < <(grep -n 'esp32-wroom-32d-multi-sensor\.yaml' "$file" 2>/dev/null || true)
 
   # L6: assemble-sensor-history.sh --check appearing before --write within 20 lines (WARN)
-  # Rationale: Best-effort ordering check; correct pipeline order is --check then --write
-  # is NOT the concern — the concern is invoking --check alone where --write is needed.
-  # This WARN flags co-occurrence patterns for human review.
+  # Rationale: Best-effort ordering check (audit E-5). In prompts that describe the pipeline,
+  # finding --check immediately followed by --write in the same section suggests the prompt
+  # may be conflating the CI verification step (--check) with the code-generation step
+  # (--write). The two flags serve different phases and should not appear in close succession
+  # as sequential agent instructions. WARN only — a human must judge whether the ordering is
+  # intentional (e.g., a "verify then regenerate" pattern) or an authoring error.
   while IFS= read -r warn_line; do
     [[ -n "$warn_line" ]] && emit_warn "$warn_line"
   done < <(awk '

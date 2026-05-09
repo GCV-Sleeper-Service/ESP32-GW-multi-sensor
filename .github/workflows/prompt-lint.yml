@@ -49,8 +49,9 @@ jobs:
         if: always()
         shell: bash
         run: |
+          VERSION_STR="$(cat VERSION 2>/dev/null || echo 'unknown')"
           {
-            echo "## Prompt Lint — $(cat VERSION)"
+            echo "## Prompt Lint — ${VERSION_STR}"
             echo "| Field | Value |"
             echo "|-------|-------|"
             echo "| Ref | \`${GITHUB_REF_NAME}\` |"
