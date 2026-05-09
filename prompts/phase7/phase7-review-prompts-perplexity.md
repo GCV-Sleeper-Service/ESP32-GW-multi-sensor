@@ -239,8 +239,9 @@ If verdict is **NEEDS-FIX or BLOCKED**: produce a targeted fix prompt that addre
 - Apply version tag: `git tag -a v7.7.1.1 -m "Phase 7: Chunked HTTP streaming - BUG-082 fix" && git push origin v7.7.1.1`
 
 Operator device testing (post-merge — CRITICAL — results go in consolidated audit):
-- Flash WROOM (192.168.120.190) — the board that crashed before this fix
-- `curl -v http://192.168.120.190/history/office/temp` — must return chunked CSV, NO crash
+- Flash WROOM (192.168.120.170) — the board that crashed before this fix
+- Before using serial-gated conclusions, verify the flashed WROOM YAML is `firmware/esp32-wroom-32d-gw.yaml`, `logger.level: INFO`, serial output is not disabled, and `start_health_check_task_()` is present in generated `on_boot`
+- `curl -v http://192.168.120.170/history/office/temp` — must return chunked CSV, NO crash
 - Flash C3 (192.168.120.189) — verify chunked response
 - Run `scripts/stress-test-httpd-stack.sh` — verify no regression
 - Monitor health-check logs during history serve — peak heap usage should be < 5 KB

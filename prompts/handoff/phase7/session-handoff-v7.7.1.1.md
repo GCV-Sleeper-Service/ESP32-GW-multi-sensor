@@ -30,7 +30,7 @@ Use these as the "before" comparison baseline in v7.7.1.1 device testing.
 ### Open follow-up items from v7.7.1.0 (non-blocking for merge, required before v7.7.1.1 closes)
 
 - **NI-001 (Medium) — WROOM previous-boot `IllegalInstruction` crash:** The WROOM satellite emitted `*** CRASH DETECTED ON PREVIOUS BOOT *** Fault - IllegalInstruction` after v7.7.1.0 OTA flash. HTTP API responded correctly post-reboot. Root cause unknown — may be pre-existing, may be related to health-check task on WROOM. **Investigate during v7.7.1.1 WROOM device testing.** If the crash recurs or the fault is linked to the health-check task, escalate before merging v7.7.1.1.
-- **NI-002 (Low) — WROOM + S3 `HEALTH:` log lines not observed:** Neither WROOM (130s window) nor S3 (90s window) emitted observable `HEALTH:` serial lines after v7.7.1.0 flash. The C3 confirmed HEALTH: output at the expected interval. Use a >150s capture window for WROOM and S3 in v7.7.1.1 device testing. A confirmed `HEALTH:` line on WROOM is a gate for v7.7.1.1.
+- **NI-002 (Low) — WROOM + S3 `HEALTH:` log lines not observed:** Neither WROOM (130s window) nor S3 (90s window) emitted observable `HEALTH:` serial lines after v7.7.1.0 flash. The C3 confirmed HEALTH: output at the expected interval. Use a >150s capture window for WROOM and S3 in v7.7.1.1 device testing, but treat that as necessary rather than sufficient: also verify the flashed board config has `logger.level: INFO`, serial output enabled if UART capture is required, and `start_health_check_task_()` present in generated `on_boot`. A confirmed `HEALTH:` line on WROOM is a gate for v7.7.1.1.
 
 ---
 
@@ -198,7 +198,7 @@ The Phase 7 step table in `prompts/prompt-index-and-workflow.md` still shows the
 
 | Board | IP | Role | Why |
 |-------|-----|------|-----|
-| WROOM-32D | `192.168.120.190` | Satellite | **Tightest heap — original crash board; also NI-001 crash to investigate** |
+| WROOM-32D | `192.168.120.170` | Satellite | **Tightest heap — original crash board; also NI-001 crash to investigate** |
 | ESP32-C3 SuperMini | `192.168.120.189` | Satellite | Second crash board |
 
 After flash:
@@ -208,7 +208,7 @@ After flash:
 - [ ] Dashboard history charts render correctly on both boards
 - [ ] Health-check logs show peak heap usage < 5 KB during history serve
 - [ ] `scripts/stress-test-httpd-stack.sh` passes on at least C3
-- [ ] **NI-002 gate:** WROOM serial log confirms `HEALTH:` lines within 150s capture window
+- [ ] **NI-002 gate:** WROOM serial log confirms `HEALTH:` lines within 150s capture window after verifying the flashed config still enables INFO logging, serial output, and `start_health_check_task_()`
 - [ ] **NI-001 gate:** WROOM does NOT report `*** CRASH DETECTED ON PREVIOUS BOOT ***` after v7.7.1.1 OTA
 
 **If WROOM crashes:** capture serial log immediately. This means the chunked approach has a bug. Do NOT close the PR as resolved.

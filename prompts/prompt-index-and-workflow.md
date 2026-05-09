@@ -239,19 +239,20 @@ Before starting Phase 7, read `prompts/handoff/phaseD/phaseD-results.md` for the
 
 | Version | Scope | Prompt File | Status |
 |---------|-------|-------------|--------|
-| v7.7.0.0 | Per-device structs, key scheme, hash | `prompts/phase7/v7.7.0.0-implementation-instructions-for-coding-agent.md` | Pending |
-| v7.7.0.1 | Per-device persist (write path) | `prompts/phase7/v7.7.0.1-implementation-instructions-for-coding-agent.md` | Pending |
-| v7.7.0.2 | Per-device restore (boot) + retention budget | _Prompt not yet created_ | Pending |
-| v7.7.0.3 | Wire new engine, storage-stats v2 | _Prompt not yet created_ | Pending |
-| v7.7.1.0 | v7→v8 one-time migration | `prompts/phase7/v7.7.1.0-implementation-instructions-for-coding-agent.md` | Pending |
-| v7.7.1.1 | Per-device delete API | _Prompt not yet created_ | Pending |
-| v7.7.1.2 | Dashboard per-device storage UI | _Prompt not yet created_ | Pending |
-| v7.7.2.0 | Per-device CSV export | _Prompt not yet created_ | Pending |
-| v7.7.2.1 | Per-device CSV import (merge) | _Prompt not yet created_ | Pending |
-| v7.7.2.2 | Multi-device bundle export/import | _Prompt not yet created_ | Pending |
-| v7.7.2.3 | Full regression + Phase 7 closure | _Prompt not yet created_ | Pending |
+| v7.7.0.0 | ESPHome component defaults audit (research) | `prompts/phase7/v7.7.0.0-research-prompt.md` | Complete |
+| v7.7.1.0 | Health-check telemetry task + measurement baseline | `prompts/phase7/v7.7.1.0-agent-prompt-gpt-codex.md` | Complete |
+| v7.7.1.1 | Chunked HTTP streaming for history endpoints (BUG-082 fix) | `prompts/phase7/v7.7.1.1-agent-prompt-gpt-codex.md` | Complete |
+| v7.7.1.2 | Per-device structs, key scheme, hash function | _Prompt not yet created_ | Pending |
+| v7.7.1.3 | Per-device persist engine (write path) | _Prompt not yet created_ | Pending |
+| v7.7.1.4 | Per-device restore engine (boot path) + retention budget | _Prompt not yet created_ | Pending |
+| v7.7.2.1 | Wire new engine, storage stats v2, switchover | _Prompt not yet created_ | Pending |
+| v7.7.2.2 | v7→v8 one-time migration | _Prompt not yet created_ | Pending |
+| v7.7.2.3 | Per-device delete API + dashboard UI | _Prompt not yet created_ | Pending |
+| v7.7.3.1 | Per-device export/import | _Prompt not yet created_ | Pending |
+| v7.7.3.2 | Multi-device bundle export/import | _Prompt not yet created_ | Pending |
+| v7.7.3.3 | Full regression, old engine removal, phase closure | _Prompt not yet created_ | Pending |
 
-**Note:** Phase 7 prompts for v7.7.0.2 through v7.7.2.3 are to be created during the post-Phase-D preparation session (see `prompts/handoff/session-prompt-post-phaseD-completion.md` Steps 4–6). They require the post-Phase-D codebase state to properly trace data paths and verify function names.
+**Note:** The older Phase 7 table above was superseded by the 2026-05-07 multi-phase planning rewrite. The active sequence starts with research step `v7.7.0.0`, then implementation steps `v7.7.1.0`, `v7.7.1.1`, `v7.7.1.2`, `v7.7.1.3`, `v7.7.1.4`, followed by `v7.7.2.x` integration and `v7.7.3.x` export/closure work.
 
 ---
 

@@ -167,6 +167,140 @@ static void set_aggregator_poll_basic_auth_(const char *username,
 // Avoids esp_http_client.h, which is not in ESPHome's IDF PRIV_REQUIRES.
 // Uses lwip/sockets.h and lwip/netdb.h (both already available).
 // Returns true and sets *out_len on HTTP 200; false otherwise.
+static bool recv_exact_(int sock, char *dst, int len) {
+  int total = 0;
+  while (total < len) {
+    int n = lwip_recv(sock, dst + total, len - total, 0);
+    if (n <= 0) return false;
+    total += n;
+  }
+  return true;
+}
+
+static bool discard_exact_(int sock, int len) {
+  char scratch[128];
+  int remaining = len;
+  while (remaining > 0) {
+    int want = remaining < static_cast<int>(sizeof(scratch))
+                   ? remaining
+                   : static_cast<int>(sizeof(scratch));
+    int n = lwip_recv(sock, scratch, want, 0);
+    if (n <= 0) return false;
+    remaining -= n;
+  }
+  return true;
+}
+
+static bool recv_crlf_line_(int sock, char *dst, size_t dst_size, int *out_len) {
+  if (dst == nullptr || dst_size < 3 || out_len == nullptr) return false;
+
+  int total = 0;
+  while (total < static_cast<int>(dst_size - 1)) {
+    int n = lwip_recv(sock, dst + total, 1, 0);
+    if (n <= 0) return false;
+    total += n;
+    if (total >= 2 && dst[total - 2] == '\r' && dst[total - 1] == '\n') {
+      dst[total] = '\0';
+      *out_len = total;
+      return true;
+    }
+  }
+  return false;
+}
+
+static char ascii_tolower_(char c) {
+  return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+}
+
+static bool ascii_ieq_n_(const char *a, const char *b, size_t len) {
+  if (a == nullptr || b == nullptr) return false;
+  for (size_t i = 0; i < len; ++i) {
+    if (ascii_tolower_(a[i]) != ascii_tolower_(b[i])) return false;
+  }
+  return true;
+}
+
+static bool header_has_transfer_encoding_chunked_(const char *hdr) {
+  if (hdr == nullptr) return false;
+
+  const char *line = hdr;
+  while (*line != '\0') {
+    const char *line_end = strstr(line, "\r\n");
+    if (line_end == nullptr) break;
+    if (line_end == line) break;
+
+    const char *colon = static_cast<const char *>(memchr(line, ':', line_end - line));
+    if (colon != nullptr &&
+        static_cast<size_t>(colon - line) == strlen("Transfer-Encoding") &&
+        ascii_ieq_n_(line, "Transfer-Encoding", strlen("Transfer-Encoding"))) {
+      const char *value = colon + 1;
+      while (value < line_end && (*value == ' ' || *value == '\t')) value++;
+
+      while (value < line_end) {
+        while (value < line_end && (*value == ' ' || *value == '\t' || *value == ',')) value++;
+        const char *token_end = value;
+        while (token_end < line_end && *token_end != ',') token_end++;
+        while (token_end > value &&
+               (token_end[-1] == ' ' || token_end[-1] == '\t')) token_end--;
+
+        if (static_cast<size_t>(token_end - value) == strlen("chunked") &&
+            ascii_ieq_n_(value, "chunked", strlen("chunked"))) {
+          return true;
+        }
+        value = token_end;
+      }
+    }
+
+    line = line_end + 2;
+  }
+  return false;
+}
+
+static bool read_chunked_body_(int sock, char *buf, uint16_t buf_size, uint16_t *out_len) {
+  if (buf == nullptr || out_len == nullptr || buf_size == 0) return false;
+
+  int total = 0;
+  char line[64];
+  for (;;) {
+    int line_len = 0;
+    if (!recv_crlf_line_(sock, line, sizeof(line), &line_len)) return false;
+
+    char *end = nullptr;
+    long chunk_size = strtol(line, &end, 16);
+    if (end == line || chunk_size < 0) return false;
+
+    if (chunk_size == 0) {
+      do {
+        if (!recv_crlf_line_(sock, line, sizeof(line), &line_len)) return false;
+      } while (!(line_len == 2 && line[0] == '\r' && line[1] == '\n'));
+      break;
+    }
+
+    int remaining = static_cast<int>(buf_size - 1) - total;
+    int to_copy = remaining > 0
+                      ? (static_cast<int>(chunk_size) < remaining
+                             ? static_cast<int>(chunk_size)
+                             : remaining)
+                      : 0;
+
+    if (to_copy > 0) {
+      if (!recv_exact_(sock, buf + total, to_copy)) return false;
+      total += to_copy;
+    }
+    if (chunk_size > to_copy) {
+      if (!discard_exact_(sock, static_cast<int>(chunk_size) - to_copy)) return false;
+    }
+
+    char crlf[2];
+    if (!recv_exact_(sock, crlf, sizeof(crlf))) return false;
+    if (crlf[0] != '\r' || crlf[1] != '\n') return false;
+  }
+
+  buf[total] = '\0';
+  *out_len = static_cast<uint16_t>(total);
+  return true;
+}
+
 static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint16_t* out_len,
                             int timeout_s = 5, int* out_http_status = nullptr,
                             const char* basic_auth = nullptr) {
@@ -264,6 +398,7 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
     }
   }
   if (!hdr_done) { lwip_close(sock); return false; }
+  hdr[hdr_len] = '\0';
 
   // Parse and check HTTP status (bounded; no reliance on NUL terminator).
   if (strncmp(hdr, "HTTP/", 5) != 0) { lwip_close(sock); return false; }
@@ -283,6 +418,13 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
                          (status[2] - '0');
   if (out_http_status != nullptr) *out_http_status = http_status_code;
   if (http_status_code != 200) { lwip_close(sock); return false; }
+
+  bool is_chunked = header_has_transfer_encoding_chunked_(hdr);
+  if (is_chunked) {
+    bool ok = read_chunked_body_(sock, buf, buf_size, out_len);
+    lwip_close(sock);
+    return ok;
+  }
 
   // ── Read body directly into caller's buffer ────────────────────
   int total = 0;
@@ -965,4 +1107,3 @@ static void start_aggregator_task() {
 // ═══════════════════════════════════════════════════════════════════
 // HistoryWebHandler — custom endpoints on ESPHome web server
 // ═══════════════════════════════════════════════════════════════════
-

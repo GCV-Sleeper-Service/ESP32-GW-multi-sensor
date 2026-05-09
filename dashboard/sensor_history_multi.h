@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// config-v7.7.1.0.h - hourly persistence with dedicated history NVS partition
+// config-v7.7.1.1.h - hourly persistence with dedicated history NVS partition
 // Source fragment: firmware/core/config.h. Assembled output: dashboard/sensor_history_multi.h.
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
@@ -471,7 +471,7 @@ static SensorEntity devices[NUM_DEVICES] = {
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.7.1.0) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.7.1.1) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -1581,6 +1581,140 @@ static void set_aggregator_poll_basic_auth_(const char *username,
 // Avoids esp_http_client.h, which is not in ESPHome's IDF PRIV_REQUIRES.
 // Uses lwip/sockets.h and lwip/netdb.h (both already available).
 // Returns true and sets *out_len on HTTP 200; false otherwise.
+static bool recv_exact_(int sock, char *dst, int len) {
+  int total = 0;
+  while (total < len) {
+    int n = lwip_recv(sock, dst + total, len - total, 0);
+    if (n <= 0) return false;
+    total += n;
+  }
+  return true;
+}
+
+static bool discard_exact_(int sock, int len) {
+  char scratch[128];
+  int remaining = len;
+  while (remaining > 0) {
+    int want = remaining < static_cast<int>(sizeof(scratch))
+                   ? remaining
+                   : static_cast<int>(sizeof(scratch));
+    int n = lwip_recv(sock, scratch, want, 0);
+    if (n <= 0) return false;
+    remaining -= n;
+  }
+  return true;
+}
+
+static bool recv_crlf_line_(int sock, char *dst, size_t dst_size, int *out_len) {
+  if (dst == nullptr || dst_size < 3 || out_len == nullptr) return false;
+
+  int total = 0;
+  while (total < static_cast<int>(dst_size - 1)) {
+    int n = lwip_recv(sock, dst + total, 1, 0);
+    if (n <= 0) return false;
+    total += n;
+    if (total >= 2 && dst[total - 2] == '\r' && dst[total - 1] == '\n') {
+      dst[total] = '\0';
+      *out_len = total;
+      return true;
+    }
+  }
+  return false;
+}
+
+static char ascii_tolower_(char c) {
+  return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+}
+
+static bool ascii_ieq_n_(const char *a, const char *b, size_t len) {
+  if (a == nullptr || b == nullptr) return false;
+  for (size_t i = 0; i < len; ++i) {
+    if (ascii_tolower_(a[i]) != ascii_tolower_(b[i])) return false;
+  }
+  return true;
+}
+
+static bool header_has_transfer_encoding_chunked_(const char *hdr) {
+  if (hdr == nullptr) return false;
+
+  const char *line = hdr;
+  while (*line != '\0') {
+    const char *line_end = strstr(line, "\r\n");
+    if (line_end == nullptr) break;
+    if (line_end == line) break;
+
+    const char *colon = static_cast<const char *>(memchr(line, ':', line_end - line));
+    if (colon != nullptr &&
+        static_cast<size_t>(colon - line) == strlen("Transfer-Encoding") &&
+        ascii_ieq_n_(line, "Transfer-Encoding", strlen("Transfer-Encoding"))) {
+      const char *value = colon + 1;
+      while (value < line_end && (*value == ' ' || *value == '\t')) value++;
+
+      while (value < line_end) {
+        while (value < line_end && (*value == ' ' || *value == '\t' || *value == ',')) value++;
+        const char *token_end = value;
+        while (token_end < line_end && *token_end != ',') token_end++;
+        while (token_end > value &&
+               (token_end[-1] == ' ' || token_end[-1] == '\t')) token_end--;
+
+        if (static_cast<size_t>(token_end - value) == strlen("chunked") &&
+            ascii_ieq_n_(value, "chunked", strlen("chunked"))) {
+          return true;
+        }
+        value = token_end;
+      }
+    }
+
+    line = line_end + 2;
+  }
+  return false;
+}
+
+static bool read_chunked_body_(int sock, char *buf, uint16_t buf_size, uint16_t *out_len) {
+  if (buf == nullptr || out_len == nullptr || buf_size == 0) return false;
+
+  int total = 0;
+  char line[64];
+  for (;;) {
+    int line_len = 0;
+    if (!recv_crlf_line_(sock, line, sizeof(line), &line_len)) return false;
+
+    char *end = nullptr;
+    long chunk_size = strtol(line, &end, 16);
+    if (end == line || chunk_size < 0) return false;
+
+    if (chunk_size == 0) {
+      do {
+        if (!recv_crlf_line_(sock, line, sizeof(line), &line_len)) return false;
+      } while (!(line_len == 2 && line[0] == '\r' && line[1] == '\n'));
+      break;
+    }
+
+    int remaining = static_cast<int>(buf_size - 1) - total;
+    int to_copy = remaining > 0
+                      ? (static_cast<int>(chunk_size) < remaining
+                             ? static_cast<int>(chunk_size)
+                             : remaining)
+                      : 0;
+
+    if (to_copy > 0) {
+      if (!recv_exact_(sock, buf + total, to_copy)) return false;
+      total += to_copy;
+    }
+    if (chunk_size > to_copy) {
+      if (!discard_exact_(sock, static_cast<int>(chunk_size) - to_copy)) return false;
+    }
+
+    char crlf[2];
+    if (!recv_exact_(sock, crlf, sizeof(crlf))) return false;
+    if (crlf[0] != '\r' || crlf[1] != '\n') return false;
+  }
+
+  buf[total] = '\0';
+  *out_len = static_cast<uint16_t>(total);
+  return true;
+}
+
 static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint16_t* out_len,
                             int timeout_s = 5, int* out_http_status = nullptr,
                             const char* basic_auth = nullptr) {
@@ -1678,6 +1812,7 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
     }
   }
   if (!hdr_done) { lwip_close(sock); return false; }
+  hdr[hdr_len] = '\0';
 
   // Parse and check HTTP status (bounded; no reliance on NUL terminator).
   if (strncmp(hdr, "HTTP/", 5) != 0) { lwip_close(sock); return false; }
@@ -1697,6 +1832,13 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
                          (status[2] - '0');
   if (out_http_status != nullptr) *out_http_status = http_status_code;
   if (http_status_code != 200) { lwip_close(sock); return false; }
+
+  bool is_chunked = header_has_transfer_encoding_chunked_(hdr);
+  if (is_chunked) {
+    bool ok = read_chunked_body_(sock, buf, buf_size, out_len);
+    lwip_close(sock);
+    return ok;
+  }
 
   // ── Read body directly into caller's buffer ────────────────────
   int total = 0;
@@ -2379,7 +2521,6 @@ static void start_aggregator_task() {
 // ═══════════════════════════════════════════════════════════════════
 // HistoryWebHandler — custom endpoints on ESPHome web server
 // ═══════════════════════════════════════════════════════════════════
-
 static volatile bool s_import_ready = false;
 
 #if AGGREGATOR_ENABLED
@@ -2895,10 +3036,114 @@ class HistoryWebHandler : public AsyncWebHandler {
     request->send(resp);
   }
 
-  void handle_api_v2_history_(AsyncWebServerRequest *request, const char *rest) const {
-    // Public history endpoint used by dashboard charts and aggregator proxy paths.
+  // send_snapshot_series_chunk_ formats one persisted snapshot series and sends
+  // it via httpd_resp_send_chunk() without building a full response string.
+  static esp_err_t flush_chunk_buffer_(httpd_req_t *req, char *buf, int *buf_pos) {
+    if (buf_pos == nullptr || *buf_pos <= 0) return ESP_OK;
+    esp_err_t err = httpd_resp_send_chunk(req, buf, *buf_pos);
+    if (err == ESP_OK) *buf_pos = 0;
+    return err;
+  }
 
-    // Parse: rest = "device_id/metric_key"
+  static esp_err_t append_csv_line_chunk_(httpd_req_t *req, char *buf,
+                                          size_t buf_size, int *buf_pos,
+                                          const HistEntry &entry) {
+    if (buf == nullptr || buf_pos == nullptr) return ESP_ERR_INVALID_ARG;
+
+    // CSV history lines are short ("epoch,%.2f\n" or "epoch,\n"); 96 bytes is
+    // deliberate headroom, and exceeding it indicates unexpected input.
+    char line[96];
+    int len;
+    if (std::isnan(entry.value)) {
+      len = snprintf(line, sizeof(line), "%u,\n", (unsigned) entry.epoch);
+    } else {
+      len = snprintf(line, sizeof(line), "%u,%.2f\n",
+                     (unsigned) entry.epoch, entry.value);
+    }
+
+    if (len <= 0) return ESP_OK;
+    if (len >= (int) sizeof(line) || len > (int) buf_size) {
+      return ESP_ERR_INVALID_SIZE;
+    }
+
+    if (*buf_pos + len > (int) buf_size) {
+      esp_err_t err = flush_chunk_buffer_(req, buf, buf_pos);
+      if (err != ESP_OK) return err;
+    }
+
+    memcpy(buf + *buf_pos, line, len);
+    *buf_pos += len;
+    return ESP_OK;
+  }
+
+  static void finalize_chunked_response_(httpd_req_t *req, const char *context,
+                                         esp_err_t prior_err = ESP_OK) {
+    esp_err_t err = httpd_resp_send_chunk(req, nullptr, 0);
+    if (err != ESP_OK) {
+      if (prior_err == ESP_ERR_HTTPD_RESP_SEND && err == ESP_ERR_HTTPD_RESP_SEND) {
+        ESP_LOGD(TAG, "%s final chunk skipped after client disconnect", context);
+      } else {
+        ESP_LOGW(TAG, "%s final chunk failed: %s",
+                 context, esp_err_to_name(err));
+      }
+    }
+  }
+
+  static esp_err_t send_snapshot_series_chunk_(httpd_req_t *req,
+                                               const SegmentSnapshot &snapshot,
+                                               int sensor_idx,
+                                               int series_kind) {
+    if (sensor_idx < 0 || sensor_idx >= NUM_SENSORS) return ESP_OK;
+
+    const HistEntry *entries = nullptr;
+    int count = 0;
+    if (series_kind == HISTORY_SERIES_TEMP) {
+      entries = snapshot.temp[sensor_idx];
+      count = snapshot.temp_counts[sensor_idx];
+    } else {
+      entries = snapshot.hum[sensor_idx];
+      count = snapshot.hum_counts[sensor_idx];
+    }
+
+    char buf[512];
+    int buf_pos = 0;
+
+    for (int i = 0; i < count; i++) {
+      const HistEntry &entry = entries[i];
+      if (entry.epoch == 0) continue;
+
+      esp_err_t err = append_csv_line_chunk_(req, buf, sizeof(buf), &buf_pos, entry);
+      if (err != ESP_OK) return err;
+    }
+
+    return flush_chunk_buffer_(req, buf, &buf_pos);
+  }
+
+  // send_history_buffer_chunk_ formats RAM history entries and sends them via
+  // httpd_resp_send_chunk() with the same CSV wire format.
+  static esp_err_t send_history_buffer_chunk_(
+      httpd_req_t *req, const HistoryBuffer &buf,
+      uint32_t min_epoch_exclusive = 0) {
+    char line_buf[512];
+    int buf_pos = 0;
+
+    for (int i = 0; i < buf.count(); i++) {
+      HistEntry entry = buf.at_logical(i);
+      if (entry.epoch == 0 || entry.epoch <= min_epoch_exclusive) continue;
+
+      esp_err_t err = append_csv_line_chunk_(req, line_buf, sizeof(line_buf),
+                                             &buf_pos, entry);
+      if (err != ESP_OK) return err;
+    }
+
+    return flush_chunk_buffer_(req, line_buf, &buf_pos);
+  }
+
+  void handle_api_v2_history_(AsyncWebServerRequest *request, const char *rest) const {
+    // Public history endpoint used by dashboard charts and aggregator proxy.
+    // Phase 7 v7.7.1.1: Chunked HTTP streaming for consistency with
+    // handle_history_() and future-proofing for per-device NVS reads.
+
     const char *slash = strchr(rest, '/');
     if (slash == nullptr) {
       request->send(404);
@@ -2922,7 +3167,6 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    // Find metric index by matching metric_defs[].key
     int metric_idx = -1;
     for (int m = 0; m < devices[dev_idx].metric_count; m++) {
       if (strcmp(devices[dev_idx].metric_defs[m].key, metric_key) == 0) {
@@ -2935,7 +3179,6 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    // Check history_enabled and history buffer
     if (!devices[dev_idx].metric_defs[metric_idx].history_enabled ||
         devices[dev_idx].metric_states[metric_idx].history == nullptr) {
       request->send(404);
@@ -2944,28 +3187,18 @@ class HistoryWebHandler : public AsyncWebHandler {
 
     HistoryBuffer *buf = devices[dev_idx].metric_states[metric_idx].history;
 
-    // Use pre-reserved string pattern (LESSON-OPS-056)
-    size_t est_bytes = (size_t)buf->count() * 20 + 64;
-    // v7.6.9.4 (#139 partial): heap-adaptive cap replaces fixed 60 KB.
-    // Fixed cap (v7.6.8.1 V2-E) was sized for C3 ~68 KB free heap budget.
-    // On WROOM with ~30-40 KB free, a 60 KB reserve exceeds running heap and
-    // crashes the board. Clamp to free_heap/3 with a 12 KB floor and the
-    // original 60 KB ceiling preserved for healthy boards. Dashboard tolerates
-    // truncated CSV gracefully (parseCompactHistory processes line-by-line).
-    size_t free_now = esp_get_free_heap_size();
-    size_t adaptive_cap = free_now / 3;
-    if (adaptive_cap < 12000) adaptive_cap = 12000;
-    if (adaptive_cap > 60000) adaptive_cap = 60000;
+    httpd_req_t *raw_req = static_cast<httpd_req_t *>(*request);
+    httpd_resp_set_type(raw_req, "text/plain");
+    httpd_resp_set_hdr(raw_req, "Cache-Control", "no-store");
 
-    std::string csv;
-    csv.reserve(std::min(est_bytes, adaptive_cap));
-    buf->append_csv_to(csv);
+    esp_err_t err = send_history_buffer_chunk_(raw_req, *buf);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "V2 history chunked send failed: %s", esp_err_to_name(err));
+      finalize_chunked_response_(raw_req, "V2 history", err);
+      return;
+    }
 
-    auto *resp = request->beginResponse(
-        200, "text/plain",
-        reinterpret_cast<const uint8_t *>(csv.data()), csv.size());
-    resp->addHeader("Cache-Control", "no-store");
-    request->send(resp);
+    finalize_chunked_response_(raw_req, "V2 history");
   }
 
   void handle_api_ingest_(AsyncWebServerRequest *request) const {
@@ -3835,6 +4068,9 @@ class HistoryWebHandler : public AsyncWebHandler {
 
   void handle_history_(AsyncWebServerRequest *request, const char *rest) const {
     // Public history endpoint used by the embedded dashboard.
+    // Phase 7 v7.7.1.1: Chunked HTTP streaming (BUG-082 fix).
+    // Streams NVS segments directly to the response without building
+    // a full std::string in RAM. Peak heap: ~744 bytes vs ~40 KB.
 
     const char *slash = strchr(rest, '/');
     if (slash == nullptr) {
@@ -3858,8 +4094,6 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    // Legacy /history/{id}/temp and /history/{id}/hum paths are environmental-only.
-    // Non-environmental devices use /api/v2/history/{device}/{metric} instead.
     if (devices[sensor_idx].category_id != 0) {
       request->send(404);
       return;
@@ -3883,81 +4117,62 @@ class HistoryWebHandler : public AsyncWebHandler {
       return;
     }
 
-    // BUG-043 rev2: Build the CSV into a pre-reserved std::string instead of
-    // using beginResponseStream().  The streaming approach grows its internal
-    // std::string through many reallocations — when going from 16KB to 32KB,
-    // it temporarily holds BOTH the old and new buffer (48KB).  With SSE active
-    // and TCP buffers allocated, this exceeds the ESP32-C3's ~70KB free heap
-    // and causes the crash.
-    //
-    // Pre-reserving to the estimated size makes a single allocation upfront.
-    // Each CSV line is at most ~20 bytes ("1773766800,25.50\n").
-    // Upper bound: (NVS segments × points_per_segment + RAM buffer count) × 20.
-
-    int nvs_segments = 0;
     uint32_t latest_flash_epoch = 0;
     nvs_handle_t handle;
     bool have_nvs = open_history_nvs_(&handle, NVS_READONLY);
     HistoryMeta meta = {};
+    httpd_req_t *raw_req = static_cast<httpd_req_t *>(*request);
+
+    httpd_resp_set_type(raw_req, "text/plain");
+    httpd_resp_set_hdr(raw_req, "Cache-Control", "no-store");
+
     if (have_nvs) {
       if (load_history_meta_(handle, &meta) && meta.valid_segments > 0) {
-        nvs_segments = meta.valid_segments;
-      }
-    }
+        SegmentSnapshot *snapshot = allocate_snapshot_();
+        if (snapshot != nullptr) {
+          int oldest_slot =
+              (meta.next_slot + PERSIST_SLOTS - meta.valid_segments) % PERSIST_SLOTS;
 
-    size_t est_points = (size_t)nvs_segments * PERSIST_POINTS_PER_SEGMENT
-                      + (size_t)buf->count();
-    size_t est_bytes  = est_points * 20 + 128;  // 20 bytes/line + margin
-    // v7.6.9.4 (#139 partial): heap-adaptive cap replaces fixed 60 KB.
-    // Fixed cap (v7.6.8.1 V2-E) was sized for C3 ~68 KB free heap budget.
-    // On WROOM with ~30-40 KB free, a 60 KB reserve exceeds running heap and
-    // crashes the board. Clamp to free_heap/3 with a 12 KB floor and the
-    // original 60 KB ceiling preserved for healthy boards. Dashboard tolerates
-    // truncated CSV gracefully (parseCompactHistory processes line-by-line).
-    size_t free_now = esp_get_free_heap_size();
-    size_t adaptive_cap = free_now / 3;
-    if (adaptive_cap < 12000) adaptive_cap = 12000;
-    if (adaptive_cap > 60000) adaptive_cap = 60000;
+          for (int n = 0; n < meta.valid_segments; n++) {
+            maybe_yield_nvs_scan_(n);
+            int slot = (oldest_slot + n) % PERSIST_SLOTS;
+            if (!load_snapshot_from_handle_(handle, slot, snapshot)) continue;
 
-    std::string csv;
-    csv.reserve(std::min(est_bytes, adaptive_cap));
+            esp_err_t err = send_snapshot_series_chunk_(
+                raw_req, *snapshot, sensor_idx, series_kind);
+            if (err != ESP_OK) {
+              ESP_LOGW(TAG, "Chunked send failed at segment %d: %s",
+                       n, esp_err_to_name(err));
+              delete snapshot;
+              nvs_close(handle);
+              finalize_chunked_response_(raw_req, "History stream", err);
+              return;
+            }
 
-    // Read persisted NVS segments into the pre-reserved string
-    SegmentSnapshot *snapshot = nullptr;
-    if (have_nvs && nvs_segments > 0) {
-      snapshot = allocate_snapshot_();
-      if (snapshot != nullptr) {
-        int oldest_slot =
-            (meta.next_slot + PERSIST_SLOTS - meta.valid_segments) % PERSIST_SLOTS;
-
-        for (int n = 0; n < nvs_segments; n++) {
-          maybe_yield_nvs_scan_(n);
-          int slot = (oldest_slot + n) % PERSIST_SLOTS;
-          if (!load_snapshot_from_handle_(handle, slot, snapshot)) continue;
-          append_snapshot_series_csv_(csv, *snapshot, sensor_idx, series_kind);
-          if (snapshot->header.last_epoch > latest_flash_epoch) {
-            latest_flash_epoch = snapshot->header.last_epoch;
+            if (snapshot->header.last_epoch > latest_flash_epoch) {
+              latest_flash_epoch = snapshot->header.last_epoch;
+            }
           }
+          delete snapshot;
+        } else {
+          ESP_LOGE(TAG, "History stream: failed to allocate snapshot buffer");
         }
       }
+      nvs_close(handle);
     }
-    if (have_nvs) nvs_close(handle);
-    if (snapshot != nullptr) delete snapshot;
 
-    // Append RAM ring buffer entries (newer than persisted data)
-    buf->append_csv_to(csv, latest_flash_epoch);
+    esp_err_t err = send_history_buffer_chunk_(raw_req, *buf, latest_flash_epoch);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "Chunked send failed for RAM buffer: %s",
+               esp_err_to_name(err));
+      finalize_chunked_response_(raw_req, "History stream", err);
+      return;
+    }
 
-    ESP_LOGD(TAG, "History response for sensor %d/%s: %u bytes, est %u",
-             sensor_idx, type, (unsigned)csv.size(), (unsigned)est_bytes);
+    finalize_chunked_response_(raw_req, "History stream");
 
-    // Send as a complete response using the raw-bytes overload (same pattern as
-    // gzip dashboard serving).  This avoids the string-copy overhead of the
-    // const char* overload — csv.data() stays valid until send() returns.
-    auto *resp = request->beginResponse(
-        200, "text/plain",
-        reinterpret_cast<const uint8_t *>(csv.data()), csv.size());
-    resp->addHeader("Cache-Control", "no-store");
-    request->send(resp);
+    ESP_LOGD(TAG, "History streamed for sensor %d/%s (%d NVS segments + RAM)",
+             sensor_idx, type, have_nvs ? meta.valid_segments : 0);
   }
 
 #if AGGREGATOR_ENABLED

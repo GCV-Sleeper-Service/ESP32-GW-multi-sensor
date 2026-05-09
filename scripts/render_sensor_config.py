@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_aggregator_config, load_board_profile, load_gateway_config, load_manifest, manifest_v2
 
-VERSION = "7.7.1.0"
+VERSION = "7.7.1.1"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"
@@ -791,6 +791,14 @@ def generate_board_yaml(
         lines.append("            #if AGGREGATOR_ENABLED")
         lines.append("            start_aggregator_task();")
         lines.append("            #endif")
+
+    # Priority 600: health-check task
+    lines.append("    - # Priority 600: start health-check telemetry task.")
+    lines.append("      # Logs heap, stack watermarks, NVS stats every 60s.")
+    lines.append("      priority: 600")
+    lines.append("      then:")
+    lines.append("        - lambda: |-")
+    lines.append("            start_health_check_task_();")
 
     lines.append("")
 

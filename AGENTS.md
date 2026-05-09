@@ -117,7 +117,7 @@ Use `bash scripts/bump-version.sh <version>`. Verify it updates VERSION, YAML, d
 
 Production boards:
 - C3 satellite: `192.168.120.189`
-- WROOM satellite: `192.168.120.190`  
+- WROOM satellite: `192.168.120.170`  
 - S3 aggregator: `192.168.120.191`
 
 Flash via OTA (never use `esphome run`, use `esphome upload --device=IP`):
