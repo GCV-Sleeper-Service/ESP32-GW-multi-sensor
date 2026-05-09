@@ -29,10 +29,16 @@ jobs:
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.sha }}"
           mapfile -t FILES < <(git diff --name-only "$BASE" "$HEAD" | grep '^prompts/' || true)
-          if [[ "${#FILES[@]}" -eq 0 ]]; then
-            echo "No files under prompts/ changed in this PR — skipping lint."
-            exit 0
-          fi
+          
+            if [[ "${#FILES[@]}" -eq 0 ]]; then
+              echo "No prompts/** changed — running baselined full-corpus scan to detect regressions in the linter itself."
+              mapfile -t FILES < <(git ls-files 'prompts/**' || true)
+              if [[ "${#FILES[@]}" -eq 0 ]]; then
+                echo "No prompt files in repo — nothing to lint."
+                exit 0
+              fi
+            fi
+          
           printf 'Linting %d changed prompt file(s) against baseline %s:\n' "${#FILES[@]}" "$BASE"
           printf '  %s\n' "${FILES[@]}"
           echo
