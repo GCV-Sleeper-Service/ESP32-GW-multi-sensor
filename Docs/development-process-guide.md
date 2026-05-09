@@ -146,7 +146,7 @@ Before a PR may be marked "Ready to merge," the branch MUST contain:
    The minimum consolidated audit must contain:
    - **(a)** Review findings grouped by severity
    - **(b)** Agent autonomous decisions taken without human input
-   - **(c)** A prompt quality score (1–5) with a one-line rationale
+   - **(c)** Prompt quality metrics per §6.2 — fix cycles, checkpoint saves, preventable review findings, and agent autonomous decisions (each classified as helpful / harmful / neutral). Include a one-line summary judgment.
    - **(d)** A list of unimplemented recommendations and where each was routed (issue # / `CURRENT-STATE.md` entry / explicitly closed-as-wontfix with reason)
 5. **Next-step session handoff updates** — if the next step's prompts need changes based on what this step discovered, edit them in this PR.
 6. **Recommendation routing** — if this step produced new recommendations, each one is recorded in CURRENT-STATE.md "Unimplemented Recommendations" OR opened as a GitHub Issue. No third option.
@@ -298,6 +298,8 @@ Track per phase:
 5. **Preventable review findings** — review findings that the prompt should have prevented. Higher = prompt gaps.
 
 ### 6.2 Prompt Quality Score
+
+> _The audit deliverable in §2.5 item 4(c) feeds these KPIs. Every consolidated audit must record all four metrics below._
 
 For each consolidated audit, record:
 

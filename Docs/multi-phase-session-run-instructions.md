@@ -284,11 +284,11 @@ The following symptoms, diagnostics, and fixes apply when running a **prompt pro
 | Symptom | Diagnostic | Fix |
 |---|---|---|
 | Producer wrote `§9 — Post-Merge Deliverables` (E-1) | `grep -n 'Post-Merge Deliverables' <produced-prompt>` returns hits | Use `Post-Merge Bookkeeping (tag and close only)`; move docs to §6. CI lint **L1** catches this automatically. |
-| Producer used a stale board IP / YAML filename (E-3) | Compare prompts against `Docs/CURRENT-STATE.md` Board Fleet table | Rerun Board Info Extraction Gate; embed result in handoff. CI lint **L4** (stale WROOM IP) and **L5** (wrong YAML name) catch the known-bad values. |
+| Producer used a stale board IP / YAML filename (E-3) | Compare prompts against the `CURRENT-STATE.md` Board Fleet table (file lives at the repository root, not under `Docs/`) | Rerun Board Info Extraction Gate; embed result in handoff. CI lint **L4** (stale WROOM IP) and **L5** (wrong YAML name) catch the known-bad values. |
 | Producer wrote spec paths that don't exist (`tests/mixed.spec.js`) | `find tests -name '*.spec.js'` does not include the cited path | Use the live `find` output; never rely on memory of file names. |
 | Producer punted device testing to operator (E-2) | §6 task groups list "operator does X" for compile/upload/curl | Reassign to agent per `Docs/development-process-guide.md` §2.3. Methodology `Docs/writing-guide/methodology.md` §3.10 must agree. |
 | Producer cross-referenced another prompt for scope (A6) | Prompt §3 says "see vX.Y.Z prompt §3" | Inline the full whitelist. CI lint **L3** catches this class of cross-prompt reference automatically. |
-| Producer hit `bump-version.sh` scope explosion (E-4) | Agent stopped because canonical pipeline files weren't whitelisted | Add the 6+6 whitelist to §3 of every prompt that touches versioned files. |
+| Producer hit `bump-version.sh` scope explosion (E-4) | Agent stopped because canonical pipeline files weren't whitelisted | Add the bump-version.sh whitelist (the 6 source files written by `bump-version.sh` plus the 6 generated artifacts it regenerates — full enumeration in `prompts/handoff/phase7-batch-production-prompt-update.md`, "Scope-guard whitelist" section) to §3 of every prompt that touches versioned files. |
 | Producer ordered `assemble-sensor-history.sh --check` before `--write` (E-5) | Pipeline runs `--check` against stale data | Always `--write` first (regenerate), then `--check` (verify). CI lint **L6** warns when `--check` appears before `--write` within 20 lines. |
 
 **Cross-reference:** Each row maps to a lint rule (L1, L3, L4, L5, L6) that mechanically prevents it on every future PR. If you find a new symptom pattern, open an issue to add a lint rule and update this table.

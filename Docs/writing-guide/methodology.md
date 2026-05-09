@@ -156,7 +156,7 @@ The agent performs device testing by default. The prompt must include device com
 - Serial-log inspection when no UART adapter is available
 - Final merge approval
 
-Every step that exercises a runtime path must include device commands covering every board in the fleet. Listing only one board while the fleet has three is the gap that issue #228 item A1/A2 found at the produced-prompt layer. The prompt author must enumerate boards explicitly — the agent cannot infer which boards exist.
+Every step that exercises a runtime path must include device commands covering every board in the fleet. Listing only a subset of the fleet (e.g., only the C3 device when the `CURRENT-STATE.md` Board Fleet table lists multiple boards) is the gap that issue #228 item A1/A2 found at the produced-prompt layer. Always enumerate boards from the live `CURRENT-STATE.md` table — never from memory.
 
 ### 3.11 Test Group Implementation Guardrails (required in every prompt that adds new test groups)
 
@@ -313,7 +313,7 @@ The Phase X execution established a refined 10-section prompt structure:
 6. **§6 — Acceptance criteria.** Checklist format. Each item is a concrete, testable assertion.
 7. **§7 — Pipeline commands.** Full regeneration pipeline as of this step. No shortcuts.
 8. **§8 — Verification gate.** Identity/compile/test gate specific to this step's risk profile.
-9. **§9 — Post-merge deliverables.** Consolidated audit, changelog entry, session log, instruction compliance table. Demanded explicitly — not left as afterthoughts.
+9. **§9 — Post-Merge Bookkeeping (tag and close only).** Mechanical post-merge work limited to actions that depend on the merge commit SHA: tag the release, close resolved GitHub issues linked via "Fixes #N", move milestone progress. **Documentation deliverables (consolidated audit, changelog entry, session log, `CURRENT-STATE.md` update, instruction compliance table) belong in-PR before merge — see `Docs/development-process-guide.md` §2.5.** Listing them under §9 is the E-1 anatomy bug the project actively guards against (CI lint rule L1).
 10. **§10 — Domain-specific anti-patterns.** Consolidated reference for patterns that must never appear.
 
 ### 4.2 Key Insight: Handoff Documents Alone Are Insufficient
@@ -324,7 +324,7 @@ Effective prompts require the following at the point of risk (not in a separate 
 - **Imperative numbered reading order** — the agent reads in the order you specify, not the order it prefers
 - **Pre-implementation verification gates** — the agent proves it understands the starting state before touching code
 - **Inline anti-patterns** — placed next to the instruction they guard, not gathered in a separate section
-- **Explicit post-merge deliverable blocks** — demanding the consolidated audit before session close
+- **Explicit in-PR deliverable blocks** — demanding the consolidated audit, changelog entry, session log, and `CURRENT-STATE.md` update before the PR is marked Ready for Review. Per `Docs/development-process-guide.md` §2.5, these are pre-merge deliverables, not post-merge.
 
 ### 4.3 Chain-Inspection Pattern
 
