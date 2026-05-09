@@ -8,6 +8,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 - BUG-082 / #139: history endpoints no longer build full CSV payloads in RAM before sending, removing the heap-growth pattern that crashed C3 and WROOM boards with larger retained history.
 - Aggregator proxy history fetches remain compatible after the chunked `/api/v2/history` rewrite because upstream chunked responses are now dechunked in `fetch_to_buffer()`.
 - WROOM/C3 NI-002 validation now has generated `start_health_check_task_()` startup coverage, and WROOM serial validation is no longer suppressed by `logger.baud_rate: 0` in the board profile.
+- Aggregator upstream chunked-response detection is now case-insensitive and token-based, and truncated fixed-buffer reads drain the remainder of the chunked body before socket close.
 
 ### Changed
 - Rewrote `handle_history_()` in `firmware/core/web-handler.h` to stream persisted NVS segments and newer RAM-buffer entries directly through `httpd_resp_send_chunk()`.
@@ -20,6 +21,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 - Preserved the existing CSV wire format exactly: `epoch,value\\n`.
 - Kept `maybe_yield_nvs_scan_()` in the NVS segment loop and retained explicit `SegmentSnapshot` allocation/freeing in `handle_history_()`.
 - Added explicit error logging when persisted-history snapshot allocation fails during the chunked stream path.
+- Live aggregator verification completed after flashing `.191` to `v7.7.1.1`: `/api/aggregator/proxy/gw-main/history/office/temp` returned `200 OK` and plain CSV from the chunked C3 upstream.
 - Uses the raw `httpd_req_t *` conversion operator exposed by the local `web_server_idf` component to issue chunked responses inside the AsyncWebServer handler flow.
 
 ## [v7.7.1.0] - 2026-05-07 - Phase 7: Health-Check Telemetry Task

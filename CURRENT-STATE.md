@@ -17,7 +17,7 @@ _Next action: Phase 7 Step v7.7.1.2 — per-device structs, key scheme, and hash
 
 | Step | PR | Summary |
 |---|---|---|
-| v7.7.1.1 | #226 | History endpoints now stream CSV with `httpd_resp_send_chunk()`, fixing BUG-082 heap exhaustion on larger retained history sets; follow-up preserved aggregator proxy compatibility and restored NI-002 `HEALTH:` evidence on WROOM/C3 |
+| v7.7.1.1 | #226 | History endpoints now stream CSV with `httpd_resp_send_chunk()`, fixing BUG-082 heap exhaustion on larger retained history sets; follow-up preserved aggregator proxy compatibility, restored NI-002 `HEALTH:` evidence on WROOM/C3, and live-verified `.191` proxy history against the chunked C3 upstream |
 | v7.7.1.0 | #225 | Health-check telemetry task added as a ninth firmware fragment; boot startup, assembly, and preflight updated for periodic heap/NVS/stack telemetry |
 | v7.6.10.4 | #202 | Dashboard auth refactor: `authFetch()` wrapper, auth modal, eliminated browser native auth dialogs |
 
@@ -42,7 +42,7 @@ _Next action: Phase 7 Step v7.7.1.2 — per-device structs, key scheme, and hash
 
 | Issue | Version | Resolution |
 |---|---|---|
-| #139 / BUG-082 | v7.7.1.1 | Replaced full-CSV-in-RAM history responses with chunked HTTP streaming in `handle_history_()` and `handle_api_v2_history_()`, kept aggregator proxy compatibility by dechunking upstream `/api/v2/history`, and restored NI-002 `HEALTH:` validation coverage on WROOM/C3. |
+| #139 / BUG-082 | v7.7.1.1 | Replaced full-CSV-in-RAM history responses with chunked HTTP streaming in `handle_history_()` and `handle_api_v2_history_()`, kept aggregator proxy compatibility by dechunking upstream `/api/v2/history`, hardened the parser for case-insensitive `Transfer-Encoding` handling and truncation drain, and restored NI-002 `HEALTH:` validation coverage on WROOM/C3. |
 
 ## Phase 7 Device Validation Snapshot
 

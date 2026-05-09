@@ -527,6 +527,8 @@ class HistoryWebHandler : public AsyncWebHandler {
                                           const HistEntry &entry) {
     if (buf == nullptr || buf_pos == nullptr) return ESP_ERR_INVALID_ARG;
 
+    // CSV history lines are short ("epoch,%.2f\n" or "epoch,\n"); 96 bytes is
+    // deliberate headroom, and exceeding it indicates unexpected input.
     char line[96];
     int len;
     if (std::isnan(entry.value)) {

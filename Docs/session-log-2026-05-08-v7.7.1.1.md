@@ -608,3 +608,66 @@ Additional fix applied from that sweep:
 - `firmware/core/web-handler.h`
   - now logs `History stream: failed to allocate snapshot buffer` when the
     persisted-history chunked stream cannot allocate the snapshot buffer
+
+### Final review sweep after `.191` became reachable
+
+Reviewed issue comment:
+
+- `#issuecomment-4411237439`
+
+Assessment:
+
+- Warranted:
+  - case-sensitive/exact `Transfer-Encoding: chunked` detection in
+    `fetch_to_buffer()` was a real robustness gap in the autonomous
+    aggregator-compatibility fix, even though it was not failing against the
+    in-repo upstream producer at the time of review
+  - returning success immediately when the fixed caller buffer filled mid-chunk
+    without draining the remainder of the chunked response was also a valid
+    behavior note; it worked with the current close-on-return model, but it was
+    brittle and left avoidable partial-read semantics on the upstream socket
+- Acceptable / documented:
+  - the 96-byte CSV line buffer limit is acceptable for the environmental and
+    ping-domain metrics in this repo; a clarifying comment was added
+- Already addressed by prior docs:
+  - the prompt-scope expansion concerns were already documented in this session
+    log and prior PR follow-up comments
+
+Additional fixes applied from this final sweep:
+
+- `firmware/core/aggregator-runtime.h`
+  - added case-insensitive token-based `Transfer-Encoding` parsing
+  - changed chunked-body truncation handling to drain the remainder of the
+    current chunk and the rest of the chunked body before returning success
+- `firmware/core/web-handler.h`
+  - added an explicit comment documenting that the 96-byte CSV line buffer is
+    deliberate headroom for short `epoch,%.2f\n` / `epoch,\n` rows
+
+### Live aggregator verification completed
+
+Once `.191` became reachable again, live aggregator verification was rerun
+after flashing the aggregator to branch-tip `v7.7.1.1`.
+
+Provision / flash path:
+
+- `bash scripts/provision.sh aggregator`
+- `esphome clean firmware/esp32-s3-devkitc1-n16r8-gw.yaml`
+- `esphome compile firmware/esp32-s3-devkitc1-n16r8-gw.yaml`
+- `esphome upload firmware/esp32-s3-devkitc1-n16r8-gw.yaml --device=192.168.120.191`
+
+Observed aggregator evidence after flash:
+
+- `curl -si -u ESPadmin:ESPpass100 http://192.168.120.191/api/status/full`
+  returned `HTTP/1.1 200 OK` with `version":"v7.7.1.1"`
+- `curl -s -u ESPadmin:ESPpass100 http://192.168.120.191/api/aggregator/gateways`
+  showed gateway `gw-main` reachable with upstream firmware `v7.7.1.1`
+- `curl -si -u ESPadmin:ESPpass100 http://192.168.120.191/api/aggregator/proxy/gw-main/history/office/temp`
+  returned `HTTP/1.1 200 OK`, `Content-Type: text/plain`, `Content-Length: 1632`
+- `curl -s -u ESPadmin:ESPpass100 http://192.168.120.191/api/aggregator/proxy/gw-main/history/office/temp | head -20`
+  returned plain CSV rows from the chunked C3 upstream history endpoint
+
+Conclusion:
+
+- the aggregator compatibility follow-up is now validated both by code-path
+  inspection and by a successful live `.191` proxy request against the chunked
+  `v7.7.1.1` C3 upstream

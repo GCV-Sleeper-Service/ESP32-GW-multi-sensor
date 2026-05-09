@@ -177,6 +177,20 @@ static bool recv_exact_(int sock, char *dst, int len) {
   return true;
 }
 
+static bool discard_exact_(int sock, int len) {
+  char scratch[128];
+  int remaining = len;
+  while (remaining > 0) {
+    int want = remaining < static_cast<int>(sizeof(scratch))
+                   ? remaining
+                   : static_cast<int>(sizeof(scratch));
+    int n = lwip_recv(sock, scratch, want, 0);
+    if (n <= 0) return false;
+    remaining -= n;
+  }
+  return true;
+}
+
 static bool recv_crlf_line_(int sock, char *dst, size_t dst_size, int *out_len) {
   if (dst == nullptr || dst_size < 3 || out_len == nullptr) return false;
 
@@ -190,6 +204,54 @@ static bool recv_crlf_line_(int sock, char *dst, size_t dst_size, int *out_len) 
       *out_len = total;
       return true;
     }
+  }
+  return false;
+}
+
+static char ascii_tolower_(char c) {
+  return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+}
+
+static bool ascii_ieq_n_(const char *a, const char *b, size_t len) {
+  if (a == nullptr || b == nullptr) return false;
+  for (size_t i = 0; i < len; ++i) {
+    if (ascii_tolower_(a[i]) != ascii_tolower_(b[i])) return false;
+  }
+  return true;
+}
+
+static bool header_has_transfer_encoding_chunked_(const char *hdr) {
+  if (hdr == nullptr) return false;
+
+  const char *line = hdr;
+  while (*line != '\0') {
+    const char *line_end = strstr(line, "\r\n");
+    if (line_end == nullptr) break;
+    if (line_end == line) break;
+
+    const char *colon = static_cast<const char *>(memchr(line, ':', line_end - line));
+    if (colon != nullptr &&
+        static_cast<size_t>(colon - line) == strlen("Transfer-Encoding") &&
+        ascii_ieq_n_(line, "Transfer-Encoding", strlen("Transfer-Encoding"))) {
+      const char *value = colon + 1;
+      while (value < line_end && (*value == ' ' || *value == '\t')) value++;
+
+      while (value < line_end) {
+        while (value < line_end && (*value == ' ' || *value == '\t' || *value == ',')) value++;
+        const char *token_end = value;
+        while (token_end < line_end && *token_end != ',') token_end++;
+        while (token_end > value &&
+               (token_end[-1] == ' ' || token_end[-1] == '\t')) token_end--;
+
+        if (static_cast<size_t>(token_end - value) == strlen("chunked") &&
+            ascii_ieq_n_(value, "chunked", strlen("chunked"))) {
+          return true;
+        }
+        value = token_end;
+      }
+    }
+
+    line = line_end + 2;
   }
   return false;
 }
@@ -214,23 +276,20 @@ static bool read_chunked_body_(int sock, char *buf, uint16_t buf_size, uint16_t 
       break;
     }
 
-    if (total >= static_cast<int>(buf_size - 1)) {
-      *out_len = static_cast<uint16_t>(buf_size - 1);
-      buf[buf_size - 1] = '\0';
-      return true;
-    }
-
     int remaining = static_cast<int>(buf_size - 1) - total;
-    if (chunk_size > remaining) {
-      if (!recv_exact_(sock, buf + total, remaining)) return false;
-      total += remaining;
-      *out_len = static_cast<uint16_t>(total);
-      buf[total] = '\0';
-      return true;
-    }
+    int to_copy = remaining > 0
+                      ? (static_cast<int>(chunk_size) < remaining
+                             ? static_cast<int>(chunk_size)
+                             : remaining)
+                      : 0;
 
-    if (!recv_exact_(sock, buf + total, static_cast<int>(chunk_size))) return false;
-    total += static_cast<int>(chunk_size);
+    if (to_copy > 0) {
+      if (!recv_exact_(sock, buf + total, to_copy)) return false;
+      total += to_copy;
+    }
+    if (chunk_size > to_copy) {
+      if (!discard_exact_(sock, static_cast<int>(chunk_size) - to_copy)) return false;
+    }
 
     char crlf[2];
     if (!recv_exact_(sock, crlf, sizeof(crlf))) return false;
@@ -360,7 +419,7 @@ static bool fetch_to_buffer(const char* url, char* buf, uint16_t buf_size, uint1
   if (out_http_status != nullptr) *out_http_status = http_status_code;
   if (http_status_code != 200) { lwip_close(sock); return false; }
 
-  bool is_chunked = strstr(hdr, "\r\nTransfer-Encoding: chunked\r\n") != nullptr;
+  bool is_chunked = header_has_transfer_encoding_chunked_(hdr);
   if (is_chunked) {
     bool ok = read_chunked_body_(sock, buf, buf_size, out_len);
     lwip_close(sock);
