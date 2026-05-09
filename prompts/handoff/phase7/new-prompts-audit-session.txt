@@ -4,42 +4,55 @@ Repo https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor
 Let me provide the background. 
 
 
-1. The prompts/handoff/phase7-batch-production-prompt.md given to the session, with the only update that the section Context That Carries Forward to v7.7.1.2 from the prompts/handoff/phase7/session-handoff-v7.7.1.1.md was inserted in the document.
-2. Operator's feedback was provided in addition to the prompt producer - see operator-notes.txt file prompts/handoff/phase7/operator-notes.txt
-3. In the session after these documents were given to the prompt producer, it came back with the following analysis - see the prompts/handoff/phase7/new-session-analysis-conclusion.txt file.
+1. The prompts/handoff/phase7-batch-production-prompt.md given to the session, with the only update - 
+the section 'Context That Carries Forward to v7.7.1.2' from the `prompts/handoff/phase7/session-handoff-v7.7.1.1.md` was inserted in the document.
+2. Operator's feedback was provided in addition to the prompt producer - see `operator-notes.txt` file `prompts/handoff/phase7/operator-notes.txt`
+3. In the session after these documents were given to the prompt producer, it came back with the following analysis - 
+see the `prompts/handoff/phase7/new-session-analysis-conclusion.txt` file.
 
 It also produced the new batch of 10 documents:
 
 prompts/handoff/phase7-batch-production-prompt-update.md - the updated prompt producing document
 
 Handoff prompts:
-prompts/handoff/phase7/session-handoff-v7.7.1.2.md
-prompts/handoff/phase7/session-handoff-v7.7.1.3.md
-prompts/handoff/phase7/session-handoff-v7.7.1.4.md
+`prompts/handoff/phase7/session-handoff-v7.7.1.2.md`
+`prompts/handoff/phase7/session-handoff-v7.7.1.3.md`
+`prompts/handoff/phase7/session-handoff-v7.7.1.4.md`
 
 Two step and agent prompts:
-prompts/phase7/v7.7.1.2-claude-two-step.md
-prompts/phase7/v7.7.1.2-agent-prompt-gpt-codex.md
-prompts/phase7/v7.7.1.3-claude-two-step.md
-prompts/phase7/v7.7.1.3-agent-prompt-gpt-codex.md
-prompts/phase7/v7.7.1.4-claude-two-step.md
-prompts/phase7/v7.7.1.4-agent-prompt-gpt-codex.md
+`prompts/phase7/v7.7.1.2-claude-two-step.md`
+`prompts/phase7/v7.7.1.2-agent-prompt-gpt-codex.md`
+`prompts/phase7/v7.7.1.3-claude-two-step.md-`
+`prompts/phase7/v7.7.1.3-agent-prompt-gpt-codex.md`
+`prompts/phase7/v7.7.1.4-claude-two-step.md`
+`prompts/phase7/v7.7.1.4-agent-prompt-gpt-codex.md`
 
-My requests - do deep analysis of each prompt and especially the updated prompts/handoff/phase7-batch-production-prompt-update.md and provide result of your analysis in the form of factual, informative on point report that touches following points:
+My requests - do deep analysis of each prompt and especially the updated `prompts/handoff/phase7-batch-production-prompt-update.md`
+Provide result of your analysis in the form of factual, informative on point report that touches following points:
 
 - do the new prompts for new batch address ALL the questions/points/concerns that operator has raised in his message?
-- is the prompts/handoff/phase7-batch-production-prompt-update.md updated sufficiently that for the next batches it will eliminate the problems encountered in the first batch?
-- are new produced prompts follow the requirements outlined in the Docs/development-process-guide.md and Docs/writing-guide/methodology.md documents?
+- is the `prompts/handoff/phase7-batch-production-prompt-update.md` updated sufficiently 
+that for the next batches it will eliminate the problems encountered in the first batch?
+- are new produced prompts follow the requirements outlined in the `Docs/development-process-guide.md` and `Docs/writing-guide/methodology.md` documents?
 - is the new session analysis what went wrong with the previous batch on point and accurate?
-- do new prompts have been checked against the section 5 from the Docs/multi-phase-session-run-instructions.md? 
-- What is the quality of the new prompts - is there any potential degradation of the quality compared to the previous step/phase prompts - for example content, density, checking points, etc? Are they following/taking into consideration all points/decisions that were mentioned/addressed in the Docs/multi-phase-planning-session-summary.md?
+- do new prompts have been checked against the section 5 from the `Docs/multi-phase-session-run-instructions.md`? 
+- What is the quality of the new prompts - is there any potential degradation of the quality compared to the previous step/phase prompts - 
+for example content, density, checking points, etc? 
+Are they following/taking into consideration all points/decisions that were mentioned/addressed in the `Docs/multi-phase-planning-session-summary.md`?
 - if the produced documents need fixes - what, where and why?
-- if any other documents that were used to produce these new prompts need fixes - in other words if these documents itself contributed one way or another into these results in the first batch - what are these document, where and how need fixes?
-- What can be done in future that situation like this is not encountered? The Docs/development-process-guide.md specifically was created NOT to have this situation, but the very first session after this did not follow this guideline. 
+- if any other documents that were used to produce these new prompts need fixes - 
+in other words if these documents itself contributed one way or another into these results in the first batch - 
+what are these document, where and how need fixes?
+- What can be done in future that situation like this is not encountered? 
+The `Docs/development-process-guide.md` specifically was created NOT to have this situation, 
+but the very first session after this did not follow this guideline. 
 
-Read all the necessary documents that are needed to provide the high quality result addressing the what, why, how questions. Designate deep research agent and execute it outside of this session for all the detailed analysis.
+Read all the necessary documents that are needed to provide the high quality result addressing the what, why, how questions. 
+Designate deep research agent and execute it outside of this session for all the detailed analysis.
 
-Take time - think and check the result of your work twice before presenting because it will be used as a guideline for future for the prompt creating session. DO NOT invent anything - everything you write MUST be factual and verifiable.
+Take time - think and check the result of your work twice before presenting 
+because it will be used as a guideline for future for the prompt creating session. 
+DO NOT invent anything - everything you write MUST be factual and verifiable.
 
 Do not make your report very verbose - three pages max, use tables and bullet points. Provide the report as a downloadable .md file
 
