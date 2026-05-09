@@ -121,6 +121,13 @@ Before a PR may be marked "Ready to merge," the branch MUST contain:
 
 If you find yourself opening "documentation update" PRs the day after a merge, that is the drift this rule prevents.
 
+**Prompt lint enforcement:**
+Every PR that touches `prompts/**` is automatically checked by `.github/workflows/prompt-lint.yml`,
+which invokes `scripts/lint-prompts.sh` against the PR's changed files. ERROR-level violations
+(L1–L5, L7: stale IPs, wrong filenames, forbidden section titles, cross-prompt references)
+fail the PR. WARN-level findings (L6: pipeline-ordering advisory) are reported without blocking.
+Run `bash scripts/lint-prompts.sh` locally before pushing to catch violations before CI does.
+
 ---
 
 ## 3. Prompt Production
