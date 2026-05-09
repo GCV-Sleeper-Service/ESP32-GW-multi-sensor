@@ -197,4 +197,38 @@ Future audits should mechanically re-verify each citation against the file befor
 - **Upstream documents requiring fixes:** `methodology.md` §3.10 (HIGH — direct contradiction with dev-process-guide §2.3), `dev-process-guide.md` §2.5 visibility (MEDIUM), `dev-process-guide.md` §4.1 artifact requirement (MEDIUM).
 - **Top action:** add WROOM device-testing blocks to v7.7.1.3 and v7.7.1.4 BEFORE either prompt is dispatched to an agent; add a Board Coverage Rule to the batch-production-prompt so this class of error cannot recur.
 
+---
+
+## 12. Cross-audit reconciliation (added after publication)
+
+This audit was produced independently of [new-prompts-audit-report-Copilot.md](prompts/handoff/phase7/new-prompts-audit-report-Copilot.md) (consolidated GPT + Perplexity + Copilot findings). The two reports are **complementary, not contradictory** — they were preserved as separate documents and the action items merged into the tracking issue (linked separately).
+
+### Agreements (both reports converge)
+- ✅ E-1…E-5 process fixes verified (operator concerns 1, 5, 6, 7, 8 fully addressed).
+- ✅ Board IPs are now correct in handoffs; YAML filename for WROOM remains under-referenced.
+- ✅ `session-handoff-v7.7.1.3.md` is structurally thinner than its peers (missing Critical Rules table / Risk section / Architecture references).
+- ✅ Methodology §3.10 *"Device Testing (for Human)"* is an upstream-doc bug that contributed to the failure and must be rewritten.
+- ✅ §4.1 Assumption Audit Gate is referenced but not enforced as an artifact.
+
+### Unique to **this** (Opus 4.7) report
+- **Missing WROOM device-testing in v7.7.1.3 and v7.7.1.4** (operator concern #3 from [operator-notes.txt:49](prompts/handoff/phase7/operator-notes.txt#L49)). Verified mechanically: `grep -i wroom` returns 0 matches in both files. Not flagged in the consolidated report.
+- **§5 citation correction:** `Docs/multi-phase-session-run-instructions.md` §5 is "Troubleshooting" ([L242](Docs/multi-phase-session-run-instructions.md#L242)), not "Knowledge Architecture" — an error that propagated across earlier audit material.
+- **Board Coverage Rule** as a structural meta-prompt addition.
+
+### Unique to the **consolidated Copilot** report (not duplicated here; cite as authoritative)
+- **R1 Version-bump ordering defect** — `bump-version.sh` runs after device-test, so `/api/status` reports old version during evidence step (HIGH).
+- **R2 `find_partition_size_bytes_` signature drift** — embedded code uses 2-arg call; live signature is 3-arg ([firmware/core/nvs-persistence.h:44](firmware/core/nvs-persistence.h#L44)). Verified by this auditor: the live function takes `(const char *label, esp_partition_type_t type, esp_partition_subtype_t subtype)`. Will not compile (HIGH).
+- **R3 Struct byte-size comments wrong** — C++ implicit padding causes 36 vs 40, 22 vs 24, 226 vs 228 mismatches; recommends `static_assert` (HIGH for retention math).
+- **R4 Checkpoint A grep counts usages, not definitions** — false-positive checkpoint failures (MEDIUM).
+- **P1 Budget calculator on hot path** — `calculate_retention_budgets_()` recomputed per persist (MEDIUM).
+- **P3 Provisioning-state pre-flash check missing** in v7.7.1.3 reviewer checklist.
+- **P4 Stale predecessor instructions** `prompts/handoff/phase7-prompt-production-instructions.md` not marked superseded (MEDIUM).
+- **Doctrinal precedence rule** — explicit hierarchy statement needed when methodology and dev-process-guide conflict.
+- **v7.7.1.4 §3 self-containedness** — references "v7.7.1.2 prompt §3 for full list".
+
+### Why the reports were not merged
+- The consolidated report has a code-level depth (compile correctness, struct layout, function signatures) that this report explicitly chose not to duplicate.
+- This report has a behavioral/coverage finding (missing WROOM) and a citation-hygiene correction that the consolidated report lacks.
+- Merging would conceal authorship and the independent verification trail. The action list (in the tracking issue) is the right place for unification.
+
 _End of report._
