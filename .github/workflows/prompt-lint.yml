@@ -33,10 +33,10 @@ jobs:
             echo "No files under prompts/ changed in this PR — skipping lint."
             exit 0
           fi
-          printf 'Linting %d changed prompt file(s):\n' "${#FILES[@]}"
+          printf 'Linting %d changed prompt file(s) against baseline %s:\n' "${#FILES[@]}" "$BASE"
           printf '  %s\n' "${FILES[@]}"
           echo
-          bash scripts/lint-prompts.sh "${FILES[@]}"
+          bash scripts/lint-prompts.sh --baseline "$BASE" "${FILES[@]}"
 
       - name: Run prompt lint (full scan)
         if: github.event_name == 'workflow_dispatch'
