@@ -45,7 +45,7 @@ cd ESP32-GW-multi-sensor
 1. `CURRENT-STATE.md` — current version, open issues, board measurements, unimplemented recommendations. **This is the ground truth. If it contradicts the plan, CURRENT-STATE.md wins.**
 2. `Docs/phase-7-review-and-rewrite.md` — THE Phase 7 plan. Read the step details for the steps you're producing.
 3. `Docs/multi-phase-planning-session-summary.md` — full session record with operator decisions. Points 1-3 (retention, boards, binary sensor dedup) are essential for Batches 2-5. Point 6 (recommendation → issue routing) applies to all batches.
-4. `Docs/development-process-guide.md` — §2-3 (execution workflow, prompt structure), §4.3 (phase closure — relevant for final batch)
+4. `Docs/development-process-guide.md` — §2-3 (execution workflow, prompt structure), §4.1 (Assumption Audit Gate), §4.3 (phase closure — relevant for final batch)
 5. `Docs/writing-guide/methodology.md` — 10-section prompt anatomy
 6. `prompts/prompt-index-and-workflow.md` — Critical Rules table (all current rules)
 7. `AGENTS.md` — what inline reviewers see
