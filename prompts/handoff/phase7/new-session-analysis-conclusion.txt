@@ -1,0 +1,15 @@
+--
+Root Cause Analysis: Why Batch 1 Prompts Violated Development Process Guide
+Issue 1 — Pre-merge vs post-merge confusion.
+The batch production prompt's mandatory reading said "§2-3" of the development process guide. The critical rule is in §2.5 ("In-PR mandatory deliverables"). The prompt producer either skimmed it or didn't internalize it because the 10-section prompt anatomy (inherited from pre-Phase VY) uses "§9 — Post-Merge Deliverables" as a section title. That section title itself is the bug — it actively teaches the agent to treat documentation as post-merge work. Fix: rename §9 to "Post-Merge Bookkeeping (tag and close)" and move all documentation to §6.
+Issue 2 — Device testing punted to operator.
+The development guide §2.3 provides esphome compile/upload/curl commands for the agent. But the prompt producer created a separate §10 "Operator Device Testing" section. The agent can do compile, upload, and curl. The operator should only verify visual dashboard rendering (which requires a browser).
+Issue 3 — Stale board info.
+CURRENT-STATE.md has the correct WROOM IP (.170) and the board profile generates esp32-wroom-32d-gw.yaml, but the prompt producer used memorized values (.190 and a stale filename). The batch production prompt says "read CURRENT-STATE.md" but doesn't require extracting specific values from it and injecting them into the prompts.
+Issue 4 — Scope boundary vs bump-version.sh.
+The prompt listed 4 files in scope. bump-version.sh touches 6+ source files plus triggers pipeline regeneration of 6+ more. The agent ran the canonical script (correct), hit a scope checkpoint (wrong), and stopped.
+Issue 5 — Assembly --check before --write.
+Checkpoint A said run --check after adding helpers but before rewriting handlers. Since the helpers were already in the assembled fragment, --check passed only if --write had run first. The prompt didn't make this explicit.
+Issue 6 — CI trigger question.
+You asked why posting a doc file in prompts/ triggered CI. It didn't — looking at PR#226's file list, the PR also contained changes to firmware/core/config.h, firmware/core/data-model.h, dashboard/core/app-shell.js, etc. (all bump-version.sh artifacts). Those paths match the CI filter (firmware/**, dashboard/**). The consolidated audit file in prompts/ was harmless. The CI ran because of code changes in the same PR.
+--

@@ -1,0 +1,145 @@
+Operator notes:
+
+---
+
+Following needs to be addressed:
+
+In the previous prompt producing prompt - prompts/handoff/phase7-prompt-production-instructions.md session the result was the first tow steps produced prompts - v7.7.1.0 and v7.7.1.0 that violated the rules established by the phaseVY results.
+
+Examples: prompts/phase7/v7.7.1.1-claude-two-step.md has following entries:
+
+---
+
+Post-merge deliverables:
+
+prompts/phase7/v7.7.1.1-PR<NN>-consolidated-audit-and-lessons.md
+
+Review and update v7.7.1.2 handoff + agent prompt (if produced)
+
+---
+
+And the prompts/phase7/v7.7.1.1-agent-prompt-gpt-codex.md has following:
+
+--
+
+§9 — Post-Merge Deliverables
+
+Session log: Docs/session-log-<DATE>-v7.7.1.1.md
+
+Instruction Compliance Output table in the PR description
+
+Consolidated audit: prompts/phase7/v7.7.1.1-PR<NN>-consolidated-audit-and-lessons.md
+
+Inspect next step artifacts:
+
+prompts/handoff/phase7/session-handoff-v7.7.1.2.md
+
+prompts/phase7/v7.7.1.2-agent-prompt-gpt-codex.md
+
+§10 — Operator Device Testing (Post-Merge — CRITICAL)
+
+---
+
+And the session handoff prompts/handoff/phase7/session-handoff-v7.7.1.1.md had following:
+
+--
+
+Merge, tag v7.7.1.1
+
+CRITICAL device testing: flash WROOM AND C3, verify no crash on history serve
+
+Produce consolidated audit with device test measurements
+
+Inspect and update v7.7.1.2 handoff + agent prompt
+
+---
+
+
+
+
+
+At the same time, the  Docs/development-process-guide.md - that was the result of the phaseVY session, says following:
+
+---
+
+Before a PR may be marked "Ready to merge," the branch MUST contain:
+
+1. **Code changes** — the actual implementation, with all checkpoints satisfied (or a checkpoint-failure comment posted and accepted by the operator).
+
+2. **`CURRENT-STATE.md` update** — bump "Last verified" date, append to "What Just Shipped," update "What's Next," add/remove "Open Issues" and "Unimplemented Recommendations."
+
+3. **Changelog entry** — `Docs/changelog.md` entry under the new version.
+
+4. **Consolidated audit file** — for non-trivial steps. Includes all review findings with severity, agent autonomous decisions, and prompt quality score.
+
+5. **Next-step session handoff updates** — if the next step's prompts need changes based on what this step discovered, edit them in this PR.
+
+6. **Recommendation routing** — if this step produced new recommendations, each one is recorded in CURRENT-STATE.md "Unimplemented Recommendations" OR opened as a GitHub Issue. No third option.
+
+---
+
+So in the new produced prompts - in the handoff, two-step prompts, agent prompts - again slipped into that PR related document producing/updating is done AFTER merge when the development-process-guide clearly says that it is needs to be done within PR itself - the development guide clearly says:
+
+**Post-merge bookkeeping only:**
+
+- Tag the release if this step is a version increment
+
+- Close resolved GitHub Issues (linked via "Fixes #N")
+
+- Move milestone progress bar (automatic if PRs are linked)
+
+If you find yourself opening "documentation update" PRs the day after a merge, that is the drift this rule prevents.
+
+---
+
+
+
+So despite this rule, the newly produced prompts violated it. My question - why it happened and how to prevent this happening again? the prompt `prompts/handoff/phase7-prompt-production-instructions.md` clearly had the entry:
+
+--
+
+3. `Docs/development-process-guide.md` — §2-3 (execution workflow, prompt structure)
+
+--
+
+so even above should be preventing above error, but it did not. The problem is that the development-process-guide.md has 7 topics and there is ### 4.1 Assumption Audit Gate as well.
+
+Secondly, the device testing with curl, flashing, updating and results recording again was defaulted to operator, when development guide says that this can and should be done by the agent as a part of the agent's prompt. Operator should ONLY do actions that agent can't do, like check dashboard. Everything else that can be automated should be done by the agent.
+
+Then, in the prompts stale/incorrect information about boards slipped:
+
+- wroom yaml config file was mentioned as esp32-wroom-32d-multi-sensor.yaml - that was not correct
+
+- wroom board IP address was mentioned as 192.168.120.190 - that also was not correct, the correct IP address is 192.168.120.170 - so again, one needs to confirm the current state.
+
+Then, agent stopped on both steps because updating version via bump-version.sh script triggered a gate. There was already mentioned that such things should not affect agent's works. Also gates were too broad and that also triggered agent stop working.
+
+Please do read PR226 - v7.7.1.1 implementation - that deals in great detail (Perplexity's last comment) - deviation that happened and what caused that and how to avoid this in future.
+
+Also - when Perplexity posted consolidated audit file in the phase7 prompts directory this triggered full CI pipeline run. My understanding reading Docs/development-process-guide.md section 7. CI and Automation says following:
+
+--
+
+The CI workflow (`.github/workflows/ci.yml`) only runs on changes to code, config, scripts, and build files. Documentation-only PRs, prompts, images, and tags do not trigger CI.
+
+--
+
+
+
+But posting doc file in the PR brunch in the prompts folder triggered CI run. Why?
+
+So my request would be the following when producing next prompts for phase7:
+
+- examine this prompt - prompts/handoff/phase7-batch-production-prompt.md and propose your edits such a way that:
+
+- phaseVY results/deliverables - protocols, development guidelines, session summary/results - must be followed when producing new prompts
+
+- interpret session logs and PRs for both previous steps - to understand what caused agent to stop work/trigger gate and see how this can be prevented when producing prompts (and prompt producing prompt) for new sub-phase and next phases
+
+- we need to make sure that prompt has real, current, accurate information, whole CURRENT-STATE.md was created for this but incorrect information still slipped into prompts
+
+- When producing prompts (and additional documents, if any) produce them in a ZIP file with the relative paths so they lend in the right folders
+
+
+
+So with the above information please proceed with prompts creation and let's make sure that the same errors are not repeated again. If something is not clear - STOP and ask for the clarification
