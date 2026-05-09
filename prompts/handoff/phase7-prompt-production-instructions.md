@@ -1,3 +1,13 @@
+> ⛔ **SUPERSEDED — DO NOT USE.**
+>
+> This document predates the Phase-7 batch-2 audit. It treats §9 as "Post-Merge Deliverables" (the E-1 anatomy bug — see `prompts/handoff/phase7/operator-notes.txt`).
+>
+> The current authoritative meta-prompt is **`prompts/handoff/phase7-batch-production-prompt-update.md`**.
+>
+> Phase 8+ will use a phase-agnostic successor (issue #228 item E14).
+>
+> Do NOT propagate any pattern, structure, or wording from this file into produced prompts.
+
 # Phase 7 Prompt Production — Session Instructions
 
 _Purpose: Produce agent prompt bundles for Phase 7 steps._

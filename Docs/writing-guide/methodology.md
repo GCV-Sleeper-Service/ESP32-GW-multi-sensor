@@ -15,6 +15,8 @@ _Based on real prompt failures and revisions from the ESP32-GW Multi-Sensor Gate
 
 ## 1. Why This Document Exists
 
+> **Doctrinal precedence.** Where this document and `Docs/development-process-guide.md` conflict, **the development-process-guide governs**. This document describes prompt anatomy; the development-process-guide describes execution authority and merge gates.
+
 During Phase 4 (v7.5.4.x) and Phase 5 (v7.5.5.x) of the ESP32-GW Multi-Sensor Gateway project, implementation prompts were written to guide AI coding agents through each development step. These prompts went through three iterations:
 
 1. **Original prompts** — high-level scope and acceptance criteria, written from the implementation plan
@@ -136,8 +138,25 @@ Which docs to update and what to write. Without this, documentation drifts from 
 ### 3.9 Review Checklist
 A verification list the agent runs before creating a PR. Each item should be a concrete, testable assertion — not a subjective judgment.
 
-### 3.10 Device Testing (for Human)
-Step-by-step verification the human performs after merge. Includes expected outputs for each command. Any deviation from expected output is a signal.
+### 3.10 Device Testing — Agent-Performed by Default; Operator Items Listed Separately
+
+> See `Docs/development-process-guide.md` §2.3 for the canonical workflow. This methodology section is the **prompt-anatomy** view; the dev-process-guide is the **execution** view. Where these two conflict, the dev-process-guide governs (see §1 "Doctrinal Precedence" above).
+
+The agent performs device testing by default. The prompt must include device commands for **every board** in the current fleet. Do not omit any board; omitting a board is a silent gap identical to omitting a test case.
+
+**Agent-performed (required in every firmware prompt):**
+- Compile: `esphome compile <yaml>` — run after all code changes
+- Upload: `esphome upload <yaml> --device=<ip>` — wrapped in `timeout 300`; never use `esphome run`
+- Clean before AND after compile to prevent stale artifacts
+- Curl smoke tests against `/api/status`, `/api/status/full`, `/api/history`, and any endpoint the step modifies
+- Post curl output as PR comment
+
+**Operator-performed (only what the agent cannot do):**
+- Visual browser checks (dashboard rendering, chart layout)
+- Serial-log inspection when no UART adapter is available
+- Final merge approval
+
+Every step that exercises a runtime path must include device commands covering every board in the fleet. Listing only a subset of the fleet (e.g., only the C3 device when the `CURRENT-STATE.md` Board Fleet table lists multiple boards) is the gap that issue #228 item A1/A2 found at the produced-prompt layer. Always enumerate boards from the live `CURRENT-STATE.md` table — never from memory.
 
 ### 3.11 Test Group Implementation Guardrails (required in every prompt that adds new test groups)
 
@@ -278,7 +297,7 @@ Phase X proved that a single agent prompt is not enough. Every step needs two se
 
 **Session 1 — Agent execution.** The coding agent receives the implementation prompt, reads all required files, implements the change, runs the validation pipeline, and creates a PR.
 
-**Session 2 — Review.** A separate agent (fresh context, no carry-over from Session 1) receives a review prompt targeting that step's exact failure modes. The reviewer verifies acceptance criteria, checks for scope violations, produces the consolidated audit, inspects the next step's handoff and prompt, and confirms post-merge deliverables.
+**Session 2 — Review.** A separate agent (fresh context, no carry-over from Session 1) receives a review prompt targeting that step's exact failure modes. The reviewer verifies acceptance criteria, checks for scope violations, produces the consolidated audit, inspects the next step's handoff and prompt, and confirms that any §9 items are post-merge bookkeeping only (tag/close), not documentation deliverables.
 
 This pattern catches classes of error that self-review misses: confirmation bias ("I just wrote it, so it must match the spec"), context-window pressure (long execution sessions lose early instructions), and scope drift (agents that continue into the next step unbidden).
 
@@ -294,7 +313,7 @@ The Phase X execution established a refined 10-section prompt structure:
 6. **§6 — Acceptance criteria.** Checklist format. Each item is a concrete, testable assertion.
 7. **§7 — Pipeline commands.** Full regeneration pipeline as of this step. No shortcuts.
 8. **§8 — Verification gate.** Identity/compile/test gate specific to this step's risk profile.
-9. **§9 — Post-merge deliverables.** Consolidated audit, changelog entry, session log, instruction compliance table. Demanded explicitly — not left as afterthoughts.
+9. **§9 — Post-Merge Bookkeeping (tag and close only).** Mechanical post-merge work limited to actions that depend on the merge commit SHA: tag the release, close resolved GitHub issues linked via "Fixes #N", move milestone progress. **Documentation deliverables (consolidated audit, changelog entry, session log, `CURRENT-STATE.md` update, instruction compliance table) belong in-PR before merge — see `Docs/development-process-guide.md` §2.5.** Listing them under §9 is the E-1 anatomy bug the project actively guards against (CI lint rule L1).
 10. **§10 — Domain-specific anti-patterns.** Consolidated reference for patterns that must never appear.
 
 ### 4.2 Key Insight: Handoff Documents Alone Are Insufficient
@@ -305,11 +324,11 @@ Effective prompts require the following at the point of risk (not in a separate 
 - **Imperative numbered reading order** — the agent reads in the order you specify, not the order it prefers
 - **Pre-implementation verification gates** — the agent proves it understands the starting state before touching code
 - **Inline anti-patterns** — placed next to the instruction they guard, not gathered in a separate section
-- **Explicit post-merge deliverable blocks** — demanding the consolidated audit before session close
+- **Explicit in-PR deliverable blocks** — demanding the consolidated audit, changelog entry, session log, and `CURRENT-STATE.md` update before the PR is marked Ready for Review. Per `Docs/development-process-guide.md` §2.5, these are pre-merge deliverables, not post-merge.
 
 ### 4.3 Chain-Inspection Pattern
 
-From Phase X v7.6.5.1 onward, every step's post-merge deliverables include reviewing and updating the next step's handoff and prompt. This creates a forward-inspection chain: step N's closure verifies that step N+1's assumptions are still valid given what actually happened during step N.
+From Phase X v7.6.5.1 onward, every step's in-PR deliverables include reviewing and updating the next step's handoff and prompt. This creates a forward-inspection chain: step N's closure verifies that step N+1's assumptions are still valid given what actually happened during step N.
 
 Without this pattern, prompts written at plan time accumulate stale references as earlier steps introduce small deviations from the plan.
 

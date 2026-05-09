@@ -297,7 +297,7 @@ This preamble costs ~350 tokens. It prevents the five most common cross-LLM fail
 
 **No analysis produced.** Copilot only optimized review prompts.
 
-**Prompt quality:** The 4-step deep-research review structure is operationally sound and well-suited to Copilot's capabilities. Gate checklists are comprehensive. Post-merge deliverables are preserved.
+**Prompt quality:** The 4-step deep-research review structure is operationally sound and well-suited to Copilot's capabilities. Gate checklists are comprehensive. In-PR deliverables are preserved, and §9 remains post-merge bookkeeping only (tag/close).
 
 **Verdict:** Use for review sessions in Copilot. The deep-research delegation pattern genuinely reduces reviewer context pressure while maintaining gate coverage.
 
@@ -320,7 +320,7 @@ Perplexity's review prompts reference the PR number and expect to access the PR 
 
 This works because the review side doesn't need shell access — it needs file inspection and logical reasoning, which Perplexity handles well.
 
-**Limitation:** Perplexity cannot produce post-merge deliverables (consolidated audit, next-step handoff update). Those still require Claude or Copilot.
+**Limitation:** Perplexity cannot run shell commands, so it can't replace the implementation agent for PR-side gates that require command output. It can still review the diff and produce a consolidated audit.
 
 ---
 
