@@ -127,7 +127,8 @@ collect_fail_violations() {
 
 # Build a sorted set of dedup keys "RULE_ID <TAB> LINE_CONTENT" from
 # collect_fail_violations output, stripping the line-number column.
-# Line numbers shift on edits; content does not — content is the dedup key.
+# Using content (not line number) as the key keeps violations stable across
+# line position changes caused by unrelated edits elsewhere in the file.
 # Handles content containing tabs by capturing all fields from the third onward.
 violation_keys() {
   awk -F'\t' '{
@@ -210,11 +211,12 @@ check_file_baseline() {
   collect_fail_violations "$file" > "$tmp_head"
   violation_keys "$tmp_head" > "$tmp_head_keys"
 
-  # Collect BASELINE violations (file content at the given ref)
-  if git show "${baseline_ref}:${file}" > "$base_src" 2>/dev/null; then
+  # Collect BASELINE violations (file content at the given ref, blobs only)
+  if git cat-file -t "${baseline_ref}:${file}" 2>/dev/null | grep -q "^blob$" && \
+     git show "${baseline_ref}:${file}" > "$base_src" 2>/dev/null; then
     collect_fail_violations "$base_src" > "$tmp_base"
   else
-    # File did not exist at baseline — every HEAD violation is new
+    # File did not exist (or was not a regular file) at baseline — every HEAD violation is new
     : > "$tmp_base"
   fi
   violation_keys "$tmp_base" > "$tmp_base_keys"
@@ -222,13 +224,19 @@ check_file_baseline() {
   # New = present in HEAD but absent from BASELINE (comm -23 on sorted inputs)
   comm -23 "$tmp_head_keys" "$tmp_base_keys" > "$tmp_new_keys"
 
+  # Load new-violation keys into an associative array for O(n) lookups.
+  declare -A new_keys_set
+  while IFS= read -r k; do
+    new_keys_set["$k"]=1
+  done < "$tmp_new_keys"
+
   # Report each HEAD violation as ERROR (new) or EXISTING (pre-existing)
   local rule lineno content key
   while IFS=$'\t' read -r rule lineno content; do
     # Reconstruct the dedup key with the same multi-field-aware logic as violation_keys
     key="${rule}"$'\t'"${content}"
     local msg="${file}:${lineno}: [${rule}] $(rule_message "$rule")"
-    if grep -qxF "$key" "$tmp_new_keys" 2>/dev/null; then
+    if [[ -n "${new_keys_set[$key]+x}" ]]; then
       emit_error "$msg"
     else
       emit_existing "$msg"
