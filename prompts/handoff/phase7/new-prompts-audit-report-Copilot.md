@@ -8,12 +8,12 @@ _Scope: 10 documents produced after Batch 1 post-mortem + updated meta-prompt_
 
 ## 1. Executive Summary
 
-- **Overall verdict: PASS with minor deficiencies.** The producer correctly identified all six root causes and addressed every operator concern. The new prompts are structurally sound and enforce in-PR deliverables.
-- **E-1 fixed (§9 title bug).** All three agent prompts rename §9 to "Post-Merge Bookkeeping (tag and close only)" and explicitly state "No documentation work here." (`v7.7.1.2-agent-prompt-gpt-codex.md` §9 line 557).
+- **Overall verdict: PASS with minor deficiencies.** The producer correctly identified all six root causes and addressed all 10 operator concerns (9 fully, 1 partially — see §2 row 4 for the WROOM YAML gap). The new prompts are structurally sound and enforce in-PR deliverables.
+- **E-1 fixed (§9 title bug).** All three agent prompts rename §9 to "Post-Merge Bookkeeping (tag and close only)" and explicitly state "No documentation work here." (`prompts/phase7/v7.7.1.2agent-prompt-gpt-codex.md` §9 line 557).
 - **E-3 partially fixed.** Board IPs are now correct (.170 for WROOM, .189 for C3) in all three handoffs, but the YAML filename for WROOM is not mentioned explicitly in any prompt — only the C3 YAML is referenced. The Board Info Extraction Gate was added to the meta-prompt but its output was not captured/verified in a gate table within the produced prompts.
 - **v7.7.1.3 session handoff is significantly thinner** than v7.7.1.2 and v7.7.1.4 — it omits the Critical Rules table, Architecture references section, and Risk section that the other handoffs contain.
 - **v7.7.1.4 §3 scope boundary is not self-contained** — it says "see v7.7.1.2 prompt §3 for full list" for bump-version.sh artifacts, requiring the agent to cross-reference another prompt at runtime.
-- **No conformance failures against `Docs/writing-guide/methodology.md`** or `Docs/development-process-guide.md` §2.5. In-PR deliverables (session log, consolidated audit, CURRENT-STATE.md, changelog) are explicitly mandated in §6 and §7 of all three agent prompts.
+- **No `Docs/writing-guide/methodology.md` §2.5 in-PR-deliverables conformance failures **. Methodology gaps in v7.7.1.3 artifacts are detailed in §4 and §6.
 - **Must-fix items:** (a) v7.7.1.3 handoff missing Critical Rules table + Risk section; (b) v7.7.1.4 §3 self-containedness; (c) meta-prompt still references "§1-§11" in original Deliverables section (updated version corrected to §1-§10 in Prompt Anatomy, but wording inconsistency remains).
 - **CI trigger issue self-analysis is correct.** PR#226 triggered CI because it contained `firmware/core/` and `dashboard/` changes from `bump-version.sh`, not because of the prompts file placement.
 
@@ -23,11 +23,11 @@ _Scope: 10 documents produced after Batch 1 post-mortem + updated meta-prompt_
 
 | # | Operator Concern (`operator-notes.txt`) | Addressed In | Coverage | Evidence |
 |---|---|---|---|---|
-| 1 | Post-merge doc deliverables recurred in new prompts (audit, CURRENT-STATE.md, session log listed as §9) | `phase7-batch-production-prompt-update.md` Errata E-1; all three agent prompts §6/§9 | **Fully** | `v7.7.1.2-agent-prompt-gpt-codex.md` §9: "No documentation work here." |
-| 2 | Device testing (compile, upload, curl) punted entirely to operator | Errata E-2; `v7.7.1.3-agent-prompt-gpt-codex.md` §6 Task Group 3; `v7.7.1.4-agent-prompt-gpt-codex.md` §6 | **Fully** | v7.7.1.3 §6: `esphome upload ... --device=192.168.120.189`, curl commands agent-run |
+| 1 | Post-merge doc deliverables recurred in new prompts (audit, CURRENT-STATE.md, session log listed as §9) | `phase7-batch-production-prompt-update.md` Errata E-1; all three agent prompts §6/§9 | **Fully** | `prompts/phase7/v7.7.1.2agent-prompt-gpt-codex.md` §9: "No documentation work here." |
+| 2 | Device testing (compile, upload, curl) punted entirely to operator | Errata E-2; `prompts/phase7/v7.7.1.3agent-prompt-gpt-codex.md` §6 Task Group 3; `prompts/phase7/v7.7.1.4agent-prompt-gpt-codex.md` §6 | **Fully** | v7.7.1.3 §6: `esphome upload ... --device=192.168.120.189`, curl commands agent-run |
 | 3 | Stale WROOM IP (.190) | Errata E-3; Board Info Extraction Gate in meta-prompt; all handoffs | **Fully** | `session-handoff-v7.7.1.2.md` Board Fleet table: WROOM-32D at 192.168.120.170 |
 | 4 | Stale WROOM YAML filename (`esp32-wroom-32d-multi-sensor.yaml`) | Errata E-3 (stale board info); meta-prompt Board Info Extraction Gate | **Partially** | Gate in meta-prompt verifies from `scripts/provision.sh`. Correct YAML name not explicitly stated in any produced prompt |
-| 5 | Agent stopped on `bump-version.sh` scope gate | Errata E-4; scope whitelist in §3 of all agent prompts | **Fully** | `v7.7.1.2-agent-prompt-gpt-codex.md` §3: full 6-file + 6-artifact whitelist |
+| 5 | Agent stopped on `bump-version.sh` scope gate | Errata E-4; scope whitelist in §3 of all agent prompts | **Fully** | `prompts/phase7/v7.7.1.2agent-prompt-gpt-codex.md` §3: full 6-file + 6-artifact whitelist |
 | 6 | Assembly `--check` before `--write` false failure | Errata E-5; all agent prompts and meta-prompt constraint | **Fully** | All prompts preamble: "`assemble-sensor-history.sh --write` BEFORE `--check`" |
 | 7 | CI triggered by prompt file (why?) | `new-session-analysis-conclusion.txt` Issue 6 | **Fully** | Self-analysis: CI triggered by bump-version.sh `firmware/`+`dashboard/` artifacts in PR#226, not the prompts file |
 | 8 | Agent should do device testing, not operator | Errata E-2; agent prompts §6 Task Group 3 | **Fully** | v7.7.1.3, v7.7.1.4: full flash+curl sequence in §6; operator only verifies serial log / visual dashboard |
@@ -64,12 +64,12 @@ _Scope: 10 documents produced after Batch 1 post-mortem + updated meta-prompt_
 | `session-handoff-v7.7.1.2.md` | ✓ Pre-merge checklist has "In-PR deliverables" block | ✓ Board fleet table, carries-forward, risk level present | ✓ Correct board IPs; measurements from v7.7.1.1 provided | ✓ ARCH-001, ARCH-002, PLAN-002 in design decisions table |
 | `session-handoff-v7.7.1.3.md` | ✗ Pre-merge checklist minimal; **no Critical Rules table, no Architecture section, no Risk section** | ✗ Missing sections: risk quantification, architecture references, key design decisions | ✗ Shorter than predecessor — increases stale analysis risk for next session | ✓ Dual-write pattern, provisional slot limit correctly described |
 | `session-handoff-v7.7.1.4.md` | ✓ Pre-merge checklist full; Critical Rules table present; Risk section complete | ✓ Architecture references, device testing plan, carries-forward all present | ✓ Board fleet verified; functions from prior steps listed | ✓ PLAN-001, PLAN-003, PLAN-005, ARCH-001 explicitly listed |
-| `v7.7.1.2-claude-two-step.md` | ✓ In-PR deliverables checklist; post-merge tag-only explicit | ✓ External reviewer focus areas with specifics | N/A (execution prompt, not planning) | ✓ Struct sizes match architecture doc §5 |
-| `v7.7.1.3-claude-two-step.md` | ✓ In-PR deliverables checklist; post-merge tag-only | ✗ External reviewer focus area #6 ("Yield compliance") lacks explanation of _why_ Rule 61 matters here | N/A | ✓ Dedup guard, ring buffer, NVS handle lifecycle covered |
-| `v7.7.1.4-claude-two-step.md` | ✓ In-PR deliverables; post-merge tag-only | ✓ External reviewer focus: boot safety, budget math, metric mapping, memory safety, hash collision, power loss | N/A | ✓ 30% reserve, priority tiers (70/20/10), slot cap 999 from planning session Point 1 |
-| `v7.7.1.2-agent-prompt-gpt-codex.md` | ✓ §2.5 cited in §1 required reading; §6 has all 5 deliverables; §9 = tag only | ✓ §1-§10 present; code examples match architecture doc; checkpoints use grep counts not line numbers | ✓ Preflight pass stated; stale analysis prevented by verification gate §2 | ✓ PLAN-002 (EventLog), ARCH-002 (FNV-1a, 15-char NVS limit) |
-| `v7.7.1.3-agent-prompt-gpt-codex.md` | ✓ All in-PR deliverables in §6/§7; §9 tag-only | ✓ Code blocks provided; stop-don't-fix checkpoints | ✓ Agent runs device testing; §2 gate before changes | ✓ DEV_PERSIST_PROVISIONAL_SLOTS = 360 pending budget (PLAN-003 deferred to v7.7.1.4) |
-| `v7.7.1.4-agent-prompt-gpt-codex.md` | ✗ §3 scope boundary says "see v7.7.1.2 prompt §3 for full list" — **not self-contained** (dev-process-guide §3.3 requires scope be in the prompt) | ✓ §1-§10 present; memory safety and collision detection addressed | ✓ Agent performs mandatory device test before marking PR ready | ✓ All PLAN-00x decisions from planning session cited in key design table |
+| `prompts/phase7/v7.7.1.2claude-two-step.md` | ✓ In-PR deliverables checklist; post-merge tag-only explicit | ✓ External reviewer focus areas with specifics | N/A (execution prompt, not planning) | ✓ Struct sizes match architecture doc §5 |
+| `prompts/phase7/v7.7.1.3claude-two-step.md` | ✓ In-PR deliverables checklist; post-merge tag-only | ✗ External reviewer focus area #6 ("Yield compliance") lacks explanation of _why_ Rule 61 matters here | N/A | ✓ Dedup guard, ring buffer, NVS handle lifecycle covered |
+| `prompts/phase7/v7.7.1.4claude-two-step.md` | ✓ In-PR deliverables; post-merge tag-only | ✓ External reviewer focus: boot safety, budget math, metric mapping, memory safety, hash collision, power loss | N/A | ✓ 30% reserve, priority tiers (70/20/10), slot cap 999 from planning session Point 1 |
+| `prompts/phase7/v7.7.1.2agent-prompt-gpt-codex.md` | ✓ §2.5 cited in §1 required reading; §6 has all 5 deliverables; §9 = tag only | ✓ §1-§10 present; code examples match architecture doc; checkpoints use grep counts not line numbers | ✓ Preflight pass stated; stale analysis prevented by verification gate §2 | ✓ PLAN-002 (EventLog), ARCH-002 (FNV-1a, 15-char NVS limit) |
+| `prompts/phase7/v7.7.1.3agent-prompt-gpt-codex.md` | ✓ All in-PR deliverables in §6/§7; §9 tag-only | ✓ Code blocks provided; stop-don't-fix checkpoints | ✓ Agent runs device testing; §2 gate before changes | ✓ DEV_PERSIST_PROVISIONAL_SLOTS = 360 pending budget (PLAN-003 deferred to v7.7.1.4) |
+| `prompts/phase7/v7.7.1.4agent-prompt-gpt-codex.md` | ✗ §3 scope boundary says "see v7.7.1.2 prompt §3 for full list" — **not self-contained** (dev-process-guide §3.3 requires scope be in the prompt) | ✓ §1-§10 present; memory safety and collision detection addressed | ✓ Agent performs mandatory device test before marking PR ready | ✓ All PLAN-00x decisions from planning session cited in key design table |
 
 ---
 
@@ -88,7 +88,7 @@ _Scope: 10 documents produced after Batch 1 post-mortem + updated meta-prompt_
 
 **Things the self-analysis missed:**
 - The WROOM YAML filename error (mentioned in operator-notes.txt l.110-111) is not identified as a distinct root cause — it's folded into Issue 3 but was a separate artifact (wrong filename vs wrong IP).
-- The self-analysis does not mention the filename typo in operator-notes.txt l.25: `prompts/phase7/v7.7.1.3-claude-two-step.md-` (trailing dash). The file was produced with the correct name but operator listed it with a dash — this should have been flagged.
+- The self-analysis does not mention the filename typo in prompts/handoff/phase7/new-prompts-audit-session.txt line 25: `prompts/phase7/prompts/phase7/v7.7.1.3claude-two-step.md-` (trailing dash). The file was produced with the correct name but operator listed it with a dash — this should have been flagged.
 - No mention of `development-process-guide.md` §2.5 item 5 (next-step handoff updates must be in-PR) — the handoffs for v7.7.1.2/1.3/1.4 were produced as a batch simultaneously, which is correct; but the self-analysis doesn't acknowledge this as a positive pattern.
 
 ---
@@ -114,10 +114,10 @@ _Scope: 10 documents produced after Batch 1 post-mortem + updated meta-prompt_
 | File | Section/Line | Problem | Recommended Fix | Why |
 |---|---|---|---|---|
 | `session-handoff-v7.7.1.3.md` | Missing sections | No Critical Rules table, no Architecture references section, no Risk section, no Workflow section | Add Critical Rules table (Rules 2, 11, 40, 58, 61, 62, 63, 64, 67 with Why column), add Risk: MEDIUM block, add Architecture references citing `Docs/v7.7-v7.8-persistence-architecture.md §10` | v7.7.1.2 and v7.7.1.4 handoffs are complete; v7.7.1.3 is an outlier that will make the next session incomplete |
-| `v7.7.1.4-agent-prompt-gpt-codex.md` | §3, l.97-98 | Scope boundary references "v7.7.1.2 prompt §3 for full list" — agent prompt must be self-contained per `Docs/development-process-guide.md` §3.3 | Inline the complete bump-version.sh whitelist (6 source files + 6 artifacts) into §3, same as v7.7.1.2 §3 ll.98-111 | If agent cannot access v7.7.1.2 prompt (different session), scope boundary is undefined |
-| `v7.7.1.3-claude-two-step.md` | Step 2, reviewer item 6 | "Yield compliance (Rule 61): Is `maybe_yield_nvs_scan_()` called correctly between device persists?" — no explanation of _why_ | Add: "(Omitting this causes watchdog resets under multi-device NVS iteration — see `Docs/lessons/firmware.md`)" | `Docs/writing-guide/methodology.md` §3.2: good prompts state the "trap" not just the item |
+| `prompts/phase7/v7.7.1.4agent-prompt-gpt-codex.md` | §3, l.97-98 | Scope boundary references "v7.7.1.2 prompt §3 for full list" — agent prompt must be self-contained per `Docs/development-process-guide.md` §3.3 | Inline the complete bump-version.sh whitelist (6 source files + 6 artifacts) into §3, same as v7.7.1.2 §3 ll.98-111 | If agent cannot access v7.7.1.2 prompt (different session), scope boundary is undefined |
+| `prompts/phase7/v7.7.1.3claude-two-step.md` | Step 2, reviewer item 6 | "Yield compliance (Rule 61): Is `maybe_yield_nvs_scan_()` called correctly between device persists?" — no explanation of _why_ | Add: "(Omitting this causes watchdog resets under multi-device NVS iteration — see `Docs/lessons/firmware.md`)" | `Docs/writing-guide/methodology.md` §3.2: good prompts state the "trap" not just the item |
 | `session-handoff-v7.7.1.3.md` | Pre-merge checklist | Missing `NI-001`, `NI-002`-style open-item tracking from v7.7.1.1 | Add any open issues discovered during v7.7.1.2 (BUG-084 is noted in issues table but not in pre-merge checklist) | Checklist is the operator's gate; gaps lead to missed items |
-| All 3 agent prompts | §8 Pre-PR Gate | `git diff --name-only` expected file list does not mention session log or consolidated audit paths | Add `Docs/session-log-*-vX.Y.Z.W.md` and `prompts/phase7/vX.Y.Z.W-PR*-consolidated-audit-and-lessons.md` to expected diff output | Scope check currently won't flag if those files were not committed |
+
 
 ---
 
