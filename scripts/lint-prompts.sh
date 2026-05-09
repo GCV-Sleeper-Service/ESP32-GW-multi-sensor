@@ -126,10 +126,10 @@ collect_fail_violations() {
 }
 
 # Build a sorted set of dedup keys "RULE_ID <TAB> LINE_CONTENT" from
-# collect_fail_violations output, stripping the line-number column.
+# collect_fail_violations output. Field 2 (line number) is stripped; fields
+# 1 (rule ID) and 3+ (line content, which may itself contain tabs) are kept.
 # Using content (not line number) as the key keeps violations stable across
 # line position changes caused by unrelated edits elsewhere in the file.
-# Handles content containing tabs by capturing all fields from the third onward.
 violation_keys() {
   awk -F'\t' '{
     key = $1
@@ -211,12 +211,17 @@ check_file_baseline() {
   collect_fail_violations "$file" > "$tmp_head"
   violation_keys "$tmp_head" > "$tmp_head_keys"
 
-  # Collect BASELINE violations (file content at the given ref, blobs only)
+  # Collect BASELINE violations (file content at the given ref, blobs only).
+  # The cat-file blob check guards against the edge case where the path was a
+  # directory (tree object) at baseline, preventing tree metadata from being
+  # treated as file content. If the path doesn't exist or isn't a blob at
+  # baseline, all HEAD violations are treated as new.
   if git cat-file -t "${baseline_ref}:${file}" 2>/dev/null | grep -q "^blob$" && \
      git show "${baseline_ref}:${file}" > "$base_src" 2>/dev/null; then
     collect_fail_violations "$base_src" > "$tmp_base"
   else
-    # File did not exist (or was not a regular file) at baseline — every HEAD violation is new
+    # File did not exist, was not a regular blob, or baseline ref is invalid
+    # — every HEAD violation is new
     : > "$tmp_base"
   fi
   violation_keys "$tmp_base" > "$tmp_base_keys"
@@ -230,7 +235,11 @@ check_file_baseline() {
     new_keys_set["$k"]=1
   done < "$tmp_new_keys"
 
-  # Report each HEAD violation as ERROR (new) or EXISTING (pre-existing)
+  # Report each HEAD violation as ERROR (new) or EXISTING (pre-existing).
+  # The key reconstruction "${rule}"$'\t'"${content}" is equivalent to
+  # violation_keys' awk logic because collect_fail_violations produces exactly
+  # 3 tab-separated fields; `content` captures the full third field (which
+  # may itself contain tabs via the IFS=$'\t' read-r with 3 variables).
   local rule lineno content key
   while IFS=$'\t' read -r rule lineno content; do
     # Reconstruct the dedup key with the same multi-field-aware logic as violation_keys
