@@ -68,7 +68,7 @@ Current status:
 
 Follow all rules listed under "Critical Rules" in the instructions file.
 After implementation, run validation (preflight + Playwright), create a PR,
-and provide the exact device testing checklist for me to execute post-merge.
+and execute the device testing as a §6 (in-PR) acceptance criterion before marking the PR ready.
 
 MANDATORY deliverables (in addition to the code):
 - Session log: Docs/session-log-<TODAY>-<VERSION>.md
