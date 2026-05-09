@@ -297,7 +297,7 @@ Phase X proved that a single agent prompt is not enough. Every step needs two se
 
 **Session 1 — Agent execution.** The coding agent receives the implementation prompt, reads all required files, implements the change, runs the validation pipeline, and creates a PR.
 
-**Session 2 — Review.** A separate agent (fresh context, no carry-over from Session 1) receives a review prompt targeting that step's exact failure modes. The reviewer verifies acceptance criteria, checks for scope violations, produces the consolidated audit, inspects the next step's handoff and prompt, and confirms post-merge deliverables.
+**Session 2 — Review.** A separate agent (fresh context, no carry-over from Session 1) receives a review prompt targeting that step's exact failure modes. The reviewer verifies acceptance criteria, checks for scope violations, produces the consolidated audit, inspects the next step's handoff and prompt, and confirms that any §9 items are post-merge bookkeeping only (tag/close), not documentation deliverables.
 
 This pattern catches classes of error that self-review misses: confirmation bias ("I just wrote it, so it must match the spec"), context-window pressure (long execution sessions lose early instructions), and scope drift (agents that continue into the next step unbidden).
 
@@ -328,7 +328,7 @@ Effective prompts require the following at the point of risk (not in a separate 
 
 ### 4.3 Chain-Inspection Pattern
 
-From Phase X v7.6.5.1 onward, every step's post-merge deliverables include reviewing and updating the next step's handoff and prompt. This creates a forward-inspection chain: step N's closure verifies that step N+1's assumptions are still valid given what actually happened during step N.
+From Phase X v7.6.5.1 onward, every step's in-PR deliverables include reviewing and updating the next step's handoff and prompt. This creates a forward-inspection chain: step N's closure verifies that step N+1's assumptions are still valid given what actually happened during step N.
 
 Without this pattern, prompts written at plan time accumulate stale references as earlier steps introduce small deviations from the plan.
 
