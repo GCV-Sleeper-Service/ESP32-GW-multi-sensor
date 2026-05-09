@@ -1,0 +1,59 @@
+name: Prompt Lint
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'prompts/**'
+      - 'scripts/lint-prompts.sh'
+      - '.github/workflows/prompt-lint.yml'
+
+jobs:
+  prompt-lint:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run prompt lint (PR changed files)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.sha }}"
+          mapfile -t FILES < <(git diff --name-only "$BASE" "$HEAD" | grep '^prompts/' || true)
+          if [[ "${#FILES[@]}" -eq 0 ]]; then
+            echo "No files under prompts/ changed in this PR — skipping lint."
+            exit 0
+          fi
+          printf 'Linting %d changed prompt file(s):\n' "${#FILES[@]}"
+          printf '  %s\n' "${FILES[@]}"
+          echo
+          bash scripts/lint-prompts.sh "${FILES[@]}"
+
+      - name: Run prompt lint (full scan)
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          echo "workflow_dispatch — linting all tracked prompt files."
+          bash scripts/lint-prompts.sh
+
+      - name: Write lint summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Prompt Lint — $(cat VERSION)"
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Ref | \`${GITHUB_REF_NAME}\` |"
+            echo "| Commit | \`${GITHUB_SHA::8}\` |"
+            echo "| Event | ${GITHUB_EVENT_NAME} |"
+          } >> "$GITHUB_STEP_SUMMARY"
