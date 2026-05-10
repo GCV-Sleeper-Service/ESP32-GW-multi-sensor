@@ -276,4 +276,127 @@ Confidence I have not missed an additional HIGH defect: **0.75**. I did not run 
 
 ---
 
-_End of audit report._
+## 8. Post-publication reconciliation with co-auditors (added 2026-05-10)
+
+After publishing this report, I performed a deeper diff against the two co-auditor reports already on `main`:
+
+- `prompts/handoff/phase7/pr-233-third-independent-audit-perplexity-2026-05-10.md` — Perplexity AI (Claude Sonnet 4.6) — verdict **CONDITIONAL PASS**.
+- `prompts/handoff/phase7/pr-233-third-independent-audit-report-gpt-5-5-thinking-2026-05-10.md` — GPT-5.5 Thinking — verdict **FAIL**.
+
+### 8.1 Verdict reconciliation
+
+The merge gate (zero remaining HIGH) stands at **FAIL**. Two of three independent auditors (this report + GPT-5.5 Thinking) reach FAIL on the same H-1. Perplexity's CONDITIONAL PASS missed H-1 entirely; the textual evidence is unambiguous and mechanically demonstrable, so I treat Perplexity's verdict as a miss rather than a competing valid view. GPT-5.5 additionally ran `bash scripts/lint-prompts.sh --baseline main` and reports exit 0 with 14 EXISTING/WARN entries and no new ERROR — this lifts my §2.B C9 from "unable to verify" to **PASS** (subject to operator re-run).
+
+### 8.2 Findings I accept from co-auditors (added to this report)
+
+The following co-auditor findings I had not raised independently. I have reviewed each against the live files and accept them as valid:
+
+#### M-3 — `calculate_retention_budgets_()` PERFORMANCE-ACK lacks an N upper bound (from Perplexity M-3)
+
+**Severity:** MEDIUM (clarity, not correctness).
+**File:** `prompts/phase7/v7.7.1.4-agent-prompt-gpt-codex.md`.
+**Quote (Perplexity, verified against the prompt):**
+
+> ```cpp
+> // Complexity notes:
+> //   - Boot path: O(device_count) NVS/array scan work.
+> //   - Persist path: O(device_count) per call × N devices per cycle ⇒ O(N²) per persist cycle.
+> ```
+
+The note is accurate but does not bound N. With current `NUM_DEVICES ≤ 6`, actual cost is ≤ 36 ops/cycle — trivially cheap — and the unbounded "O(N²)" framing risks inducing premature optimization in a future phase.
+
+**Fix proposal (Perplexity):** add `(bounded: N ≤ 20 per architecture §6, so ≤ 400 ops/cycle — measure before optimizing)`.
+
+**Disposition:** track-as-followup under #228 §C. Not a dispatch blocker.
+
+#### L-3 — Audit-prompt §2.B C1 wording is not satisfiable on current `main` (from GPT-5.5 L2)
+
+**Severity:** LOW (audit-prompt template defect, not a PR #233 defect).
+**File:** `prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md`.
+
+GPT-5.5 verified that current `main` contains `pdMS_TO_TICKS(1)` literals in non-PR-#233 historical files (`prompts/phaseD/v7.6.0.0-implementation-instructions-for-coding-agent.md`, `prompts/handoff/phase7/opus-producer-session-chat-handoff.md`). My report flagged the same hits but absorbed them into the C1 PASS verdict by silently scoping to the 9 modified files. GPT-5.5's framing is more rigorous: the audit prompt should explicitly scope C1 to PR-modified files (or to active, non-historical prompts) rather than `prompts/**` repo-wide.
+
+**Fix proposal:** in future audit-prompt revisions, scope C1 (and C2/C3/C5 by analogy) to "files modified by the PR under audit" rather than `prompts/**`.
+
+**Disposition:** track-as-followup against the audit-prompt template. Not a PR #233 implementation blocker.
+
+#### L-4 — Non-idempotent SIZING-log insertion in v7.7.1.2 §2 step 2 (from Perplexity L-1)
+
+**Severity:** LOW (single-pass execution is the intended path; re-run is an edge case).
+**File:** `prompts/phase7/v7.7.1.2-agent-prompt-gpt-codex.md` §2 measurement procedure.
+
+I previously rated this concern PASS on the strength of step 6 (which removes the SIZING log line). Perplexity correctly notes that step 2 (which inserts the line) lacks a pre-insertion idempotency guard: if an agent re-runs the procedure after step 6 has already executed but before a fresh insertion, no harm; if the agent re-runs after a partial execution, the insertion may duplicate. Cheap to fix: add `grep -c 'SIZING' firmware/core/nvs-persistence.h` → expected 0 before insertion.
+
+**Disposition:** track-as-followup. Not a dispatch blocker.
+
+#### L-5 — `session-handoff-v7.7.1.3.md` Workflow does not flag `last_written_slot = 0xFFFF` non-zero default (from Perplexity L-3)
+
+**Severity:** LOW (informational gap; the struct definition itself is correct in v7.7.1.2).
+**File:** `prompts/handoff/phase7/session-handoff-v7.7.1.3.md` Workflow section.
+
+`DeviceHistoryMeta` ships with `last_written_slot = 0xFFFF` as a non-zero default (used to detect "no slots written yet"). The handoff describes `DEV_HIST_MAGIC` and `DEV_HIST_VERSION` chain-inspection but does not call out the non-zero default, which a restore validator could trip on if the agent zero-initialises the struct. The struct definition in v7.7.1.2 is correct; this is a doc gap in the handoff, not a code defect.
+
+**Disposition:** track-as-followup. Not a dispatch blocker.
+
+### 8.3 Co-auditor findings I decline to incorporate
+
+- **Perplexity L-4 (HISTORICAL banner missing session provenance).** Cosmetic; banner already names the two referencing files. No execution impact, no maintenance hazard. Accept-as-is.
+- **Perplexity L-2 (template task-group reference vagueness in `consolidated-audit-template-phase7.md`).** Cosmetic and the placeholder is intentionally generic to fit all three sub-phase prompts. Accept-as-is.
+
+### 8.4 Severity disagreement on the sub-step gap
+
+Perplexity rated the v7.7.1.3 §6 Task Group 4 sub-step renumbering as **MEDIUM** (their M-1). I rated it **LOW** (my L-2). I retain LOW: there is no execution hazard and no §7/§8 cross-reference is broken. The disagreement is purely about the bar for MEDIUM. The disposition is the same in both reports (no fix-in-PR; cosmetic).
+
+### 8.5 Findings unique to this report (Opus 4.7)
+
+After comparing all three reports, **no finding unique to this report goes uncorroborated**:
+
+- H-1 corroborated by GPT-5.5.
+- M-1 (changelog hard-coded byte counts) corroborated by GPT-5.5.
+- M-2 (`nvs-persistence.h:248` fragility) corroborated by Perplexity.
+- L-1 (PR-body C3-only) corroborated by GPT-5.5.
+- L-2 (sub-step gap) corroborated by Perplexity (at MEDIUM).
+
+This convergence is the strongest available evidence that no additional HIGH defect was missed by all three independent passes.
+
+### 8.6 Updated final findings ledger
+
+| ID | Severity | Source | Disposition |
+|---|---|---|---|
+| H-1 | HIGH | this report + GPT-5.5 | **fix-in-PR before dispatching v7.7.1.4** |
+| M-1 | MEDIUM | this report + GPT-5.5 | **fix-in-PR before dispatching v7.7.1.2** |
+| M-2 | MEDIUM | this report + Perplexity | track-as-followup (#228 §C) |
+| M-3 | MEDIUM | **Perplexity (newly accepted)** | track-as-followup (#228 §C) |
+| L-1 | LOW | this report + GPT-5.5 | fix-in-PR alongside H-1 (cheap one-line edit) |
+| L-2 | LOW | this report + Perplexity | accept-as-is |
+| L-3 | LOW | **GPT-5.5 (newly accepted)** | track-as-followup (audit-prompt template) |
+| L-4 | LOW | **Perplexity (newly accepted)** | track-as-followup |
+| L-5 | LOW | **Perplexity (newly accepted)** | track-as-followup |
+| Rule 61 lint rule (L8) | NOTE | all three | track as planned §C13 (out of scope per audit prompt §5) |
+
+### 8.7 Confidence after reconciliation
+
+- Confidence H-1 is real: **0.97** (was 0.95 — raised by independent GPT-5.5 confirmation against a different starting context).
+- Confidence in C9 (`lint-prompts.sh`): **PASS** (was unable-to-verify — raised by GPT-5.5's executed verification).
+- Confidence I have not missed an additional HIGH defect: **0.85** (was 0.75 — raised by three-way convergence on the same single HIGH).
+- Verdict: **unchanged — FAIL.** Dispatch of v7.7.1.4 must be blocked until H-1 is corrected.
+
+### 8.8 Attribution of contributions to this reconciled report
+
+| Contribution | Source |
+|---|---|
+| H-1 (declaration-order compile blocker) — original detection | this report (Opus 4.7) and GPT-5.5 Thinking, independently |
+| M-1 (changelog hard-coded byte counts) — original detection | this report (Opus 4.7) and GPT-5.5 Thinking, independently |
+| M-2 (`nvs-persistence.h:248` fragility) — original detection | this report (Opus 4.7) and Perplexity, independently |
+| M-3 (O(N²) note lacks N upper bound) — **added from Perplexity** | Perplexity AI |
+| L-1 (PR-body C3-only) — original detection | this report (Opus 4.7) and GPT-5.5 Thinking, independently |
+| L-2 (sub-step gap) — original detection | this report (Opus 4.7, LOW) and Perplexity (MEDIUM) |
+| L-3 (audit-prompt C1 scope mismatch) — **added from GPT-5.5** | GPT-5.5 Thinking |
+| L-4 (SIZING-log idempotency guard) — **added from Perplexity** | Perplexity AI |
+| L-5 (`last_written_slot` default doc gap) — **added from Perplexity** | Perplexity AI |
+| C9 lint-script PASS — verified from GPT-5.5 execution | GPT-5.5 Thinking |
+| Verdict (FAIL) — corroborated | this report (Opus 4.7) and GPT-5.5 Thinking |
+
+---
+
+_End of audit report (with §8 post-publication reconciliation)._
