@@ -1,3 +1,10 @@
+> **HISTORICAL — applied to v7.7.1.1 review only. NOT for reuse without doctrinal review against `Docs/development-process-guide.md` §2.5.**
+> This file is referenced only by `prompts/phase7/v7.7.1.1-PR226-consolidated-audit-and-lessons.md`
+> and `Docs/session-log-2026-05-08-v7.7.1.1.md` (immutable execution records). The body wording
+> below is preserved unchanged as an execution record. Do not apply these prompts to v7.7.1.2 or
+> later without first reframing all device-testing and post-merge language to match
+> `Docs/development-process-guide.md` §2.5 (in-PR mandatory deliverables).
+
 # Phase 7 — Review Prompts for Perplexity AI
 
 _Repo: `GCV-Sleeper-Service/ESP32-GW-multi-sensor`_

@@ -126,5 +126,5 @@ _Items from postmortems or phase closures that have NOT been acted on._
 
 ---
 
-_This file is updated after every merge as a mandatory post-merge deliverable._
+_This file is updated as a mandatory in-PR deliverable for every step that changes shipped state (per Docs/development-process-guide.md §2.5)._
 _If the "Last verified" date is more than 1 step old, run verification checks before trusting values._

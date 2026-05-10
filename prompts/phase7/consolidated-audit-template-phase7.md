@@ -101,17 +101,20 @@ Copy each criterion from the agent prompt §7 (Acceptance Criteria). Mark each P
 
 ## §6 — Device Test Results
 
-_Fill in after post-merge device testing. If device testing is not applicable for this step, write "N/A — no device testing required."_
+_Fill in as part of the in-PR §6 acceptance criteria BEFORE marking the PR ready. If device testing
+is not applicable for this step, write "N/A — no device testing required." Per
+`Docs/development-process-guide.md` §2.5 deliverable 1 (consolidated audit), device test results
+are an in-PR mandatory deliverable — not a post-merge activity._
 
 ### Test Matrix
 
 | Test | Board | IP | Result | Evidence |
 |------|-------|-----|--------|----------|
-| [from agent prompt §10] | [C3/WROOM/S3] | [.189/.190/.191] | PASS/FAIL | [curl output, serial log excerpt, heap values] |
+| [from agent prompt §6 Task Group device testing] | [C3/WROOM/S3] | [.189/.170/.191] | PASS/FAIL | [curl output, serial log excerpt, heap values] |
 
 ### Measurements (Phase 7 Baseline Tracking)
 
-| Metric | C3 (.189) | WROOM (.190) | S3 (.191) | Notes |
+| Metric | C3 (.189) | WROOM (.170) | S3 (.191) | Notes |
 |--------|-----------|-------------|-----------|-------|
 | free_heap (boot) | | | | |
 | min_free_heap | | | | |
