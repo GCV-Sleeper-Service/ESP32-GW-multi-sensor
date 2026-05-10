@@ -501,4 +501,203 @@ The methodology produced the correct outcome with one auditor mis-call (Perplexi
 
 ---
 
-_End of methodology audit document._
+## §11 Post-publication reconciliation with peer methodology audits (added 2026-05-10)
+
+After publishing this document, the operator commissioned three peer methodology audits on the same topic and committed them alongside this report:
+
+- [Docs/prompt-producing-methodology-audit-Codex-2026-05-10.md](prompt-producing-methodology-audit-Codex-2026-05-10.md) — Codex (~480 lines)
+- [Docs/prompt-producing-methodology-audit-gpt-5-5-thinking-2026-05-10.md](prompt-producing-methodology-audit-gpt-5-5-thinking-2026-05-10.md) — GPT-5.5 Thinking (~700 lines)
+- [Docs/prompt-producing-methodology-audit-Perplexity-2026-05-10.md](prompt-producing-methodology-audit-Perplexity-2026-05-10.md) — Perplexity (~650 lines)
+
+This §11 reconciles the four documents. It absorbs peer contributions where they materially strengthen this report, declines them where they conflict with stronger evidence, and revises positions in §1–§10 where peer arguments are operationally superior. **Peer documents themselves are not modified.** Where a peer position is adopted, the change applies prospectively to this document and to any operator action that flows from it.
+
+### §11.1 Reconciliation feasibility
+
+All four documents are reconcilable on the core gate structure (multi-auditor → find HIGH/CRITICAL → reconcile → dispatch). Peers differ on sequencing and emphasis, not on principles. All four converge on:
+
+- Multi-auditor audit is necessary before dispatch.
+- HIGH-severity findings (CRITICAL in Codex/GPT-5.5 taxonomy) block dispatch.
+- Every finding requires a recurrence-prevention disposition (lint / producer rule / methodology / issue).
+- Audits must verify against live repo state, not planning documents.
+
+Foundational compatibility issues: **none**. Merge risk: **low**.
+
+### §11.2 Position revisions adopted into this report
+
+Where a peer position is operationally superior, this report's earlier text is superseded by §11.2. The original §1–§10 text remains for historical context.
+
+#### §11.2.A Auditor count — adopt risk-tiered model
+
+**Original position (§6.B):** "≥ 2 independent auditors, run in parallel."
+
+**Codex (§5.2 L.155):** "Use at least three independent audits." **GPT-5.5 (§3.2 L.147):** "≥3" baseline. **Perplexity (§3.2):** does not state a fixed number; mandates the adversarial-first role.
+
+**Revised position (binding for §6.B):**
+- **Baseline: ≥ 2 independent auditors** for any prompt-producer bundle.
+- **Mandatory ≥ 3 independent auditors** for bundles touching: boot path, NVS / persistence, authentication, OTA / partition, dashboard data path, multi-board validation, or any bundle whose prior batch had a HIGH-severity audit finding (this list is from Codex §4 L.96–98 and GPT-5.5 §9.3 L.480–481, which I adopt verbatim as the high-risk taxonomy).
+- **Escalation to ≥ 3** if two auditors return CONDITIONAL PASS with non-overlapping findings (this rule was already in §6.B and is corroborated independently by GPT-5.5 §3.2 L.155–156).
+- **Operator opt-out** is permitted only for low-risk bundles (planning supplements, doc-only changes, prompt-template version bumps) and must be recorded in writing in the bundle PR body.
+
+#### §11.2.B Reconciliation artifact — adopt separate-file requirement
+
+**Original position (§6.G):** "A reconciliation §8 (or appended-section) update to one of the peer reports — or a separate reconciliation document."
+
+**Perplexity (§7 L.365–367):** "The cross-audit reconciliation report is a separate Markdown file committed to the same path as the individual audit reports: `prompts/handoff/<phase>/prompt-bundle-audit-reconciliation-<phase>-batch<N>-<date>.md`."
+
+**Revised position (binding for §6.G):** Reconciliation MUST be a separate Markdown file at the canonical path Perplexity proposes. Appended-section reconciliation (as I did in PR #233) is acceptable historically but is no longer the canonical form. Rationale: a separate file is independently linkable, has a clear author identity, and survives edit-history rewrites of the underlying audit reports.
+
+#### §11.2.C Audit lanes — adopt Codex's four-lane mandatory-coverage model alongside §2.A/B/C
+
+**Original position (§6.D):** Three check classes — §2.A doctrinal compliance, §2.B cross-cutting integrity, §2.C hot-take quality.
+
+**Codex (§5.2 L.155–164):** Four mandatory audit lanes — Doctrine, Code-coherence, Device/evidence, Drift/lint — with the requirement that "the consolidated audit package must prove that all lanes were checked."
+
+**Revised position:** §2.A/B/C remains the **per-auditor check structure** (each auditor's report is partitioned this way). Codex's four lanes are additionally adopted as the **bundle-level coverage requirement** (the consolidated set of audit reports must collectively cover all four lanes). The reconciliation report's attribution table (per §6.G) must explicitly state which lane(s) each auditor primarily covered. This is additive, not replacing, and resolves a §6.D weakness: §2.A/B/C describes _what each auditor does_ but not _what the bundle of auditors collectively must cover_.
+
+#### §11.2.D Live-extract block in producer prompt — adopt Perplexity §8.4
+
+**Original position (§7.D):** "Live-symbol re-grep mandate" applied at coding-agent execution time via §2 verification gate.
+
+**Perplexity (§8.4 L.598–637):** Producer's session must run a Live-Extract Block (specific `grep` / `ls` / `find` commands) BEFORE drafting any prompt content. Quote: _"Run the following before drafting any prompt content. Paste outputs into your working context. Do not use any board, YAML, IP, signature, or version fact from planning documents without confirming it against these outputs first."_
+
+**Revised position (added to §7):** §7.D's coding-agent-time re-grep stays as written. Perplexity's producer-time Live-Extract Block is added as **§7.I** (new). Both are required: producer extracts live facts at the start of the producer session and embeds them in the bundle as a verification table (which folds into §7.C extract-→-enumerate-→-enforce); the agent re-greps at execution time as a second-line defense. This catches cases where the producer's session-start extract is stale by the time the agent runs (e.g., a fix-cycle PR landed in between).
+
+#### §11.2.E Adversarial scenario classes — adopt Perplexity §6 as canonical taxonomy for §2.C
+
+**Original position (§6.D §2.C):** Hot-take quality concerns listed as 9 generic check categories.
+
+**Perplexity (§6 L.358–419):** Six named adversarial scenario classes that checklists structurally miss: (1) compliant-but-wrong, (2) evidence-theater, (3) scope-boundary-leakage, (4) deferred-ambiguity, plus context-dependent edge cases. Each includes a detection method.
+
+**Revised position:** Perplexity's six scenarios are adopted verbatim as the canonical §2.C inspection categories. The previous §6.D.8 (declaration-order trace) and §6.D.9 (searchable-anchor check) are subsumed under "compliant-but-wrong" and "scope-boundary-leakage" respectively. This sharpens §2.C from a generic hot-take checklist to a structured adversarial taxonomy. The PR #233 H-1 finding fits cleanly under "compliant-but-wrong": the v7.7.1.4 prompt obeyed every rule but produced incoherent output.
+
+#### §11.2.F Severity model — adopt Codex §8 categorical severity definitions
+
+**Original position (§6.E):** Verdict thresholds (zero HIGH = PASS / CONDITIONAL PASS; ≥ 1 HIGH = FAIL) without explicit severity-class definitions.
+
+**Codex (§8 L.280–319):** Severity tied to merge-gate consequences: CRITICAL = data loss / credential exposure / unrecoverable device risk; HIGH = compile failure / false evidence / missing merge-gate deliverables; MEDIUM = clarity / incomplete coverage / non-blocking drift; LOW = cosmetic.
+
+**Revised position (binding for §6.E):** Codex's CRITICAL / HIGH / MEDIUM / LOW definitions are adopted. Both CRITICAL and HIGH block dispatch (CRITICAL is HIGH plus an explicit operator-notification step). PR #233 H-1 (declaration-order compile failure) maps to HIGH under the revised taxonomy — board-bricking risk is real but recoverable via reflash; if the same defect class were undetectable until OTA-locked devices were already in the field, it would be CRITICAL.
+
+#### §11.2.G Producer self-report table — adopt Codex §11
+
+**Original position (§7):** No explicit self-report table; producer rules are checklist items.
+
+**Codex (§11 L.402–410):** Producer fills in a self-report table (Board facts, YAML names, function signatures, version-bump whitelist, device coverage, §9 content, prompt-code snippets); auditors verify against it. Quote: _"The producer self-report is not an independent audit, but it gives auditors a clear surface to verify."_
+
+**Revised position (added as §7.J):** Producer must commit a `prompt-bundle-producer-selfreport-<phase>-batch<N>.md` as part of the bundle PR. The self-report is not an audit; it is a checklist anchor for auditors. Required rows match Codex's list. This formalises §7.C's "extract → enumerate → enforce" output into a reviewable artifact and addresses F-7 (gate-runs ≠ gate-enforces).
+
+#### §11.2.H Audit prompt as versioned artifact — adopt Perplexity §4
+
+**Original position (§6.C):** Audit prompt template referenced; no versioning discipline.
+
+**Perplexity (§4 L.244–318):** Audit prompt skeleton is versioned (`prompts/audit/prompt-bundle-audit-skeleton-v<N>.md`), includes a CHANGELOG, requires pre-use freshness check.
+
+**Revised position (added as §6.H):** Audit prompt skeleton is versioned. Each phase or batch may extend or amend the skeleton; amendments increment the version and append a CHANGELOG entry. Pre-use freshness checklist (4 items: skeleton references current `CURRENT-STATE.md` board fleet; skeleton references current doctrinal sources; skeleton's §2.B grep targets exist in live repo; skeleton's §1 input list matches the bundle's actual files) MUST pass before audit begins. PR #233's audit prompt (`pr-233-third-independent-audit-prompt.md`) is treated retroactively as v1.0 of this skeleton.
+
+#### §11.2.I Operator pre-dispatch checklist — adopt GPT-5.5 §11
+
+**Original position:** No explicit operator-side workflow checklist.
+
+**GPT-5.5 (§11 L.505–519):** 9-step operator workflow: confirm files exist, open PR, run lint, launch audits, produce reports, create action list, fix, re-audit, dispatch.
+
+**Revised position (added as §6.I):** 9-step operator pre-dispatch checklist is adopted verbatim from GPT-5.5 §11. Operationalises the gate; mirrors `Docs/development-process-guide.md` §2.5 merge-gate language.
+
+#### §11.2.J Triage heuristics for time-constrained audits — adopt Perplexity §5
+
+**Original position:** None.
+
+**Perplexity (§5 L.318–351):** When full audit time is unavailable, run a "minimum viable audit": (1) stale-fact grep suite, (2) §9 doctrine checklist, (3) embedded C++ inspection.
+
+**Revised position (added as §6.J):** Minimum viable audit is the operator's escape hatch only when the operator has explicitly recorded time pressure and accepted the residual risk. For high-risk bundles (per §11.2.A taxonomy), full audit is mandatory regardless of time pressure.
+
+#### §11.2.K Information-attenuation pipeline — adopt Perplexity §2 as framing
+
+**Original position:** Failure modes F-1 … F-8 are discrete observations without an integrating framework.
+
+**Perplexity (§2 L.44–108):** Five-stage information-attenuation pipeline (Planning → Production-prompt → Producer → Dispatch → Agent execution) with four attenuation points; each observed defect maps to an attenuation point.
+
+**Revised position:** The pipeline framing is adopted as analytic context for §5 (failure modes catalogue). It is not a new gate; it is a vocabulary that makes "where in the chain did this defect originate" answerable. Operationally: when a future audit finds a new defect class, the disposition step must identify its attenuation point so the corresponding gate (planning audit, producer rule, audit-gate check, agent verification) absorbs the prevention.
+
+### §11.3 Peer positions declined
+
+Two peer positions are declined; rationale below.
+
+#### Declined: Codex's "single PR with auditors adding reports" topology (§15)
+
+**Codex (§15 L.416–434):** Auditors add independent reports to the same producer bundle PR.
+
+**Decline rationale:** Single-PR topology contaminates auditor independence. PR review threads are visible to all parties; later auditors see earlier verdicts and findings, biasing their review. PR #233's audit reports were committed to `main` directly _after_ the bundle PR closed, which preserved independence. The cleaner topology (already in §6.B and the development-process-guide.md §5 diff in Appendix A.1) is: bundle PR opens → audit branch(es) per auditor open → reconciliation PR opens → all merge in order. Reconcilability with Codex's position: low; this is one of the two real disagreements.
+
+#### Declined: Perplexity's "rotate adversarial-first auditor role" requirement (§3.4)
+
+**Perplexity (§3.4 L.186–197):** At least one auditor is assigned the adversarial-first role; the role rotates across batches.
+
+**Decline rationale:** Role rotation is operationally heavy and assumes a stable pool of auditors with consistent identity over time. The current operator dispatches model sessions, not named auditors; "rotating the role" does not map cleanly. Adversarial inspection is instead embedded into the §2.C check structure (per §11.2.E) so every auditor performs it. This achieves the same outcome (adversarial coverage) without the role-tracking burden.
+
+### §11.4 Peer findings I overlooked but accept
+
+Five peer findings strengthen this report and are now incorporated:
+
+| ID | Source | Finding | Where absorbed |
+|---|---|---|---|
+| R-1 | GPT-5.5 §11 | 9-step operator pre-dispatch checklist | §6.I (per §11.2.I) |
+| R-2 | Codex §11 | Producer self-report table as auditor-verification surface | §7.J (per §11.2.G) |
+| R-3 | Perplexity §6 | Six adversarial scenario classes with detection methods | §2.C taxonomy (per §11.2.E) |
+| R-4 | Perplexity §8.4 | Live-Extract Block at producer-session start | §7.I (per §11.2.D) |
+| R-5 | Perplexity §4 | Audit prompt skeleton as versioned artifact | §6.H (per §11.2.H) |
+| R-6 | Codex §5.2 | Four mandatory audit lanes (Doctrine, Code, Device, Drift) | §6.D bundle-level coverage requirement (per §11.2.C) |
+| R-7 | Codex §8 | Categorical severity (CRITICAL / HIGH / MEDIUM / LOW with specific rationale) | §6.E (per §11.2.F) |
+| R-8 | Perplexity §2 | Information-attenuation pipeline as analytic framework | §5 framing (per §11.2.K) |
+| R-9 | Codex §7.4 | Evidence-consistency cross-check across §6 / §7 / §8 / PR-body / reviewer-checklist | §2.B new check (cross-section evidence consistency) |
+
+### §11.5 Findings I had that peers did not — all retained
+
+Confirmed unique-to-this-report contributions, all retained without revision:
+
+- Eight-failure-mode catalogue with explicit auditor attribution and per-mode defusion rule (§5).
+- Three-part audit check structure §2.A / §2.B / §2.C (§6.D — now augmented with Codex's four lanes per §11.2.C).
+- Appendix A — four detailed suggested diffs in copy-ready form.
+- Appendix B — worked example tracing PR #233 through the methodology end-to-end.
+- §6.G reconciliation step with seven explicit duties (now also requiring separate file per §11.2.B).
+- Numeric confidence statements with caveats (§10).
+- Audit/lint division-of-labor matrix (§8.B).
+- Eight discrete producer rules (§7.A–§7.H — now §7.A–§7.J with R-2 and R-4 additions).
+
+### §11.6 Direct disagreements — final disposition
+
+| Disagreement | Opus 4.7 (was) | Codex | GPT-5.5 | Perplexity | Final position (§11.2) |
+|---|---|---|---|---|---|
+| Auditor count | ≥ 2 baseline + escalation | ≥ 3 baseline | ≥ 3 baseline | ≥ 2 + adversarial role | **≥ 2 baseline; ≥ 3 mandatory for high-risk; escalation rule retained** (§11.2.A) |
+| Reconciliation form | appended OR separate | merged into report | merged into report | separate file required | **separate file required** (§11.2.B) |
+| Audit universality | mandatory for all | mandatory for non-trivial | mandatory for high-risk; opt-out for others | not addressed | **risk-tiered with operator opt-out** (§11.2.A) |
+| Model-family diversity | "when feasible" | not emphasized | empirically motivated | "at least one different" | **"strongly preferred when feasible"** — unchanged from original |
+| Merge-blocking status | explicit merge-block | implied | implied | not addressed | **explicit merge-block** — unchanged from original |
+| PR topology | not addressed | single bundle PR | not addressed | not addressed | **separate audit branches; single reconciliation PR** (§11.3 decline of Codex §15) |
+
+### §11.7 Strongest single contribution from each peer (acknowledgement)
+
+- **Codex:** Four mandatory audit lanes with consolidated lane-coverage proof. Adopted as §11.2.C / R-6.
+- **GPT-5.5 Thinking:** Escalation rule for two CONDITIONAL PASS with non-overlapping findings. (Already independently in §6.B; corroboration strengthens confidence.) Plus the 9-step operator checklist (R-1).
+- **Perplexity:** Six adversarial scenario classes that checklists structurally miss, with detection methods. Adopted as §11.2.E / R-3.
+
+### §11.8 Updated confidence after reconciliation
+
+- Confidence the methodology in §6 (as revised by §11) is sufficient to catch a v7.7.1.4-class defect: **≈ 0.92** (was 0.85). Raised by R-3 (adversarial scenario taxonomy now explicitly covers compliant-but-wrong, which is what H-1 was) and R-6 (four-lane coverage prevents specialist blindspots).
+- Confidence the producer rules in §7 (as revised by §11) prevent recurrence: **≈ 0.75** (was 0.65). Raised by R-2 (producer self-report table) and R-4 (Live-Extract Block at producer-session start), which together give the producer a structured pre-dispatch check that did not exist.
+- Confidence I have not missed an additional gap: **≈ 0.80** (new metric). Three peer documents converge on the same gate structure with no foundational disagreement; this is the strongest available evidence the methodology is approximately complete.
+
+### §11.9 Disposition for operator action
+
+| Item | Status | Operator decision |
+|---|---|---|
+| Adopt §11 revisions into §6 / §7 of this document | done above | accept as-is or amend |
+| Update Appendix A diffs to reflect §11 revisions | not done in this round | small update for §6.B (auditor count) and §6.G (separate-file reconciliation); operator can request when ready |
+| Update producer prompt (`phase7-batch-production-prompt-update.md`) with §7.I and §7.J | not done | requires producer-prompt v3.0 dispatch |
+| Create canonical audit-skeleton file at `prompts/audit/prompt-bundle-audit-skeleton-v1.md` | not done | derivable from `pr-233-third-independent-audit-prompt.md` |
+| Track lint-rule additions L8 / L9 / L10 (and Codex's evidence-consistency rule) under #228 §C | open | already in plan |
+| Decline Codex §15 single-PR topology | declined | operator can override if independence cost is acceptable |
+| Decline Perplexity §3.4 role-rotation | declined | operator can override if a stable auditor pool exists |
+
+---
+
+_End of methodology audit document (with §11 post-publication reconciliation against Codex, GPT-5.5 Thinking, and Perplexity peer audits)._
