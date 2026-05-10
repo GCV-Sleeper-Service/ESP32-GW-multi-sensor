@@ -97,17 +97,18 @@ YES — verify board boots cleanly with dual-write. Hourly persist produces "V2 
 | # | Rule | Why Relevant |
 |---|------|-------------|
 | 2 | Use `bash scripts/bump-version.sh 7.7.1.3` | Version bump must be step 1 of §6, before compile |
-| 11 | `maybe_yield_nvs_scan_()` between NVS operations | Persist loop iterates all devices in NVS write path |
+| 11 | NVS scan loops must yield (`vTaskDelay` every N blobs) — general principle, source: LESSON-OPS-053 | Pre-existing requirement: any NVS iteration loop MUST yield to FreeRTOS scheduler. Scope: ALL NVS loop patterns across the entire codebase. Does NOT prescribe the helper function or delay value — only that yielding must occur. |
 | 40 | Deferred task for HTTP handlers with NVS | NOT applicable: persist runs from hourly lambda (main loop), not httpd. Only applicable if adding an HTTP-triggered persist endpoint (not planned for this step). |
 | 58 | Edit fragments, not assembled artifact | `nvs-persistence.h` is a fragment; `sensor_history_multi.h` is generated |
-| 61 | `maybe_yield_nvs_scan_()` yield in NVS scan loops | Called between device persists in `persist_all_devices_v2()` to prevent watchdog reset on single-core C3 (RISC-V). See LESSON-OPS-127 / BUG-043. |
+| 61 | Use `maybe_yield_nvs_scan_()` (defined once in `firmware/core/nvs-persistence.h`) in every NVS scan loop — specific implementation, source: Phase Y v7.6.6.5 + BUG-043 rev2 | Scope: THIS codebase only. Prescribes the specific helper function (NOT a custom `vTaskDelay` call). The helper uses `vTaskDelay(pdMS_TO_TICKS(5))` at every 2 iterations (NVS_SCAN_YIELD_INTERVAL). BUG-043 rev2 established 5ms — 1ms proved insufficient for ESP32-C3 single-core stability. Verified: `firmware/core/nvs-persistence.h:248`. |
 | 62 | Assembly fragment order unchanged | No new fragments — count stays at 9 |
 | 63 | Session log is pre-merge acceptance criterion | Mandatory — committed to branch before marking ready |
 | 64 | Checkpoint greps mechanically derived | All greps from code blocks in the agent prompt |
 | 67 | Binary sensors use EventLog | EventLog persist NOT in this step; no binary sensors in current manifest |
 
-New rule added during v7.7.1.2 closure: **Rule 61 yield** — `vTaskDelay(pdMS_TO_TICKS(1))` in
-NVS scan loops is mandatory on single-core ESP32-C3. Omitting it causes watchdog resets under
+New rule added during v7.7.1.2 closure: **Rule 61 yield** — `vTaskDelay(pdMS_TO_TICKS(5))` in
+NVS scan loops is mandatory on single-core ESP32-C3 (BUG-043 rev2 — 1ms proved insufficient;
+verified against `firmware/core/nvs-persistence.h:248`). Omitting it causes watchdog resets under
 multi-device iteration.
 
 ---
