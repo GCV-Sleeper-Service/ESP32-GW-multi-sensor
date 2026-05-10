@@ -1,5 +1,7 @@
 # Repository Instructions for Code Review
 
+PR title and body preservation: when reviewing or modifying a pull request, follow the "PR Title and Body — Preservation Rules" section in AGENTS.md. Do not replace producer-supplied PR titles or bodies; append-only edits, with the named exception flow.
+
 ## Architecture — Generated Files
 
 These files are **generated artifacts** — never edit them directly:
@@ -45,7 +47,3 @@ npx playwright test                 # ~370 browser tests
 - **High:** Wrong content-type on POST, missing authFetch, version mismatch
 - **Medium:** Pipeline ordering issue, missing preflight check
 - **Low:** Style, naming, documentation gaps
-
-## **PR title and body preservation:** 
-when reviewing or modifying a pull request, follow the "PR Title and Body — Preservation Rules" section in [`AGENTS.md`](../AGENTS.md). 
-Do not replace producer-supplied PR titles or bodies; append-only edits, with the named exception flow.
