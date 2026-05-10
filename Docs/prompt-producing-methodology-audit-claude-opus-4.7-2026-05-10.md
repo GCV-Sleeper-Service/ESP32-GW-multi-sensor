@@ -384,9 +384,10 @@ Requirements (binding):
    families. ≥ 3 if both auditors return CONDITIONAL PASS with non-overlapping
    findings.
 2. The audit prompt template lives at
-   `Docs/templates/prompt-audit-template.md` (to be created from
-   `prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md` as the
-   canonical example).
+   `Docs/templates/prompt-audit-template.md` (created 2026-05-10
+   from `prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md`
+   as the canonical example, structured per §6 of this document with §11
+   revisions applied).
 3. Verdict thresholds: zero HIGH = PASS or CONDITIONAL PASS; ≥ 1 HIGH = FAIL;
    any FAIL among the auditors = bundle FAIL.
 4. A reconciliation §8 (or separate reconciliation report) is committed
@@ -693,7 +694,7 @@ Confirmed unique-to-this-report contributions, all retained without revision:
 | Adopt §11 revisions into §6 / §7 of this document | done above | accept as-is or amend |
 | Update Appendix A diffs to reflect §11 revisions | not done in this round | small update for §6.B (auditor count) and §6.G (separate-file reconciliation); operator can request when ready |
 | Update producer prompt (`phase7-batch-production-prompt-update.md`) with §7.I and §7.J | not done | requires producer-prompt v3.0 dispatch |
-| Create canonical audit-skeleton file at `prompts/audit/prompt-bundle-audit-skeleton-v1.md` | not done | derivable from `pr-233-third-independent-audit-prompt.md` |
+| Create canonical audit-skeleton file at `Docs/templates/prompt-audit-template.md` (v1.0) | **done 2026-05-10** | committed alongside this document; extracted from `pr-233-third-independent-audit-prompt.md` and structured per §6 of this document with §11 revisions applied (Codex four-lane coverage, Codex severity model, Codex evidence-consistency C8, Perplexity adversarial scenario taxonomy, Perplexity separate-file reconciliation, Perplexity freshness checklist, Perplexity triage heuristics, GPT-5.5 operator checklist). Future amendments increment template version + append CHANGELOG entry per §11.2.H. |
 | Track lint-rule additions L8 / L9 / L10 (and Codex's evidence-consistency rule) under #228 §C | open | already in plan |
 | Decline Codex §15 single-PR topology | declined | operator can override if independence cost is acceptable |
 | Decline Perplexity §3.4 role-rotation | declined | operator can override if a stable auditor pool exists |
