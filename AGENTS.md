@@ -164,3 +164,31 @@ Use PRs #176-178 as reference for description format. Include:
 - Device testing results (curl outputs)
 - Acceptance criteria checklist
 - Known limitations or deferred items
+
+
+## PR Title and Body — Preservation Rules (binding for all coding and review agents)
+
+When you (any coding or review agent — Copilot SWE Agent, Codex, Gemini Code Assist, Copilot PR Reviewer, or any other automation) push commits to or comment on a pull request that you did NOT originate, you MUST treat the PR title and body as **append-only producer-supplied content** unless the original problem statement explicitly authorizes you to rewrite them.
+
+Specifically:
+
+1. **Do not replace the PR title.** If the title needs an addendum, append `— round-N: <short note>` rather than overwriting. 
+The original title format `prompts: issue #NNN §X — ...` (or whatever the producer set) MUST remain the leading substring.
+2. **Do not replace the PR body.** The PR body contains operator-facing audit evidence: Pre-Implementation Verification, Per-Item Verification, Acceptance Criteria, Audit Gate Notice, Files Modified, and the Round Summary table. 
+These are mandatory in-PR deliverables per `Docs/development-process-guide.md` §2.5 and a continuation of the "PR Description Standards" section above. 
+Wiping them defeats the merge gate.
+3. **If you need to add information,** append a new section under a heading `## Round-N notes (added by <your-agent-name>)` at the bottom of the existing body. 
+Never modify the producer-supplied sections above it.
+4. **If the PR body is empty or missing a required section** when you arrive (because a prior agent or a UI edit wiped it), STOP. 
+Post a single comment on the PR titled `⛔ PR body missing required sections` listing which sections are absent, and do not push further commits until the body is restored. 
+Do not attempt to reconstruct the body yourself — you do not have the original verification evidence.
+5. **Do not call the GitHub REST API endpoint `PATCH /repos/{owner}/{repo}/pulls/{number}` with a `body` or `title` parameter** unless the operator's problem statement explicitly authorizes it for this PR. 
+Commits and inline review comments do not require this endpoint; only metadata edits do.
+6. **Do not "clean up" producer-supplied tables, checkboxes, or verification commands.** They are evidence, not formatting drafts. 
+Their literal text — including verbatim shell-command output — is part of the audit trail.
+
+These rules apply equally to the first commit on a branch, follow-up commits in the same session, and any commits authored under a different bot identity than the one that opened the PR. 
+They override any default agent behavior of "ensure PR description is up to date."
+
+A repository CI check (`pr-body-preservation.yml`, when present) enforces this mechanically by failing PRs that lose required sections after they were once present. 
+If your push causes that check to fail, your edit is the regression — restore the missing content from the PR's edit history before adding any new material.
