@@ -2,103 +2,140 @@
 
 _Auditor: GPT-5.5 Thinking_  
 _Repository: `GCV-Sleeper-Service/ESP32-GW-multi-sensor`_  
-_PR audited: #233 — `prompts: issue #228 §A + §B9 — produced-doc fixes for v7.7.1.2/1.3/1.4 and active-file post-merge cleanup`_  
-_PR final head: `2692e742ca96f2772da8892ddd6a4225d97cb99f`; merge commit: `a2c83442f3d6d19d65ab0651c4ea596673e9080a`_  
+_Target: current `main` with PR #233 merged; PR #233 final head `2692e742ca96f2772da8892ddd6a4225d97cb99f`; merge commit `a2c83442f3d6d19d65ab0651c4ea596673e9080a`_
 _Report path: `prompts/handoff/phase7/pr-233-third-independent-audit-report-gpt-5-5-thinking-2026-05-10.md`_
 
 ---
 
-## 1. Executive verdict
+## Verdict
 
-**Verdict: FAIL — one remaining HIGH-severity defect found.**
+**FAIL — one HIGH-severity defect remains.**
 
-PR #233 correctly fixes the previously known A1–A11 and B9.1–B9.4 classes in the visible prompt text: WROOM coverage is present, version bumps were moved before compile/device evidence, the `find_partition_size_bytes_()` call signature was corrected, v7.7.1.4 is now self-contained, Rule 61 uses the 5 ms helper wording, and the B9 post-merge wording cleanup is materially complete.
+PR #233 fixes the requested A1-A11 and B9.1-B9.4 mechanical/doctrinal items in the merged files: WROOM coverage is present, v7.7.1.3 and v7.7.1.4 move the version bump ahead of compile/device evidence, `find_partition_size_bytes_()` uses the live 3-arg signature, v7.7.1.2 uses a two-phase commented-out `static_assert` measurement pattern, v7.7.1.4 is self-contained, Rule 61 now points at the 5 ms helper behavior, and the active B9 wording is reframed as in-PR.
 
-However, the final v7.7.1.4 prompt still contains an independent C++ declaration-order compile blocker: it instructs the agent to add `RetentionBudget` and `calculate_retention_budgets_()` **after** the v7.7.1.3 persist functions, then later injects code into the already-earlier `persist_device_segment_()` body that uses `RetentionBudget` and `calculate_retention_budgets_()`. Literal execution will put the type/function definition below the function body that uses it. In C++, that is not valid for a stack array of `RetentionBudget` and a function call with no earlier declaration.
+The blocker is independent of those known review items: v7.7.1.4 tells the implementation agent to place `RetentionBudget` and `calculate_retention_budgets_()` after the per-device persist functions, then tells it to inject `RetentionBudget budgets[NUM_DEVICES]` and a `calculate_retention_budgets_()` call into the earlier `persist_device_segment_()` function. Literal execution creates a C++ declaration-order compile error.
 
-**Dispatch recommendation:** do **not** dispatch v7.7.1.4 until this is corrected. Because this audit gate was requested against the corrected batch before dispatching v7.7.1.2 / v7.7.1.3 / v7.7.1.4, the batch gate remains closed.
-
-**Confidence:** 0.90 that the HIGH finding is real. Confidence that there are no additional HIGH findings is lower, about 0.75, because I used GitHub connector inspection and PR evidence rather than a local checkout with full script execution.
+**Dispatch recommendation:** do not dispatch v7.7.1.4, and do not treat the corrected-batch gate as passed, until H1 is fixed. If v7.7.1.2/v7.7.1.3 are dispatched independently, fix M1 first to avoid committing stale measured-size claims.
 
 ---
 
-## 2. Audit method and source set
+## Audit Method
 
-I inspected:
+I audited the merged state on current `main`, not a speculative branch. I inspected the nine PR #233 modified files, the audit prompt, issue #228 acceptance scope, PR #233 metadata and review comments, live `firmware/core/nvs-persistence.h`, doctrinal docs, and the canonical bump-version whitelist source.
 
-- The audit prompt: `prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md`
-- Issue #228 acceptance scope: §A, §B9, and the “third independent audit” acceptance item
-- PR #233 final metadata, changed-file list, PR body, review comments, review threads, and final merged state
-- Current `main` versions of all 9 PR #233 changed files
-- Live source context: `firmware/core/nvs-persistence.h`
-- Prior audit reports: GPT, Copilot consolidated, and Opus 4.7 reports
-- Targeted searches for stale WROOM IP/YAML, `esphome run`, and Rule 61 delay drift
+Commands run included targeted `rg`/`nl` checks, a bullet-for-bullet whitelist comparison, and:
 
-I did **not** run `bash scripts/lint-prompts.sh --baseline main` locally. For C9 I used PR-body evidence plus manual inspection of the modified files. That is sufficient for this verdict because the HIGH finding is independent of lint output.
+```bash
+bash scripts/lint-prompts.sh --baseline main
+```
 
----
+Result: exit 0, with 14 warning(s). All listed lint items were `EXISTING` or `WARN`; no new blocking lint error was reported.
 
-## 3. Summary table — §2.A requested checks
+The audit prompt does not fully match current `main`: its C1 wording asks for zero `pdMS_TO_TICKS(1)` hits under `prompts/**`, but current `main` now contains that literal in historical prompt files and in already-committed audit/prompt artifacts. I therefore report C1 two ways: the PR #233 modified files pass, while the strict repo-wide command is not satisfiable on current `main`.
 
-| ID | Result | Finding |
-|---|---:|---|
-| A1 | PASS | v7.7.1.3 includes both C3 `.189` and WROOM-32D `.170` compile/upload/curl device-test blocks. |
-| A2 | PASS | v7.7.1.4 includes both C3 `.189` and WROOM-32D `.170`, with cross-SoC boot-path validation language. |
-| A3 | PASS | v7.7.1.3 and v7.7.1.4 both now use `Step 0: Version bump (FIRST — before any code changes or compile)`. |
-| A4 | PASS | v7.7.1.4 now uses the live 3-arg `find_partition_size_bytes_(label, type, subtype)` form and has a pre-gate signature grep. |
-| A5 | PASS with MEDIUM note | The two-phase commented-out `static_assert` measurement pattern is present. Medium finding M1 remains in the changelog template, where old hard-coded byte counts are still asserted. |
-| A6 | PASS | v7.7.1.4 §3 inlines the full bump-version source-file and regenerated-artifact whitelist. |
-| A7 | PASS | `session-handoff-v7.7.1.3.md` now has workflow, architecture references, Critical Rules, risk profile, checklist, and carries-forward sections; top-level section count is ≥ 8. |
-| A8 | PASS | Checkpoint A now counts constant definitions only with `grep -cE '^static constexpr.*(...)'`. |
-| A9 | PASS | `PERFORMANCE-ACK` no longer relies on guessed timing numbers and explicitly says the budget helper must remain off the HTTP request path. |
-| A10 | PASS | Rule 61 explanation now cites 5 ms yield behavior and BUG-043 rev2; no Rule 61 `pdMS_TO_TICKS(1)` drift found in modified Phase 7 files. |
-| A11 | PASS | v7.7.1.3 reviewer checklist includes `bash scripts/provision.sh status` role verification. |
-| B9.1 | PASS | `CURRENT-STATE.md` footer now frames updates as mandatory in-PR deliverables. |
-| B9.2 | PASS | `prompts/prompt-index-and-workflow.md` now says device testing is a §6 in-PR acceptance criterion before ready-for-review. Remaining “post-merge” mentions are treated as intentional or historical by the PR body. |
-| B9.3 | PASS | `consolidated-audit-template-phase7.md` now frames device results as in-PR evidence and uses current board IP placeholders. |
-| B9.4 | PASS | `phase7-review-prompts-perplexity.md` now has a clear HISTORICAL banner and says not to reuse without doctrinal review. |
+Per the operator instruction, I inspected the other same-topic audit reports only after completing the independent pass. Reconciliation is in the Cross-Audit Reconciliation section.
 
 ---
 
-## 4. Summary table — §2.B cross-cutting integrity checks
+## Summary Table — §2.A
 
-| ID | Result | Finding |
-|---|---:|---|
-| C1 | PASS for PR #233 scope; not repo-wide clean | Modified Phase 7 Rule 61 material uses `pdMS_TO_TICKS(5)`. A repository-wide search still finds old `pdMS_TO_TICKS(1)` references outside the PR #233 modified files; those appear historical/non-Rule-61 and are not a PR #233 blocker. This still supports the lint-follow-up recommendation. |
-| C2 | PASS | No stale WROOM `.190` or stale WROOM YAML found in the PR #233 modified active prompt files. Repository-wide stale hits are confined to historical/operator/audit contexts or lint logic. |
-| C3 | PASS | Device-test blocks use `esphome compile` and `esphome upload`; targeted search did not find `esphome run` in Phase 7 prompt material. |
-| C4 | PASS | Fragment-edit checkpoints use `assemble-sensor-history.sh --write` before `--check`. |
-| C5 | PASS | Device-test blocks use `timeout 300 esphome upload ...`. |
-| C6 | PASS | Modified device-test curl commands include `--connect-timeout 5 --max-time 10`. |
-| C7 | PASS | v7.7.1.4 §3 no longer cross-references v7.7.1.2 for scope; it is self-contained. |
-| C8 | PASS with MEDIUM note | The struct-definition block no longer uses narrative `sizeof(X) = N` comments; M1 covers remaining hard-coded byte claims in the changelog template. |
-| C9 | PASS by PR evidence, not re-run | PR #233 body reports `bash scripts/lint-prompts.sh --baseline main` exit 0, 14 existing warnings, 0 new errors. I did not re-run it locally. |
-
----
-
-## 5. Summary table — §2.C independent inspection hot-takes
-
-| Check | Result | Finding |
-|---|---:|---|
-| 1. Prompt-code coherence | FAIL | HIGH H1: v7.7.1.4 can emit C++ that uses `RetentionBudget` before it is declared/defined. |
-| 2. Unverified factual claims | FAIL | MEDIUM M1: v7.7.1.2 changelog template still hard-codes byte-size claims despite requiring empirical struct-size measurement. |
-| 3. Cross-prompt consistency | PASS with H1 caveat | v7.7.1.2 → v7.7.1.3 → v7.7.1.4 terminology and prerequisites are coherent; H1 is an implementation-order defect inside v7.7.1.4, not a prerequisite-chain mismatch. |
-| 4. Non-idempotent procedure review | PASS | The temporary SIZING log is explicitly removed before commit; version bump is first in v7.7.1.3/v7.7.1.4. |
-| 5. Doctrinal drift review | PASS with LOW note | §9 is now tag/close only. LOW L1 notes the v7.7.1.4 PR-body template still says only “Boot-tested on C3” despite the prompt requiring both C3 and WROOM testing. |
-| 6. Rule 61 lint gap | PASS / follow-up | No immediate PR #233 blocker. Add a future lint to prevent `pdMS_TO_TICKS(1)` from reappearing in active Rule 61 prompt contexts. |
-| 7. N3 whitelist byte-for-byte check | PASS | v7.7.1.4 §3 uses the canonical 6 source-file bullets and 6 regenerated-artifact bullets from the batch-production prompt. |
+| Check | Result | Note |
+|---|---|---|
+| A1 | PASS | v7.7.1.3 §6 Task Group 3 has C3 `.189` and WROOM-32D `.170` blocks. |
+| A2 | PASS | v7.7.1.4 §6 Task Group 5 has both production satellites plus explicit RISC-V vs Xtensa-LX6 language. |
+| A3 | PASS | v7.7.1.3 bump at line 146 and first compile at line 372; v7.7.1.4 bump at line 161 and first compile at line 499. |
+| A4 | PASS | v7.7.1.4 includes a live-header grep and calls `find_partition_size_bytes_(HISTORY_PARTITION_LABEL, ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS)`. |
+| A5 | PASS with MEDIUM note | v7.7.1.2 has the required commented-out two-phase `static_assert` form and six-step measurement procedure; M1 covers stale byte claims in the changelog template. |
+| A6 | PASS | v7.7.1.4 §3 inlines the canonical 6 source bullets and 6 regenerated-artifact bullets. |
+| A7 | PASS | `session-handoff-v7.7.1.3.md` has 9 top-level `## ` sections and a Risk Profile with 3 mitigated risks. |
+| A8 | PASS | v7.7.1.2 Checkpoint A uses `^static constexpr` to count definitions only. |
+| A9 | PASS | v7.7.1.4 `PERFORMANCE-ACK` names `restore_device_history_v2_()` and `persist_device_segment_()`, says the helper must stay off HTTP path, and avoids guessed timing claims. |
+| A10 | PASS | v7.7.1.3 Claude prompt cites `pdMS_TO_TICKS(5)`, BUG-043 rev2, and the live helper line. |
+| A11 | PASS | Reviewer checklist includes `bash scripts/provision.sh status` before upload. |
+| B9.1 | PASS | `CURRENT-STATE.md` footer now says mandatory in-PR deliverable. |
+| B9.2 | PASS | `prompt-index-and-workflow.md` line 71 is reframed to §6 in-PR device testing; remaining `post-merge` mentions are Rule 63 wording and a revision-log entry. |
+| B9.3 | PASS | `consolidated-audit-template-phase7.md` device results are in-PR and WROOM uses `.170`. |
+| B9.4 | PASS | `phase7-review-prompts-perplexity.md` has a HISTORICAL banner. |
 
 ---
 
-## 6. HIGH findings
+## Summary Table — §2.B
 
-### H1 — v7.7.1.4 prompt can generate a C++ compile blocker because `RetentionBudget` is introduced after the function that later uses it
+| Check | Result | Note |
+|---|---|---|
+| C1 | PASS for PR #233 files; FAIL for strict current-main wording | The nine PR #233 files have zero `pdMS_TO_TICKS(1)` hits. A repo-wide `prompts/**` search does not have zero hits on current `main` because historical/audit artifacts contain the literal. See L2. |
+| C2 | PASS | No stale WROOM `.190` full-IP reference in the nine PR #233 files. |
+| C3 | PASS | No stale WROOM YAML filename in the nine PR #233 files; WROOM device blocks use `esp32-wroom-32d-gw.yaml`. |
+| C4 | PASS | Modified prompt checkpoints order `assemble-sensor-history.sh --write` before `--check`. |
+| C5 | PASS | No `esphome run` in the nine PR #233 files; device uploads use `timeout 300 esphome upload ... --device=...`. |
+| C6 | PASS | All §6 device-test `curl -s` lines targeting board IPs include `--connect-timeout 5 --max-time 10`. |
+| C7 | PASS | No `see v7.7.1.2 §3` / `see other prompt` scope reference remains in modified §3 content. |
+| C8 | PASS with MEDIUM note | v7.7.1.2 struct block no longer uses narrative `// sizeof(X) = N bytes`; M1 covers hard-coded measured-size claims elsewhere in the prompt. |
+| C9 | PASS | `bash scripts/lint-prompts.sh --baseline main` exits 0 with 14 warning(s), all `EXISTING` or `WARN`. |
+
+---
+
+## Summary Table — §2.C
+
+| Check | Result | Note |
+|---|---|---|
+| Coherence | FAIL | H1: v7.7.1.4 produces a declaration-order compile blocker. |
+| Unverified factual claims | FAIL | M1: v7.7.1.2 changelog template hard-codes byte counts despite requiring empirical measurement. |
+| Cross-prompt consistency | FAIL | H1 arises from interaction between v7.7.1.3 persist placement and v7.7.1.4 budget placement. |
+| Non-idempotent procedures | PASS | The SIZING log is explicitly removed before commit and regenerated via assembly. |
+| Doctrinal drift not caught by lint | PASS with LOW note | L1: v7.7.1.4 PR body template understates WROOM evidence. |
+| Rule 61 lint gap | NOTE | Add the planned L8/C13 follow-up; not itself a PR #233 blocker. |
+| N3 whitelist verification | PASS | The 12 canonical bullet items match exactly; quoted below. |
+
+---
+
+## N3 Whitelist Verification
+
+Canonical source bullet list from `prompts/handoff/phase7-batch-production-prompt-update.md`:
+
+```markdown
+- `VERSION`
+- `scripts/render_sensor_config.py` (VERSION constant)
+- `tests/fixtures/generate-fixtures.js` (VERSION constant)
+- `dashboard/core/app-shell.js` (App.version)
+- `firmware/core/config.h` (version comment)
+- `firmware/core/data-model.h` (version comment)
+- `dashboard/dashboard.js`, `dashboard/dashboard.html` (bundle)
+- `dashboard/dashboard.h` (gzip header)
+- `dashboard/sensor_history_multi.h` (assembly)
+- `src/gateway_manifest.h` (manifest)
+- `tests/fixtures/manifest.json`, `tests/fixtures/api-status.json` (fixtures)
+- `tests/fixtures/variants/*/` (variant fixtures)
+```
+
+v7.7.1.4 §3 inlined bullet list:
+
+```markdown
+- `VERSION`
+- `scripts/render_sensor_config.py` (VERSION constant)
+- `tests/fixtures/generate-fixtures.js` (VERSION constant)
+- `dashboard/core/app-shell.js` (App.version)
+- `firmware/core/config.h` (version comment)
+- `firmware/core/data-model.h` (version comment)
+- `dashboard/dashboard.js`, `dashboard/dashboard.html` (bundle)
+- `dashboard/dashboard.h` (gzip header)
+- `dashboard/sensor_history_multi.h` (assembly)
+- `src/gateway_manifest.h` (manifest)
+- `tests/fixtures/manifest.json`, `tests/fixtures/api-status.json` (fixtures)
+- `tests/fixtures/variants/*/` (variant fixtures)
+```
+
+Result: PASS. The bullet content is identical. The surrounding heading text differs slightly (`directly modified` in v7.7.1.4), but the audit prompt specifically scoped the byte-for-byte comparison to the 6 source bullets and 6 regenerated-artifact bullets.
+
+---
+
+## HIGH Findings
+
+### H1 — v7.7.1.4 will emit C++ that uses `RetentionBudget` before it is declared
 
 **Severity:** HIGH  
 **File:** `prompts/phase7/v7.7.1.4-agent-prompt-gpt-codex.md`  
-**Location:** §6 Task Group 1 and §6 Task Group 3
-
-**Offending content, quoted:**
+**Locations:** line 168, lines 186-191, lines 426-449
 
 Task Group 1 says:
 
@@ -106,17 +143,15 @@ Task Group 1 says:
 Add after the per-device persist functions (from v7.7.1.3):
 ```
 
-and then defines:
+It then defines:
 
 ```cpp
 struct RetentionBudget {
-  int max_slots;
-  const char *device_id;
+  int max_slots;           // calculated slot count for this device
+  const char *device_id;   // which device this budget is for
 };
 
 static int calculate_retention_budgets_(RetentionBudget *budgets, int max_budgets) {
-  ...
-}
 ```
 
 Task Group 3 later says:
@@ -128,165 +163,105 @@ In `persist_device_segment_()`, replace the line that uses `DEV_PERSIST_PROVISIO
 and injects:
 
 ```cpp
+    // Use calculated budget if available, fallback to provisional
     RetentionBudget budgets[NUM_DEVICES] = {};
     calculate_retention_budgets_(budgets, NUM_DEVICES);
 ```
 
-**Why this is HIGH:**
+**Why this is HIGH:** v7.7.1.3 defines `persist_device_segment_()` before `persist_all_devices_v2()`. v7.7.1.4 says to add the budget calculator after the per-device persist functions, which places the complete `RetentionBudget` type and the helper function below `persist_device_segment_()`. C++ requires the complete type before `RetentionBudget budgets[NUM_DEVICES]` and at least a prior declaration before calling `calculate_retention_budgets_()`. Literal prompt execution therefore fails at compile time.
 
-The v7.7.1.3 prompt adds `persist_device_segment_()` before `persist_all_devices_v2()` and v7.7.1.4 instructs the new budget calculator to be added **after the per-device persist functions**. If followed literally, `persist_device_segment_()` is defined before `RetentionBudget` and before `calculate_retention_budgets_()`.
+This is a dispatch blocker because v7.7.1.4 is boot-path/persistence code and the audit gate requires zero HIGH defects before dispatch.
 
-A C++ function body cannot instantiate a stack array of an undeclared/incomplete type:
+**Concrete fix:** change v7.7.1.4 Task Group 1 to place `struct RetentionBudget` and `calculate_retention_budgets_()` before `persist_device_segment_()`, for example after `save_device_meta_()` and before any function that uses those names.
 
-```cpp
-RetentionBudget budgets[NUM_DEVICES] = {};
-```
-
-Nor can it call a function with no prior declaration in C++. This is likely an ESPHome compile failure in the first v7.7.1.4 implementation attempt. Since v7.7.1.4 is boot-path code and this audit gates dispatch, this is a blocker.
-
-**Recommended fix:**
-
-Use one of these approaches before dispatch:
-
-1. **Preferred minimal fix:** in v7.7.1.4, instruct the agent to place `struct RetentionBudget` and `calculate_retention_budgets_()` **before** `persist_device_segment_()`, not after the persist functions.
-2. **Better design fix:** compute retention budgets once in `persist_all_devices_v2()` or at boot, then pass the selected `budget_slots` into `persist_device_segment_()` as a parameter. This also avoids the O(N²) per-cycle recomputation documented in the prompt’s own `PERFORMANCE-ACK`.
-3. If keeping current structure, add a valid forward declaration and move the complete `RetentionBudget` type definition before `persist_device_segment_()`; a function prototype alone is insufficient because the array requires the complete type.
-
-**Chance this is wrong:** low, about 10%. The only realistic escape is if the implementation agent notices and silently reorders the code despite the prompt’s “execute literally” preamble. That would be an agent correction, not a correct prompt.
+**Better design fix:** compute budgets once in `persist_all_devices_v2()` or at boot and pass `budget_slots` into `persist_device_segment_()`; this also removes the O(N squared) per-cycle recomputation that the prompt already flags.
 
 ---
 
-## 7. MEDIUM findings
+## MEDIUM Findings
 
-### M1 — v7.7.1.2 changelog template still hard-codes unverified byte-size claims
+### M1 — v7.7.1.2 changelog template hard-codes byte-size claims that the same prompt requires measuring
 
 **Severity:** MEDIUM  
 **File:** `prompts/phase7/v7.7.1.2-agent-prompt-gpt-codex.md`  
-**Location:** §6 Step 4.4 — Changelog
+**Location:** lines 487-502
 
-**Offending content, quoted:**
+Offending content:
 
 ```markdown
 - `DeviceHistoryMeta` struct: per-device ring buffer state (36 bytes)
 - `DeviceSegmentHeader` + `DeviceSegment` structs: per-device hourly segments (226 bytes)
 - `EventLog` class: binary sensor state-change-only history (168 bytes, Rule 67)
+- `EventEntry` struct: timestamped state transition record (8 bytes)
 ...
 - EventLog saves 608 B per binary sensor vs HistoryBuffer (776 B → 168 B)
 ```
 
-**Why this matters:**
+**Why this matters:** §2 of the same prompt requires empirical `sizeof(...)` measurement before enabling `static_assert`s and explicitly warns not to copy audit-estimated values. The changelog template reintroduces fixed byte counts that can drift from the actual measured values.
 
-The same prompt correctly requires empirical `sizeof(...)` measurement before enabling `static_assert`s and warns not to copy audit-estimated values. The changelog template then reintroduces hard-coded byte-size claims. This is not as immediately blocking as H1 because it affects documentation/audit output rather than the compile path, but it undermines the storage-budget discipline that A5 was meant to enforce.
-
-**Recommended fix:**
-
-Replace these changelog bullets with measured placeholders tied to the measurement procedure:
-
-```markdown
-- `DeviceHistoryMeta` struct: per-device ring buffer state (measured in session log; static_assert locked)
-- `DeviceSegmentHeader` + `DeviceSegment` structs: per-device hourly segments (measured in session log; static_assert locked)
-- `EventLog` class: binary sensor state-change-only history (measured in session log)
-```
-
-or require the agent to fill the exact measured values after the §2 measurement checkpoint and before committing the changelog.
+**Concrete fix:** replace fixed byte values with measurement-tied placeholders, or instruct the agent to fill them only after the §2 sizing procedure and to cite the measured values in the session log.
 
 ---
 
-## 8. LOW findings
+## LOW Findings
 
-### L1 — v7.7.1.4 PR-body template says only C3 was boot-tested
+### L1 — v7.7.1.4 PR-body template understates the required device evidence
 
 **Severity:** LOW  
 **File:** `prompts/phase7/v7.7.1.4-agent-prompt-gpt-codex.md`  
-**Location:** §8 — PR body template
+**Location:** line 680
 
-**Offending content, quoted:**
+Offending content:
 
 ```markdown
 Boot-tested on C3: board boots and responds to all endpoints.
 ```
 
-**Why this matters:**
+**Why this matters:** Task Group 5 requires both C3 `.189` and WROOM-32D `.170` boot-path testing. The PR-body template should not mention only C3.
 
-Task Group 5 correctly requires both C3 `.189` and WROOM-32D `.170` boot-path testing. The PR-body template should not summarize only the C3 test, because that can lead reviewers to miss whether the WROOM evidence was posted.
-
-**Recommended fix:**
-
-Change the template line to:
+**Concrete fix:** change the template to:
 
 ```markdown
 Boot-tested on C3 (.189) and WROOM-32D (.170): both boards boot and respond to status/full-status/history endpoints.
 ```
 
-### L2 — Rule 61 delay drift is not mechanically guarded yet
+### L2 — Audit prompt C1 is not directly satisfiable on current `main`
 
-**Severity:** LOW / process follow-up  
-**Scope:** lint/guardrail; not a PR #233 dispatch blocker by itself
+**Severity:** LOW / audit-scope mismatch
+**File:** `prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md`
 
-PR #233 fixes the active modified Rule 61 wording to `pdMS_TO_TICKS(5)`. However, this drift was caught by review rather than by a deterministic prompt lint. A future prompt could reintroduce the 1 ms value unless lint explicitly checks active Rule 61 contexts.
-
-**Recommended fix:**
-
-Add a follow-up prompt-lint rule that flags active prompt files where Rule 61 / BUG-043 / `maybe_yield_nvs_scan_()` context contains `pdMS_TO_TICKS(1)`.
+The audit prompt asks for zero repo-wide `pdMS_TO_TICKS(1)` hits under `prompts/**`. Current `main` has historical and audit-artifact hits, including same-topic audit files. The PR #233 modified files are clean, so this is not a PR #233 defect, but future audit prompts should scope this check to active prompt files or to PR-modified files unless historical/audit artifacts are excluded.
 
 ---
 
-## 9. Cross-audit reconciliation
+## Cross-Audit Reconciliation
 
-### What PR #233 appears to have fixed from prior audits
+I inspected the other same-topic audit reports after completing the independent audit:
 
-- **Opus 4.7 missing-WROOM finding:** fixed. Both v7.7.1.3 and v7.7.1.4 now include WROOM-32D `.170` blocks with the correct generated YAML name.
-- **GPT/Copilot version-bump ordering finding:** fixed. Step 0 now precedes compile/upload/curl in v7.7.1.3 and v7.7.1.4.
-- **GPT/Copilot `find_partition_size_bytes_()` signature drift:** fixed. The prompt now uses the 3-arg return-value form matching the live header.
-- **Copilot static_assert compile-blocker:** fixed. The prompt uses a two-phase pattern with commented-out asserts until measurement is complete.
-- **Copilot v7.7.1.4 self-containedness finding:** fixed. The scope whitelist is now inlined.
-- **Gemini curl timeout finding:** fixed. Device curl commands include timeouts.
-- **Rule 11 vs Rule 61 confusion:** fixed well enough. The handoff distinguishes the general yield principle from the concrete helper/delay rule.
+| Report | Verdict | Reconciliation |
+|---|---|---|
+| `pr-233-third-independent-audit-perplexity-2026-05-10.md` | CONDITIONAL PASS | Disagree. It did not catch H1 and states the prompts may be dispatched. H1 is mechanically demonstrable from the placement directive and inserted C++ block, so I treat the Perplexity verdict as a miss. |
+| `pr-233-third-independent-audit-report-claude-opus-4.7-2026-05-10.md` | FAIL | Agree. It independently confirms the same H1 declaration-order compile blocker, M1 stale byte-count issue, and L1 PR-body C3-only issue. It also adds line-number fragility as a medium/low follow-up; I consider that valid but not dispatch-blocking. |
 
-### What this audit adds
-
-H1 is independent of the prior reports and review comments. It is a prompt-code ordering defect introduced by the interaction between v7.7.1.3’s persist-function placement and v7.7.1.4’s budget-calculator placement. It was not one of the original A1–A11 items, but it is in the requested §2.C prompt-code coherence scope.
-
-### Disagreement with PR #233 body
-
-The PR body’s statement that all A-series and B9 items are complete is mostly supported. The reason for the **FAIL** verdict is not that A1–A11 remain unfixed; it is that the corrected prompt now contains a new HIGH compile-order defect discovered by independent inspection.
+The original producer-driving audit reports (`new-prompts-audit-report-Copilot.md`, `new-prompts-audit-report-Opus4.7.md`, `phase7-batch2-prompt-audit-report-GPT.md`) identified the A-series defects that PR #233 was meant to fix. My audit agrees those known A/B9 items are materially fixed; the FAIL verdict is due to the newly discovered H1 prompt-code coherence defect.
 
 ---
 
-## 10. Disposition
+## Disposition Recommendation
 
-| Item | Disposition |
+| Finding | Disposition |
 |---|---|
-| A1–A11 | Mechanically satisfied, except M1 documentation hard-code note under A5/C8. |
-| B9.1–B9.4 | Satisfied. |
-| Dispatch v7.7.1.2 | Can be considered after H1 is fixed if dispatch is step-isolated; M1 should still be corrected first. |
-| Dispatch v7.7.1.3 | Can be considered after H1 is fixed if dispatch is step-isolated. |
-| Dispatch v7.7.1.4 | **Blocked** until H1 is fixed. |
-| Overall corrected-batch gate | **FAIL** until H1 is fixed and this audit or a follow-up verifies the correction. |
+| H1 — v7.7.1.4 declaration-order compile blocker | Fix in a follow-up PR before dispatching v7.7.1.4. If the batch gate is all-or-nothing, do not dispatch v7.7.1.2/v7.7.1.3 either until this is corrected. |
+| M1 — v7.7.1.2 hard-coded byte counts | Fix before dispatching v7.7.1.2, or require measured values to replace the placeholders before any changelog commit. |
+| L1 — v7.7.1.4 PR body mentions only C3 | Merge/fix with H1; not a standalone blocker. |
+| L2 — audit prompt C1 current-main mismatch | Track in the next audit-prompt/template cleanup; not a PR #233 implementation blocker. |
 
 ---
 
-## 11. Minimal corrective patch recommendation
+## Confidence Statement
 
-A minimal follow-up PR should change only the v7.7.1.4 prompt and, optionally, the v7.7.1.2 changelog template:
+Confidence that H1 is real: **0.95**. The prompt text unambiguously places the type/function below the function body that later uses them.
 
-1. In `prompts/phase7/v7.7.1.4-agent-prompt-gpt-codex.md`, replace:
-   ```markdown
-   Add after the per-device persist functions (from v7.7.1.3):
-   ```
-   with explicit placement before `persist_device_segment_()`.
-2. Add a checkpoint verifying order, for example:
-   ```bash
-   python3 - <<'PY'
-   from pathlib import Path
-   p = Path('firmware/core/nvs-persistence.h').read_text()
-   assert p.index('struct RetentionBudget') < p.index('static bool persist_device_segment_')
-   assert p.index('static int calculate_retention_budgets_') < p.index('static bool persist_device_segment_')
-   PY
-   ```
-3. Update `prompts/phase7/v7.7.1.2-agent-prompt-gpt-codex.md` changelog template to avoid unmeasured byte claims or require measured values from the sizing step.
-4. Update the v7.7.1.4 PR-body template to mention both C3 and WROOM boot tests.
-
----
+Confidence there are zero additional HIGH defects: **0.80**. I ran the mechanical checks, lint, and a targeted prompt-code coherence pass; two independent FAIL reports now converge on the same blocker. Residual risk remains because these are implementation prompts containing substantial embedded C++ that has not yet been compiled.
 
 _End of report._
