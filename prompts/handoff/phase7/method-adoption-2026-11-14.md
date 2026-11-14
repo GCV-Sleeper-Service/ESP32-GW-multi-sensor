@@ -43,7 +43,7 @@ CHECKPOINT G PASS
 
 ## §3 Review findings by severity
 
-First inline review round assessed on 2026-11-14 against implementation commit `6069d71`. Codex and Gemini submitted reviews. Copilot posted an approval-oriented overview with no findings, but explicitly reported that it could not complete the selected review tier because of model policy or plan restrictions; this is not counted as a completed full Copilot review. External reviewers have not run.
+First inline review round assessed on 2026-11-14 against implementation commit `6069d71`. Codex and Gemini submitted reviews. Copilot posted an approval-oriented overview with no findings, but explicitly reported that it could not complete the selected review tier because of model policy or plan restrictions; this is not counted as a completed full Copilot review. A later external, comment-only review by Muse (Spark) assessed `6a3a5dc`; its dispositions are recorded below.
 
 | Severity | Review findings |
 |---|---|
@@ -55,6 +55,17 @@ First inline review round assessed on 2026-11-14 against implementation commit `
 Sources: [Codex finding](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/234#discussion_r4572481385), [Gemini suggestion](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/234#discussion_r4572669380), [Copilot limitation](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/234#pullrequestreview-5903050784).
 
 Validation: traced LOW, MEDIUM and HIGH from §0 through §7 to confirm each tier's auditor count and dispatch artifacts agree with the process guide. Prompt lint on the three changed prompt paths reports zero violations; `git diff --check` exits 0. The template version and its changelog are updated; the project VERSION and the preserved agent prompt are unchanged.
+
+Later review: [Muse (Spark), review 5903363182](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/234#pullrequestreview-5903363182), submitted 2026-11-14 against `6a3a5dc`. Verdict: no blocking or high-severity findings; explicitly not an approval. The reviewer confirmed the tier-conflict fix and agreed with retaining item 7.13's wording.
+
+| Item | Assessment and disposition |
+|---|---|
+| 1 — Record this later review before merge | Warranted pre-merge deliverable, not a defect in the diff. This record-only follow-up adds the review and its dispositions, updates the review-dependent metrics, and explicitly records which reviewers ran. |
+| 2 — Mandatory housekeeping PR after a pause | Low, non-blocking wording suggestion. Accept as-is: item 7.2 was prescribed verbatim by the operator, who planned one restart housekeeping PR after this adoption. Making that binding optional would change the intended process. |
+| 3 — No unit for “shorter than v2.0” | Low, non-blocking ambiguity. Accept as intent in PLAN-012; this adoption PR does not implement a numeric size gate. Choosing lines or tokens here would add a measure absent from the operator's prescribed decision. |
+| 4 — “the PR's first comment” | Non-blocking wording nit. Accept as-is: the pre-dispatch paragraph supplies the prompt/PR context, and the exact project-binding text was prescribed by the operator. No scope or permission change is needed. |
+
+Reviewer accounting: Codex and Gemini completed inline reviews; Copilot attempted the selected-tier review but reported it could not complete it. Thus there are two completed inline reviews and one limited/incomplete attempt, not three completed full inline reviews. Muse (Spark) supplied one later external comment-only review. No reviewer approval or waiver of the incomplete Copilot review is inferred.
 
 The execution errors and operator-authorized recoveries are recorded below; they are not presented as reviewer findings. No review is claimed as approval of the follow-up commit before it is reviewed.
 
@@ -74,7 +85,7 @@ For this continuation, a failed edit command is repaired and repeated before mov
 
 | Metric | Value | Evidence |
 |---|---|---|
-| Fix cycles | 1 | One follow-up commit addresses the warranted Codex finding from the first inline review round. |
+| Fix cycles | 2 | One substantive review-fix commit for Codex, then one record-only commit for Muse's pre-merge deliverable request. |
 | Checkpoint saves | 1 | CHECKPOINT G exposed incomplete execution at 7.3; it did not identify a defect in the prompt or repository. |
 | Checkpoint stops | 2 | Premature CHECKPOINT G execution, then the PRE-PR preflight failure at the Playwright manifest step. |
 | Preventable review findings | 1 | The prompt's new tier rule should also have reconciled the audit template's existing auditor-count and dispatch instructions. |
@@ -90,7 +101,7 @@ After that diagnostic, the unchanged PRE-PR Gate was run once. It exited 0 and e
 
 ## §6 Recommendations routed
 
-No new recommendations were produced. No issues or milestones were created, edited or closed. The operator's command-recovery instruction is recorded in §4 and was applied in this continuation. The existing adoption follow-ups remain those explicitly listed in PLAN-017; this PR adds no new follow-up scope.
+Muse's optional wording recommendations are accepted as-is with reasons in §3; none creates an additional implementation task. No issues or milestones were created, edited or closed. The operator's command-recovery instruction is recorded in §4 and was applied in this continuation. The existing adoption follow-ups remain those explicitly listed in PLAN-017; this PR adds no new follow-up scope.
 
 ## §7 Process metrics
 
@@ -98,8 +109,8 @@ No new recommendations were produced. No issues or milestones were created, edit
 |---|---|---|
 | Producer sessions for this step's prompt | 2 | Operator-supplied planning record: two sessions wrote, amended and rehearsed the prompt, 2026-11-04 to 05 and 2026-11-10 to 14. |
 | Audit sessions for this step's prompt | 0 | Operator confirmed no separate audit session for this documentation-only step; checks were lint and three rehearsals inside the producer sessions. |
-| Fix-cycle commits after the first review round | 1 | One follow-up commit fixes the audit-template tier conflict. |
+| Fix-cycle commits after the first review round | 2 | One fixes the audit-template tier conflict; one completes the later review record before merge. |
 | Defects that escaped the prompt gates into agent execution | 1 | Codex identified the audit-template tier conflict in the resulting PR; the prompt gates did not detect it. The earlier command failures remain execution errors. |
 | Defects that escaped to devices | 0 | Documentation-only work; no device deployment. |
 
-Producer and audit session counts are supplied by the operator. The other three numbers reflect this PR after the first review-fix round. Review-dependent metrics and review findings must reflect the last review round and be committed before merge.
+Producer and audit session counts are supplied by the operator. The other three numbers reflect this PR after the Muse review-record update. Producer-prompt audit sessions remain distinct from subsequent PR reviews. Review-dependent metrics and review findings must reflect the last review round and be committed before merge.
