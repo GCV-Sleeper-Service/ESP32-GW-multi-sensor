@@ -204,6 +204,10 @@ For high-risk bundles: minimum viable is NOT permitted. Full audit is mandatory 
 
 ---
 
+## §9 Batch process metrics (record in the reconciliation or single-audit file)
+
+Producer sessions · audit sessions · fix-cycle PRs · defects escaped to agent execution · defects escaped to devices · verification:production session ratio. Tier rule (PLAN-017): LOW = lint only; MEDIUM = one auditor, no reconciliation file; HIGH = two auditors from different model families, one reconciliation file, and a compile gate for embedded code.
+
 ## CHANGELOG
 
 | Version | Date | Change |

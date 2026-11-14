@@ -2,6 +2,7 @@
 
 _Version 1.0 — 2026-05-06 (Phase VY)_
 _This document governs how development is executed on this project._
+_Method of record: [HowTo-LLM-Assisted-Workflow-v2](https://github.com/GCV-Sleeper-Service/HowTo-LLM-Assisted-Workflow-v2) at tag `v2.3.1` (commit `450c446`) (PLAN-017). The HowTo governs the method; this guide governs project bindings (commands, paths, boards, reviewers, risk-tier assignments). On a question of method the HowTo wins; on a project fact this guide and `CURRENT-STATE.md` win. Coding agents do not read the HowTo: anything binding on them is in their prompt or `AGENTS.md`._
 
 ---
 
@@ -59,13 +60,16 @@ Before starting any step:
    - `grep -n 'function_name' firmware/core/target-file.h`
    - Don't trust line numbers from the prompt — they decay with every merge
 
+5. After a pause of more than two weeks, run the restart checklist first (HowTo v2 `templates/restart-checklist.md`): environment, repository, documents, last conversation, then one documentation-only housekeeping PR. Re-validate every unapplied fix against the current tree before applying it; code and script fixes go in their own PR with the normal reviews.
+6. Pre-dispatch gate (PLAN-017): on the day a prompt is dispatched, a session that can run commands runs the prompt's §2 commands against `origin/main` and records each output beside its expected value, runs `bash scripts/lint-prompts.sh` on the prompt file (exit 0), confirms that every fill-in left for the operator (dates, pins, R1 values, `<LIVE>` markers) has been replaced, and for a HIGH step compiles any embedded code on a scratch branch. Device values come only from the operator's latest `fleet` output. The record (date, `main` SHA, commands, outputs) is the PR's first comment. A mismatch is fixed in the prompt, never by changing an expected value to fit.
+
 ### 2.2 Agent Execution
 
 The operator gives the agent two things:
 
 **A) Setup instructions:**
 ```
-1) Sync latest main and branch:
+1) Confirm the checkout has no unrelated work (`git -C /root/config/ESP32-GW-multi-sensor status --short` prints nothing), then sync latest main and branch; stop on any failure:
    git -C /root/config/ESP32-GW-multi-sensor fetch origin main
    git -C /root/config/ESP32-GW-multi-sensor checkout -b <feature-branch> origin/main
 2) Create empty bootstrap commit, push branch, open DRAFT PR to main
@@ -180,6 +184,16 @@ Each step requires three prompts:
 
 3. **Session handoff** (`prompts/handoff/phaseN/session-handoff-vX.Y.Z.W.md`) — What this step does, risk level, deliverables, and whether next step prompts need updating.
 
+**Risk tiers (PLAN-017).** Set per step at planning time and written in the prompt header. The tier sets the producer-side audit and the prompt style. It does not change the review pipeline: five reviewers on every code step, at every tier. Documentation-only PRs run the three inline reviewers; external reviewers are optional, and the round summary says which ran.
+
+| Tier | Phase 7 steps | Producer audit before dispatch | Prompt style |
+|---|---|---|---|
+| LOW | v7.7.1.2 | Lint | Intent and acceptance criteria |
+| MEDIUM | v7.7.1.3, v7.7.2.1, v7.7.2.3, v7.7.3.1, v7.7.3.2 | Lint + one independent auditor | Intent and acceptance criteria; prescribe only interface contracts |
+| HIGH | v7.7.1.4, v7.7.2.2, v7.7.3.3 | Lint + two auditors from different model families, reconciled in one file; embedded code compiled on a scratch branch before dispatch | Prescriptive allowed |
+
+Transition (PLAN-017): the Batch 2 prompts of May 2026 (v7.7.1.2-v7.7.1.4) are not dispatched. They are re-produced under the method of record and audited at their tier before dispatch; the compile of v7.7.1.4's embedded code runs once v7.7.1.3 is on `main`.
+
 ### 3.2 Checkpoint Authoring Rules
 
 Checkpoints prevent agent drift. Rules for writing them:
@@ -196,10 +210,16 @@ Checkpoints prevent agent drift. Rules for writing them:
 Expected: <expected value or condition>
 Actual:   <command output>
 Command:  <verbatim command>
-Action:   STOPPING. NO code changes made. Awaiting operator decision.
+Action:   STOPPING. No further edits or commits.
+Changes already made: <none, or the files and task groups completed before this checkpoint>
+Working tree: <verbatim output of git status --short>
+Last completed checkpoint: <name, or none>
+Awaiting operator decision.
 ```
 
 Agents that "explain away" a checkpoint failure instead of posting this template are exhibiting the plausible-narrative trap. The comment forces structured reporting.
+
+A checkpoint tests whether the repository matches what the prompt assumed, and the agent never fixes a failing checkpoint. A failing test inside a task group is ordinary work: fix it within the §3 scope and record the fix in the session log (HowTo v2 §4.3).
 
 ### 3.3 Scope Guards
 
@@ -235,6 +255,8 @@ Before producing any phase plan or prompt set, run the assumption audit (documen
 > 2. **Unimplemented postmortem items** — list every recommendation from the previous batch's consolidated audit, and for each: implemented / deferred-to-issue-#N / explicitly-rejected (with reason).
 > 3. **Simplest thing that could go wrong** — name the single failure mode most likely to surface during execution and how the prompt's checkpoints would catch it.
 > 4. **3-week continuous-operation impact** — if this batch's changes ran for 3 weeks unattended on the fleet, what would degrade (memory, NVS wear, partition fill, log volume)?
+> 5. **Platform capabilities** — every hardware, framework or library capability the batch relies on, with its exact version, the documentation URL and the date checked (HowTo v2 `templates/planning-assumption-audit.md` §7). A step that rests on an unsupported or unverified capability is a research step with a decision gate, not an implementation step.
+> 6. **Decision changes** — a plan or calendar that changes a logged decision writes the superseding row in `Docs/decisions/decision-log.md` before anything else.
 
 ### 4.2 Phase Sizing
 
@@ -257,6 +279,8 @@ Every phase ends with:
 4. Writing guide update — new gap categories and checkpoint learnings
 5. `CURRENT-STATE.md` update — reflect new baseline
 6. Recommendation tracking — every recommendation becomes an issue or CURRENT-STATE entry
+7. Early-warning numbers — verification:production session ratio (red flag above 2:1), fix cycles per step trend, days since `Last verified` in `CURRENT-STATE.md`
+8. Method check — compare this phase's batch process metrics with the previous phase and record keep or adjust as a decision-log row
 
 ---
 

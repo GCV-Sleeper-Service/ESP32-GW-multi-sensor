@@ -1,7 +1,7 @@
 # Decision Log
 
 _One-line index of architectural decisions. Full rationale in linked documents._
-_Updated: 2026-05-06_
+_Updated: 2026-11-14_
 
 ---
 
@@ -47,6 +47,8 @@ When making a new architectural decision during any session, add a line here as 
 | 2026-05-07 | PLAN-009 | C6 8MB is the intended standard satellite; C6 4MB is binary-sensor-only satellite | `Docs/board-selection-guide-expansion.md` |
 | 2026-05-07 | PLAN-010 | NVS deduplication study (value-dictionary for environmental sensors) deferred to v7.7.5.0 | `Docs/phase-7-review-and-rewrite.md` §optimization |
 | 2026-05-07 | PLAN-011 | RAM window reduction (24h→2h on non-PSRAM) deferred to v7.7.5.1, after chunked streaming | `Docs/phase-7-review-and-rewrite.md` §optimization |
+| 2026-11-14 | PLAN-012 | Meta-work freeze until v1.0 is tagged: no new methodology documents, audits of audits or producer-prompt rewrites, except the HowTo v2 adoption items listed in PLAN-017; batch-production prompt v3.0 must be shorter than v2.0 | `prompts/handoff/phase7/method-adoption-2026-11-14.md` |
+| 2026-11-14 | PLAN-017 | HowTo-LLM-Assisted-Workflow-v2 at `v2.3.1` (`450c446`) is the method of record; `Docs/development-process-guide.md` holds the project bindings. Pre-dispatch gate (operator decision 2026-11-05): no prompt is dispatched until its §2 checks and lint have been run against `main` on the day of dispatch and recorded in the PR (process guide §2.1 item 6). Transition (operator decision 2026-11-05): the Batch 2 prompts of May 2026 (v7.7.1.2-v7.7.1.4) are not dispatched; they are re-produced under this method and audited at their tier before dispatch, to validate the method, and code embedded in a prompt is compiled on a scratch branch before dispatch (first: v7.7.1.4). Before v1.0 the only HowTo v2 adoption items (PLAN-012) are this PR, the R5 tooling PR (`scripts/scope-gate.py`, lint L8, rules for the two recurred classes and a credential-literal rule, CI stub, PR-body check), `prompts/producer-contract.md` with batch-production prompt v3.0, the Batch 2 re-production with its audits, and Critical Rule retirements. Tiers: v7.7.1.2 LOW; v7.7.1.3, 2.1, 2.3, 3.1, 3.2 MEDIUM; v7.7.1.4, 2.2, 3.3 HIGH. Five reviewers on every code step; three inline reviewers on documentation-only PRs | `prompts/handoff/phase7/method-adoption-2026-11-14.md` |
 
 ---
 

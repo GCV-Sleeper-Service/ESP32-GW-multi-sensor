@@ -1,6 +1,6 @@
 # Phase 7 — Consolidated Audit Template
 
-_Copy this file as `prompts/phase7/v7.7.X.Y-PR<NN>-consolidated-audit-and-lessons.md` after each step merges._
+_Copy this file as `prompts/phase7/v7.7.X.Y-PR<NN>-consolidated-audit-and-lessons.md` inside the step's PR; complete it after the last review round and commit it before merge (`Docs/development-process-guide.md` §2.5)._
 _Fill in every section. Do not leave sections blank — write "N/A" or "None" if not applicable._
 
 ---
@@ -86,6 +86,18 @@ List every change the agent made that was NOT explicitly specified in the prompt
 **Prompt improvements for next step:** [List any changes to make to subsequent prompts based on this step's experience]
 
 ---
+
+### Process metrics (HowTo v2 §5.6)
+
+| Metric | Value |
+|---|---|
+| Producer sessions for this step's prompt | |
+| Audit sessions for this step's prompt | |
+| Fix-cycle commits after the first review round | |
+| Defects that escaped the prompt gates into agent execution | |
+| Defects that escaped to devices | |
+
+_Completed after the last review round and committed before merge._
 
 ## §5 — Acceptance Criteria Checklist
 

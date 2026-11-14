@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## 0. This project (ESP32-GW-multi-sensor)
+
+Claude sessions in this repository act as architect/planner or prompt producer, not as the coding agent. Read in this order: `CURRENT-STATE.md`, `Docs/decisions/decision-log.md`, `Docs/development-process-guide.md` (the method-of-record line at the top), then only what the task needs. Confirm what is happening with one diagnostic command before explaining why. Every value you put in a prompt comes from a live grep or `CURRENT-STATE.md`, never from memory. If you cannot run commands, write `<LIVE>` where an expected value belongs; the pre-dispatch gate in `Docs/development-process-guide.md` §2.1 item 6 fills it. When sources disagree about what is implemented, live code on `main` wins, then measurements tied to a named build, then `CURRENT-STATE.md`, then the decision log; chat memory and past conversations are hints, never state.
+
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
