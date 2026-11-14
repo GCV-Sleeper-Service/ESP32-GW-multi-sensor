@@ -31,6 +31,8 @@ Each command below was run after Task Group 7 was complete. Outputs are listed i
 
 Items 7.1, 7.2 and 7.12 were also compared character for character with the supplied prompt and required no correction. Item 7.2 has one blank line after item 6. Item 7.3 preserves its internal blank lines and its final blank line. All remaining insertions were applied individually with the file-edit tool in prompt order after operator authorization to continue.
 
+The operator subsequently requested assessment and fixes for PR reviews. That follow-up aligns the existing audit-template instructions with the adopted tiers; the original prompt, checks and expected values remain unchanged. The review dispositions are recorded in §3.
+
 The first commit after empty bootstrap `d6653e1` is `d0f2746`, containing only the supplied prompt copied byte for byte to `prompts/handoff/phase7/method-adoption-2026-11-14-agent-prompt.md`. `cmp` exited 0 with no output; this commit is pushed to the feature branch.
 
 The unchanged CHECKPOINT G block was run after all Task Group 7 edits were complete:
@@ -41,16 +43,20 @@ CHECKPOINT G PASS
 
 ## §3 Review findings by severity
 
-No review round has run at this execution checkpoint; the GitHub review list is empty. The three inline reviewers (Copilot, Codex and Gemini) have not run. External reviewers have not run. This section must be completed after the review round and committed before merge.
+First inline review round assessed on 2026-11-14 against implementation commit `6069d71`. Codex and Gemini submitted reviews. Copilot posted an approval-oriented overview with no findings, but explicitly reported that it could not complete the selected review tier because of model policy or plan restrictions; this is not counted as a completed full Copilot review. External reviewers have not run.
 
 | Severity | Review findings |
 |---|---|
-| Blocking / Critical | Not yet assessed by reviewers |
-| High | Not yet assessed by reviewers |
-| Medium | Not yet assessed by reviewers |
-| Low / Cosmetic | Not yet assessed by reviewers |
+| Blocking / Critical | None reported. |
+| High | None reported. |
+| Medium | Codex P2: the audit template's old auditor counts and mandatory reconciliation contradicted PLAN-017. Warranted; fixed in template v1.1 by aligning the usage instructions, §0, §3, §6, §7 and §8 with LOW lint, MEDIUM one auditor without reconciliation, and HIGH two auditors from different model families plus reconciliation and the embedded-code compile gate. Existing failure and third-auditor escalation safeguards are retained. |
+| Low / Cosmetic | Gemini marked the phrase “board addresses your prompt names” medium priority. Assessed as a cosmetic preference: “names” is a valid verb and the deployment boundary is clear. No change; retain the operator-prescribed text of item 7.13. |
 
-The execution error and operator-authorized recovery are recorded below; they are not presented as reviewer findings.
+Sources: [Codex finding](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/234#discussion_r4572481385), [Gemini suggestion](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/234#discussion_r4572669380), [Copilot limitation](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/234#pullrequestreview-5903050784).
+
+Validation: traced LOW, MEDIUM and HIGH from §0 through §7 to confirm each tier's auditor count and dispatch artifacts agree with the process guide. Prompt lint on the three changed prompt paths reports zero violations; `git diff --check` exits 0. The template version and its changelog are updated; the project VERSION and the preserved agent prompt are unchanged.
+
+The execution errors and operator-authorized recoveries are recorded below; they are not presented as reviewer findings. No review is claimed as approval of the follow-up commit before it is reviewed.
 
 ## §4 Agent autonomous decisions
 
@@ -68,10 +74,10 @@ For this continuation, a failed edit command is repaired and repeated before mov
 
 | Metric | Value | Evidence |
 |---|---|---|
-| Fix cycles | 0 | No review round or commits addressing review findings yet. |
+| Fix cycles | 1 | One follow-up commit addresses the warranted Codex finding from the first inline review round. |
 | Checkpoint saves | 1 | CHECKPOINT G exposed incomplete execution at 7.3; it did not identify a defect in the prompt or repository. |
 | Checkpoint stops | 2 | Premature CHECKPOINT G execution, then the PRE-PR preflight failure at the Playwright manifest step. |
-| Preventable review findings | 0 observed | No reviews have run; this is not a final review result. |
+| Preventable review findings | 1 | The prompt's new tier rule should also have reconciled the audit template's existing auditor-count and dispatch instructions. |
 | Agent autonomous decisions | 1 harmful; 0 helpful; 0 neutral | Premature CHECKPOINT G execution, recorded in §4. |
 
 The operator confirmed that the prompt and repository were as expected. The stop was caused by the agent's command handling; the method-adoption edits completed without changing the prompt, checks or expected values. Review-dependent metrics remain provisional until the last review round.
@@ -92,8 +98,8 @@ No new recommendations were produced. No issues or milestones were created, edit
 |---|---|---|
 | Producer sessions for this step's prompt | 2 | Operator-supplied planning record: two sessions wrote, amended and rehearsed the prompt, 2026-11-04 to 05 and 2026-11-10 to 14. |
 | Audit sessions for this step's prompt | 0 | Operator confirmed no separate audit session for this documentation-only step; checks were lint and three rehearsals inside the producer sessions. |
-| Fix-cycle commits after the first review round | 0 | No review round has run. |
-| Defects that escaped the prompt gates into agent execution | 0 observed | The recorded failure was an execution-command error; the operator confirmed no prompt or repository mismatch. |
+| Fix-cycle commits after the first review round | 1 | One follow-up commit fixes the audit-template tier conflict. |
+| Defects that escaped the prompt gates into agent execution | 1 | Codex identified the audit-template tier conflict in the resulting PR; the prompt gates did not detect it. The earlier command failures remain execution errors. |
 | Defects that escaped to devices | 0 | Documentation-only work; no device deployment. |
 
-Producer and audit session counts are supplied by the operator. The other three numbers reflect this PR at implementation completion. Review-dependent metrics and review findings are completed after the last review round and committed before merge.
+Producer and audit session counts are supplied by the operator. The other three numbers reflect this PR after the first review-fix round. Review-dependent metrics and review findings must reflect the last review round and be committed before merge.
