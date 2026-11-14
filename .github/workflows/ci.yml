@@ -16,16 +16,7 @@ on:
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'firmware/**'
-      - 'dashboard/**'
-      - 'config/**'
-      - 'scripts/**'
-      - 'partitions/**'
-      - 'src/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/ci.yml'
+    # Required status checks must run for documentation-only PRs too.
 
 jobs:
   preflight-and-compile:

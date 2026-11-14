@@ -7,6 +7,8 @@ _Execution record: 2026-11-13 to 2026-11-14 (America/Los_Angeles). The operator-
 
 The operator adopts HowTo-LLM-Assisted-Workflow-v2 at `v2.3.1` (`450c446`) before the restart housekeeping PR. Development paused on 2026-05-10 for reasons outside the project. This PR binds the method in the project process guide, records PLAN-012 and PLAN-017, and updates the project instructions and audit templates. Firmware remains at v7.7.1.1.
 
+After the review rounds, the operator explicitly authorized correcting the CI trigger on this PR. That follow-up extends the original documentation-only scope to `.github/workflows/ci.yml`: remove the pull-request path filter so documentation-only PRs targeting `main` produce the required `preflight-and-compile` check. The push-to-main path filter, manual trigger, job name and job steps are unchanged. The final scope is nine modified files and two new files; the original prompt and its historical gates remain unchanged.
+
 The supplied prompt's SHA-256 matches `066d1c630a89864d5f546498044990f3e58123d38965959892d3574113793f1f`. The pre-implementation gate printed `§2 PASS` against the checkout based on `b64cd770f87ff0d8a3c7697065c97dfe23d1129d`.
 
 ## §2 Edit list
@@ -67,6 +69,8 @@ Later review: [Muse (Spark), review 5903363182](https://github.com/GCV-Sleeper-S
 
 Reviewer accounting: Codex and Gemini completed inline reviews; Copilot attempted the selected-tier review but reported it could not complete it. Thus there are two completed inline reviews and one limited/incomplete attempt, not three completed full inline reviews. Muse (Spark) supplied one later external comment-only review. No reviewer approval or waiver of the incomplete Copilot review is inferred.
 
+The subsequent CI-trigger correction is an explicit operator request, not an additional reviewer finding. A successful manual `workflow_dispatch` run does not satisfy GitHub's PR-required-check evaluation; the pull-request event must be eligible. YAML validation confirmed that the edited workflow has no PR path filter and preserves the push/manual triggers and all job definitions. The actual PR-event run and merge-state result are recorded in the PR's follow-up notes.
+
 The execution errors and operator-authorized recoveries are recorded below; they are not presented as reviewer findings. No review is claimed as approval of the follow-up commit before it is reviewed.
 
 ## §4 Agent autonomous decisions
@@ -85,7 +89,7 @@ For this continuation, a failed edit command is repaired and repeated before mov
 
 | Metric | Value | Evidence |
 |---|---|---|
-| Fix cycles | 2 | One substantive review-fix commit for Codex, then one record-only commit for Muse's pre-merge deliverable request. |
+| Fix cycles | 3 | One substantive review-fix commit for Codex, one record-only commit for Muse, and one operator-authorized CI-trigger correction. |
 | Checkpoint saves | 1 | CHECKPOINT G exposed incomplete execution at 7.3; it did not identify a defect in the prompt or repository. |
 | Checkpoint stops | 2 | Premature CHECKPOINT G execution, then the PRE-PR preflight failure at the Playwright manifest step. |
 | Preventable review findings | 1 | The prompt's new tier rule should also have reconciled the audit template's existing auditor-count and dispatch instructions. |
@@ -109,8 +113,8 @@ Muse's optional wording recommendations are accepted as-is with reasons in §3; 
 |---|---|---|
 | Producer sessions for this step's prompt | 2 | Operator-supplied planning record: two sessions wrote, amended and rehearsed the prompt, 2026-11-04 to 05 and 2026-11-10 to 14. |
 | Audit sessions for this step's prompt | 0 | Operator confirmed no separate audit session for this documentation-only step; checks were lint and three rehearsals inside the producer sessions. |
-| Fix-cycle commits after the first review round | 2 | One fixes the audit-template tier conflict; one completes the later review record before merge. |
+| Fix-cycle commits after the first review round | 3 | One fixes the audit-template tier conflict, one completes the later review record, and one corrects the CI trigger at the operator's request. |
 | Defects that escaped the prompt gates into agent execution | 1 | Codex identified the audit-template tier conflict in the resulting PR; the prompt gates did not detect it. The earlier command failures remain execution errors. |
-| Defects that escaped to devices | 0 | Documentation-only work; no device deployment. |
+| Defects that escaped to devices | 0 | No firmware or runtime change; no device deployment. |
 
-Producer and audit session counts are supplied by the operator. The other three numbers reflect this PR after the Muse review-record update. Producer-prompt audit sessions remain distinct from subsequent PR reviews. Review-dependent metrics and review findings must reflect the last review round and be committed before merge.
+Producer and audit session counts are supplied by the operator. The other three numbers reflect this PR after the operator-authorized CI-trigger correction. Producer-prompt audit sessions remain distinct from subsequent PR reviews. Review-dependent metrics and review findings must reflect the last review round and be committed before merge.
