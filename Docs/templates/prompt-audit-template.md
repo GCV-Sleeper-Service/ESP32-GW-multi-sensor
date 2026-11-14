@@ -2,12 +2,12 @@
 
 _Canonical audit-prompt skeleton for the ESP32-GW-multi-sensor prompt-audit gate._
 
-- **Template version:** v1.0
+- **Template version:** v1.1
 - **Authority:** [Docs/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (as revised by §11)
 - **Worked example this template was extracted from:** [prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md](../../prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md)
 - **CHANGELOG:** see end of this file
 
-> **How to use this file.** Copy this template to `prompts/handoff/<phase>/<bundle>-audit-prompt-v<N>.md`, fill in every `<<…>>` placeholder, and dispatch to ≥ 2 independent auditors in parallel (≥ 3 if the bundle is high-risk per §0 below). Do NOT modify this template in place when running an audit — versioning is preserved here so methodology drift is traceable. To amend the template itself, increment the template version and append a CHANGELOG entry.
+> **How to use this file.** Use the producer-audit tier assigned under PLAN-017 in §0 below: LOW runs lint only; MEDIUM uses this template for one auditor; HIGH uses it for two independent auditors from different model families, followed by reconciliation. For MEDIUM or HIGH, copy this template to `prompts/handoff/<phase>/<bundle>-audit-prompt-v<N>.md` and fill in every `<<…>>` placeholder before dispatch. Do NOT modify this template in place when running an audit — versioning is preserved here so methodology drift is traceable. To amend the template itself, increment the template version and append a CHANGELOG entry.
 
 ---
 
@@ -20,13 +20,19 @@ The operator (or the auditor running this template the first time on a new branc
 - [ ] §2.B grep targets exist in the live repo at the cited paths.
 - [ ] §1 input list matches the bundle's actual file set (`git diff --name-only <base>..<head>` of the bundle PR).
 
-**Risk classification (determines auditor count):**
+**Risk classification (PLAN-017; determines the producer-audit gate):**
 
-- **High-risk bundle** (≥ 3 independent auditors required): boot path, NVS / persistence, authentication, OTA / partition, dashboard data path, multi-board validation, or any bundle whose prior batch had a HIGH-severity audit finding.
-- **Standard bundle** (≥ 2 independent auditors required): everything else not on the low-risk list.
-- **Low-risk bundle** (operator may opt out, with written justification in PR body): planning supplements, doc-only changes, prompt-template version bumps, lint-rule additions.
+The tier is set at planning time and written in the prompt header; use the Phase 7 assignments in `Docs/development-process-guide.md` §3.1. Do not infer a different tier or auditor count from the subsystem being changed. If the tier is missing, obtain it from the producer before dispatch.
 
-This bundle's classification: `<<HIGH-RISK | STANDARD | LOW-RISK>>` — justification: `<<one-sentence rationale>>`.
+| Tier | Producer audit before dispatch | Required audit artifact |
+|---|---|---|
+| LOW | Lint | No independent audit or reconciliation file |
+| MEDIUM | Lint + one independent auditor | One audit report; no reconciliation file |
+| HIGH | Lint + two independent auditors from different model families; compile embedded code on a scratch branch | Two audit reports and one reconciliation file; compile evidence if code is embedded |
+
+These producer-audit tiers do not change the PR review pipeline: five reviewers on every code step; three inline reviewers on documentation-only PRs, with external reviewers optional.
+
+This bundle's classification: `<<LOW | MEDIUM | HIGH>>` — justification: `<<one-sentence rationale>>`.
 
 ---
 
@@ -123,7 +129,7 @@ Required sections:
 8. **Confidence statement** — explicit numeric confidence on (a) each HIGH finding's reality, (b) probability of additional HIGH defects missed, (c) any mechanical check the auditor was unable to run.
 9. **Producer self-report verification** (Codex §11) — if the bundle PR body contains a producer self-report table, walk each row and confirm the claim against the live repo. Note any discrepancy as a finding.
 
-> Cross-audit reconciliation is **NOT** part of this report. It is a separate artifact (see §4 reconciliation step below) committed only after all peer audits land.
+> For MEDIUM, this single audit report is the audit artifact; no reconciliation file is required. For HIGH, cross-audit reconciliation is **NOT** part of this report: it is a separate artifact (see §6 below), committed only after both independent audits land.
 
 ### §4 Constraints (binding)
 
@@ -144,6 +150,8 @@ Required sections:
 ---
 
 ## §6 Reconciliation step (operator-orchestrated, after all peer audits land)
+
+This section applies to HIGH only. LOW requires lint only; MEDIUM uses its single audit report without reconciliation (PLAN-017).
 
 Reconciliation is a separate Markdown file committed at:
 
@@ -169,7 +177,7 @@ The reconciliation writer (one of the auditors, designated by the operator, OR a
 - Any single auditor `FAIL` → bundle FAIL.
 - Any single auditor `CONDITIONAL PASS` combined with another auditor `FAIL` → bundle FAIL.
 - Two `CONDITIONAL PASS` verdicts with **non-overlapping** findings → escalate to a third auditor before issuing a final verdict.
-- For high-risk bundles (per §0 risk classification), three or more auditors are required before reconciliation may issue a final verdict.
+- For HIGH, both independent audits must come from different model families before reconciliation may issue a final verdict. A third auditor is required by the escalation rule above, rather than by the tier alone; other additional audits are an explicit operator decision.
 
 ---
 
@@ -177,22 +185,24 @@ The reconciliation writer (one of the auditors, designated by the operator, OR a
 
 Before the producer's bundle PR may be dispatched to a coding agent:
 
+For LOW, steps 4–9 are not applicable; lint and the project's same-day pre-dispatch gate still apply. For MEDIUM and HIGH, follow the applicable audit path below.
+
 1. Confirm all bundle files exist on the bundle PR head commit.
 2. Open the bundle PR (status: draft or ready-for-review).
 3. Run `bash scripts/lint-prompts.sh --baseline main` and confirm exit 0.
-4. Launch ≥ 2 (or ≥ 3 for high-risk) independent auditors using this template, in parallel.
-5. Collect peer audit reports as separate Markdown files in `prompts/handoff/<phase>/`.
+4. MEDIUM: launch one independent auditor using this template. HIGH: launch two independent auditors from different model families, in parallel.
+5. Collect the single MEDIUM audit report or both HIGH audit reports as separate Markdown files in `prompts/handoff/<phase>/`.
 6. Assemble the action list (HIGH + CRITICAL findings → fix-in-PR; MEDIUM → track as follow-up issue under the bundle's tracking issue; LOW → triage at operator discretion).
 7. Apply fixes in the bundle PR; commit and push.
 8. Re-audit the changed sections only (mini-audit; same template, scoped §1 input list).
-9. Issue the reconciliation report (per §6) confirming zero HIGH / CRITICAL.
-10. Dispatch the bundle to the coding agent only after the reconciliation report is committed.
+9. MEDIUM: confirm the single audit report has zero HIGH / CRITICAL findings; do not create a reconciliation file. HIGH: issue the reconciliation report (per §6) confirming zero HIGH / CRITICAL findings, and record a successful scratch-branch compile for any embedded code.
+10. Dispatch only after the tier's gate is satisfied: LOW lint passes; MEDIUM's single audit report is committed; HIGH's two audit reports and reconciliation are committed, with compile evidence for any embedded code. Every tier also passes the same-day pre-dispatch gate in `Docs/development-process-guide.md` §2.1 item 6.
 
 ---
 
 ## §8 Triage heuristics for time-constrained audits (Perplexity §5)
 
-If the operator has explicitly recorded time pressure and accepted the residual risk **AND** the bundle is not high-risk, an auditor may run a "minimum viable audit":
+If the operator has explicitly recorded time pressure and accepted the residual risk **AND** the bundle is MEDIUM, its auditor may run a "minimum viable audit". LOW requires lint only:
 
 1. **Stale-fact grep suite** (fast, objective, high-precision) — `grep -rEn '192\.168\.120\.190|esp32-wroom-32d-multi-sensor\.yaml|esphome run' prompts/`
 2. **§9 doctrine checklist** (fast, objective) — verify in-PR vs post-merge framing per `Docs/development-process-guide.md` §2.5.
@@ -200,15 +210,20 @@ If the operator has explicitly recorded time pressure and accepted the residual 
 
 §2.A row-by-row mechanical checks may be skipped under minimum-viable; §2.B C7 (self-containedness) and C8 (evidence consistency) and §2.C scenarios 1, 3, 5 must always run.
 
-For high-risk bundles: minimum viable is NOT permitted. Full audit is mandatory regardless of time pressure.
+For HIGH: minimum viable is NOT permitted. Full audits by both independent auditors are mandatory regardless of time pressure.
 
 ---
+
+## §9 Batch process metrics (record in the reconciliation or single-audit file)
+
+Producer sessions · audit sessions · fix-cycle PRs · defects escaped to agent execution · defects escaped to devices · verification:production session ratio. Tier rule (PLAN-017): LOW = lint only; MEDIUM = one auditor, no reconciliation file; HIGH = two auditors from different model families, one reconciliation file, and a compile gate for embedded code.
 
 ## CHANGELOG
 
 | Version | Date | Change |
 |---|---|---|
 | v1.0 | 2026-05-10 | Initial template extracted from `prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md` and structured per [Docs/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (with §11 revisions: Codex four-lane coverage, Codex severity model, Codex evidence-consistency check C8, Perplexity adversarial scenario taxonomy in §2.C, Perplexity separate-file reconciliation, Perplexity freshness checklist §0, Perplexity triage heuristics §8, GPT-5.5 operator checklist §7). |
+| v1.1 | 2026-11-14 | PR #234 review fix: align auditor counts, reconciliation, dispatch and triage instructions with PLAN-017's LOW / MEDIUM / HIGH producer-audit tiers. |
 
 ---
 

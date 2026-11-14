@@ -12,6 +12,7 @@ _Next action: Phase 7 Step v7.7.1.2 — per-device structs, key scheme, and hash
 - **Last completed phase:** Phase VX (board onboarding + auth refactor, 4 steps, 3 PRs)
 - **Next implementation phase:** Phase 7 (per-device persistence engine)
 - **ESPHome version:** 2026.4.1 (ESP-IDF 5.5.4, upgraded in Phase VX v7.6.10.0)
+- **Method of record:** HowTo-LLM-Assisted-Workflow-v2 v2.3.1 (450c446), bound in PR #234 (PLAN-017).
 
 ## What Just Shipped (last 3 steps)
 
@@ -123,6 +124,7 @@ _Items from postmortems or phase closures that have NOT been acted on._
 | Wall-clock per step (est.) | ~2h | ~2.5h | ~3h |
 | New bugs discovered | 3 | 5 | 2 |
 | New critical rules added | 12 | 8 | 4 |
+| Verification : production sessions | not recorded | not recorded | not recorded |
 
 ---
 
