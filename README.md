@@ -6,7 +6,7 @@ Supports **ESP32-C3**, **ESP32-S3**, **ESP32-WROOM-32D**, and other ESP32 varian
 
 No cloud. No database. No Home Assistant required. Just ESP32 hardware, the gateway firmware, and a browser.
 
-> **Current version: v7.6.5.8** — Phase X complete (Dashboard Architecture Refactor).
+> **Current version: v7.7.1.1** — Phase 7 in progress (per-device persistence engine). BUG-082 (history heap exhaustion) is resolved by chunked streaming in v7.7.1.1.
 > Multi-board support, unified satellite/aggregator architecture, manifest-driven dashboard with environmental + network device cards, modular component-based architecture.
 > Default config on `main`: **3 BLE sensors + 1 WAN ping probe** on ESP32-C3.
 
@@ -67,7 +67,7 @@ FIXTURE_SET=3sensor npx playwright test --project=chromium
 
 # 7. Compile and flash
 esphome compile firmware/esp32-c3-multi-sensor.yaml
-esphome run firmware/esp32-c3-multi-sensor.yaml
+esphome upload firmware/esp32-c3-multi-sensor.yaml --device=<board-ip>   # never 'esphome run': it waits on log output (see AGENTS.md)
 ```
 
 Open `http://<esp-ip>/dashboard.html` in your browser.

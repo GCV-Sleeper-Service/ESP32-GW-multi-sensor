@@ -167,8 +167,8 @@ For internet exposure, this is accepted until Phase E designs a credential-propa
 | `/api/aggregator/gateways` | GET | ✅ Yes (V2-C) | RV-01 |
 | `/api/aggregator/live` | GET | ✅ Yes (V2-C) | RV-01 |
 | `/api/aggregator/proxy/{...}` | GET | ✅ Yes (V2-C) | RV-01 |
-| `/history/` | GET | ✅ Yes (V2-E) | RV-01, RV-04 |
-| `/api/v2/history/` | GET | ✅ Yes (V2-E) | RV-01, RV-04 |
+| `/history/` | GET | ❌ Public since v7.6.9.0 (`0a4b0d1`), SEC-002 | RV-04 |
+| `/api/v2/history/` | GET | ❌ Public since v7.6.9.0 (`0a4b0d1`), SEC-002 | RV-04 |
 | `/api/status` | GET | ❌ Public (intentional) | RV-03 (partial) |
 | `/api/status/full` | GET | ✅ Yes (V2-D) | RV-01 |
 | `/api/v2/live` | GET | ❌ Public (intentional) | RV-07 |
@@ -210,6 +210,20 @@ Rationale:
 | RV-05 Import session timeout | Phase E rewrite or timeout guard | v8.0.x or later |
 | RV-06 Manifest topology disclosure | Phase E credential propagation | v8.0.x |
 | RV-07 `/api/v2/live` unauthenticated | Phase E credential propagation | v8.0.x |
+| RV-08 Secrets in the public repository | Out of the files agents read (restart housekeeping PR); every board secret changed (SEC-003) | v7.7.1.5 |
+| RV-09 Native OTA without a password | Per-board OTA password (SEC-003) | v7.7.1.5 |
+
+---
+
+## Amendment 2026-11 (restart)
+
+_Added 2026-11-14 by the restart housekeeping PR. It records what changed since this ADR was written; the sections above stay as written._
+
+1. **Deployment.** The boards are LAN-only since 2026-11-05: the operator deleted every Cloudflare Tunnel route. No route returns until the conditions of SEC-003 hold.
+2. **History is public.** Since v7.6.9.0 (`0a4b0d1`, PR #183) `/history/` and `/api/v2/history/` need no login. This replaces the history statements in RV-01 and RV-04 and the two V2-E rows of the coverage table. It is accepted for the LAN-only deployment and is re-decided before any Internet route (SEC-002).
+3. **Shared management login.** Since v7.6.8.0 (`56ae93c`, PR #180) the aggregator sends its own management login to each satellite's `/api/status/full`, so every board on project firmware carries the same login. `/api/v2/live` and `/api/manifest` stay public (RV-06, RV-07).
+4. **RV-08, secrets in the public repository.** The management password, the native API key and the bootstrap OTA and fallback-AP passwords are in tracked files. The restart housekeeping PR takes the management login out of the files agents read. Every board secret changes in v7.7.1.5 (SEC-003). Git history keeps the old values, so only that change makes them useless.
+5. **RV-09, native OTA without a password.** The `ota:` block of `firmware/esp32-c3-multi-sensor.yaml` sets no password, so any device on the LAN can upload firmware to a board on project firmware. v7.7.1.5 adds a per-board OTA password (SEC-003).
 
 ---
 

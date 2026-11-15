@@ -96,7 +96,7 @@ No new issues discovered during v7.7.1.1 that affect this step.
 | WROOM-32D | 192.168.120.170 | ESP32 | Satellite (production) |
 | S3 DevKitC N16R8 | 192.168.120.191 | ESP32-S3 | Aggregator (production) |
 
-Credentials: `ESPadmin` / `ESPpass100`
+Credentials: `$ESP_USER` / `$ESP_PASS` in the operator's shell; the firmware reads `gateway_mgmt_username` / `gateway_mgmt_password` from the git-ignored `firmware/secrets.yaml`
 
 ### Logger level (do not revert)
 

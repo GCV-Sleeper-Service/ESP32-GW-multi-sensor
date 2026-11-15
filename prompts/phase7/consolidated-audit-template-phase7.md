@@ -23,7 +23,7 @@ _Agent: [Copilot / Codex / GPT / Kiro]._
 | Step Version | v7.7.X.Y |
 | Executing Agent | [agent name] |
 | Inline Reviewers | [Copilot, Codex, Gemini — list which participated] |
-| External Reviewers | [GPT, Codex, Perplexity — list which participated] |
+| External Reviewers | [A: Claude; B: Meta Muse (fallback: Gemini) — list which participated and the model each one named] |
 | Device Testing | [YES / NO / CRITICAL] |
 | Fix Cycles | [0 / 1 / 2 / ...] |
 

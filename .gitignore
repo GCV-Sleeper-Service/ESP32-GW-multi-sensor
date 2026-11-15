@@ -20,6 +20,8 @@ __pycache__/
 # Per-device gateway config (operator creates from gateway.example.json)
 config/gateway.json
 config/aggregator.json
+# Local fleet file with private columns (MAC, hub port, tty) - never commit
+config/fleet.local.csv
 # Per-deployment sensor configs (operator creates per-device)
 config/sensors-*.json
 # Generated board-specific YAML files (non-C3)
