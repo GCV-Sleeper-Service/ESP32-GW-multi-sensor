@@ -73,9 +73,11 @@ Please analyze the code reviews and comments for the PR. Assess if they are warr
 - [ ] The PR changes exactly 16 files: 13 changed and 3 new.
 - [ ] The checks `preflight-and-compile` and `prompt-lint` are green.
 - [ ] The record file `prompts/handoff/phase7/housekeeping-2026-11-14-restart.md` names every review and what the agent did with it.
-- [ ] The hash block of the gate record prints the branch name and 15 lines that end in `OK`.
+- [ ] The hash block of the gate record matches the rehearsal, except for files changed by reviewed follow-up commits. Each difference and its new hash is recorded in the housekeeping record.
 
 A line that ends in `FAILED` is not an error by itself. It means that a file differs from the rehearsal. Paste the output into the planning session before you merge.
+
+The original implementation at `ce6495d` matched all 15 rehearsal hashes. Review fixes change this page, `CURRENT-STATE.md`, the decision log and the security ADR; their original hashes no longer apply to the current files. The supplied agent prompt remains unchanged. See the record's §3 for the review changes and their hashes.
 
 ## After the merge
 
@@ -84,12 +86,34 @@ cd /root/config/ESP32-GW-multi-sensor && git checkout main && git pull
 grep -c '| HEAP-002a |' Docs/decisions/decision-log.md
 grep -c '^## Amendment 2026-11 (restart)$' Docs/decisions/SEC-ADR-001-residual-vulnerabilities.md
 grep -c 'sat-c5-8m-181' CURRENT-STATE.md
-[ -n "$ESP_PASS" ] || echo "load the helpers first: source /root/esp-helpers.sh"
-git grep -l -F -e "$ESP_PASS" -- AGENTS.md CLAUDE.md CURRENT-STATE.md Docs/development-process-guide.md prompts/phase7 prompts/handoff/phase7 || echo "none in the files agents read"
+python3 - <<'PY'
+import os
+from pathlib import Path
+import sys
+
+password = os.environb.get(b"ESP_PASS")
+if not password:
+    sys.exit("ESP_PASS is unset or empty; load the helpers first: source /root/esp-helpers.sh")
+paths = (
+    "AGENTS.md",
+    "CURRENT-STATE.md",
+    "Docs/development-process-guide.md",
+    "prompts/phase7/v7.7.1.3-agent-prompt-gpt-codex.md",
+    "prompts/phase7/v7.7.1.4-agent-prompt-gpt-codex.md",
+    "prompts/handoff/phase7/session-handoff-v7.7.1.2.md",
+    "prompts/handoff/phase7/session-handoff-v7.7.1.4.md",
+)
+try:
+    matches = [path for path in paths if password in Path(path).read_bytes()]
+except OSError:
+    sys.exit("Could not read a required file; credential check stopped")
+print("\n".join(matches) if matches else "none in the seven files checked")
+sys.exit(1 if matches else 0)
+PY
 git log -1 --format='%h %s'
 ```
 
-Each `grep -c` prints 1. The `git grep` line prints `none in the files agents read`. It prints file names only, never the password.
+Each `grep -c` prints 1. The Python check reads the password from its environment, without putting it in command arguments or writing it to disk. It checks only the seven files cleaned by this PR. If clean, it prints `none in the seven files checked`; otherwise it prints matching file paths and exits non-zero. An unset or empty password, or an unreadable file, also stops the check. Historical records and live test scripts are outside this check; script cleanup and secret rotation remain work for v7.7.1.5 (SEC-003).
 
 ## Bookkeeping
 

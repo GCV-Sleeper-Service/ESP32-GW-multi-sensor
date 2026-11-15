@@ -105,10 +105,12 @@ _Items from postmortems or phase closures that have NOT been acted on._
 | v7.6.10.4 session log | 10 prompt recommendations for writing guide | **Not implemented** — pending Phase VY |
 | Restart check 2026-11 | Full-length WROOM history export at 60 % NVS fill or more, with peak heap recorded (BUG-082 acceptance evidence) | **Partly done** — a full-length export completed on 2026-11-11 without a reboot; peak heap and NVS fill were not recorded. Routed to the Phase 7 closure step (v7.7.3.3) |
 | Restart check 2026-11 | Firmware `.bin` size checkpoint against the OTA slot in every Phase 7 prompt from v7.7.1.3 on (C6 4 MB at 91.6 %) | **Not implemented** — routed to the Batch 2 re-production |
-| Restart check 2026-11 | README test counts disagree (402 and 117); reconcile with `npx playwright test --list` | **Not implemented** — routed to the v7.7.3.3 README rewrite |
+| Restart check 2026-11 | Test counts disagree across README (402 and 117), `AGENTS.md` (~370) and this file (~370+); reconcile all three with `npx playwright test --list` | **Not implemented** — routed to the v7.7.3.3 documentation rewrite |
 | Restart check 2026-11 | Make `dashboard/dashboard.h` reproducible: `scripts/generate-header.sh` compresses with `gzip -9 -c`, which stores a file name and a time, so every build changes the file (for example use `gzip -n`) | **Not implemented** — code change, needs its own PR |
 | PR #234 | `scripts/preflight.sh` sends the browser test's report to `/dev/null`, so a failure leaves no evidence | **Not implemented** — routed to the tooling PR (PLAN-020) |
 | Issue #228 §D | Phase-closure prompt refinements | **Deferred** — folded into the v7.7.3.3 closure prompt |
+| PR #235 review (Muse) | Literal management login remains in live test scripts and historical records; the housekeeping scrub covers only seven named files | **Not implemented** — live-script cleanup and secret rotation routed to v7.7.1.5 (SEC-003); historical records and git history retain old values |
+| PR #235 review (Gemini) | Retire the superseded RV-04 narrative and resolution target in SEC-ADR-001; the restart amendment now states that v7.7.1.1 resolved it | **Deferred** — documentation cleanup routed to v7.7.1.5; preserve this PR's prescribed history coverage rows and original prompt |
 
 ## Stale Documents Requiring Update Before Use
 
