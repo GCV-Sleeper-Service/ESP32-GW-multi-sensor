@@ -78,6 +78,9 @@ The operator gives the agent two things:
 5) Commit only to that branch, never to main
 6) When done: gh pr ready <PR#> --repo GCV-Sleeper-Service/ESP32-GW-multi-sensor
 7) Update PR description (use PR176-178 as reference)
+8) Apply every edit with your file-edit tool; never with a script that parses the prompt
+9) If one of your own commands fails, repair it and repeat the step; run no checkpoint while an edit before it is missing
+10) Run one test command at a time: no second preflight, Playwright run or mock server while one is running
 ```
 
 **B) The agent prompt** — copy the agent section from the Claude two-step prompt.
@@ -96,7 +99,7 @@ esphome clean   firmware/esp32-c3-multi-sensor.yaml
 
 # Smoke test (wait 30s after upload)
 curl -s http://192.168.120.189/api/status | python3 -m json.tool
-curl -s -u ESPadmin:ESPpass100 http://192.168.120.189/api/status/full | python3 -m json.tool
+curl -s -u "$ESP_USER:$ESP_PASS" http://192.168.120.189/api/status/full | python3 -m json.tool
 ```
 
 **Rules:**
@@ -114,8 +117,8 @@ Five reviews in this order:
 | 1 | Copilot | GitHub inline | Inline code review |
 | 2 | Codex | GitHub inline | Inline code review |
 | 3 | Gemini | GitHub inline | Inline code review |
-| 4 | GPT/ChatGPT | Web portal (external) | Comprehensive PR analysis |
-| 5 | Codex (external) | Web portal | Comprehensive PR analysis |
+| 4 | Claude (external review A) | Its own session, apart from planning and from the coding agent | Whole-PR review: findings by severity, each acceptance criterion checked |
+| 5 | Meta Muse, Spark or Wonder (external review B); fallback: Gemini on the web | Its own session | Structured three-turn review |
 
 After inline reviews complete, agent addresses findings:
 ```
@@ -125,7 +128,7 @@ if yes, implement necessary fixes. Post a comment summarizing your assessment.
 
 External reviewers get a structured prompt (see prompt templates) that asks them to classify findings by severity and check acceptance criteria.
 
-Perplexity runs the structured three-turn review protocol as the final quality gate when MCP cooperates. When MCP fails, operator downloads the review output manually.
+External review B runs the structured three-turn review protocol as the final quality gate. No external reviewer comes from the coding agent's vendor; the coding agent is Codex (PLAN-019). Each external reviewer posts one PR comment, or the operator pastes its output into the PR. A reviewer never pushes, merges or approves.
 
 ### 2.5 Step Deliverables (in-PR, before merge)
 
@@ -341,7 +344,7 @@ Prompt Quality Score:
 
 ### 7.1 CI Path Filtering
 
-The CI workflow (`.github/workflows/ci.yml`) only runs on changes to code, config, scripts, and build files. Documentation-only PRs, prompts, images, and tags do not trigger CI.
+The CI workflow (`.github/workflows/ci.yml`) runs its `preflight-and-compile` job on every pull request to `main`, documentation-only ones too: branch protection requires that check, and a required check that a path filter skips blocks the merge (PLAN-020). On a push to `main` the workflow still runs only for changes to code, config, scripts and build files.
 
 Manual trigger via `workflow_dispatch` is always available.
 
@@ -357,7 +360,7 @@ To confirm agents are consuming the instruction files:
 
 1. **Copilot inline review:** On the next PR, check if review comments reference project-specific rules (deferred task pattern, generated file warnings). If Copilot flags a generated file edit or mentions `authFetch()`, the instructions are working.
 2. **Agent execution in VSC:** Ask the agent "What files should you never edit directly?" It should list the generated artifacts.
-3. **CI path filtering:** Submit a docs-only PR. If CI doesn't trigger, path filtering is working.
+3. **CI on pull requests:** Submit a docs-only PR. The `preflight-and-compile` check must start; if it does not, the merge stays blocked (PLAN-020).
 4. **Path-specific instructions:** Submit a PR touching `firmware/core/`. If Copilot mentions assembly script or deferred task pattern, the firmware-specific instructions are being consumed.
 
 If any of these checks fail, verify the instruction files are committed, correctly named, and in the right locations.

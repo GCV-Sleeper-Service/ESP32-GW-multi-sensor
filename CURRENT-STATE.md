@@ -1,7 +1,7 @@
 # Current Project State
 
-_Last verified: 2026-05-08 — v7.7.1.1 validation complete_
-_Next action: Phase 7 Step v7.7.1.2 — per-device structs, key scheme, and hash function_
+_Last verified: 2026-11-14 — restart re-verification by the operator: on 2026-11-11 the production boards .189, .170 and .191 reported v7.7.1.1, ESPHome was 2026.4.1, the httpd stack override check passed and a compile without upload succeeded; on 2026-11-14 the same three boards reported v7.7.1.1 again. No firmware change since v7.7.1.1._
+_Next action: the restart plan of record into the repository (PLAN-021), then the tooling PR, the producer contract and the Batch 2 prompts re-produced under the method of record (PLAN-017). Phase 7 Step v7.7.1.2 is dispatched after that._
 
 ---
 
@@ -13,6 +13,7 @@ _Next action: Phase 7 Step v7.7.1.2 — per-device structs, key scheme, and hash
 - **Next implementation phase:** Phase 7 (per-device persistence engine)
 - **ESPHome version:** 2026.4.1 (ESP-IDF 5.5.4, upgraded in Phase VX v7.6.10.0)
 - **Method of record:** HowTo-LLM-Assisted-Workflow-v2 v2.3.1 (450c446), bound in PR #234 (PLAN-017).
+- **Development paused:** 2026-05-10 to 2026-11-14, for reasons outside the project. The May 2026 Batch 2 prompts (v7.7.1.2 to v7.7.1.4) are not dispatched: they are re-produced under the method of record and audited at their tier first (PLAN-017).
 
 ## What Just Shipped (last 3 steps)
 
@@ -36,7 +37,8 @@ _Next action: Phase 7 Step v7.7.1.2 — per-device structs, key scheme, and hash
 |---|---|---|---|
 | BUG-084 | High | Non-PSRAM boards crash under 8 concurrent HTTP connections. Safe limit: 4 concurrent. | Phase 7 (socket limit config) |
 | #137 | Low | Board-type SVG diagrams for documentation. Cosmetic. | Phase 7+ or standalone |
-| A-004 | Medium | C5 WROOM-1U BLE non-functional — external IPEX antenna not attached. Re-test pending. | Before Phase 7 |
+| A-004 | Medium | C5 WROOM-1U BLE not verified. The external antenna is fitted (operator, 2026-11-05). The re-test needs a BLE-capable build on .180. | Test-board check |
+| WROOM heap | Medium | `.170` reported `min_free_heap` 3,988 B at 7.5 days uptime on v7.7.1.1 (operator reading, 2026-11-14; 5,156 B on 2026-11-11 in the same boot). It is the lowest value since boot: a deep dip, not a proven leak. | Heap sampling, decided before v7.7.1.2 |
 | C6 flash | Medium | C6 SuperMini uses 91.6% of OTA partition on 4MB flash. Phase 7 firmware growth may exceed. | Phase 7 planning |
 
 ## Recently Resolved
@@ -58,6 +60,24 @@ _Observed on 2026-05-08 after flashing v7.7.1.1 production builds._
 
 ## Board Fleet and Measurements
 
+_Fleet: nine boards (BOARD-002). Identity comes from the operator's board file and esptool output of 2026-11-04. `firmware_now` comes from the operator's `fleet` output of 2026-11-11 and readings of 2026-11-14; the date is in each cell._
+
+| device_id | Board | Chip (esptool) | Module | Flash MB | PSRAM MB | USB | IP | Role | board_profile | firmware_now | Antenna | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| sat-esp32-4m-170 | ESP32 dev board | ESP32-D0WD-V3, rev v3.1 | WROOM-32D (module marking not checked) | 4 | 0 | USB-UART bridge | 192.168.120.170 | production satellite | `esp32-wroom-32d` | v7.7.1.1 (2026-11-14) | fitted | formerly at .190 |
+| sat-s3-4m-173 | ESP32-S3 SuperMini | ESP32-S3 (QFN56), rev v0.2 | none (flash and PSRAM in the chip package) | 4 | 2 | native USB-Serial/JTAG | 192.168.120.173 | test | `esp32-s3-supermini-4m` | v7.6.10.1 (2026-11-11) | fitted | marginal as an aggregator |
+| sat-c5-8m-180 | ESP32-C5 dev board | ESP32-C5, rev v1.0 | WROOM-1U | 8 | 8 | USB-UART bridge | 192.168.120.180 | test | `esp32-c5-wroom1u-8m` | v7.6.10.1 (2026-11-11) | external, fitted | BLE not verified (A-004) |
+| sat-c5-8m-181 | Seeed XIAO ESP32C5 | ESP32-C5, rev v1.0 | ESP32-C5-WROOM-1 | 8 | 8 | native USB-Serial/JTAG | 192.168.120.181 | not yet on project firmware | none yet | minimum firmware (2026-11-14) | external, fitted | needs a board profile |
+| sat-c6-4m-184 | ESP32-C6 SuperMini | ESP32-C6FH4 (QFN32), rev v0.2 | none | 4 | 0 | native USB-Serial/JTAG | 192.168.120.184 | test | `esp32-c6-supermini-4m` | v7.6.10.1 (2026-11-11) | fitted | OTA slot 91.6 % full in May 2026 |
+| esp32-c3-multi | ESP32-C3 SuperMini | ESP32-C3 (QFN32), rev v0.4 | none | 4 | 0 | native USB-Serial/JTAG | 192.168.120.189 | production satellite | `esp32-c3-supermini` | v7.7.1.1 (2026-11-14) | fitted | renamed sat-c3-4m-176 at .176 after v1.0 |
+| agg-s3-16m-1 | ESP32-S3-DevKitC-1 N16R8 | ESP32-S3 (QFN56), rev v0.2 | N16R8 | 16 | 8 | USB-UART bridge | 192.168.120.191 | production aggregator | `esp32-s3-devkitc1-n16r8` | v7.7.1.1 (2026-11-14) | fitted | renamed agg-s3-16m-191 after v1.0 |
+| agg-s3-16m-192 | ESP32-S3-DevKitC-1 N16R8 | ESP32-S3 (QFN56), rev v0.2 | N16R8 | 16 | 8 | USB-UART bridge | 192.168.120.192 | test aggregator | `esp32-s3-devkitc1-n16r8` | minimum firmware (2026-11-14) | fitted | its web page has an OTA upload form and no login |
+| agg-c5-8m-194 | Seeed XIAO ESP32C5 | ESP32-C5, rev v1.0 | ESP32-C5-WROOM-1 | 8 | 8 | native USB-Serial/JTAG | 192.168.120.194 | not yet on project firmware | none yet | minimum firmware (2026-11-14) | external, fitted | needs a board profile |
+
+_Minimum firmware is a plain ESPHome build without the project firmware. Such a board does not answer `/api/status`. The private columns (MAC, hub port, tty) are in the git-ignored `config/fleet.local.csv` on the build host._
+
+### Measurements (2026-05-05)
+
 _Source: `Docs/board-measurement-log-v7.6.10.md` (2026-05-05)_
 
 | Board | IP | Chip | PSRAM | free_heap (boot) | min_free_heap | httpd_wm | Role |
@@ -69,7 +89,7 @@ _Source: `Docs/board-measurement-log-v7.6.10.md` (2026-05-05)_
 | C6 SuperMini | .184 | ESP32-C6 | None | 150,332 | 152,820 | 12,820 | Test (flash-constrained) |
 | C5 WROOM-1U | .180 | ESP32-C5 | 8 MB | 32,908 | 8,420,784 | 12,728 | Test (BLE pending A-004) |
 
-Credentials: `ESPadmin` / `ESPpass100`
+Credentials: `$ESP_USER` / `$ESP_PASS` in the operator's shell; the firmware reads `gateway_mgmt_username` / `gateway_mgmt_password` from the git-ignored `firmware/secrets.yaml`
 
 ## Unimplemented Recommendations
 
@@ -83,6 +103,14 @@ _Items from postmortems or phase closures that have NOT been acted on._
 | BUG-075-076 postmortem | Audit ESPHome component defaults for hardcoded-too-small values | **Not implemented** — proposed as Phase 7 Step -1 |
 | Phase V closure | Show `min_free_heap` instead of `free_heap` on dashboard | **Not implemented** — deferred post-v7.6.9.0 |
 | v7.6.10.4 session log | 10 prompt recommendations for writing guide | **Not implemented** — pending Phase VY |
+| Restart check 2026-11 | Full-length WROOM history export at 60 % NVS fill or more, with peak heap recorded (BUG-082 acceptance evidence) | **Partly done** — a full-length export completed on 2026-11-11 without a reboot; peak heap and NVS fill were not recorded. Routed to the Phase 7 closure step (v7.7.3.3) |
+| Restart check 2026-11 | Firmware `.bin` size checkpoint against the OTA slot in every Phase 7 prompt from v7.7.1.3 on (C6 4 MB at 91.6 %) | **Not implemented** — routed to the Batch 2 re-production |
+| Restart check 2026-11 | Test counts disagree across README (402 and 117), `AGENTS.md` (~370) and this file (~370+); reconcile all three with `npx playwright test --list` | **Not implemented** — routed to the v7.7.3.3 documentation rewrite |
+| Restart check 2026-11 | Make `dashboard/dashboard.h` reproducible: `scripts/generate-header.sh` compresses with `gzip -9 -c`, which stores a file name and a time, so every build changes the file (for example use `gzip -n`) | **Not implemented** — code change, needs its own PR |
+| PR #234 | `scripts/preflight.sh` sends the browser test's report to `/dev/null`, so a failure leaves no evidence | **Not implemented** — routed to the tooling PR (PLAN-020) |
+| Issue #228 §D | Phase-closure prompt refinements | **Deferred** — folded into the v7.7.3.3 closure prompt |
+| PR #235 review (Muse) | Literal management login remains in live test scripts and historical records; the housekeeping scrub covers only seven named files | **Not implemented** — live-script cleanup and secret rotation routed to v7.7.1.5 (SEC-003); historical records and git history retain old values |
+| PR #235 review (Gemini) | Retire the superseded RV-04 narrative and resolution target in SEC-ADR-001; the restart amendment now states that v7.7.1.1 resolved it | **Deferred** — documentation cleanup routed to v7.7.1.5; preserve this PR's prescribed history coverage rows and original prompt |
 
 ## Stale Documents Requiring Update Before Use
 
@@ -90,6 +118,11 @@ _Items from postmortems or phase closures that have NOT been acted on._
 |---|---|---|
 | `Docs/v7.7-implementation-plan.md` | 2026-03-19 | **Superseded** by `Docs/phase-7-review-and-rewrite.md` (2026-05-07). Keep for historical reference. |
 | `Docs/v7.7-v7.8-persistence-architecture.md` | 2026-03-19 | Architecture decisions still valid. Memory budget (§15) needs measured values from board-measurement-log. Update during Phase 7 prompt production. |
+| `Docs/phase-7-review-and-rewrite.md` | 2026-05-07 | Its section "Partition Table Changes" plans the USB reflash for v7.7.1.4. The partition change moves to v1.1 as its own step (PLAN-015). |
+| `Docs/phase-E-captive-portal-plan.md` | 2026-05-07 | Phase E is deferred until after Phase 9, and step E-b waits for the Zigbee spike (PLAN-014). Re-check the plan against the current ESPHome release before use. |
+| `Docs/phase-9-cloud-upload-plan.md` | 2026-05-07 | The primary upload target is now the Azure tier-2 ingest endpoint, not InfluxDB Cloud (PLAN-013). Rewrite at Phase 9 start. |
+| `Docs/feature-roadmap.md` | 2026-05-06 | Its phase order and cloud target are superseded by PLAN-013 to PLAN-015. Where it differs from `Docs/phase-8-notifications-plan.md`, the plan document wins. |
+| The nine Batch 2 prompt files of May 2026: the agent prompt and the two-step file of v7.7.1.2, v7.7.1.3 and v7.7.1.4 in `prompts/phase7/`, and `session-handoff-v7.7.1.2.md`, `-v7.7.1.3.md` and `-v7.7.1.4.md` in `prompts/handoff/phase7/` | 2026-05 | **Superseded, not to be dispatched** (PLAN-017). They are re-produced under the method of record; until then they are source material only. |
 
 
 ## Architecture Quick Reference
