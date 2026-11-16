@@ -1,7 +1,7 @@
 # Phase 7 — Per-Device Persistence Engine (Rewritten Plan)
 
 _Date: 2026-05-07 (rewritten during multi-phase planning session)_
-_Supersedes: `Docs/v7.7-implementation-plan.md` (2026-03-19 — stale)_
+_Supersedes: `Docs/archive/planning-2026-05/v7.7-implementation-plan.md` (2026-03-19 — stale)_
 _Architecture reference: `Docs/v7.7-v7.8-persistence-architecture.md` (memory budget sections need update)_
 _Measurement source: `Docs/board-measurement-log-v7.6.10.md`_
 _Repo: v7.6.10.4 on `main`_
@@ -28,7 +28,7 @@ Replace the monolithic `SegmentSnapshot` persistence model with a per-device seg
 
 ## Why the Original Plan Needed Rewriting
 
-The original plan (`Docs/v7.7-implementation-plan.md`, 2026-03-19) had the right architectural approach but was operationally stale:
+The original plan (`Docs/archive/planning-2026-05/v7.7-implementation-plan.md`, 2026-03-19) had the right architectural approach but was operationally stale:
 
 - References `dashboard/sensor_history_multi.h` directly 9 times — now a generated artifact from `firmware/core/` (Phase Y, v7.6.6.x)
 - References `dashboard/dashboard.js` 5 times — now generated from `dashboard/core/` + `dashboard/components/` (Phase X, v7.6.5.x)

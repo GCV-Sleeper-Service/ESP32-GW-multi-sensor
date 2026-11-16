@@ -1,7 +1,7 @@
 # Current Project State
 
 _Last verified: 2026-11-14 — restart re-verification by the operator: on 2026-11-11 the production boards .189, .170 and .191 reported v7.7.1.1, ESPHome was 2026.4.1, the httpd stack override check passed and a compile without upload succeeded; on 2026-11-14 the same three boards reported v7.7.1.1 again. No firmware change since v7.7.1.1._
-_Next action: the restart plan of record into the repository (PLAN-021), then the tooling PR, the producer contract and the Batch 2 prompts re-produced under the method of record (PLAN-017). Phase 7 Step v7.7.1.2 is dispatched after that._
+_Next action: R5, the tooling PR (PLAN-017, PLAN-020, PLAN-028). The order and the scope of every step are in `Docs/plan-of-record.md` (PLAN-024). Phase 7 Step v7.7.1.2 is dispatched after R5, R5r, R5a and R5b._
 
 ---
 
@@ -25,11 +25,13 @@ _Next action: the restart plan of record into the repository (PLAN-021), then th
 
 ## What's Next
 
-1. **Phase 7 Step v7.7.1.2** — Per-device structs, key scheme, hash function.
-2. **Phase 7 Step v7.7.1.3** — Per-device persist engine (write path).
-3. **Phase 7 Step v7.7.1.4** — Per-device restore engine (boot path) + retention budget.
-4. **Phase 7 Steps v7.7.2.1–v7.7.3.3** — Engine switchover, migration, export/import, and closure.
-5. **Phase 7 optimization sprint v7.7.5.x** — NVS dedup study, RAM window reduction.
+The order, the scope and the status of every step are in `Docs/plan-of-record.md` (PLAN-024). In short:
+
+1. **R5, R5r, R5a, R5b** — the tooling PR, the review-runner PR, the producer contract, and the Batch 2 prompts re-produced under the method of record (PLAN-017, PLAN-022). No firmware change.
+2. **Phase 7 Steps v7.7.1.2 to v7.7.1.4** — per-device structs and key scheme; persist engine (write path); restore engine (boot path) and retention budget.
+3. **v7.7.1.5** — new board secrets (SEC-003).
+4. **Phase 7 Steps v7.7.2.1 to v7.7.3.3** — engine switchover, migration, export and import, and closure. v7.7.3.3 is v1.0 (PLAN-015).
+5. **After v1.0** — the ESPHome upgrade spike; v1.1 with the partition layouts and the former optimisation sprint; then Phases 8 and 9.
 
 ## Open Issues (by severity)
 
@@ -116,14 +118,14 @@ _Items from postmortems or phase closures that have NOT been acted on._
 
 | Document | Written | Issue |
 |---|---|---|
-| `Docs/v7.7-implementation-plan.md` | 2026-03-19 | **Superseded** by `Docs/phase-7-review-and-rewrite.md` (2026-05-07). Keep for historical reference. |
 | `Docs/v7.7-v7.8-persistence-architecture.md` | 2026-03-19 | Architecture decisions still valid. Memory budget (§15) needs measured values from board-measurement-log. Update during Phase 7 prompt production. |
 | `Docs/phase-7-review-and-rewrite.md` | 2026-05-07 | Its section "Partition Table Changes" plans the USB reflash for v7.7.1.4. The partition change moves to v1.1 as its own step (PLAN-015). |
 | `Docs/phase-E-captive-portal-plan.md` | 2026-05-07 | Phase E is deferred until after Phase 9, and step E-b waits for the Zigbee spike (PLAN-014). Re-check the plan against the current ESPHome release before use. |
 | `Docs/phase-9-cloud-upload-plan.md` | 2026-05-07 | The primary upload target is now the Azure tier-2 ingest endpoint, not InfluxDB Cloud (PLAN-013). Rewrite at Phase 9 start. |
-| `Docs/feature-roadmap.md` | 2026-05-06 | Its phase order and cloud target are superseded by PLAN-013 to PLAN-015. Where it differs from `Docs/phase-8-notifications-plan.md`, the plan document wins. |
 | The nine Batch 2 prompt files of May 2026: the agent prompt and the two-step file of v7.7.1.2, v7.7.1.3 and v7.7.1.4 in `prompts/phase7/`, and `session-handoff-v7.7.1.2.md`, `-v7.7.1.3.md` and `-v7.7.1.4.md` in `prompts/handoff/phase7/` | 2026-05 | **Superseded, not to be dispatched** (PLAN-017). They are re-produced under the method of record; until then they are source material only. |
 
+
+_Documents that are history only are in `Docs/archive/`. `Docs/archive/README.md` lists what moved there on 2026-11-16 (PLAN-025)._
 
 ## Architecture Quick Reference
 
@@ -135,17 +137,18 @@ _Items from postmortems or phase closures that have NOT been acted on._
 - **Httpd stack:** Uniform 16 KB via local component override in `firmware/local_components/web_server_idf/`. Must re-apply after ESPHome upgrades via `scripts/patch-esphome-httpd-stack.sh`.
 
 
-## Planning Documents (2026-05-07 Multi-Phase Session)
+## Planning Documents
 
 | Document | Purpose |
 |---|---|
-| `Docs/phase-7-review-and-rewrite.md` | Rewritten Phase 7 plan (supersedes v7.7-implementation-plan.md) |
+| `Docs/plan-of-record.md` | Plan of record: the ladder of steps to v1.0, the scope and done-when of each step, open findings and risks (PLAN-024) |
+| `Docs/planner-start-here.md` | Entry page for planning and prompt-producing sessions (PLAN-030) |
+| `Docs/phase-7-review-and-rewrite.md` | Rewritten Phase 7 plan (supersedes `Docs/archive/planning-2026-05/v7.7-implementation-plan.md`) |
 | `Docs/phase-E-captive-portal-plan.md` | Phase E scoping — WiFi provisioning, sensor discovery |
 | `Docs/phase-8-notifications-plan.md` | Phase 8 scoping — Telegram, ntfy.sh, threshold alerts |
 | `Docs/phase-9-cloud-upload-plan.md` | Phase 9 scoping — InfluxDB, MQTT, store-and-forward |
 | `Docs/phase-10-dashboard-ui-plan.md` | Phase 10 scoping — responsive UI, i18n |
 | `Docs/board-selection-guide-expansion.md` | Board capability matrix with Phase 7 retention numbers |
-| `Docs/multi-phase-planning-session-summary.md` | Full session record including operator feedback incorporation |
 
 
 ## KPI Baselines (for tracking)

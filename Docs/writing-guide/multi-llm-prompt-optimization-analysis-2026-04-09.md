@@ -199,7 +199,7 @@ This preamble costs ~350 tokens. It prevents the five most common cross-LLM fail
 
 **What Perplexity proposed:** Deferred targeted reads — only open files at the moment of editing.
 
-**What would fail:** The agent skips reading `Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md` because it's not a file being edited. But that document contains the exact `run_full_pipeline()` contract, the fragment manifest with boundary line numbers, and the assembly script specification. Without reading it, the agent implements from the handoff summary which is a condensed version and may miss edge cases. The agent produces `run_full_pipeline()` with 7 steps instead of 8, or gets the assembly script `--check` behavior wrong.
+**What would fail:** The agent skips reading `Docs/archive/completed-phases/phase-Y-architecture-and-refactor-plan-sensor-history.md` because it's not a file being edited. But that document contains the exact `run_full_pipeline()` contract, the fragment manifest with boundary line numbers, and the assembly script specification. Without reading it, the agent implements from the handoff summary which is a condensed version and may miss edge cases. The agent produces `run_full_pipeline()` with 7 steps instead of 8, or gets the assembly script `--check` behavior wrong.
 
 **Probability:** Medium-high for implementation steps, low for validation-only steps.
 
