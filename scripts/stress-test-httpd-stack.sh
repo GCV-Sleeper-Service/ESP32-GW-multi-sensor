@@ -15,6 +15,7 @@
 #   - Target board flashed and booted for at least 2 minutes
 #   - Board must serve /api/status/full with httpd_stack_watermark_bytes
 #   - curl and jq installed
+#   - ESP_USER and ESP_PASS set in your shell (SEC-003); the script holds no login and stops without one
 #
 # ACCEPTANCE GATE:
 #   Minimum watermark across all waves must be >= 10000 bytes after the
@@ -49,7 +50,11 @@ for arg in "$@"; do
 done
 
 TARGET="${TARGET:-192.168.120.189}"
-AUTH="${ESP_AUTH:-ESPadmin:ESPpass100}"
+if [[ -z "${ESP_USER:-}" || -z "${ESP_PASS:-}" ]]; then
+    echo "ERROR: ESP_USER and ESP_PASS must be set in your shell (SEC-003). This script holds no login." >&2
+    exit 2
+fi
+AUTH="${ESP_USER}:${ESP_PASS}"
 BASE="http://${TARGET}"
 WAVES=5
 MIN_WM=999999
