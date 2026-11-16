@@ -373,7 +373,7 @@ Phase Y validated a multi-LLM workflow where different agents serve different ro
 
 - **Primary execution:** GitHub Copilot — IDE integration, repo context, PR creation
 - **Architectural advisor + prompt producer:** Claude — long-context reasoning, document production
-- **Post-execution review (3-turn):** Perplexity — GitHub MCP access, structured review protocol
+- **Post-execution review (3-turn):** in Phase Y, Perplexity — GitHub MCP access, structured review protocol. The reviewers of today are in `Docs/development-process-guide.md` §2.4 (PLAN-019)
 - **Fallback execution:** GPT, Codex — token constraints on Copilot, alternative reasoning
 
 **Critical constraint (validated by cross-LLM analysis):** Every LLM asked to "optimise" an agent prompt strips safety constraints — the constraints it considers redundant are exactly the ones that prevent the failure modes documented in the lessons database. **Original prompts with the universal multi-LLM execution preamble are the only prompts used for execution.** LLM-specific "optimised" variants are never used.

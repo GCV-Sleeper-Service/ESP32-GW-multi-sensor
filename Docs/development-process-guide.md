@@ -81,7 +81,11 @@ The operator gives the agent two things:
 8) Apply every edit with your file-edit tool; never with a script that parses the prompt
 9) If one of your own commands fails, repair it and repeat the step; run no checkpoint while an edit before it is missing
 10) Run one test command at a time: no second preflight, Playwright run or mock server while one is running
+11) After `gh pr ready`: post the comment `/gemini review` on the PR; wait up to 30 minutes for the inline reviews of Copilot, Codex and Gemini; then assess each finding, fix what is warranted, and post one comment with your assessment that names any reviewer that did not post. Never merge, approve or start an external review
+12) Stops: a known tooling defect with a recovery written in the prompt gets that recovery once, with the result posted, and a second failure stops; a value you would have to ask for is in the prompt; a real mismatch (a missing anchor, a different value, a path out of scope, a test failing twice) always stops with the checkpoint-failure comment of §3.2
 ```
+
+Items 11 and 12 hold from R3c on (PLAN-027): the coding agent starts the inline review round itself, and the stop rules are decided in advance.
 
 **B) The agent prompt** — copy the agent section from the Claude two-step prompt.
 
@@ -94,7 +98,7 @@ For steps modifying firmware behavior, the agent (or operator) runs:
 bash scripts/provision.sh satellite
 esphome clean   firmware/esp32-c3-multi-sensor.yaml
 esphome compile firmware/esp32-c3-multi-sensor.yaml
-esphome upload  firmware/esp32-c3-multi-sensor.yaml --device=192.168.120.189
+timeout 300 esphome upload firmware/esp32-c3-multi-sensor.yaml --device=192.168.120.189
 esphome clean   firmware/esp32-c3-multi-sensor.yaml
 
 # Smoke test (wait 30s after upload)
@@ -120,7 +124,7 @@ Five reviews in this order:
 | 4 | Claude (external review A) | Its own session, apart from planning and from the coding agent | Whole-PR review: findings by severity, each acceptance criterion checked |
 | 5 | Meta Muse, Spark or Wonder (external review B); fallback: Gemini on the web | Its own session | Structured three-turn review |
 
-After inline reviews complete, agent addresses findings:
+After the inline reviews the agent addresses the findings by itself (§2.2 item 11, PLAN-027). After each external review the operator pastes the same line to the agent:
 ```
 Please analyze the code reviews and comments for the PR. Assess if they are warranted,
 if yes, implement necessary fixes. Post a comment summarizing your assessment.
@@ -129,6 +133,8 @@ if yes, implement necessary fixes. Post a comment summarizing your assessment.
 External reviewers get a structured prompt (see prompt templates) that asks them to classify findings by severity and check acceptance criteria.
 
 External review B runs the structured three-turn review protocol as the final quality gate. No external reviewer comes from the coding agent's vendor; the coding agent is Codex (PLAN-019). Each external reviewer posts one PR comment, or the operator pastes its output into the PR. A reviewer never pushes, merges or approves.
+
+Claude Code is the fallback coding agent (PLAN-026). The agent changes only at a step boundary, or at a passed checkpoint with a handoff comment on the PR, and two agents never work in one checkout. When Claude Code codes a step, external review A is a GPT model. When the review-runner PR is merged, PLAN-022 and PLAN-023 replace this section: after the inline round, reviews A and C run side by side, and review B by the runner comes last (`Docs/plan-of-record.md`, section 7).
 
 ### 2.5 Step Deliverables (in-PR, before merge)
 
@@ -141,7 +147,7 @@ The PR is the single source of truth for a step. A step is not "done" until the 
 Before a PR may be marked "Ready to merge," the branch MUST contain:
 
 1. **Code changes** — the actual implementation, with all checkpoints satisfied (or a checkpoint-failure comment posted and accepted by the operator).
-2. **`CURRENT-STATE.md` update** — bump "Last verified" date, append to "What Just Shipped," update "What's Next," add/remove "Open Issues" and "Unimplemented Recommendations."
+2. **`CURRENT-STATE.md` update** — bump "Last verified" date, append to "What Just Shipped," update "What's Next," add/remove "Open Issues" and "Unimplemented Recommendations." Mark the step's row in the ladder of `Docs/plan-of-record.md` and move its "You are here" line (PLAN-024).
 3. **Changelog entry** — `Docs/changelog.md` entry under the new version.
 4. **Consolidated audit file** — required for any **non-trivial** step. A step is non-trivial if any of the following is true:
    - It introduces a new firmware feature
@@ -295,6 +301,7 @@ Every phase ends with:
 |---|---|---|---|
 | 1 — Current State | `CURRENT-STATE.md` | ~2K | Every session |
 | 2 — Decision Index | `Docs/decisions/decision-log.md` | ~3K | Planning sessions |
+| 2 — Plan of Record | `Docs/plan-of-record.md`; planners enter at `Docs/planner-start-here.md` | ~8K | Planning sessions |
 | 3 — Methodology | `Docs/writing-guide/` | ~15K | Prompt production only |
 | 4 — Phase Context | Agent prompt + handoff + critical rules subset | ~10-20K | Execution sessions |
 | 5 — Historical | Lessons, postmortems, gap catalog, old phase results | ~100K+ | Investigation only |
@@ -350,9 +357,16 @@ Manual trigger via `workflow_dispatch` is always available.
 
 ### 7.2 Agent Instructions Files
 
-- `.github/copilot-instructions.md` — top 10 review rules, consumed by Copilot inline review (4,000 char limit)
-- `.github/instructions/*.instructions.md` — path-specific rules for firmware, dashboard, and Playwright files
-- `AGENTS.md` — comprehensive agent instructions, consumed by multiple AI agents (Copilot, Claude, Gemini)
+`AGENTS.md` is the one source of rules for coding agents and reviewers. The other files point to it and repeat a rule only where their reader needs it. Each file stays under 200 lines, and a PR that changes a rule changes every file that states it (PLAN-029).
+
+| File | Who loads it by itself (vendors' documentation, checked 2026-11-16) |
+|---|---|
+| `AGENTS.md` | Codex; GitHub Copilot (code review and cloud agent on GitHub, VS Code chat, CLI); Claude Code through the import line in `CLAUDE.md` |
+| `CLAUDE.md` | Claude Code; GitHub Copilot (code review and cloud agent on GitHub, CLI). Not Codex |
+| `.github/copilot-instructions.md` | GitHub Copilot only, in every Copilot feature |
+| `.github/instructions/*.instructions.md` | GitHub Copilot only (code review and cloud agent on GitHub, VS Code chat, CLI); `applyTo` names the paths |
+
+The Gemini inline reviewer loads none of these files; R5a decides whether it gets a `.gemini/styleguide.md`. Copilot's code review reads the instruction files from the head branch of the PR, so a PR that edits one of them changes its own Copilot review: the review file of such a step tells reviewers A and B to read that diff by hand.
 
 ### 7.3 Verifying Agents Follow Rules
 

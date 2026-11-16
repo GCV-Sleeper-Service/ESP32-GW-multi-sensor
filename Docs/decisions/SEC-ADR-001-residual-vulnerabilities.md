@@ -94,7 +94,7 @@ Issue #139 identifies a heap exhaustion crash when `/api/v2/history/` is called 
 `csv.reserve()` in `handle_history_()` is capped at `MIN(estimated_bytes, 60000)`. Auth is added to `/history/` and `/api/v2/history/` so that anonymous callers cannot trigger the allocation. This reduces (but does not eliminate) the risk: an authenticated attacker with valid credentials could still trigger a large allocation.
 
 **Full resolution path:**  
-Phase 7 per-device persistence engine with chunked CSV streaming (tracked in #139 and `Docs/v7.7-implementation-plan.md`).
+Phase 7 per-device persistence engine with chunked CSV streaming (tracked in #139 and `Docs/archive/planning-2026-05/v7.7-implementation-plan.md`).
 
 ---
 

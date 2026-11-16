@@ -3,7 +3,7 @@
 _Canonical audit-prompt skeleton for the ESP32-GW-multi-sensor prompt-audit gate._
 
 - **Template version:** v1.1
-- **Authority:** [Docs/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (as revised by §11)
+- **Authority:** [Docs/archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (as revised by §11)
 - **Worked example this template was extracted from:** [prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md](../../prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md)
 - **CHANGELOG:** see end of this file
 
@@ -222,7 +222,7 @@ Producer sessions · audit sessions · fix-cycle PRs · defects escaped to agent
 
 | Version | Date | Change |
 |---|---|---|
-| v1.0 | 2026-05-10 | Initial template extracted from `prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md` and structured per [Docs/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (with §11 revisions: Codex four-lane coverage, Codex severity model, Codex evidence-consistency check C8, Perplexity adversarial scenario taxonomy in §2.C, Perplexity separate-file reconciliation, Perplexity freshness checklist §0, Perplexity triage heuristics §8, GPT-5.5 operator checklist §7). |
+| v1.0 | 2026-05-10 | Initial template extracted from `prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md` and structured per [Docs/archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (with §11 revisions: Codex four-lane coverage, Codex severity model, Codex evidence-consistency check C8, Perplexity adversarial scenario taxonomy in §2.C, Perplexity separate-file reconciliation, Perplexity freshness checklist §0, Perplexity triage heuristics §8, GPT-5.5 operator checklist §7). |
 | v1.1 | 2026-11-14 | PR #234 review fix: align auditor counts, reconciliation, dispatch and triage instructions with PLAN-017's LOW / MEDIUM / HIGH producer-audit tiers. |
 
 ---

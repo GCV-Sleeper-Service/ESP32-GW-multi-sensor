@@ -220,7 +220,7 @@ The dashboard is built from modular source files using a three-pass build pipeli
 
 `dashboard.js` and `dashboard.html` are generated files — never edit them directly. Edit the source modules and run the pipeline.
 
-See `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` for the full architecture plan.
+See `Docs/archive/completed-phases/phase-X-architecture-and-refactor-plan-dashboard.md` for the full architecture plan.
 
 ### Firmware Core Modules (`firmware/core/`)
 
@@ -261,8 +261,8 @@ The firmware history/persistence engine (`dashboard/sensor_history_multi.h`) is 
 |----------|---------|
 | [Docs/architecture-overview.md](Docs/architecture-overview.md) | Architecture overview — hardware, firmware, dashboard, build pipeline, phase history |
 | [Docs/changelog.md](Docs/changelog.md) | Full release history |
-| [Docs/phase-d-implementation-plan.md](Docs/phase-d-implementation-plan.md) | Phase D (runtime satellite management) |
-| [Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md](Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md) | Phase Y firmware refactor plan |
+| [Docs/archive/completed-phases/phase-d-implementation-plan.md](Docs/archive/completed-phases/phase-d-implementation-plan.md) | Phase D (runtime satellite management) |
+| [Docs/archive/completed-phases/phase-Y-architecture-and-refactor-plan-sensor-history.md](Docs/archive/completed-phases/phase-Y-architecture-and-refactor-plan-sensor-history.md) | Phase Y firmware refactor plan |
 | [Docs/v7.7-v7.8-persistence-architecture.md](Docs/v7.7-v7.8-persistence-architecture.md) | Phase 7 persistence architecture |
 | [Docs/aggregator-setup.md](Docs/aggregator-setup.md) | Aggregator deployment guide |
 | [Docs/lessons/index.md](Docs/lessons/index.md) | Bug database + operational lessons (by domain) |

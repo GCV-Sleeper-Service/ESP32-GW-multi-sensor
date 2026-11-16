@@ -49,7 +49,7 @@ The dashboard was refactored from a 3,955-line monolith into a modular component
 2. Pass 1: Replace `{{COMPONENT:name}}` markers → component templates
 3. Pass 2: Replace `{{JS_PLACEHOLDER}}` → bundled JS
 
-See `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` for the full dashboard architecture plan.
+See `Docs/archive/completed-phases/phase-X-architecture-and-refactor-plan-dashboard.md` for the full dashboard architecture plan.
 
 ### Build Pipeline
 
@@ -95,11 +95,11 @@ Board switching: `scripts/provision.sh <aggregator|wroom|satellite>`. Always run
 
 | Document | Purpose |
 |----------|---------|
-| `Docs/phase-Y-architecture-and-refactor-plan-sensor-history.md` | Phase Y firmware refactor plan |
-| `Docs/phase-Y-current-state-inventory-sensor-history-v2.md` | Phase Y current state inventory |
-| `Docs/phase-X-architecture-and-refactor-plan-dashboard.md` | Phase X plan (methodology reference) |
-| `Docs/phase-d-implementation-plan.md` | Phase D plan (API contracts reference) |
-| `Docs/v7.7-implementation-plan.md` | Phase 7 step-level scope |
+| `Docs/archive/completed-phases/phase-Y-architecture-and-refactor-plan-sensor-history.md` | Phase Y firmware refactor plan |
+| `Docs/archive/completed-phases/phase-Y-current-state-inventory-sensor-history-v2.md` | Phase Y current state inventory |
+| `Docs/archive/completed-phases/phase-X-architecture-and-refactor-plan-dashboard.md` | Phase X plan (methodology reference) |
+| `Docs/archive/completed-phases/phase-d-implementation-plan.md` | Phase D plan (API contracts reference) |
+| `Docs/archive/planning-2026-05/v7.7-implementation-plan.md` | Phase 7 step-level scope |
 | `Docs/v7.7-v7.8-persistence-architecture.md` | Phase 7/8 persistence design |
 | `Docs/changelog.md` | Full version history |
 | `Docs/lessons/index.md` | Bugs and lessons learned (by domain) |

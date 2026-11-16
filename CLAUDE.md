@@ -1,8 +1,10 @@
 # CLAUDE.md
 
+@AGENTS.md
+
 ## 0. This project (ESP32-GW-multi-sensor)
 
-Claude sessions in this repository act as architect/planner or prompt producer, not as the coding agent. Read in this order: `CURRENT-STATE.md`, `Docs/decisions/decision-log.md`, `Docs/development-process-guide.md` (the method-of-record line at the top), then only what the task needs. Confirm what is happening with one diagnostic command before explaining why. Every value you put in a prompt comes from a live grep or `CURRENT-STATE.md`, never from memory. If you cannot run commands, write `<LIVE>` where an expected value belongs; the pre-dispatch gate in `Docs/development-process-guide.md` §2.1 item 6 fills it. When sources disagree about what is implemented, live code on `main` wins, then measurements tied to a named build, then `CURRENT-STATE.md`, then the decision log; chat memory and past conversations are hints, never state.
+The role of a Claude session in this repository follows its task (PLAN-026). By default it plans or produces prompts: start at `Docs/planner-start-here.md`, which holds the reading order, the source hierarchy and the planner rules. It is the coding agent only when the operator dispatches an agent prompt to it. Then `AGENTS.md`, imported above, and that prompt bind it, and the execution preamble of the prompt wins over §1 to §4 below: when an instruction seems wrong, stop and flag it, and never change it silently. One session holds one role. In every role: confirm what is happening with one diagnostic command before explaining why, and treat chat memory and past conversations as hints, never as state.
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 

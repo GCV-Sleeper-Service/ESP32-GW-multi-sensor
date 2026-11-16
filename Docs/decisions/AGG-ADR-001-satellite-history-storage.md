@@ -81,7 +81,7 @@ After the V1-A fix (proxy 502 diagnostic and timeout), the proxy path is viable 
 
 **Option 2 — Pull and store locally — is designated Phase 7 pre-work, targeted for v7.7.1.x.**
 
-The Phase 7 per-device persistence engine (`Docs/v7.7-implementation-plan.md`) already plans the NVS partition rework needed for satellite history storage. Option 2 implementation must be deferred until after the partition table change is executed as part of Phase 7.
+The Phase 7 per-device persistence engine (`Docs/archive/planning-2026-05/v7.7-implementation-plan.md`) already plans the NVS partition rework needed for satellite history storage. Option 2 implementation must be deferred until after the partition table change is executed as part of Phase 7.
 
 ---
 
@@ -171,7 +171,7 @@ This is a one-time maintenance event per aggregator board. The Phase 7 implement
 
 ## Related Documents
 
-- `Docs/v7.7-implementation-plan.md` — Phase 7 per-device persistence engine (includes aggregator history storage as a v7.7.1.x deliverable)
+- `Docs/archive/planning-2026-05/v7.7-implementation-plan.md` — Phase 7 per-device persistence engine (includes aggregator history storage as a v7.7.1.x deliverable)
 - `Docs/v7.7-v7.8-persistence-architecture.md` — §5, §12, §14–16 — aggregator storage design
 - `Docs/phase-V-capacity-study.md` — §5 Aggregator Capacity — NVS budget analysis
 - Issue #161 — Proxy bug fix (V1-A prerequisite)
