@@ -16,7 +16,8 @@ on:
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
-    # Required status checks must run for documentation-only PRs too.
+    # Required status checks must run for documentation-only PRs too (PLAN-020).
+    # Such a PR takes the fast path that the step "List changed paths" decides (PLAN-028).
 
 jobs:
   preflight-and-compile:
@@ -28,6 +29,40 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: List changed paths
+        id: paths
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # PLAN-028: a pull request whose every changed path is documentation runs preflight only.
+          # Any other path, an empty diff, a push and a manual run take the full job.
+          docs_only=false
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            git diff --name-only --no-renames "origin/${BASE_REF}...${HEAD_SHA}" > "$RUNNER_TEMP/changed-paths.txt"
+            if [[ -s "$RUNNER_TEMP/changed-paths.txt" ]]; then
+              docs_only=true
+              while IFS= read -r p; do
+                case "$p" in
+                  Docs/*|prompts/*|README.md|CURRENT-STATE.md|AGENTS.md|CLAUDE.md) ;;
+                  .github/copilot-instructions.md|.github/instructions/*.instructions.md) ;;
+                  *) docs_only=false ;;
+                esac
+              done < "$RUNNER_TEMP/changed-paths.txt"
+            fi
+            echo "Changed paths: $(wc -l < "$RUNNER_TEMP/changed-paths.txt")"
+          fi
+          echo "docs_only=${docs_only}" >> "$GITHUB_OUTPUT"
+          if [[ "$docs_only" == "true" ]]; then
+            echo "### Fast path: documentation only; ESPHome install and compile skipped (PLAN-028)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Full job: ESPHome install and compile" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -40,6 +75,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
+        if: steps.paths.outputs.docs_only != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -64,6 +100,7 @@ jobs:
           EOF_SECRETS
 
       - name: Minify dashboard
+        if: steps.paths.outputs.docs_only != 'true'
         shell: bash
         run: |
           bash ./scripts/minify-dashboard.sh 2>&1 | tee build-logs/minify.log
@@ -75,6 +112,7 @@ jobs:
           echo "| ${ORIG} bytes | ${MINI} bytes |" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Regenerate dashboard.h from minified source
+        if: steps.paths.outputs.docs_only != 'true'
         shell: bash
         run: |
           bash ./scripts/generate-header.sh 2>&1 | tee build-logs/generate-header.log
@@ -85,6 +123,7 @@ jobs:
           bash ./scripts/preflight.sh 2>&1 | tee build-logs/preflight.log
 
       - name: Compile firmware
+        if: steps.paths.outputs.docs_only != 'true'
         shell: bash
         run: |
           esphome compile firmware/esp32-c3-multi-sensor.yaml 2>&1 | tee build-logs/compile.log
