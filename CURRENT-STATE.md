@@ -113,6 +113,8 @@ _Items from postmortems or phase closures that have NOT been acted on._
 | Issue #228 §D | Phase-closure prompt refinements | **Deferred** — folded into the v7.7.3.3 closure prompt |
 | PR #235 review (Muse) | Literal management login remains in live test scripts and historical records; the housekeeping scrub covers only seven named files | **Partly implemented in R5** — `scripts/stress-test-httpd-stack.sh` holds no default login now; `scripts/exporters/system-metrics-exporter.sh` still sets default values for `METRICS_USER` and `METRICS_PASS`; live-script cleanup and secret rotation routed to v7.7.1.5 (SEC-003); historical records and git history retain old values |
 | PR #235 review (Gemini) | Retire the superseded RV-04 narrative and resolution target in SEC-ADR-001; the restart amendment now states that v7.7.1.1 resolved it | **Deferred** — documentation cleanup routed to v7.7.1.5; preserve this PR's prescribed history coverage rows and original prompt |
+| PR #237 inline review (Gemini) | Add temporary-resource cleanup to the scope-gate test fixture and the workflow/body helpers of prompt check files; give malformed run blocks a bounded extraction diagnostic | **Deferred** — next prompt check-file and fixture production (PLAN-031); the supplied R5 files remain byte-identical to their dispatched hashes |
+| PR #237 CI | Browser Tests cannot install browsers: Playwright 1.56.0 does not support the runner's `ubuntu26.04-x64` platform | **Not implemented** — a separate scoped CI/dependency compatibility follow-up; the Browser Tests workflow and dependency files are outside R5 scope |
 
 ## Stale Documents Requiring Update Before Use
 
