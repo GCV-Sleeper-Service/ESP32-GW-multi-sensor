@@ -188,11 +188,11 @@ collect_fail_violations() {
 
 # L11 helper: succeed when the line holds a login literal. A login literal is a value after -u or
 # --user whose user part is a plain name (letters, digits, . _ @ -), or whose user part is a variable
-# and whose password part is not; or any value after "Authorization: Basic" that does not start with
+# and whose password part is not; or any bare or quoted value after "Authorization: Basic" that does not start with
 # $, {, <, . or *. Variables ($NAME, ${NAME}, $(...)) and placeholders (<...>) are not literals.
 l11_literal() {
   local line="$1" tok val user pass
-  if grep -qiE 'authorization:[[:space:]]*basic[[:space:]]+[^[:space:]$<{"`'"'"'.*]' <<< "$line"; then
+  if grep -qiE 'authorization:[[:space:]]*basic[[:space:]]+["'"'"'`]?[^[:space:]$<{"`'"'"'.*]' <<< "$line"; then
     return 0
   fi
   while IFS= read -r tok; do
