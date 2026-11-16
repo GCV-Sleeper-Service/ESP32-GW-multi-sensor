@@ -71,10 +71,10 @@ A disagreement is recorded before you act on it. Something that a conversation c
 3. Write the files that go with it: the operator page for `Docs/operator/`, the setup block (process guide §2.2), and for a code step the review file.
 4. Run the pre-dispatch gate (process guide §2.1 item 6) on the day of dispatch.
 5. Rehearse the whole pull request on a fresh worktree of `origin/main`: apply every edit as written, run every checkpoint, run the real `scripts/lint-prompts.sh` and the real `scripts/preflight.sh`. Add negative tests: each gate must stop when its condition is broken.
-6. Hand over: the prompt, the operator page, the setup block, and the gate record with the expected SHA-256 of every file that has a fixed text.
+6. Hand over: the prompt, the check file, the operator page, the setup block, and the gate record with the expected SHA-256 of every file that has a fixed text. The check file holds every gate and checkpoint of the prompt, so the agent runs it and types no check (PLAN-031).
 7. After the merge, close the step: read the merged pull request and its audit, and correct the next prompt at its gate.
 
-## Rules that came from review findings (PR #234, PR #235)
+## Rules that came from review findings (PR #234, PR #235, PR #236)
 
 - Run every command that you give the operator yourself first, exactly as written.
 - No secret in a command argument. A check that needs a secret reads it from the environment inside one process.
@@ -83,6 +83,7 @@ A disagreement is recorded before you act on it. Something that a conversation c
 - A status mark that the pull request changes is searched for in the whole file, not only on the edited line.
 - A rule that changes is changed in every place that states it.
 - A prompt that changes a file an agent loads (`AGENTS.md`, `CLAUDE.md`, the Copilot files) says so in the review file, because Copilot reads these files from the head branch of the pull request.
+- Every gate and checkpoint of a prompt is in its check file, which has a known SHA-256; the agent runs the file and never types a check (PR #236: the agent typed the §2 gate by hand, with wrong dates).
 
 ## Where a planning session can run
 
