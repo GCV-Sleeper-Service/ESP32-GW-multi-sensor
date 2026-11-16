@@ -115,6 +115,8 @@ _Items from postmortems or phase closures that have NOT been acted on._
 | PR #235 review (Gemini) | Retire the superseded RV-04 narrative and resolution target in SEC-ADR-001; the restart amendment now states that v7.7.1.1 resolved it | **Deferred** — documentation cleanup routed to v7.7.1.5; preserve this PR's prescribed history coverage rows and original prompt |
 | PR #237 inline review (Gemini) | Add temporary-resource cleanup to the scope-gate test fixture and the workflow/body helpers of prompt check files; give malformed run blocks a bounded extraction diagnostic | **Deferred** — next prompt check-file and fixture production (PLAN-031); the supplied R5 files remain byte-identical to their dispatched hashes |
 | PR #237 CI | Browser Tests cannot install browsers: Playwright 1.56.0 does not support the runner's `ubuntu26.04-x64` platform | **Not implemented** — a separate scoped CI/dependency compatibility follow-up; the Browser Tests workflow and dependency files are outside R5 scope |
+| PR #237 external review A | Add quoted Basic-auth token pass/fail regression cases, including variable and placeholder exceptions, in normal and baseline lint modes | **Deferred** — next fixture production under PLAN-031, alongside the Gemini fixture follow-ups; the supplied R5 fixtures and check file remain byte-identical |
+| PR #237 external review A | Exercise the documentation CI fast path on a clean GitHub runner after the PyYAML fix | **Pending operator post-merge check** — run the existing one-off documentation PR procedure in the R5 prompt §9 and operator page immediately after merge, before relying on the fast path for real documentation PRs; no agent-created smoke PR or merge |
 
 ## Stale Documents Requiring Update Before Use
 
