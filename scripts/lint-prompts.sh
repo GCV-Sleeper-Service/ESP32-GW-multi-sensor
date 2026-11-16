@@ -13,6 +13,7 @@
 #
 # Exit 0 — clean, WARN only, or all violations are pre-existing
 # Exit 1 — at least one net-new violation (ERROR) found
+# Exit 2 — rule L8 cannot read the live value it compares with
 #
 # Output format:
 #   ERROR    <file>:<line>: [LN] <desc>  — new violation; blocks PR
@@ -70,6 +71,10 @@ rule_message() {
     L4) echo "Stale WROOM IP 192.168.120.190 — verify current IP via Board Info Extraction Gate" ;;
     L5) echo "Wrong YAML filename 'esp32-wroom-32d-multi-sensor.yaml' — use 'esp32-wroom-32d-gw.yaml'" ;;
     L7) echo "Forbidden §9 compound pattern — §9 must not reference 'Post-Merge Deliverables'" ;;
+    L8) echo "Rule 61 delay drift — a pdMS_TO_TICKS value within 3 lines of 'Rule 61' differs from the live value in maybe_yield_nvs_scan_()" ;;
+    L9) echo "Step agent prompt without a closing line 'Fixes #N' for its PR body (plan of record, section 6)" ;;
+    L10) echo "Agent prompt runs 'git checkout main' or 'git switch main' — check the feature branch instead" ;;
+    L11) echo "Login literal after -u, --user or 'Authorization: Basic' — take the login from \$ESP_USER and \$ESP_PASS (SEC-003)" ;;
     *)  echo "Unknown rule $1" ;;
   esac
 }
@@ -78,9 +83,10 @@ rule_message() {
 # Collect FAIL-class violations from a content source file.
 # Outputs one TSV line per violation:  RULE_ID <TAB> LINENO <TAB> LINE_CONTENT
 # $1 = path to file whose content to scan
+# $2 = repository path of that file; rules L9 and L10 read its name (default: $1)
 # ---------------------------------------------------------------------------
 collect_fail_violations() {
-  local src="$1"
+  local src="$1" name="${2:-$1}"
   local raw lineno content
 
   # L1: "Post-Merge Deliverables" (case-sensitive)
@@ -118,12 +124,85 @@ collect_fail_violations() {
     printf 'L5\t%s\t%s\n' "$lineno" "$content"
   done < <(grep -n 'esp32-wroom-32d-multi-sensor\.yaml' "$src" 2>/dev/null || true)
 
+  # L8: Rule 61 delay drift (issue #228 §C13, R5)
+  # Rationale: a pdMS_TO_TICKS value within 3 lines of "Rule 61" must equal the live value of
+  # maybe_yield_nvs_scan_() in firmware/core/nvs-persistence.h (a draft in PR #233 cited 1; the code has 5).
+  while IFS= read -r raw; do
+    lineno="${raw%%:*}"; content="${raw#*:}"
+    printf 'L8\t%s\t%s\n' "$lineno" "$content"
+  done < <(awk -v live="$L8_LIVE" '
+    { line[NR] = $0 }
+    /Rule 61([^0-9]|$)/ { r61[NR] = 1 }
+    END {
+      for (i = 1; i <= NR; i++) {
+        s = line[i]; bad = 0
+        while (match(s, /pdMS_TO_TICKS\([ \t]*[0-9]+[ \t]*\)/)) {
+          v = substr(s, RSTART, RLENGTH); gsub(/[^0-9]/, "", v)
+          if (v + 0 != live + 0) bad = 1
+          s = substr(s, RSTART + RLENGTH)
+        }
+        if (!bad) continue
+        for (j = i - 3; j <= i + 3; j++) if (j in r61) { printf "%d:%s\n", i, line[i]; break }
+      }
+    }' "$src" 2>/dev/null || true)
+
+  # L9: a step agent prompt with no closing line "Fixes #N" (recurrence, R5)
+  # Rationale: a step prompt closes its issue from the PR body (plan of record, section 6, move 2).
+  # A step agent prompt is a file named v<a>.<b>.<c>.<d>-agent-prompt*.md.
+  if [[ "$(basename "$name")" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+-agent-prompt.*\.md$ ]] \
+     && ! grep -qE '^[[:space:]>*-]*Fixes #[0-9]+' "$src" 2>/dev/null; then
+    printf 'L9\t1\t%s\n' "no closing line Fixes #N"
+  fi
+
+  # L10: an agent prompt that runs "git checkout main" or "git switch main" (recurrence, R5)
+  # Rationale: the agent stays on its feature branch; a branch check replaces the checkout of main.
+  # An agent prompt is a file whose name contains "agent-prompt"; only lines inside code blocks count.
+  if [[ "$(basename "$name")" == *agent-prompt* ]]; then
+    while IFS= read -r raw; do
+      lineno="${raw%%:*}"; content="${raw#*:}"
+      printf 'L10\t%s\t%s\n' "$lineno" "$content"
+    done < <(awk '
+      BEGIN { fence_mark = sprintf("%c%c%c", 96, 96, 96) }
+      { t = $0; sub(/^[ \t]+/, "", t) }
+      substr(t, 1, 3) == fence_mark { in_code = !in_code; next }
+      in_code && /git([ \t]+-C[ \t]+[^ \t]+)?[ \t]+(checkout|switch)([ \t]+-[^ \t]+)*[ \t]+main([ \t;&|)]|$)/ { printf "%d:%s\n", NR, $0 }
+    ' "$src" 2>/dev/null || true)
+  fi
+
+  # L11: a login literal after -u or --user, or a value after "Authorization: Basic" (SEC-003, R5)
+  # Rationale: agents and scripts take the login from $ESP_USER and $ESP_PASS. The rule holds no real value.
+  while IFS= read -r raw; do
+    lineno="${raw%%:*}"; content="${raw#*:}"
+    if l11_literal "$content"; then
+      printf 'L11\t%s\t%s\n' "$lineno" "$content"
+    fi
+  done < <(grep -niE -- '-u|--user|authorization' "$src" 2>/dev/null || true)
+
   # L7: §9 compound pattern (case-insensitive)
   # Rationale: Catches variants that L1 string match would miss (audit E-1).
   while IFS= read -r raw; do
     lineno="${raw%%:*}"; content="${raw#*:}"
     printf 'L7\t%s\t%s\n' "$lineno" "$content"
   done < <(grep -niE '§9.*Post.Merge.*Deliverables' "$src" 2>/dev/null || true)
+}
+
+# L11 helper: succeed when the line holds a login literal. A login literal is a value after -u or
+# --user whose user part is a plain name (letters, digits, . _ @ -), or whose user part is a variable
+# and whose password part is not; or any value after "Authorization: Basic" that does not start with
+# $, {, <, . or *. Variables ($NAME, ${NAME}, $(...)) and placeholders (<...>) are not literals.
+l11_literal() {
+  local line="$1" tok val user pass
+  if grep -qiE 'authorization:[[:space:]]*basic[[:space:]]+[^[:space:]$<{"`'"'"'.*]' <<< "$line"; then
+    return 0
+  fi
+  while IFS= read -r tok; do
+    val="$(sed -E 's/^[^-]?(-u|--user)([[:space:]]+|=)?//; s/^["'"'"']//; s/["'"'"'`]+$//' <<< "$tok")"
+    [[ "$val" == *:* ]] || continue
+    user="${val%%:*}"; pass="${val#*:}"
+    if [[ "$user" =~ ^[A-Za-z0-9._@-]+$ ]]; then return 0; fi
+    if [[ "$user" == [\$\<]* && -n "$pass" && "$pass" != [\$\<]* ]]; then return 0; fi
+  done < <(grep -oE -- "(^|[^[:alnum:]_-])(-u|--user)([[:space:]]+|=)?(\"[^\"]*\"|'[^']*'|[^[:space:]\"'|;&)]+)" <<< "$line" || true)
+  return 1
 }
 
 # Build a sorted set of dedup keys "RULE_ID <TAB> LINE_CONTENT" from
@@ -178,7 +257,7 @@ check_file_normal() {
 
   local violations
   violations="$(mktemp)"
-  collect_fail_violations "$file" > "$violations"
+  collect_fail_violations "$file" "$file" > "$violations"
 
   local rule lineno content
   while IFS=$'\t' read -r rule lineno content; do
@@ -209,7 +288,7 @@ check_file_baseline() {
   base_src="$(mktemp)"
 
   # Collect HEAD violations (working tree)
-  collect_fail_violations "$file" > "$tmp_head"
+  collect_fail_violations "$file" "$file" > "$tmp_head"
   violation_keys "$tmp_head" > "$tmp_head_keys"
 
   # Collect BASELINE violations (file content at the given ref, blobs only).
@@ -219,7 +298,7 @@ check_file_baseline() {
   # baseline, all HEAD violations are treated as new.
   if git cat-file -t "${baseline_ref}:${file}" 2>/dev/null | grep -q "^blob$" && \
      git show "${baseline_ref}:${file}" > "$base_src" 2>/dev/null; then
-    collect_fail_violations "$base_src" > "$tmp_base"
+    collect_fail_violations "$base_src" "$file" > "$tmp_base"
   else
     # File did not exist, was not a regular blob, or baseline ref is invalid
     # — every HEAD violation is new
@@ -303,6 +382,14 @@ fi
 if [[ "${#FILES[@]}" -eq 0 ]]; then
   echo "lint-prompts: no files to lint"
   exit 0
+fi
+
+# Rule L8 compares with the live yield value of maybe_yield_nvs_scan_() in firmware/core/nvs-persistence.h.
+L8_LIVE="$(grep -A6 '^static void maybe_yield_nvs_scan_(' firmware/core/nvs-persistence.h 2>/dev/null \
+  | grep -oE 'pdMS_TO_TICKS\([0-9]+\)' | head -n 1 | grep -oE '[0-9]+' || true)"
+if [[ -z "$L8_LIVE" ]]; then
+  echo "lint-prompts: rule L8 cannot read the live value of maybe_yield_nvs_scan_() in firmware/core/nvs-persistence.h" >&2
+  exit 2
 fi
 
 printf 'lint-prompts: checking %d file(s)%s\n' \
