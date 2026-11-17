@@ -365,7 +365,7 @@ The CI workflow (`.github/workflows/ci.yml`) runs its `preflight-and-compile` jo
 
 The job takes a fast path for documentation (PLAN-028). Its step "List changed paths" reads the paths that the pull request changes. When every path is under `Docs/` or `prompts/`, or is `README.md`, `CURRENT-STATE.md`, `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md` or a file `.github/instructions/*.instructions.md`, the job runs preflight only: it skips the ESPHome install, the dashboard minify, the header and the compile. Any other path, an empty diff, a push to `main` and a manual run take the full job.
 
-Manual trigger via `workflow_dispatch` is always available.
+Every workflow runs on `ubuntu-24.04`, not `ubuntu-latest`, so the operating system of a job changes only through a pull request (PLAN-034). `ci.yml`, `browser-tests.yml` and `prompt-lint.yml` can also be started by hand from the Actions tab (`workflow_dispatch`); `pr-body-check.yml` cannot, because it checks a pull request. A manual run of `prompt-lint.yml` lints every prompt without a baseline, so it fails while old prompts hold violations.
 
 ### 7.2 Agent Instructions Files
 

@@ -15,7 +15,8 @@ permissions:
 
 jobs:
   pr-body-check:
-    runs-on: ubuntu-latest
+    # Pinned to one Ubuntu release: the runner's OS changes only through a pull request (R5c, PLAN-034).
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository

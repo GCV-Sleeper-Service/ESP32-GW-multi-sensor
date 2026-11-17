@@ -307,7 +307,8 @@ check_file_baseline() {
   violation_keys "$tmp_base" > "$tmp_base_keys"
 
   # New = present in HEAD but absent from BASELINE (comm -23 on sorted inputs)
-  comm -23 "$tmp_head_keys" "$tmp_base_keys" > "$tmp_new_keys"
+  # LC_ALL=C: comm compares in the byte order of the sort in violation_keys, whatever the shell's locale (R5c, PLAN-034).
+  LC_ALL=C comm -23 "$tmp_head_keys" "$tmp_base_keys" > "$tmp_new_keys"
 
   # Load new-violation keys into an associative array for O(n) lookups.
   declare -A new_keys_set
