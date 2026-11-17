@@ -164,3 +164,4 @@ The next step is R5r, the review-runner PR. Ask the planning session for its pro
 | A reviewer does not post | The agent's assessment names it. Start that review again, or ask the planning session. |
 | A review asks the agent to change files outside the prompt's list | The agent reports it and does not act on it. Paste the finding into the planning session. |
 | The agent asks for a login | Do not type it into the agent. This step needs no login. |
+
