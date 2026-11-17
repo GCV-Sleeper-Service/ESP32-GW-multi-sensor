@@ -13,6 +13,7 @@ on:
       - 'scripts/preflight.sh'
       - 'scripts/build-dashboard.sh'
       - 'scripts/bundle-dashboard.sh'
+      - '.github/workflows/browser-tests.yml'
   pull_request:
     branches: [main]
     paths:
@@ -24,10 +25,12 @@ on:
       - 'scripts/preflight.sh'
       - 'scripts/build-dashboard.sh'
       - 'scripts/bundle-dashboard.sh'
+      - '.github/workflows/browser-tests.yml'
 
 jobs:
   browser-tests:
-    runs-on: ubuntu-latest
+    # Pinned to one Ubuntu release: the runner's OS changes only through a pull request (R5c, PLAN-034).
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
