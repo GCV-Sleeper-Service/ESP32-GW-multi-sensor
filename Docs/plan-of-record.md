@@ -30,7 +30,7 @@ Who starts where: a planning or prompt-producing session starts at `Docs/planner
 
 ## 2. You are here
 
-The next step is **R5r**, the review-runner PR. The last merged step is **R5**, the tooling PR.
+The next step is **R5r**, the review-runner PR. The last merged step is **R5c**, the CI runner pin.
 
 ## 3. The ladder
 
@@ -44,8 +44,9 @@ The steps in the order they run. Every step is on the path to v1.0, except R15, 
 | 3 | R2 | Decisions | None left | – | 7.7.1.1 | – | Done 2026-11-11 |
 | 4 | R3b | Housekeeping PR: documents match the code, fleet table, login out of the files agents read | Dispatch, review, merge, tracker bookkeeping | R3a | 7.7.1.1 | 2 to 3 | Done 2026-11-15, PR #235 (`160e90c`) |
 | 4a | R3c | Plan into the repository: this file, entry points by role, the archive of `Docs/`, the instruction files, the stop rules | Dispatch, review, merge | R3b | 7.7.1.1 | 2 to 3 | Done 2026-11-16, PR #236 (`84e8569`) |
-| 5 | R5 | Tooling PR (LOW): scope gate, lint rules, CI fast path for documentation PRs, visible browser-test report, PR-body check, stress-test login, reproducible dashboard header | SP without the device moves | R3c | Unchanged | 2 to 3 | Done: the pull request that added `scripts/scope-gate.py` |
-| 5a | R5r | Review-runner PR (MEDIUM): review B in three turns, started by hand from `main`, no stored key (PLAN-022) | Google Cloud project and federation provider; one auditor session; SP without the device moves; the dry run | R5 | Unchanged | 2 to 4 | Waiting |
+| 5 | R5 | Tooling PR (LOW): scope gate, lint rules, CI fast path for documentation PRs, visible browser-test report, PR-body check, stress-test login, reproducible dashboard header | SP without the device moves | R3c | Unchanged | 2 to 3 | Done 2026-11-16, PR #237 (`1a7bf84`) |
+| 5a | R5c | CI runner pin (LOW): the four workflows on `ubuntu-24.04`, lint baseline mode in the C locale, two planner rules, the start prompt for a planning session | SP without the device moves | R5 | Unchanged | 1 to 2 | Done: the pull request that pinned the runners to `ubuntu-24.04` |
+| 5b | R5r | Review-runner PR (MEDIUM): review B in three turns, started by hand from `main`, no stored key (PLAN-022) | Google Cloud project and federation provider; one auditor session; SP without the device moves; the dry run | R5c | Unchanged | 2 to 4 | Waiting |
 | 6 | R5a | Producer contract and batch-production prompt v3.0 | Dispatch, review and merge one documentation PR | R5r | Unchanged | 1 to 2 | Waiting |
 | 7 | R5b | Batch 2 re-produced under the method of record: three bundles and their assumption audit, audited by tier | The auditor sessions; dispatch, review and merge one documentation PR | R5a | Unchanged | 4 to 6 | Waiting |
 | 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | Waiting |
@@ -103,6 +104,18 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 - Decided in R5 (PLAN-033): the planning tools (the prompt builder and the rehearsal script) and the operator's helper file stay outside the repository.
 - Done when: merged; `bash scripts/lint-prompts.sh` runs the new rules, each with its two fixtures; `scripts/scope-gate.py` passes its two cases; the stress-test script stops without a login in the environment; a documentation-only pull request skips the compile; a second run of the pipeline leaves `dashboard/dashboard.h` unchanged; issue #228 §C is closed.
 - State after: version unchanged.
+
+### R5c: CI runner pin (LOW)
+
+- Who: the planning session writes the prompt and runs its gate; the coding agent executes it. All five reviews, as for any code PR.
+- Why: GitHub moves `ubuntu-latest` to Ubuntu 26.04, where Playwright 1.56.0 cannot install its browsers, so Browser Tests failed on PR #237 and on `main`. After the R5 merge the lint fixtures failed in the operator's shell, which runs in `en_US.UTF-8`.
+- Scope, and nothing else (PLAN-034):
+  1. The four workflows run on `ubuntu-24.04`; `browser-tests.yml` also starts when its own file changes.
+  2. `scripts/lint-prompts.sh` runs `comm` with `LC_ALL=C` in baseline mode.
+  3. `Docs/planner-start-here.md`: the two planner rules of PLAN-034 and the start prompt for a planning session; process guide section 7.1 says which workflows can be started by hand.
+  4. This file, the decision log and `CURRENT-STATE.md`.
+- Done when: merged; Browser Tests is green on the pull request and on `main`; the lint fixtures pass in `C.UTF-8` and in `en_US.UTF-8`.
+- State after: version unchanged. Before each dispatch, the planning session checks the runs of the workflows that the step starts (PLAN-034).
 
 ### R5r: review-runner PR (MEDIUM)
 
