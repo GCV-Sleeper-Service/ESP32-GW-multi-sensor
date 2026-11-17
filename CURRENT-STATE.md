@@ -1,7 +1,7 @@
 # Current Project State
 
 _Last verified: 2026-11-14 — restart re-verification by the operator: on 2026-11-11 the production boards .189, .170 and .191 reported v7.7.1.1, ESPHome was 2026.4.1, the httpd stack override check passed and a compile without upload succeeded; on 2026-11-14 the same three boards reported v7.7.1.1 again. No firmware change since v7.7.1.1._
-_Next action: R5, the tooling PR (PLAN-017, PLAN-020, PLAN-028). The order and the scope of every step are in `Docs/plan-of-record.md` (PLAN-024). Phase 7 Step v7.7.1.2 is dispatched after R5, R5r, R5a and R5b._
+_Next action: R5r, the review-runner PR (PLAN-022). The order and the scope of every step are in `Docs/plan-of-record.md` (PLAN-024). Phase 7 Step v7.7.1.2 is dispatched after R5r, R5a and R5b._
 
 ---
 
@@ -27,7 +27,7 @@ _Next action: R5, the tooling PR (PLAN-017, PLAN-020, PLAN-028). The order and t
 
 The order, the scope and the status of every step are in `Docs/plan-of-record.md` (PLAN-024). In short:
 
-1. **R5, R5r, R5a, R5b** — the tooling PR, the review-runner PR, the producer contract, and the Batch 2 prompts re-produced under the method of record (PLAN-017, PLAN-022). No firmware change.
+1. **R5r, R5a, R5b** — the review-runner PR, the producer contract, and the Batch 2 prompts re-produced under the method of record (PLAN-017, PLAN-022). No firmware change.
 2. **Phase 7 Steps v7.7.1.2 to v7.7.1.4** — per-device structs and key scheme; persist engine (write path); restore engine (boot path) and retention budget.
 3. **v7.7.1.5** — new board secrets (SEC-003).
 4. **Phase 7 Steps v7.7.2.1 to v7.7.3.3** — engine switchover, migration, export and import, and closure. v7.7.3.3 is v1.0 (PLAN-015).
@@ -108,11 +108,15 @@ _Items from postmortems or phase closures that have NOT been acted on._
 | Restart check 2026-11 | Full-length WROOM history export at 60 % NVS fill or more, with peak heap recorded (BUG-082 acceptance evidence) | **Partly done** — a full-length export completed on 2026-11-11 without a reboot; peak heap and NVS fill were not recorded. Routed to the Phase 7 closure step (v7.7.3.3) |
 | Restart check 2026-11 | Firmware `.bin` size checkpoint against the OTA slot in every Phase 7 prompt from v7.7.1.3 on (C6 4 MB at 91.6 %) | **Not implemented** — routed to the Batch 2 re-production |
 | Restart check 2026-11 | Test counts disagree across README (402 and 117), `AGENTS.md` (~370) and this file (~370+); reconcile all three with `npx playwright test --list` | **Not implemented** — routed to the v7.7.3.3 documentation rewrite |
-| Restart check 2026-11 | Make `dashboard/dashboard.h` reproducible: `scripts/generate-header.sh` compresses with `gzip -9 -c`, which stores a file name and a time, so every build changes the file (for example use `gzip -n`) | **Not implemented** — code change, needs its own PR |
-| PR #234 | `scripts/preflight.sh` sends the browser test's report to `/dev/null`, so a failure leaves no evidence | **Not implemented** — routed to the tooling PR (PLAN-020) |
+| Restart check 2026-11 | Make `dashboard/dashboard.h` reproducible: `scripts/generate-header.sh` compresses with `gzip -9 -c`, which stores a file name and a time, so every build changes the file (for example use `gzip -n`) | **Implemented in R5** — `scripts/generate-header.sh` compresses with `gzip -n`; the pipeline wrote the header once (PLAN-031) |
+| PR #234 | `scripts/preflight.sh` sends the browser test's report to `/dev/null`, so a failure leaves no evidence | **Implemented in R5** — preflight prints the report when the browser test fails (PLAN-020) |
 | Issue #228 §D | Phase-closure prompt refinements | **Deferred** — folded into the v7.7.3.3 closure prompt |
-| PR #235 review (Muse) | Literal management login remains in live test scripts and historical records; the housekeeping scrub covers only seven named files | **Not implemented** — live-script cleanup and secret rotation routed to v7.7.1.5 (SEC-003); historical records and git history retain old values |
+| PR #235 review (Muse) | Literal management login remains in live test scripts and historical records; the housekeeping scrub covers only seven named files | **Partly implemented in R5** — `scripts/stress-test-httpd-stack.sh` holds no default login now; `scripts/exporters/system-metrics-exporter.sh` still sets default values for `METRICS_USER` and `METRICS_PASS`; live-script cleanup and secret rotation routed to v7.7.1.5 (SEC-003); historical records and git history retain old values |
 | PR #235 review (Gemini) | Retire the superseded RV-04 narrative and resolution target in SEC-ADR-001; the restart amendment now states that v7.7.1.1 resolved it | **Deferred** — documentation cleanup routed to v7.7.1.5; preserve this PR's prescribed history coverage rows and original prompt |
+| PR #237 inline review (Gemini) | Add temporary-resource cleanup to the scope-gate test fixture and the workflow/body helpers of prompt check files; give malformed run blocks a bounded extraction diagnostic | **Deferred** — next prompt check-file and fixture production (PLAN-031); the supplied R5 files remain byte-identical to their dispatched hashes |
+| PR #237 CI | Browser Tests cannot install browsers: Playwright 1.56.0 does not support the runner's `ubuntu26.04-x64` platform | **Not implemented** — a separate scoped CI/dependency compatibility follow-up; the Browser Tests workflow and dependency files are outside R5 scope |
+| PR #237 external review A | Add quoted Basic-auth token pass/fail regression cases, including variable and placeholder exceptions, in normal and baseline lint modes | **Deferred** — next fixture production under PLAN-031, alongside the Gemini fixture follow-ups; the supplied R5 fixtures and check file remain byte-identical |
+| PR #237 external review A | Exercise the documentation CI fast path on a clean GitHub runner after the PyYAML fix | **Pending operator post-merge check** — run the existing one-off documentation PR procedure in the R5 prompt §9 and operator page immediately after merge, before relying on the fast path for real documentation PRs; no agent-created smoke PR or merge |
 
 ## Stale Documents Requiring Update Before Use
 

@@ -30,7 +30,7 @@ Who starts where: a planning or prompt-producing session starts at `Docs/planner
 
 ## 2. You are here
 
-The next step is **R5**, the tooling PR. The last merged step is **R3c**, the pull request that added this file.
+The next step is **R5r**, the review-runner PR. The last merged step is **R5**, the tooling PR.
 
 ## 3. The ladder
 
@@ -43,8 +43,8 @@ The steps in the order they run. Every step is on the path to v1.0, except R15, 
 | 2 | R1 | Environment check and history backups on the build host | Agent check, backups | – | 7.7.1.1 | 1 | Done 2026-11-14 |
 | 3 | R2 | Decisions | None left | – | 7.7.1.1 | – | Done 2026-11-11 |
 | 4 | R3b | Housekeeping PR: documents match the code, fleet table, login out of the files agents read | Dispatch, review, merge, tracker bookkeeping | R3a | 7.7.1.1 | 2 to 3 | Done 2026-11-15, PR #235 (`160e90c`) |
-| 4a | R3c | Plan into the repository: this file, entry points by role, the archive of `Docs/`, the instruction files, the stop rules | Dispatch, review, merge | R3b | 7.7.1.1 | 2 to 3 | Done: the pull request that added this file |
-| 5 | R5 | Tooling PR (LOW): scope gate, lint rules, CI fast path for documentation PRs, visible browser-test report, PR-body check, stress-test login | SP without the device moves | R3c | Unchanged | 2 to 3 | Waiting |
+| 4a | R3c | Plan into the repository: this file, entry points by role, the archive of `Docs/`, the instruction files, the stop rules | Dispatch, review, merge | R3b | 7.7.1.1 | 2 to 3 | Done 2026-11-16, PR #236 (`84e8569`) |
+| 5 | R5 | Tooling PR (LOW): scope gate, lint rules, CI fast path for documentation PRs, visible browser-test report, PR-body check, stress-test login, reproducible dashboard header | SP without the device moves | R3c | Unchanged | 2 to 3 | Done: the pull request that added `scripts/scope-gate.py` |
 | 5a | R5r | Review-runner PR (MEDIUM): review B in three turns, started by hand from `main`, no stored key (PLAN-022) | Google Cloud project and federation provider; one auditor session; SP without the device moves; the dry run | R5 | Unchanged | 2 to 4 | Waiting |
 | 6 | R5a | Producer contract and batch-production prompt v3.0 | Dispatch, review and merge one documentation PR | R5r | Unchanged | 1 to 2 | Waiting |
 | 7 | R5b | Batch 2 re-produced under the method of record: three bundles and their assumption audit, audited by tier | The auditor sessions; dispatch, review and merge one documentation PR | R5a | Unchanged | 4 to 6 | Waiting |
@@ -88,7 +88,7 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 ### R5: tooling PR (LOW)
 
 - Who: the planning session writes the prompt and runs its gate; the coding agent executes it. All five reviews, as for any code PR.
-- Scope, and nothing else (PLAN-017, PLAN-020, PLAN-028):
+- Scope, and nothing else (PLAN-017, PLAN-020, PLAN-028, PLAN-031):
   1. `scripts/scope-gate.py`, copied from the HowTo at tag `v2.3.1` (`templates/scope-gate.py`), with the two integration cases of its `tests/run-tests.sh` adapted to this repository.
   2. Lint rule L8 in `scripts/lint-prompts.sh`: a `pdMS_TO_TICKS(N)` value within 3 lines of "Rule 61" in `prompts/**` that differs from the live value in `maybe_yield_nvs_scan_()` (`firmware/core/nvs-persistence.h`) is an ERROR.
   3. Two recurrence rules (ERROR): a step agent prompt whose PR body has no closing line `Fixes #N`; and any agent prompt that runs `git checkout main` or `git switch main`.
@@ -97,9 +97,11 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
   6. `.github/workflows/ci.yml`: the required job `preflight-and-compile` still starts on every pull request. Its first step lists the changed paths. When every path is documentation, it runs preflight only and skips the ESPHome install and the compile. Any other path, and any path the list does not know, runs the full job (PLAN-028). The R5 prompt fixes the list of documentation paths and tests it in its rehearsal.
   7. `scripts/preflight.sh` prints the report of the browser test when that test fails (PLAN-020).
   8. A PR-body check that fails when a pull request that touches `prompts/**` has no "Pre-Implementation Verification" heading.
+  9. `scripts/generate-header.sh` compresses with `gzip -n`, so `dashboard/dashboard.h` changes only when the dashboard changes; R5 writes the header once with the pipeline (PLAN-031).
 - Each lint rule gets one passing and one failing fixture under `tests/lint-prompts/`, with made-up values only, and works in `--baseline` mode, so old prompts report EXISTING and do not block.
-- R5 also decides whether the planning tools (the prompt builder and the rehearsal script) and the operator's helper file enter the repository (section 10).
-- Done when: merged; `bash scripts/lint-prompts.sh` runs the new rules, each with its two fixtures; `scripts/scope-gate.py` passes its two cases; the stress-test script stops without a login in the environment; a documentation-only pull request skips the compile; issue #228 §C is closed.
+- The workflow `prompt-lint` also runs these fixtures and the two scope-gate cases (PLAN-031).
+- Decided in R5 (PLAN-033): the planning tools (the prompt builder and the rehearsal script) and the operator's helper file stay outside the repository.
+- Done when: merged; `bash scripts/lint-prompts.sh` runs the new rules, each with its two fixtures; `scripts/scope-gate.py` passes its two cases; the stress-test script stops without a login in the environment; a documentation-only pull request skips the compile; a second run of the pipeline leaves `dashboard/dashboard.h` unchanged; issue #228 §C is closed.
 - State after: version unchanged.
 
 ### R5r: review-runner PR (MEDIUM)
@@ -315,9 +317,6 @@ Only findings that a ladder step owns, and that no issue and no row of `CURRENT-
 
 | Finding | Owner |
 |---|---|
-| Lint errors that exist in old prompts must not block new work | R5 (`--baseline` mode) |
-| The planning tools (prompt builder, rehearsal script) and the operator's helper file (`fleet`, `backup_history`, `board_port`) are not in the repository. The operator keeps them as files | R5 decides |
-| Copilot did not complete its review of PR #234 ("model policy or plan restrictions"); it reviewed PR #235. If it fails again, a code PR has two inline reviews, not three | Watch at R5 |
 | The Gemini inline reviewer loads no instruction file of this repository | R5a |
 | The leftovers of the May 2026 Batch 2 prompts (the list in section 5, R5b) | R5b |
 | Three points of the review runner are not verified (section 5, R5r) | R5r, first dry run |

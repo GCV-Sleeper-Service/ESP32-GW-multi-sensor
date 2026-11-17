@@ -1,0 +1,45 @@
+name: PR Body Check
+
+# A pull request that changes a path under prompts/ must show its gate output: its body needs a
+# "Pre-Implementation Verification" heading (R5). The job runs on every pull request to main and
+# passes when no path under prompts/ changed, so it can be a required check: a required check that
+# a path filter skips blocks the merge (PLAN-020).
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-body-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the PR body
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          # The body comes from the environment and is never written into this script.
+          git diff --name-only --no-renames "origin/${BASE_REF}...${HEAD_SHA}" > "$RUNNER_TEMP/changed-paths.txt"
+          if ! grep -q '^prompts/' "$RUNNER_TEMP/changed-paths.txt"; then
+            echo "PASS: no path under prompts/ changed."
+            exit 0
+          fi
+          if grep -qiE '^[[:space:]]*#{1,6}[[:space:]]+Pre-Implementation Verification' <<< "${PR_BODY:-}"; then
+            echo "PASS: the PR body has a 'Pre-Implementation Verification' heading."
+          else
+            echo "FAIL: this pull request changes prompts/ and its body has no 'Pre-Implementation Verification' heading." >&2
+            exit 1
+          fi

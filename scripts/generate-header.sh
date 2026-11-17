@@ -51,7 +51,8 @@ RAW_SIZE=$(wc -c < "$INPUT")
 # Gzip compress the HTML
 TMPGZ=$(mktemp /tmp/dashboard.gz.XXXXXX)
 trap "rm -f '$TMPGZ'" EXIT
-gzip -9 -c "$INPUT" > "$TMPGZ"
+# -n stores no file name and no time, so the same input gives the same header (R5, PLAN-031)
+gzip -9 -n -c "$INPUT" > "$TMPGZ"
 GZ_SIZE=$(wc -c < "$TMPGZ")
 
 # Calculate compression ratio

@@ -83,9 +83,10 @@ The operator gives the agent two things:
 10) Run one test command at a time: no second preflight, Playwright run or mock server while one is running
 11) After `gh pr ready`: post the comment `/gemini review` on the PR; wait up to 30 minutes for the inline reviews of Copilot, Codex and Gemini; then assess each finding, fix what is warranted, and post one comment with your assessment that names any reviewer that did not post. Never merge, approve or start an external review
 12) Stops: a known tooling defect with a recovery written in the prompt gets that recovery once, with the result posted, and a second failure stops; a value you would have to ask for is in the prompt; a real mismatch (a missing anchor, a different value, a path out of scope, a test failing twice) always stops with the checkpoint-failure comment of §3.2
+13) Run every gate and checkpoint from the check file that the prompt names, exactly as the prompt says; never type a check by hand
 ```
 
-Items 11 and 12 hold from R3c on (PLAN-027): the coding agent starts the inline review round itself, and the stop rules are decided in advance.
+Items 11 and 12 hold from R3c on (PLAN-027): the coding agent starts the inline review round itself, and the stop rules are decided in advance. Item 13 holds from R5 on (PLAN-031): the planning session hands over every check in one check file with its SHA-256.
 
 **B) The agent prompt** — copy the agent section from the Claude two-step prompt.
 
@@ -136,6 +137,8 @@ External review B runs the structured three-turn review protocol as the final qu
 
 Claude Code is the fallback coding agent (PLAN-026). The agent changes only at a step boundary, or at a passed checkpoint with a handoff comment on the PR, and two agents never work in one checkout. When Claude Code codes a step, external review A is a GPT model. When the review-runner PR is merged, PLAN-022 and PLAN-023 replace this section: after the inline round, reviews A and C run side by side, and review B by the runner comes last (`Docs/plan-of-record.md`, section 7).
 
+When Copilot posts no complete review, the agent's assessment says so, and the step goes on with the other inline reviews and the external reviews; the operator decides at the merge (PLAN-032).
+
 ### 2.5 Step Deliverables (in-PR, before merge)
 
 > ⚠️ **MERGE GATE** — This section defines the in-PR deliverables required before any PR may be marked "Ready for Review". A PR that ships without these has merged a defect by definition. Reviewers MUST verify each item explicitly.
@@ -174,9 +177,16 @@ If you find yourself opening "documentation update" PRs the day after a merge, t
 
 **Prompt lint enforcement:**
 Every PR that touches `prompts/**` is automatically checked by `.github/workflows/prompt-lint.yml`,
-which invokes `scripts/lint-prompts.sh` against the PR's changed files. ERROR-level violations
-(L1–L5, L7: stale IPs, wrong filenames, forbidden section titles, cross-prompt references)
-fail the PR. WARN-level findings (L6: pipeline-ordering advisory) are reported without blocking.
+which invokes `scripts/lint-prompts.sh --baseline` against the PR's changed files. ERROR-level violations
+(L1–L5, L7: stale IPs, wrong filenames, forbidden section titles, cross-prompt references; L8: a Rule 61
+delay that differs from the live value in `maybe_yield_nvs_scan_()`; L9: a step agent prompt without a
+closing line `Fixes #N`; L10: an agent prompt that runs `git checkout main` or `git switch main` in a code
+block; L11: a login literal after `-u`, `--user` or `Authorization: Basic`) fail the PR. A violation that
+the base of the PR already has is reported as EXISTING and does not block. WARN-level findings (L6:
+pipeline-ordering advisory) are reported without blocking. The same workflow runs the passing and the
+failing fixture of each rule from L8 on (`tests/lint-prompts/run-fixtures.sh`) and the two scope-gate
+cases (`tests/scope-gate/run-tests.sh`). The workflow `pr-body-check.yml` fails a PR that touches
+`prompts/**` and has no "Pre-Implementation Verification" heading in its body.
 Run `bash scripts/lint-prompts.sh` locally before pushing to catch violations before CI does.
 
 ---
@@ -352,6 +362,8 @@ Prompt Quality Score:
 ### 7.1 CI Path Filtering
 
 The CI workflow (`.github/workflows/ci.yml`) runs its `preflight-and-compile` job on every pull request to `main`, documentation-only ones too: branch protection requires that check, and a required check that a path filter skips blocks the merge (PLAN-020). On a push to `main` the workflow still runs only for changes to code, config, scripts and build files.
+
+The job takes a fast path for documentation (PLAN-028). Its step "List changed paths" reads the paths that the pull request changes. When every path is under `Docs/` or `prompts/`, or is `README.md`, `CURRENT-STATE.md`, `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md` or a file `.github/instructions/*.instructions.md`, the job runs preflight only: it skips the ESPHome install, the dashboard minify, the header and the compile. Any other path, an empty diff, a push to `main` and a manual run take the full job.
 
 Manual trigger via `workflow_dispatch` is always available.
 

@@ -7,6 +7,9 @@ on:
     paths:
       - 'prompts/**'
       - 'scripts/lint-prompts.sh'
+      - 'scripts/scope-gate.py'
+      - 'tests/lint-prompts/**'
+      - 'tests/scope-gate/**'
       - '.github/workflows/prompt-lint.yml'
 
 jobs:
@@ -50,6 +53,12 @@ jobs:
         run: |
           echo "workflow_dispatch — linting all tracked prompt files."
           bash scripts/lint-prompts.sh
+
+      - name: Run lint fixtures and scope-gate cases
+        shell: bash
+        run: |
+          bash tests/lint-prompts/run-fixtures.sh
+          bash tests/scope-gate/run-tests.sh
 
       - name: Write lint summary
         if: always()

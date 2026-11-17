@@ -808,8 +808,17 @@ fi
 
 if command -v node >/dev/null 2>&1; then
   if [[ -d node_modules/@playwright/test ]]; then
-    npx playwright test tests/browser/manifest.spec.js --project=chromium >/dev/null
-    pass "playwright_manifest_spec"
+    # R5 (PLAN-020): keep the report of the browser test, and print it when the test fails.
+    PW_LOG="$(mktemp)"
+    if npx playwright test tests/browser/manifest.spec.js --project=chromium >"$PW_LOG" 2>&1; then
+      rm -f "$PW_LOG"
+      pass "playwright_manifest_spec"
+    else
+      echo "    playwright report:"
+      sed 's/^/    /' "$PW_LOG"
+      rm -f "$PW_LOG"
+      fail "playwright_manifest_spec"
+    fi
   else
     echo "playwright_manifest_spec: SKIP (node_modules missing)"
   fi
