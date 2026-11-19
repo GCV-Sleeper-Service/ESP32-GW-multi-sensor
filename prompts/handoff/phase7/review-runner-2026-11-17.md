@@ -59,7 +59,20 @@ Claude Opus 5.5 (`claude-opus-5-5`), effort high, reviewed `fd5f67cd3ce0f9448826
 
 The two Review A regressions passed (`Ran 2 tests in 1.849s`, `OK`) with no network except local stubs. No permanent test additions were made to the supplied immutable suite. The low race and the questions remain explicitly reported rather than being described as fixed.
 
-External review B remains operator initiated and pending; it is a Muse session for the PR that installs the runner. Review C is optional for this step and does not run. This record will be updated when the operator supplies review B.
+### External Review B
+
+Muse Spark (reasoning setting: none exposed in its interface), in the operator-run three-turn protocol, reviewed `b85b5770deacafd2bff9825d7c25f691f1d7abfa`. The operator posted the final report at https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/240#issuecomment-7004119439. It reports no new code findings and agrees that all three inline findings and Review A M1 are warranted and fixed. It retains Review A L1 as an open Low protocol race, Q1/Q2 as unverified questions, and Q3/Q4 as answered. Those dispositions remain accurate; this review introduces no reason to change the prescribed API contract or fixed files.
+
+| Review B item | Assessment and disposition |
+|---|---|
+| Gates 1–15 and 17–28: PASS | Consistent with the recorded gate evidence and reviewed implementation. The report verified supplied-file hashes, inspected the diff and script, probed clean(), and checked live GitHub checks on b85b577. It did not independently rerun the supplied checks/tests or supplemental regressions; its evidence combines the PR body, Review A's reruns and live checks. No stronger independent execution coverage is claimed. |
+| Gate 16 / §7-7: record completeness UNCLEAR; advice FIX FIRST | Warranted as an expected final deliverable, not a new code defect. The record intentionally awaited Review B before completion. This commit records its assessment, completes the quality/metrics sections and retains all earlier dispositions. CHECKPOINT D and PRE-PR are rerun after the commit, and the PR body receives their output naming the new head. |
+| Earlier findings and open questions | Agree with the review's table: the code fixes remain in fd5f67c and b85b577; L1 and Q1/Q2 remain explicitly reported for the operator, with no claim that they were fixed. Safe thought preservation and the hash-comparison instructions remain as specified. |
+| New findings: None | No new implementation change is warranted. This final response changes the consolidated record only. |
+
+Coverage limits disclosed by Review B: the fixed audit and test files were not read line by line; only part of the operator page was read; the supplied gates, 31 tests and supplemental regressions were not independently rerun. Review A likewise disclosed its reading limits above. Copilot posted findings but did not complete its selected tier (PLAN-032); Codex and Gemini posted, and both external reviews A and B are now assessed. Review C is optional for this step and did not run. No reviewer is silently counted as complete beyond the coverage reported.
+
+The consolidated review record is complete after the last scheduled review round. There is no open Blocking or High finding. The open Low race, unverified hardening questions, immutable-test coverage requests and operator post-merge dry/posting runs remain visible in §9 and the PR assessments; completing this record does not resolve them or authorize a merge.
 
 ## §4 Agent autonomous decisions
 
@@ -80,15 +93,15 @@ The interfaces, dependencies, models, limits, timeouts, workflow structure, supp
 
 ## §5 Prompt Quality Score
 
-Prompt Quality Score after the inline round and external Review A:
+Final Prompt Quality Score after the inline round and external reviews A and B:
 
-- Fix cycles: 2, one inline-review fix commit and one Review A sanitizer/record commit.
+- Fix cycles: 3 review-response commits: one inline-review code-fix commit, one Review A sanitizer/record commit and one mandatory Review B record-completion commit. The final commit fixes no code defect.
 - Checkpoint saves: 0; every supplied checkpoint passed on its first run.
 - Preventable review findings: 5 unique findings (3 inline, Review A M1 and L1); the duplicate thought-screening reports count once. M1 extends the literal encoded-form list, and L1 is an acknowledged specification-level residual race.
 - Agent autonomous decisions: 10 (8 helpful, 2 neutral, 0 harmful), listed in §4.
 - Overall score: 3/5. The interface contract is detailed and executable, but the supplied tests did not catch the title-escaping and thought-screening paths, pagination header variants or equivalent entity forms before review. Those implementation paths are fixed. L1 requires an operator-owned change to the API contract; the existing rechecks do not eliminate its residual race.
 
-No PRE-PR recovery has been used. The supplied tests passed on their first implementation run. A temporary supplemental test fixture was corrected once as recorded in §3; this was not a supplied gate failure. The initial gh pr edit invocation failed on the CLI's deprecated Projects Classic GraphQL field; the same prepared body was successfully published with the authorized REST API instead. No expected value, fixed supplied text or checkpoint was changed.
+No PRE-PR recovery has been used. The supplied tests passed on their first implementation run. Review B introduced no new code finding; its expected record-completion gate is not counted as another defect. A temporary supplemental test fixture was corrected once as recorded in §3; this was not a supplied gate failure. The initial gh pr edit invocation failed on the CLI's deprecated Projects Classic GraphQL field; the same prepared body was successfully published with the authorized REST API instead. No expected value, fixed supplied text or checkpoint was changed.
 
 ## §6 Operator decisions recorded by this PR
 
@@ -108,11 +121,11 @@ No issue closes in this step, no milestone changes, and the status table of issu
 |---|---|
 | Producer sessions for this step's prompt | 1 |
 | Audit sessions for this step's prompt | 3 |
-| Fix-cycle commits after the first review round | 2 |
+| Fix-cycle commits after the first review round | 3 |
 | Defects that escaped the prompt gates into agent execution | 5 |
 | Defects that escaped to devices | 0 |
 
-The operator supplied the first two numbers in the gate-record comment on PR #240: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/240#issuecomment-7002575037. The three official GPT Astra rounds count; comparison reports and internal checks do not (PLAN-037). The five unique findings passed the supplied prompt/implementation gates and were caught by inline review and Review A. The four Review A questions are not counted as defects. No devices are in scope.
+The operator supplied the first two numbers in the gate-record comment on PR #240: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/240#issuecomment-7002575037. The three official GPT Astra rounds count; comparison reports and internal checks do not (PLAN-037). The five unique findings passed the supplied prompt/implementation gates and were caught by inline review and Review A. The four Review A questions and Review B's expected record completion are not counted as defects. The three post-inline review-response commits include two code-fix commits and this final record-only commit. No devices are in scope.
 
 ## §9 Recommendations and where each was routed
 
@@ -126,3 +139,5 @@ The operator supplied the first two numbers in the gate-record comment on PR #24
 All three implementation findings from the inline round are fixed in the permitted script. Codex also requested permanent regression coverage in the supplied test file. That file is immutable under the dispatched prompt; the coverage request is reported to the operator in the inline assessment rather than implemented. Safe thought preservation in test 23 remains a required behavior; the gap is coverage of an unsafe thought, not permission to forward one. Three supplemental tests ran from a temporary file outside the repository, without changing the supplied suite. Fixed supplied files remain verbatim.
 
 Review A M1 is fixed in the script. Its permanent-regression request, L1's compare-by-SHA contract proposal and the unverified Q1/Q2 hardening questions are reported in the Review A assessment on PR #240 for operator disposition, as the task requires for changes to the fixed specification or supplied files. No issue, milestone, fixed operator page, API endpoint contract or expected checkpoint value was changed. Q3 and Q4 are answered by the existing template and operator instructions, with their evidence recorded in §3.
+
+Review B adds no recommendation or code defect. Its sole required action, completing this record and refreshing the committed-head gate evidence, is handled in this final review-response commit and its PR assessment. All earlier open items retain their stated routes; no deferred item is relabeled as fixed.
