@@ -267,8 +267,8 @@ def template():
 
 def clean(text):
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = re.sub(r"&#(?:47|x2f);", "/", text, flags=re.I)
-    text = re.sub(r"@|&#(?:64|x40);", "(at)", text, flags=re.I)
+    text = re.sub(r"&#(?:0*47|x0*2f);|&sol;", "/", text, flags=re.I)
+    text = re.sub(r"@|&#(?:0*64|x0*40);|&commat;", "(at)", text, flags=re.I)
     return "\n".join(
         "› " + line if re.match(r"^[ \t>\-*+]*(?:[0-9]+[.)])?[ \t]*/", line) else line
         for line in text.split("\n"))

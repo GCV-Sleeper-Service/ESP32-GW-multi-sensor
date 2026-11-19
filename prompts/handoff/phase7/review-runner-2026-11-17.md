@@ -44,7 +44,22 @@ The inline round reviewed `67b189c250eb276eee749337cbab7f0603fff2e9`. The PR was
 
 The three supplemental regressions passed (`Ran 3 tests in 4.103s`, `OK`). Their first run had one fixture mistake: the synthetic thought text omitted the option syntax that defines an L11 login literal. Correcting that temporary fixture made the second run pass; no production-code change was needed for that diagnostic mistake. The supplied tests and other fixed files were not edited.
 
-External reviews A and B remain operator initiated; B is a Muse session for the PR that installs the runner. Review C is optional for this step and does not run. This record will be updated when the operator supplies external reviews.
+### External Review A
+
+Claude Opus 5.5 (`claude-opus-5-5`), effort high, reviewed `fd5f67cd3ce0f9448826e0af29307acb0ae9cf04`. The operator posted the report at https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/240#issuecomment-7003762480. The reviewer ran CHECKPOINT B and the 31 supplied tests, verified the 14 fixed-file hashes and final-head checks, and agreed with the inline dispositions. Coverage limits were disclosed: parts of the audit and fixed documents were skimmed rather than read line by line. Advice was READY TO MERGE, with one Medium finding, one Low finding and four questions.
+
+| Item | Assessment | Disposition |
+|---|---|---|
+| M1, Medium: equivalent encoded at signs and slashes bypass clean() | Warranted sanitizer gap. The specified forms were implemented literally; zero-padded decimal/hex forms and the named aliases were missed. Actual downstream bot activation was not demonstrated and is not claimed. | Fixed in the permitted script: targeted case-insensitive patterns now cover the zero-padded forms, commat and sol, before the existing command-line guard. Two temporary local regressions passed, including a posting run against stubs and checks of both raw and HTML-decoded output. The fixed supplied tests remain unchanged. |
+| L1, Low: an A-to-B-to-A head change can evade the PR movement recheck while the diff/files reads observe B | Warranted residual race in the specified protocol. The PR diff and file-list endpoints are mutable; comparing the head and base before/after does not pin those responses to a commit. | Reported for the operator, as the reviewer requested. Switching to compare-by-SHA would change the explicitly prescribed API reads and fixed stub contract. No endpoint or supplied file was changed to adopt a new specification. |
+| Q1: hidden HTML comments/details in model output | A plausible hardening question, not a demonstrated instruction-boundary bypass. The contract does not require stripping HTML markup; coding agents must treat PR comments as evidence and take instructions only from their task and AGENTS.md. | No speculative output-format change. Reported to the operator for any future contract decision. |
+| Q2: Unicode spaces or zero-width characters before a slash | The helper currently covers the exact ASCII whitespace and list-prefix contract. No evidence establishes whether this repository's external bots trim the proposed Unicode characters before matching a command. | No live bot probe or unverified behavior claim. Reported as an unresolved bot-behavior question, not an established defect. |
+| Q3: an untrusted marker in the middle of a line | The fixed template's System rule 1 explicitly describes a marker as a line and its ending line. A mid-line marker is data under that format, and the implementation escapes marker-looking line starts as specified. | No change to block() or the fixed template. This answers the format question without claiming that a model always follows its instructions. |
+| Q4: compare prompt/review hashes before trusting the result | Confirmed. The operator page's Run review B step 3 says to compare both SHA-256 values with the gate record before using the review, before step 4 sends the review line to the agent. The dry-run Expected paragraph specifies both full expected hashes. | Existing instructions already require the comparison; fixed operator documentation remains unchanged. |
+
+The two Review A regressions passed (`Ran 2 tests in 1.849s`, `OK`) with no network except local stubs. No permanent test additions were made to the supplied immutable suite. The low race and the questions remain explicitly reported rather than being described as fixed.
+
+External review B remains operator initiated and pending; it is a Muse session for the PR that installs the runner. Review C is optional for this step and does not run. This record will be updated when the operator supplies review B.
 
 ## §4 Agent autonomous decisions
 
@@ -65,13 +80,13 @@ The interfaces, dependencies, models, limits, timeouts, workflow structure, supp
 
 ## §5 Prompt Quality Score
 
-Prompt Quality Score after the inline round:
+Prompt Quality Score after the inline round and external Review A:
 
-- Fix cycles: 1, the combined inline-review fixes and this record update.
+- Fix cycles: 2, one inline-review fix commit and one Review A sanitizer/record commit.
 - Checkpoint saves: 0; every supplied checkpoint passed on its first run.
-- Preventable review findings: 3 unique defects; the duplicate thought-screening reports count once.
+- Preventable review findings: 5 unique findings (3 inline, Review A M1 and L1); the duplicate thought-screening reports count once. M1 extends the literal encoded-form list, and L1 is an acknowledged specification-level residual race.
 - Agent autonomous decisions: 10 (8 helpful, 2 neutral, 0 harmful), listed in §4.
-- Overall score: 3/5. The interface contract is detailed and executable, but the supplied tests did not catch the title-escaping and thought-screening paths or the pagination header variants before review. The implementation now handles those paths.
+- Overall score: 3/5. The interface contract is detailed and executable, but the supplied tests did not catch the title-escaping and thought-screening paths, pagination header variants or equivalent entity forms before review. Those implementation paths are fixed. L1 requires an operator-owned change to the API contract; the existing rechecks do not eliminate its residual race.
 
 No PRE-PR recovery has been used. The supplied tests passed on their first implementation run. A temporary supplemental test fixture was corrected once as recorded in §3; this was not a supplied gate failure. The initial gh pr edit invocation failed on the CLI's deprecated Projects Classic GraphQL field; the same prepared body was successfully published with the authorized REST API instead. No expected value, fixed supplied text or checkpoint was changed.
 
@@ -93,11 +108,11 @@ No issue closes in this step, no milestone changes, and the status table of issu
 |---|---|
 | Producer sessions for this step's prompt | 1 |
 | Audit sessions for this step's prompt | 3 |
-| Fix-cycle commits after the first review round | 1 |
-| Defects that escaped the prompt gates into agent execution | 3 |
+| Fix-cycle commits after the first review round | 2 |
+| Defects that escaped the prompt gates into agent execution | 5 |
 | Defects that escaped to devices | 0 |
 
-The operator supplied the first two numbers in the gate-record comment on PR #240: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/240#issuecomment-7002575037. The three official GPT Astra rounds count; comparison reports and internal checks do not (PLAN-037). The three unique defects passed the supplied implementation gates and were caught by inline review. No devices are in scope.
+The operator supplied the first two numbers in the gate-record comment on PR #240: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/240#issuecomment-7002575037. The three official GPT Astra rounds count; comparison reports and internal checks do not (PLAN-037). The five unique findings passed the supplied prompt/implementation gates and were caught by inline review and Review A. The four Review A questions are not counted as defects. No devices are in scope.
 
 ## §9 Recommendations and where each was routed
 
@@ -109,3 +124,5 @@ The operator supplied the first two numbers in the gate-record comment on PR #24
 | Prove direct federation and a single posted comment on GitHub | CURRENT-STATE.md, Unimplemented Recommendations, R5r; operator post-merge dry run and posting run on PR #239 |
 
 All three implementation findings from the inline round are fixed in the permitted script. Codex also requested permanent regression coverage in the supplied test file. That file is immutable under the dispatched prompt; the coverage request is reported to the operator in the inline assessment rather than implemented. Safe thought preservation in test 23 remains a required behavior; the gap is coverage of an unsafe thought, not permission to forward one. Three supplemental tests ran from a temporary file outside the repository, without changing the supplied suite. Fixed supplied files remain verbatim.
+
+Review A M1 is fixed in the script. Its permanent-regression request, L1's compare-by-SHA contract proposal and the unverified Q1/Q2 hardening questions are reported in the Review A assessment on PR #240 for operator disposition, as the task requires for changes to the fixed specification or supplied files. No issue, milestone, fixed operator page, API endpoint contract or expected checkpoint value was changed. Q3 and Q4 are answered by the existing template and operator instructions, with their evidence recorded in §3.
