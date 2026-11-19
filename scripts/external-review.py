@@ -140,10 +140,14 @@ def pages(url, token, api):
             raise Failed("GitHub list request returned no answer as a list")
         items.extend(data)
         next_url = None
-        for link in headers.get("Link", "").split(","):
-            match = re.fullmatch(r'\s*<([^>]+)>\s*;\s*rel="next"\s*', link)
-            if match:
-                next_url = urllib.parse.urljoin(url, match[1])
+        for link_header in headers.get_all("Link", []):
+            for link in re.split(r",(?=\s*<)", link_header):
+                match = re.fullmatch(r"\s*<([^>]+)>(.*)", link, re.S)
+                if not match:
+                    continue
+                relation = re.search(r';\s*rel\s*=\s*(?:"([^"]*)"|([^;\s]+))', match[2], re.I)
+                if relation and "next" in (relation[1] or relation[2] or "").split():
+                    next_url = urllib.parse.urljoin(url, match[1])
         url = next_url
     return items
 
@@ -299,6 +303,7 @@ def run():
     changed = "\n".join(
         f"renamed {item['previous_filename']} -> {item['filename']}" if item["status"] == "renamed"
         else f"{item['status']} {item['filename']}" for item in files)
+    screen("pr-metadata", pr["title"])
     metadata = json.dumps({"number": pr["number"], "title": pr["title"], "state": pr["state"],
                            "base_ref": base_ref, "base_sha": base, "head": head}, ensure_ascii=False)
     data1 = [("agent-prompt", prompt)]
@@ -347,6 +352,8 @@ def run():
         if candidate.get("finishReason") != "STOP":
             raise Failed(f"the model stopped with {candidate.get('finishReason', 'no reason given')}")
         content = candidate.get("content", {})
+        for part in content.get("parts", []):
+            screen(f"turn {turn}", part.get("text", ""), answer=True)
         visible = "".join(part.get("text", "") for part in content.get("parts", []) if not part.get("thought"))
         if not visible.strip():
             raise Failed(f"turn {turn}: no answer")
