@@ -1,7 +1,7 @@
 # Current Project State
 
 _Last verified: 2026-11-14 — restart re-verification by the operator: on 2026-11-11 the production boards .189, .170 and .191 reported v7.7.1.1, ESPHome was 2026.4.1, the httpd stack override check passed and a compile without upload succeeded; on 2026-11-14 the same three boards reported v7.7.1.1 again. No firmware change since v7.7.1.1._
-_Next action: R5r, the review-runner PR (PLAN-022). The order and the scope of every step are in `Docs/plan-of-record.md` (PLAN-024). Phase 7 Step v7.7.1.2 is dispatched after R5r, R5a and R5b._
+_Next action: R5a, the producer contract, a documentation PR that does not wait for the review runner; the dry run and the posting run of the runner on PR #239 (operator, `Docs/operator/R5r-review-runner.md`) come before the next code step. The order and the scope of every step are in `Docs/plan-of-record.md` (PLAN-024). Phase 7 Step v7.7.1.2 is dispatched after R5a and R5b._
 
 ---
 
@@ -27,7 +27,7 @@ _Next action: R5r, the review-runner PR (PLAN-022). The order and the scope of e
 
 The order, the scope and the status of every step are in `Docs/plan-of-record.md` (PLAN-024). In short:
 
-1. **R5r, R5a, R5b** — the review-runner PR, the producer contract, and the Batch 2 prompts re-produced under the method of record (PLAN-017, PLAN-022). No firmware change.
+1. **R5a, R5b** — the producer contract, and the Batch 2 prompts re-produced under the method of record (PLAN-017). No firmware change. Review B runs on the review runner from now on (PLAN-022, PLAN-023).
 2. **Phase 7 Steps v7.7.1.2 to v7.7.1.4** — per-device structs and key scheme; persist engine (write path); restore engine (boot path) and retention budget.
 3. **v7.7.1.5** — new board secrets (SEC-003).
 4. **Phase 7 Steps v7.7.2.1 to v7.7.3.3** — engine switchover, migration, export and import, and closure. v7.7.3.3 is v1.0 (PLAN-015).
@@ -119,6 +119,10 @@ _Items from postmortems or phase closures that have NOT been acted on._
 | PR #237 external review A | Exercise the documentation CI fast path on a clean GitHub runner after the PyYAML fix | **Done after the R5 merge** — in the operator's PR #238 (closed, never merged) `preflight-and-compile` took the fast path and passed in 26 seconds |
 | R5 after-merge check | Lint baseline mode sorted the violation keys with `LC_ALL=C` but ran `comm` in the shell's locale; in `en_US.UTF-8` `comm` stopped with "not in sorted order", and one fixture case failed on the build host (12 passed, 1 failed). CI runs in `C.UTF-8` and did not show it. R5c reviews A/B also found a cosmetic check-file diagnostic: CHECKPOINT C correctly expects 16 added lines in the plan of record, but its failure message says 17; correcting that message is deferred to the next check-file production (PLAN-031), preserving the dispatched check file | **Implemented in R5c** — `LC_ALL=C comm -23` (PLAN-034); a fixture run in a non-C locale joins the next fixture production (PLAN-031) |
 | R5c planning (CI logs) | The actions `checkout@v4`, `setup-node@v4`, `setup-python@v5`, `cache@v4` and `upload-artifact@v4` target Node.js 20; the runner forces them to Node.js 24 and warns that Node.js 20 is deprecated. `setup-node` also installs Node.js 20 for the jobs | **Not implemented** — no job fails yet; the operator decides when a CI maintenance step updates them |
+| PR #239 review A | Four helper scripts print `esphome run` advice: `scripts/provision.sh`, `scripts/render_sensor_config.py`, `scripts/change_sensor_number.py`, `scripts/patch-esphome-httpd-stack.sh`; `AGENTS.md` allows only `esphome upload` and `esphome compile` | **Not implemented** — the advice is printed, not run; routed to a later script-cleanup step that the operator schedules |
+| R5r audit (GPT, finding 9) | The tests of the review runner run in no CI job: `.github/workflows/ci.yml` calls `scripts/preflight.sh`, which does not run `tests/external-review/test_external_review.py` | **Not implemented** — it needs a change of `ci.yml` outside R5r; routed to a later tooling step that the operator schedules |
+| R5r planning (lint L11) | Rule L11 of `scripts/lint-prompts.sh` reports a false login literal on a quoted diff line that begins with `-u` and has a colon later in the same word, as a removed YAML key `update_interval` with its colon has; the login check of `scripts/external-review.py` (item 2.1) uses the same rule, so it refuses such a line too | **Not implemented** — a false finding, not a leak; routed to a later tooling step that the operator schedules |
+| R5r | Prove the review runner on GitHub: a dry run on PR #239 that posts nothing and writes three turns to the run summary, then one posting run that posts one comment | **Pending operator post-merge check** — `Docs/operator/R5r-review-runner.md`, sections "Dry run" and "Posting run"; until both pass, a code step that needs review B waits for the runner, or the operator chooses to run review B as a Muse session in three turns (PLAN-023) |
 
 ## Stale Documents Requiring Update Before Use
 

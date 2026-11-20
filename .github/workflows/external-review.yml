@@ -1,0 +1,110 @@
+# Operator setup and runs: Docs/operator/R5r-review-runner.md
+name: External Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+        type: string
+      prompt_path:
+        description: Agent prompt path at the pull request head
+        required: true
+        type: string
+      review_path:
+        description: Optional review file path at the pull request head
+        required: false
+        type: string
+        default: ""
+      model:
+        description: Enabled model for review B
+        required: true
+        type: choice
+        default: gemini-4-hydrogen
+        options: [gemini-4-hydrogen, gemini-4-argon, gemini-4-carbon]
+      thinking_level:
+        description: Thinking level; XHIGH is supported only by gemini-4-hydrogen
+        required: true
+        type: choice
+        default: HIGH
+        options: [LOW, MEDIUM, HIGH, XHIGH]
+      profile:
+        description: Google Cloud profile configured in external-review
+        required: true
+        type: choice
+        default: default
+        options: [default]
+      dry_run:
+        description: Write all three turns to the summary without posting a comment
+        required: true
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  review:
+    if: github.ref == 'refs/heads/main'
+    # Pinned to one Ubuntu release: the runner's OS changes only through a pull request (R5c, PLAN-034).
+    runs-on: ubuntu-24.04
+    environment: external-review
+    timeout-minutes: 60
+    concurrency:
+      group: external-review
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Select profile
+        id: profile
+        shell: bash
+        env:
+          PROFILE: ${{ inputs.profile }}
+          PROJECT_ID: ${{ inputs.profile == 'default' && vars.GCP_PROJECT_ID_DEFAULT || '' }}
+          PROVIDER: ${{ inputs.profile == 'default' && vars.GCP_WIF_PROVIDER_DEFAULT || '' }}
+          SERVICE_ACCOUNT: ${{ inputs.profile == 'default' && vars.GCP_SERVICE_ACCOUNT_DEFAULT || '' }}
+        run: |
+          python3 -I - <<'PY'
+          import os
+          import re
+          import sys
+
+          profile = os.environ.get('PROFILE', '')
+          if not re.fullmatch(r'[a-z][a-z0-9_]{0,19}', profile):
+              sys.exit('invalid profile name')
+          values = [os.environ.get(name, '') for name in ('PROJECT_ID', 'PROVIDER', 'SERVICE_ACCOUNT')]
+          if not values[0] or not values[1]:
+              upper = profile.upper()
+              sys.exit(f'the environment external-review has no GCP_PROJECT_ID_{upper} or no GCP_WIF_PROVIDER_{upper}')
+          if any('\r' in value or '\n' in value for value in values):
+              sys.exit('profile value contains a carriage return or line feed')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              for key, value in zip(('project_id', 'provider', 'service_account'), values):
+                  output.write(f'{key}={value}\n')
+          PY
+      - name: Sign in to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ steps.profile.outputs.project_id }}
+          workload_identity_provider: ${{ steps.profile.outputs.provider }}
+          service_account: ${{ steps.profile.outputs.service_account }}
+      - name: Run the review
+        shell: bash
+        run: python3 -I scripts/external-review.py
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ER_PR: ${{ inputs.pr }}
+          ER_PROMPT_PATH: ${{ inputs.prompt_path }}
+          ER_REVIEW_PATH: ${{ inputs.review_path }}
+          ER_MODEL: ${{ inputs.model }}
+          ER_THINKING_LEVEL: ${{ inputs.thinking_level }}
+          ER_DRY_RUN: ${{ inputs.dry_run }}
+          ER_PROJECT_ID: ${{ steps.profile.outputs.project_id }}
+          ER_PROFILE: ${{ inputs.profile }}

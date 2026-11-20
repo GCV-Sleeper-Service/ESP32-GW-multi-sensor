@@ -115,27 +115,28 @@ curl -s -u "$ESP_USER:$ESP_PASS" http://192.168.120.189/api/status/full | python
 
 ### 2.4 Review Pipeline
 
-Five reviews in this order:
+Three inline reviews, then the external reviews: reviews A and C side by side, then review B by the review runner, always last (PLAN-022, PLAN-023). Review C is required on MEDIUM and HIGH firmware steps. It is optional on every other step: a MEDIUM or HIGH step that changes no firmware, a LOW step, a documentation PR (PLAN-036). The round summary says which reviews ran.
 
-| # | Reviewer | Platform | Type |
+| # | Reviewer | Where | Type |
 |---|---|---|---|
 | 1 | Copilot | GitHub inline | Inline code review |
 | 2 | Codex | GitHub inline | Inline code review |
 | 3 | Gemini | GitHub inline | Inline code review |
-| 4 | Claude (external review A) | Its own session, apart from planning and from the coding agent | Whole-PR review: findings by severity, each acceptance criterion checked |
-| 5 | Meta Muse, Spark or Wonder (external review B); fallback: Gemini on the web | Its own session | Structured three-turn review |
+| 4 | Claude (external review A); a GPT model when Claude Code coded the step (PLAN-026) | Its own session, apart from planning and from the coding agent | Whole-PR review: findings by severity, each acceptance criterion checked |
+| 5 | Meta Muse, Spark or Wonder (external review C) | Its own session | Whole-PR review by a fourth model family |
+| 6 | The review runner (external review B): Gemini on Agent Platform, through `.github/workflows/external-review.yml` | GitHub Actions; the operator starts it from the Actions tab on `main` | The three turns of `Docs/templates/external-review-template.md`; one comment by `github-actions[bot]` |
 
-After the inline reviews the agent addresses the findings by itself (§2.2 item 11, PLAN-027). After each external review the operator pastes the same line to the agent:
+After the inline reviews the agent addresses the findings by itself (§2.2 item 11, PLAN-027). After each external round the operator pastes the same line to the agent:
 ```
 Please analyze the code reviews and comments for the PR. Assess if they are warranted,
 if yes, implement necessary fixes. Post a comment summarizing your assessment.
 ```
 
-External reviewers get a structured prompt (see prompt templates) that asks them to classify findings by severity and check acceptance criteria.
+Reviews A and C get the common part and their own part of the step's review file. Review B gets the step's agent prompt and review file as inputs of the runner; its comment prints their SHA-256, which the operator compares with the gate record. `Docs/operator/R5r-review-runner.md` says how to start it. No external reviewer comes from the coding agent's vendor. Each external reviewer posts one PR comment, or the operator pastes its output into the PR. A reviewer never pushes, merges or approves.
 
-External review B runs the structured three-turn review protocol as the final quality gate. No external reviewer comes from the coding agent's vendor; the coding agent is Codex (PLAN-019). Each external reviewer posts one PR comment, or the operator pastes its output into the PR. A reviewer never pushes, merges or approves.
+If the runner cannot run, the step waits for it; the operator may instead run review B as a Muse session in three turns, and the consolidated audit names the change (PLAN-023). Gemini on the web is no fallback, because it cannot post the comment. The runner cannot review the pull request that installs it. A pull request that changes the runner is reviewed by the runner on `main`, which reads the change as data.
 
-Claude Code is the fallback coding agent (PLAN-026). The agent changes only at a step boundary, or at a passed checkpoint with a handoff comment on the PR, and two agents never work in one checkout. When Claude Code codes a step, external review A is a GPT model. When the review-runner PR is merged, PLAN-022 and PLAN-023 replace this section: after the inline round, reviews A and C run side by side, and review B by the runner comes last (`Docs/plan-of-record.md`, section 7).
+Claude Code is the fallback coding agent (PLAN-026). The agent changes only at a step boundary, or at a passed checkpoint with a handoff comment on the PR, and two agents never work in one checkout.
 
 When Copilot posts no complete review, the agent's assessment says so, and the step goes on with the other inline reviews and the external reviews; the operator decides at the merge (PLAN-032).
 
@@ -203,13 +204,13 @@ Each step requires three prompts:
 
 3. **Session handoff** (`prompts/handoff/phaseN/session-handoff-vX.Y.Z.W.md`) — What this step does, risk level, deliverables, and whether next step prompts need updating.
 
-**Risk tiers (PLAN-017).** Set per step at planning time and written in the prompt header. The tier sets the producer-side audit and the prompt style. It does not change the review pipeline: five reviewers on every code step, at every tier. Documentation-only PRs run the three inline reviewers; external reviewers are optional, and the round summary says which ran.
+**Risk tiers (PLAN-017).** Set per step at planning time and written in the prompt header. The tier sets the producer-side audit and the prompt style. It does not change the review pipeline of §2.4, except that review C is required on MEDIUM and HIGH firmware steps (PLAN-023) and optional on every other step (PLAN-036). Documentation-only PRs run the three inline reviewers; external reviewers are optional, and the round summary says which ran.
 
 | Tier | Phase 7 steps | Producer audit before dispatch | Prompt style |
 |---|---|---|---|
 | LOW | v7.7.1.2 | Lint | Intent and acceptance criteria |
-| MEDIUM | v7.7.1.3, v7.7.2.1, v7.7.2.3, v7.7.3.1, v7.7.3.2 | Lint + one independent auditor | Intent and acceptance criteria; prescribe only interface contracts |
-| HIGH | v7.7.1.4, v7.7.2.2, v7.7.3.3 | Lint + two auditors from different model families, reconciled in one file; embedded code compiled on a scratch branch before dispatch | Prescriptive allowed |
+| MEDIUM | v7.7.1.3, v7.7.2.1, v7.7.2.3, v7.7.3.1, v7.7.3.2 | Lint + one independent auditor (PLAN-037) | Intent and acceptance criteria; prescribe only interface contracts |
+| HIGH | v7.7.1.4, v7.7.2.2, v7.7.3.3 | Lint + two auditors from different model families (PLAN-037), reconciled in one file; embedded code compiled on a scratch branch before dispatch | Prescriptive allowed |
 
 Transition (PLAN-017): the Batch 2 prompts of May 2026 (v7.7.1.2-v7.7.1.4) are not dispatched. They are re-produced under the method of record and audited at their tier before dispatch; the compile of v7.7.1.4's embedded code runs once v7.7.1.3 is on `main`.
 

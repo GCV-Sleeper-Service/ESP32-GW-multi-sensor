@@ -2,7 +2,7 @@
 
 _Canonical audit-prompt skeleton for the ESP32-GW-multi-sensor prompt-audit gate._
 
-- **Template version:** v1.1
+- **Template version:** v1.2
 - **Authority:** [Docs/archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (as revised by §11)
 - **Worked example this template was extracted from:** [prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md](../../prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md)
 - **CHANGELOG:** see end of this file
@@ -30,7 +30,7 @@ The tier is set at planning time and written in the prompt header; use the Phase
 | MEDIUM | Lint + one independent auditor | One audit report; no reconciliation file |
 | HIGH | Lint + two independent auditors from different model families; compile embedded code on a scratch branch | Two audit reports and one reconciliation file; compile evidence if code is embedded |
 
-These producer-audit tiers do not change the PR review pipeline: five reviewers on every code step; three inline reviewers on documentation-only PRs, with external reviewers optional.
+These producer-audit tiers do not change the PR review pipeline of `Docs/development-process-guide.md` §2.4 (PLAN-023): three inline reviewers; reviews A and C side by side, with C required on MEDIUM and HIGH firmware steps; review B by the runner, last. Documentation-only PRs run the three inline reviewers, with external reviewers optional.
 
 This bundle's classification: `<<LOW | MEDIUM | HIGH>>` — justification: `<<one-sentence rationale>>`.
 
@@ -196,6 +196,7 @@ For LOW, steps 4–9 are not applicable; lint and the project's same-day pre-dis
 7. Apply fixes in the bundle PR; commit and push.
 8. Re-audit the changed sections only (mini-audit; same template, scoped §1 input list).
 9. MEDIUM: confirm the single audit report has zero HIGH / CRITICAL findings; do not create a reconciliation file. HIGH: issue the reconciliation report (per §6) confirming zero HIGH / CRITICAL findings, and record a successful scratch-branch compile for any embedded code.
+   PLAN-037 (2026-11-18): the step's audit file holds the audit prompts, the reports and the dispositions, for MEDIUM and HIGH (step 5). The planning session rates each finding by the severities of PLAN-037; where the auditor rates a finding higher, the operator decides, and dispatch needs no HIGH or CRITICAL finding that the operator confirms (step 9).
 10. Dispatch only after the tier's gate is satisfied: LOW lint passes; MEDIUM's single audit report is committed; HIGH's two audit reports and reconciliation are committed, with compile evidence for any embedded code. Every tier also passes the same-day pre-dispatch gate in `Docs/development-process-guide.md` §2.1 item 6.
 
 ---
@@ -224,6 +225,7 @@ Producer sessions · audit sessions · fix-cycle PRs · defects escaped to agent
 |---|---|---|
 | v1.0 | 2026-05-10 | Initial template extracted from `prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md` and structured per [Docs/archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (with §11 revisions: Codex four-lane coverage, Codex severity model, Codex evidence-consistency check C8, Perplexity adversarial scenario taxonomy in §2.C, Perplexity separate-file reconciliation, Perplexity freshness checklist §0, Perplexity triage heuristics §8, GPT-5.5 operator checklist §7). |
 | v1.1 | 2026-11-14 | PR #234 review fix: align auditor counts, reconciliation, dispatch and triage instructions with PLAN-017's LOW / MEDIUM / HIGH producer-audit tiers. |
+| v1.2 | 2026-11-18 | R5r (PLAN-023, PLAN-037): the review-pipeline line names reviews A, B and C; a note under §7 step 9 points to PLAN-037. |
 
 ---
 

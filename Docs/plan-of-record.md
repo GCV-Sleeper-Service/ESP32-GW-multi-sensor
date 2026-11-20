@@ -24,13 +24,13 @@ Rules for this file:
 - No planned date and no forecast date is stored here. Section 4 says how a forecast is computed.
 - Nothing private is stored here: no MAC address, no hub port, no login.
 - The fleet table is not here. It is in `CURRENT-STATE.md` (BOARD-002).
-- The planning document outside the repository is a working notebook. It is not a source (PLAN-024).
+- The planning notes outside this repository are working notes in the private planning repository that `Docs/planner-start-here.md` names. They are not a source (PLAN-024, PLAN-035).
 
 Who starts where: a planning or prompt-producing session starts at `Docs/planner-start-here.md`; a coding agent at `AGENTS.md`; the operator at `Docs/operator/`.
 
 ## 2. You are here
 
-The next step is **R5r**, the review-runner PR. The last merged step is **R5c**, the CI runner pin.
+The next step is **R5a**, the producer contract. The last merged step is **R5r**, the review-runner PR; its dry run and posting run come before the next code step.
 
 ## 3. The ladder
 
@@ -46,7 +46,7 @@ The steps in the order they run. Every step is on the path to v1.0, except R15, 
 | 4a | R3c | Plan into the repository: this file, entry points by role, the archive of `Docs/`, the instruction files, the stop rules | Dispatch, review, merge | R3b | 7.7.1.1 | 2 to 3 | Done 2026-11-16, PR #236 (`84e8569`) |
 | 5 | R5 | Tooling PR (LOW): scope gate, lint rules, CI fast path for documentation PRs, visible browser-test report, PR-body check, stress-test login, reproducible dashboard header | SP without the device moves | R3c | Unchanged | 2 to 3 | Done 2026-11-16, PR #237 (`1a7bf84`) |
 | 5a | R5c | CI runner pin (LOW): the four workflows on `ubuntu-24.04`, lint baseline mode in the C locale, two planner rules, the start prompt for a planning session | SP without the device moves | R5 | Unchanged | 1 to 2 | Done: the pull request that pinned the runners to `ubuntu-24.04` |
-| 5b | R5r | Review-runner PR (MEDIUM): review B in three turns, started by hand from `main`, no stored key (PLAN-022) | Google Cloud project and federation provider; one auditor session; SP without the device moves; the dry run | R5c | Unchanged | 2 to 4 | Waiting |
+| 5b | R5r | Review-runner PR (MEDIUM): review B in three turns, started by hand from `main`, no stored key (PLAN-022) | Google Cloud project and federation provider; one auditor session; SP without the device moves; the dry run | R5c | Unchanged | 2 to 4 | Merged: the pull request that added `.github/workflows/external-review.yml`; done when the conditions of its block in section 5 hold |
 | 6 | R5a | Producer contract and batch-production prompt v3.0 | Dispatch, review and merge one documentation PR | R5r | Unchanged | 1 to 2 | Waiting |
 | 7 | R5b | Batch 2 re-produced under the method of record: three bundles and their assumption audit, audited by tier | The auditor sessions; dispatch, review and merge one documentation PR | R5a | Unchanged | 4 to 6 | Waiting |
 | 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | Waiting |
@@ -88,7 +88,7 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 
 ### R5: tooling PR (LOW)
 
-- Who: the planning session writes the prompt and runs its gate; the coding agent executes it. All five reviews, as for any code PR.
+- Who: the planning session writes the prompt and runs its gate; the coding agent executes it. All five reviews of PLAN-019, as for any code PR at that time.
 - Scope, and nothing else (PLAN-017, PLAN-020, PLAN-028, PLAN-031):
   1. `scripts/scope-gate.py`, copied from the HowTo at tag `v2.3.1` (`templates/scope-gate.py`), with the two integration cases of its `tests/run-tests.sh` adapted to this repository.
   2. Lint rule L8 in `scripts/lint-prompts.sh`: a `pdMS_TO_TICKS(N)` value within 3 lines of "Rule 61" in `prompts/**` that differs from the live value in `maybe_yield_nvs_scan_()` (`firmware/core/nvs-persistence.h`) is an ERROR.
@@ -107,7 +107,7 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 
 ### R5c: CI runner pin (LOW)
 
-- Who: the planning session writes the prompt and runs its gate; the coding agent executes it. All five reviews, as for any code PR.
+- Who: the planning session writes the prompt and runs its gate; the coding agent executes it. All five reviews of PLAN-019, as for any code PR at that time.
 - Why: GitHub moves `ubuntu-latest` to Ubuntu 26.04, where Playwright 1.56.0 cannot install its browsers, so Browser Tests failed on PR #237 and on `main`. After the R5 merge the lint fixtures failed in the operator's shell, which runs in `en_US.UTF-8`.
 - Scope, and nothing else (PLAN-034):
   1. The four workflows run on `ubuntu-24.04`; `browser-tests.yml` also starts when its own file changes.
@@ -121,8 +121,9 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 
 - Who: the planning session writes the prompt; one independent auditor checks it before dispatch; the coding agent executes it. All five reviews. The runner cannot review the pull request that installs it.
 - Scope: the workflow `.github/workflows/external-review.yml` and its script, as PLAN-022 states them; and every place that states the review pipeline, as PLAN-023 lists them.
+- Decided before R5r (PLAN-036, PLAN-037): one profile, `default`, as variables of the GitHub environment `external-review`, with a documented way to add one; the turn texts in `Docs/templates/external-review-template.md`; the script on the Python standard library only; the dry run on PR #239 with its agent prompt and review file, because the diff of PR #235 holds deleted login literals. R5r also carries the planning repository (PLAN-035) and routes the PR #239 review A finding on `esphome run` advice.
 - Not verified yet, and decided by the first dry run: that Google's Agent Platform accepts the federated identity directly (the other way is a service account without a key); which value the `ref` claim has for a run from the Actions tab; the Python calls to the model. Before the operator relies on credits from more than one Google subscription, Google's terms are checked.
-- Done when: merged; a dry run on PR #235 posts nothing and writes a three-turn review to the run summary; the next code step uses the runner for review B.
+- Done when: merged; a dry run on PR #239 posts nothing and writes a three-turn review to the run summary; one posting run posts one comment; the next code step uses the runner for review B.
 - State after: version unchanged. PLAN-023 is in force: reviews A and C, then review B by the runner (section 7).
 
 ### R5a: producer contract and batch-production prompt v3.0 (documentation)
@@ -250,7 +251,7 @@ Eight moves. The binding text is in `Docs/development-process-guide.md` §2; thi
 1. Pre-dispatch gate (process guide §2.1 item 6). On the day of dispatch the planning session runs the §2 block of the prompt against `origin/main`, runs lint on the prompt file, and checks that no fill-in is left. Device values come only from the operator's latest fleet output. The record is the first comment of the PR.
 2. Dispatch. The operator pastes the setup block (process guide §2.2) and then the agent prompt, word for word. A step prompt closes its issue with `Fixes #N`: #214 for v7.7.1.2, #215 for v7.7.1.3, #216 for v7.7.1.4, #217 for v7.7.2.1, #218 for v7.7.2.2, #219 and #224 for v7.7.2.3, #220 for v7.7.3.1, #221 for v7.7.3.2, #222 for v7.7.3.3.
 3. Checkpoint failures. When the agent posts `⛔ CHECKPOINT FAILED`, it has stopped. If the prompt is wrong, the planning session corrects it; if the code is wrong, the agent investigates and reports. Nobody tells the agent to make the check pass.
-4. Reviews (process guide §2.4). The agent marks the PR ready and starts the inline round itself (PLAN-027). Then the external reviews run. Today these are review A and review B (PLAN-019). Section 7 shows the scheme that follows.
+4. Reviews (process guide §2.4). The agent marks the PR ready and starts the inline round itself (PLAN-027). Then the external reviews run: reviews A and C side by side, then review B by the runner, always last (PLAN-023). Section 7 shows the scheme.
 5. Evidence check before the merge, by the operator. The PR body holds the gate outputs, the per-item verification and the device evidence. The branch holds the session log, the consolidated audit, `CURRENT-STATE.md`, the changelog entry, and this file with the step's row marked.
 6. Merge and tag, by the operator.
 7. Post-merge check: `VERSION` shows the new version; the boards that the step flashed report it.
@@ -281,7 +282,7 @@ sequenceDiagram
     P->>P: Step closure: correct the next prompt
 ```
 
-This scheme takes effect when the review-runner PR is merged (PLAN-022, PLAN-023). Until then PLAN-019 holds: review B is a Muse session in three turns, and there is no review C. Review C is required on MEDIUM and HIGH firmware steps and optional elsewhere.
+This scheme holds from the merge of the review-runner PR, R5r (PLAN-022, PLAN-023). If the runner cannot run, the step waits for it, or the operator runs review B as a Muse session in three turns and the consolidated audit names the change. Review C is required on MEDIUM and HIGH firmware steps and optional elsewhere (PLAN-036).
 
 Two files have similar names. The review file of a step holds the instructions for the reviewers; the planning session writes it before dispatch. The consolidated audit is the record of all reviews: each finding, whether it was warranted, and what was done; the coding agent writes it in the PR and completes it after the last review round (HowTo §6.2).
 
