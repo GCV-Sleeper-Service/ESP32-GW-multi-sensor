@@ -68,3 +68,11 @@ _Index written 2026-11-16 for the step R3c (PLAN-025)._
 | `Docs/session-log-2026-04-24-v7.6.10.0-review-fix.md` | `Docs/archive/session-logs/session-log-2026-04-24-v7.6.10.0-review-fix.md` |
 | `Docs/session-log-2026-05-05-v7.6.10.1.md` | `Docs/archive/session-logs/session-log-2026-05-05-v7.6.10.1.md` |
 | `Docs/session-log-2026-05-06-v7.6.10.4.md` | `Docs/archive/session-logs/session-log-2026-05-06-v7.6.10.4.md` |
+
+## What moved here on 2026-11-21
+
+One file, with `git mv` and no edit, in R5a (PLAN-025, PLAN-038). Its tracking rules are now in `prompts/producer-contract.md`, section 8.
+
+| Old path | New path |
+|---|---|
+| `Docs/phase7-github-tracking-supplement.md` | `Docs/archive/planning-2026-05/phase7-github-tracking-supplement.md` |

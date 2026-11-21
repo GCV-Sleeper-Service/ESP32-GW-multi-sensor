@@ -2,7 +2,7 @@
 
 _Canonical audit-prompt skeleton for the ESP32-GW-multi-sensor prompt-audit gate._
 
-- **Template version:** v1.2
+- **Template version:** v1.3
 - **Authority:** [Docs/archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (as revised by §11)
 - **Worked example this template was extracted from:** [prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md](../../prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md)
 - **CHANGELOG:** see end of this file
@@ -61,7 +61,7 @@ You are an independent auditor. A separate producer session emitted a prompt bun
    - `Docs/development-process-guide.md` — especially §2.5 (in-PR mandatory deliverables, merge gate), §3.2 (checkpoint authoring rules), §3.3 (self-containedness), §4.1 (assumption audit gate).
    - `Docs/writing-guide/methodology.md` §3.10 / §4.3 (device-testing all boards; required-reading specificity).
    - `Docs/llm-assisted-development-guide.md` §1.3 / §1.4 / §2.2 / §2.5 (truth-seeking discipline; assumption audit; source-of-truth hierarchy).
-   - `prompts/handoff/<<phase>>-batch-production-prompt-update.md` — for the canonical scope-guard whitelist and Errata.
+   - `prompts/producer-contract.md` — the binding rules of a bundle (PLAN-038); `prompts/handoff/phase7-batch-production-prompt-v3.md` — the lessons of Phase 7 and the live-extract table of a batch.
 7. The PR review thread (all rounds + inline comments) **after** you have independently completed §2 (read prior audit reports only after independent inspection — preserves auditor independence).
 
 ### §2 Required checks (HIGH-severity gate)
@@ -191,6 +191,7 @@ For LOW, steps 4–9 are not applicable; lint and the project's same-day pre-dis
 2. Open the bundle PR (status: draft or ready-for-review).
 3. Run `bash scripts/lint-prompts.sh --baseline main` and confirm exit 0.
 4. MEDIUM: launch one independent auditor using this template. HIGH: launch two independent auditors from different model families, in parallel.
+   PLAN-040 (2026-11-21): before step 4, one internal sub-agent audits the bundle with this audit prompt and executes it; the planning session checks each finding and fixes what holds; at most two internal rounds. It does not replace the audit of step 4. PLAN-037 and PLAN-041 name the auditors.
 5. Collect the single MEDIUM audit report or both HIGH audit reports as separate Markdown files in `prompts/handoff/<phase>/`.
 6. Assemble the action list (HIGH + CRITICAL findings → fix-in-PR; MEDIUM → track as follow-up issue under the bundle's tracking issue; LOW → triage at operator discretion).
 7. Apply fixes in the bundle PR; commit and push.
@@ -226,6 +227,7 @@ Producer sessions · audit sessions · fix-cycle PRs · defects escaped to agent
 | v1.0 | 2026-05-10 | Initial template extracted from `prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md` and structured per [Docs/archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (with §11 revisions: Codex four-lane coverage, Codex severity model, Codex evidence-consistency check C8, Perplexity adversarial scenario taxonomy in §2.C, Perplexity separate-file reconciliation, Perplexity freshness checklist §0, Perplexity triage heuristics §8, GPT-5.5 operator checklist §7). |
 | v1.1 | 2026-11-14 | PR #234 review fix: align auditor counts, reconciliation, dispatch and triage instructions with PLAN-017's LOW / MEDIUM / HIGH producer-audit tiers. |
 | v1.2 | 2026-11-18 | R5r (PLAN-023, PLAN-037): the review-pipeline line names reviews A, B and C; a note under §7 step 9 points to PLAN-037. |
+| v1.3 | 2026-11-21 | R5a (PLAN-038, PLAN-040): the doctrinal sources name the producer contract and batch prompt v3.0; a note under §7 step 4 sets the internal sub-agent audit before the external audit. |
 
 ---
 
