@@ -30,7 +30,7 @@ Who starts where: a planning or prompt-producing session starts at `Docs/planner
 
 ## 2. You are here
 
-The next step is **R5a**, the producer contract. The last merged step is **R5r**, the review-runner PR; its dry run and posting run come before the next code step.
+The next step is **R5b**, the Batch 2 prompts re-produced under the producer contract. The last merged step is **R5a**, the producer contract. The review runner passed its dry run on 2026-11-20 and its posting run on 2026-11-21.
 
 ## 3. The ladder
 
@@ -46,8 +46,8 @@ The steps in the order they run. Every step is on the path to v1.0, except R15, 
 | 4a | R3c | Plan into the repository: this file, entry points by role, the archive of `Docs/`, the instruction files, the stop rules | Dispatch, review, merge | R3b | 7.7.1.1 | 2 to 3 | Done 2026-11-16, PR #236 (`84e8569`) |
 | 5 | R5 | Tooling PR (LOW): scope gate, lint rules, CI fast path for documentation PRs, visible browser-test report, PR-body check, stress-test login, reproducible dashboard header | SP without the device moves | R3c | Unchanged | 2 to 3 | Done 2026-11-16, PR #237 (`1a7bf84`) |
 | 5a | R5c | CI runner pin (LOW): the four workflows on `ubuntu-24.04`, lint baseline mode in the C locale, two planner rules, the start prompt for a planning session | SP without the device moves | R5 | Unchanged | 1 to 2 | Done: the pull request that pinned the runners to `ubuntu-24.04` |
-| 5b | R5r | Review-runner PR (MEDIUM): review B in three turns, started by hand from `main`, no stored key (PLAN-022) | Google Cloud project and federation provider; one auditor session; SP without the device moves; the dry run | R5c | Unchanged | 2 to 4 | Merged: the pull request that added `.github/workflows/external-review.yml`; done when the conditions of its block in section 5 hold |
-| 6 | R5a | Producer contract and batch-production prompt v3.0 | Dispatch, review and merge one documentation PR | R5r | Unchanged | 1 to 2 | Waiting |
+| 5b | R5r | Review-runner PR (MEDIUM): review B in three turns, started by hand from `main`, no stored key (PLAN-022) | Google Cloud project and federation provider; one auditor session; SP without the device moves; the dry run | R5c | Unchanged | 2 to 4 | Merged; dry run (2026-11-20) and posting run (2026-11-21) passed (runs 44828100924 and 44861784463); done when the next code step uses the runner for review B |
+| 6 | R5a | Producer contract and batch-production prompt v3.0 | Dispatch, review and merge one documentation PR | R5r | Unchanged | 1 to 2 | Done: the pull request that added `prompts/producer-contract.md` |
 | 7 | R5b | Batch 2 re-produced under the method of record: three bundles and their assumption audit, audited by tier | The auditor sessions; dispatch, review and merge one documentation PR | R5a | Unchanged | 4 to 6 | Waiting |
 | 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | Waiting |
 | 9 | R6 | v7.7.1.3: persist write path (MEDIUM); the test board .173 gets it too | SP | R4 | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 | Waiting |
@@ -122,7 +122,7 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 - Who: the planning session writes the prompt; one independent auditor checks it before dispatch; the coding agent executes it. All five reviews. The runner cannot review the pull request that installs it.
 - Scope: the workflow `.github/workflows/external-review.yml` and its script, as PLAN-022 states them; and every place that states the review pipeline, as PLAN-023 lists them.
 - Decided before R5r (PLAN-036, PLAN-037): one profile, `default`, as variables of the GitHub environment `external-review`, with a documented way to add one; the turn texts in `Docs/templates/external-review-template.md`; the script on the Python standard library only; the dry run on PR #239 with its agent prompt and review file, because the diff of PR #235 holds deleted login literals. R5r also carries the planning repository (PLAN-035) and routes the PR #239 review A finding on `esphome run` advice.
-- Not verified yet, and decided by the first dry run: that Google's Agent Platform accepts the federated identity directly (the other way is a service account without a key); which value the `ref` claim has for a run from the Actions tab; the Python calls to the model. Before the operator relies on credits from more than one Google subscription, Google's terms are checked.
+- Decided by the dry run of 2026-11-20 and the posting run of 2026-11-21 (runs 44828100924 and 44861784463): Agent Platform accepts the federated identity directly, with no service account; the condition on `refs/heads/main` and `workflow_dispatch` accepts a run started from the Actions tab; the Python calls to the model work. Before the operator relies on credits from more than one Google subscription, Google's terms are checked.
 - Done when: merged; a dry run on PR #239 posts nothing and writes a three-turn review to the run summary; one posting run posts one comment; the next code step uses the runner for review B.
 - State after: version unchanged. PLAN-023 is in force: reviews A and C, then review B by the runner (section 7).
 
@@ -130,7 +130,8 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 
 - Who: a prompt-producing session writes two files; the coding agent commits them in one documentation PR.
 - Scope: `prompts/producer-contract.md`, at most 150 lines, binding rules only, each tagged with the lint rule, the gate or the judgment that enforces it; and `prompts/handoff/phase7-batch-production-prompt-v3.md`, a minimal change of v2.0 that must be shorter than v2.0 (PLAN-012). The contract covers: the live-extract table, symbol anchors, `<MEASURED>` placeholders, self-containedness, compile before dispatch for prescriptive prompts, the tier table with the prompt style of each tier, the pre-dispatch gate, the section skeleton of the HowTo agent-prompt template, the setup block and the review file, and the handoff template.
-- R5a also decides: the form of the review file with its common part and the parts A, B and C; how a prompt hands over a long insertion; whether the Gemini inline reviewer gets a `.gemini/styleguide.md` (PLAN-029); and it takes the tracking rules of `Docs/phase7-github-tracking-supplement.md` into the contract (PLAN-025).
+- R5a also decides: the form of the review file with its common part and the parts A, B and C; how a prompt hands over a long insertion; whether the Gemini inline reviewer gets a `.gemini/styleguide.md` (PLAN-029); and it takes the tracking rules of `Docs/archive/planning-2026-05/phase7-github-tracking-supplement.md` into the contract (PLAN-025).
+- Decided in R5a (PLAN-038 to PLAN-041): the contract also holds the planner rules from review findings and from the audit of R5r; a long text reaches the agent as a supplied file; the review file has a common part, the checks of the step and the parts A, B and C; the Gemini inline reviewer gets `.gemini/styleguide.md`; the tracking supplement moves to the archive; an internal sub-agent audit comes before each external audit; the bundle goes to the planning repository; Gemini 4 Neon is the second auditor of a HIGH prompt. R5a is LOW: an internal sub-agent audit and no external auditor; reviews A and B on its PR.
 - Done when: both files are on `main` and lint passes on them.
 
 ### R5b: Batch 2 re-produced (documentation)
@@ -150,7 +151,7 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
   - `Fixes #214`, `#215` and `#216` as closing lines; no pre-filled struct size; a branch check in place of `git checkout main`;
   - a test board first: v7.7.1.3 names .189, .170 and .173; v7.7.1.4 names .173 first, then .189, .170 and .191;
   - no login literal: `-u "$ESP_USER:$ESP_PASS"` only (SEC-003);
-  - `dashboard/dashboard.h` is in the regenerated outputs of every code prompt, because each build changes it;
+  - `dashboard/dashboard.h` is in the regenerated outputs of every code prompt that bumps the version, because the version is in the dashboard (R5 made the header reproducible);
   - a `.bin` size checkpoint against the OTA slot from v7.7.1.3 on; the WROOM's `min_free_heap` after a fresh boot and a day later.
 - Budget: three to four producer sessions plus the audits. If the audit sessions pass twice the producer sessions, stop and decide (process guide §4.3 item 7).
 - Done when: the bundles, the assumption audit and the audit files are on `main`, and the batch metrics are recorded.
@@ -331,9 +332,7 @@ Only findings that a ladder step owns, and that no issue and no row of `CURRENT-
 
 | Finding | Owner |
 |---|---|
-| The Gemini inline reviewer loads no instruction file of this repository | R5a |
 | The leftovers of the May 2026 Batch 2 prompts (the list in section 5, R5b) | R5b |
-| Three points of the review runner are not verified (section 5, R5r) | R5r, first dry run |
 | Whether a ChatGPT Plus plan carries a firmware step for the coding agent; how the management login reaches the coding agent's shell | Before R4 |
 
 ## 11. Risks

@@ -40,7 +40,7 @@ The process has five layers, each with its own document ecosystem:
 | Layer | Purpose | Key Documents |
 |---|---|---|
 | **Planning** | Phase scoping, architecture decisions | Phase implementation plans, architecture docs, `CURRENT-STATE.md` |
-| **Prompt Production** | Agent prompts, review checklists, handoffs | Agent prompts, two-step Claude prompts, session handoffs |
+| **Prompt Production** | Agent prompts, review checklists, handoffs | `prompts/producer-contract.md`; agent prompts with their check files, review files, session handoffs |
 | **Execution** | Code implementation by AI agents | PR commits, agent session output |
 | **Review** | Multi-reviewer quality assurance | Inline reviews, external reviews, consolidated audits |
 | **Closure** | Phase assessment, lessons, KPIs | Phase results, closure analysis, writing guide updates |
@@ -88,7 +88,7 @@ The operator gives the agent two things:
 
 Items 11 and 12 hold from R3c on (PLAN-027): the coding agent starts the inline review round itself, and the stop rules are decided in advance. Item 13 holds from R5 on (PLAN-031): the planning session hands over every check in one check file with its SHA-256.
 
-**B) The agent prompt** — copy the agent section from the Claude two-step prompt.
+**B) The agent prompt** — word for word, from the step's bundle (`prompts/producer-contract.md` §6).
 
 ### 2.3 Device Testing (When Applicable)
 
@@ -196,21 +196,15 @@ Run `bash scripts/lint-prompts.sh` locally before pushing to catch violations be
 
 ### 3.1 Prompt Bundle Structure
 
-Each step requires three prompts:
-
-1. **Agent prompt** (`prompts/phaseN/vX.Y.Z.W-agent-prompt-gpt-codex.md`) — Detailed implementation instructions with checkpoints, scope boundaries, and acceptance criteria. Follows the 10-section structure from the writing guide.
-
-2. **Two-step Claude prompt** (`prompts/phaseN/vX.Y.Z.W-claude-two-step.md`) — Contains the agent section (for copy-paste to the agent) plus the reviewer checklist (for the structured review).
-
-3. **Session handoff** (`prompts/handoff/phaseN/session-handoff-vX.Y.Z.W.md`) — What this step does, risk level, deliverables, and whether next step prompts need updating.
+The files of a step's bundle, their names and the rules that each must meet are in `prompts/producer-contract.md` (PLAN-038): the agent prompt and its check file, the review file, the operator page, the setup block of §2.2 and the supplied files; for a MEDIUM or HIGH step the audit file; for a firmware step the session handoff. The agent prompt follows the skeleton of the HowTo agent-prompt template: a header and preamble, the lessons of the step, and §1 to §9. A firmware step has no two-step prompt: its review file takes that place (PLAN-023). The coding agent writes the record of the step in the PR (§2.5 item 4). A batch of Phase 7 steps is produced with `prompts/handoff/phase7-batch-production-prompt-v3.md`.
 
 **Risk tiers (PLAN-017).** Set per step at planning time and written in the prompt header. The tier sets the producer-side audit and the prompt style. It does not change the review pipeline of §2.4, except that review C is required on MEDIUM and HIGH firmware steps (PLAN-023) and optional on every other step (PLAN-036). Documentation-only PRs run the three inline reviewers; external reviewers are optional, and the round summary says which ran.
 
 | Tier | Phase 7 steps | Producer audit before dispatch | Prompt style |
 |---|---|---|---|
 | LOW | v7.7.1.2 | Lint | Intent and acceptance criteria |
-| MEDIUM | v7.7.1.3, v7.7.2.1, v7.7.2.3, v7.7.3.1, v7.7.3.2 | Lint + one independent auditor (PLAN-037) | Intent and acceptance criteria; prescribe only interface contracts |
-| HIGH | v7.7.1.4, v7.7.2.2, v7.7.3.3 | Lint + two auditors from different model families (PLAN-037), reconciled in one file; embedded code compiled on a scratch branch before dispatch | Prescriptive allowed |
+| MEDIUM | v7.7.1.3, v7.7.2.1, v7.7.2.3, v7.7.3.1, v7.7.3.2 | Lint + an internal audit (PLAN-040), then one independent auditor (PLAN-037) | Intent and acceptance criteria; prescribe only interface contracts |
+| HIGH | v7.7.1.4, v7.7.2.2, v7.7.3.3 | Lint + an internal audit (PLAN-040), then two auditors from different model families (PLAN-037, PLAN-041), reconciled in one file; embedded code compiled on a scratch branch before dispatch | Prescriptive allowed |
 
 Transition (PLAN-017): the Batch 2 prompts of May 2026 (v7.7.1.2-v7.7.1.4) are not dispatched. They are re-produced under the method of record and audited at their tier before dispatch; the compile of v7.7.1.4's embedded code runs once v7.7.1.3 is on `main`.
 
@@ -313,7 +307,7 @@ Every phase ends with:
 | 1 — Current State | `CURRENT-STATE.md` | ~2K | Every session |
 | 2 — Decision Index | `Docs/decisions/decision-log.md` | ~3K | Planning sessions |
 | 2 — Plan of Record | `Docs/plan-of-record.md`; planners enter at `Docs/planner-start-here.md` | ~8K | Planning sessions |
-| 3 — Methodology | `Docs/writing-guide/` | ~15K | Prompt production only |
+| 3 — Methodology | `prompts/producer-contract.md` (binding); `Docs/writing-guide/` (reference) | ~15K | Prompt production only |
 | 4 — Phase Context | Agent prompt + handoff + critical rules subset | ~10-20K | Execution sessions |
 | 5 — Historical | Lessons, postmortems, gap catalog, old phase results | ~100K+ | Investigation only |
 
@@ -378,8 +372,9 @@ Every workflow runs on `ubuntu-24.04`, not `ubuntu-latest`, so the operating sys
 | `CLAUDE.md` | Claude Code; GitHub Copilot (code review and cloud agent on GitHub, CLI). Not Codex |
 | `.github/copilot-instructions.md` | GitHub Copilot only, in every Copilot feature |
 | `.github/instructions/*.instructions.md` | GitHub Copilot only (code review and cloud agent on GitHub, VS Code chat, CLI); `applyTo` names the paths |
+| `.gemini/styleguide.md` | The Gemini inline reviewer on GitHub (Google's documentation, checked 2026-11-21) |
 
-The Gemini inline reviewer loads none of these files; R5a decides whether it gets a `.gemini/styleguide.md`. Copilot's code review reads the instruction files from the head branch of the PR, so a PR that edits one of them changes its own Copilot review: the review file of such a step tells reviewers A and B to read that diff by hand.
+The Gemini inline reviewer loads none of the other four files. Its file `.gemini/styleguide.md` copies the table of generated files, the section "Critical Rules", the review checklist and the severities of `AGENTS.md` word for word, so a PR that changes one of these parts of `AGENTS.md` changes that file too (PLAN-039). Copilot's code review reads the instruction files from the head branch of the PR, so a PR that edits one of them changes its own Copilot review: the review file of such a step tells reviewers A and B to read that diff by hand.
 
 ### 7.3 Verifying Agents Follow Rules
 
