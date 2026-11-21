@@ -61,7 +61,7 @@ Before starting any step:
    - Don't trust line numbers from the prompt — they decay with every merge
 
 5. After a pause of more than two weeks, run the restart checklist first (HowTo v2 `templates/restart-checklist.md`): environment, repository, documents, last conversation, then one documentation-only housekeeping PR. Re-validate every unapplied fix against the current tree before applying it; code and script fixes go in their own PR with the normal reviews.
-6. Pre-dispatch gate (PLAN-017): on the day a prompt is dispatched, a session that can run commands runs the prompt's §2 commands against `origin/main` and records each output beside its expected value, runs `bash scripts/lint-prompts.sh` on the prompt file (exit 0), confirms that every fill-in left for the operator (dates, pins, R1 values, `<LIVE>` markers) has been replaced, and for a HIGH step compiles any embedded code on a scratch branch. Device values come only from the operator's latest `fleet` output. The record (date, `main` SHA, commands, outputs) is the PR's first comment. A mismatch is fixed in the prompt, never by changing an expected value to fit.
+6. Pre-dispatch gate (PLAN-017): on the day a prompt is dispatched, a session that can run commands runs the prompt's §2 commands against `origin/main` and records each output beside its expected value, runs `bash scripts/lint-prompts.sh` on the prompt file (exit 0), confirms that every fill-in left for the operator (dates, pins, R1 values, `<LIVE>` markers) has been replaced, and, for a prompt of any tier that carries code ending in a compiled artifact, compiles that code on a scratch branch from `origin/main` (`prompts/producer-contract.md` rule 3.4, PLAN-042). Device values come only from the operator's latest `fleet` output. The record (date, `main` SHA, commands, outputs) is the PR's first comment. A mismatch is fixed in the prompt, never by changing an expected value to fit.
 
 ### 2.2 Agent Execution
 
@@ -202,11 +202,11 @@ The files of a step's bundle, their names and the rules that each must meet are 
 
 | Tier | Phase 7 steps | Producer audit before dispatch | Prompt style |
 |---|---|---|---|
-| LOW | v7.7.1.2 | Lint | Intent and acceptance criteria |
-| MEDIUM | v7.7.1.3, v7.7.2.1, v7.7.2.3, v7.7.3.1, v7.7.3.2 | Lint + an internal audit (PLAN-040), then one independent auditor (PLAN-037) | Intent and acceptance criteria; prescribe only interface contracts |
+| LOW | v7.7.1.2 | Lint; embedded code compiled on a scratch branch before dispatch (PLAN-042) | Intent and acceptance criteria |
+| MEDIUM | v7.7.1.3, v7.7.2.1, v7.7.2.3, v7.7.3.1, v7.7.3.2 | Lint + an internal audit (PLAN-040), then one independent auditor (PLAN-037); embedded code compiled on a scratch branch before dispatch (PLAN-042) | Intent and acceptance criteria; prescribe only interface contracts |
 | HIGH | v7.7.1.4, v7.7.2.2, v7.7.3.3 | Lint + an internal audit (PLAN-040), then two auditors from different model families (PLAN-037, PLAN-041), reconciled in one file; embedded code compiled on a scratch branch before dispatch | Prescriptive allowed |
 
-Transition (PLAN-017): the Batch 2 prompts of May 2026 (v7.7.1.2-v7.7.1.4) are not dispatched. They are re-produced under the method of record and audited at their tier before dispatch; the compile of v7.7.1.4's embedded code runs once v7.7.1.3 is on `main`.
+Transition (PLAN-017): the Batch 2 prompts of May 2026 (v7.7.1.2-v7.7.1.4) are not dispatched. They are re-produced under the method of record and audited at their tier before dispatch; the compile of v7.7.1.4's embedded code runs once v7.7.1.3 is on `main`. Embedded code of any tier that needs the step before it is compiled once that step is on `main`, in the pre-dispatch gate of §2.1 item 6 (PLAN-042).
 
 ### 3.2 Checkpoint Authoring Rules
 
