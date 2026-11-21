@@ -30,7 +30,7 @@ Who starts where: a planning or prompt-producing session starts at `Docs/planner
 
 ## 2. You are here
 
-The next step is **R5b**, the Batch 2 prompts re-produced under the producer contract. The last merged step is **R5a**, the producer contract. The review runner passed its dry run on 2026-11-20 and its posting run on 2026-11-21.
+The next step is **R5b**, the Batch 2 prompts re-produced under the producer contract. The last merged step is **R5a.1**, the fixes of the producer contract from the reviews of R5a (PLAN-042). The review runner passed its dry run on 2026-11-20 and its posting run on 2026-11-21.
 
 ## 3. The ladder
 
@@ -48,7 +48,8 @@ The steps in the order they run. Every step is on the path to v1.0, except R15, 
 | 5a | R5c | CI runner pin (LOW): the four workflows on `ubuntu-24.04`, lint baseline mode in the C locale, two planner rules, the start prompt for a planning session | SP without the device moves | R5 | Unchanged | 1 to 2 | Done: the pull request that pinned the runners to `ubuntu-24.04` |
 | 5b | R5r | Review-runner PR (MEDIUM): review B in three turns, started by hand from `main`, no stored key (PLAN-022) | Google Cloud project and federation provider; one auditor session; SP without the device moves; the dry run | R5c | Unchanged | 2 to 4 | Merged; dry run (2026-11-20) and posting run (2026-11-21) passed (runs 44828100924 and 44861784463); done when the next code step uses the runner for review B |
 | 6 | R5a | Producer contract and batch-production prompt v3.0 | Dispatch, review and merge one documentation PR | R5r | Unchanged | 1 to 2 | Done: the pull request that added `prompts/producer-contract.md` |
-| 7 | R5b | Batch 2 re-produced under the method of record: three bundles and their assumption audit, audited by tier | The auditor sessions; dispatch, review and merge one documentation PR | R5a | Unchanged | 4 to 6 | Waiting |
+| 6a | R5a.1 | Producer-contract fixes from the reviews of R5a, issue #242 (LOW, PLAN-042) | Dispatch, review and merge one documentation PR | R5a | Unchanged | 1 to 2 | Done: the pull request that fixes issue #242 |
+| 7 | R5b | Batch 2 re-produced under the method of record: three bundles and their assumption audit, audited by tier | The auditor sessions; dispatch, review and merge one documentation PR | R5a.1 | Unchanged | 4 to 6 | Waiting |
 | 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | Waiting |
 | 9 | R6 | v7.7.1.3: persist write path (MEDIUM); the test board .173 gets it too | SP | R4 | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 | Waiting |
 | 10 | R7 | Compile gate for v7.7.1.4; backups | Backups copied off the build host; USB cable ready | R6 | 7.7.1.3 | 1 to 2 | Waiting |
@@ -134,6 +135,14 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 - Decided in R5a (PLAN-038 to PLAN-041): the contract also holds the planner rules from review findings and from the audit of R5r; a long text reaches the agent as a supplied file; the review file has a common part, the checks of the step and the parts A, B and C; the Gemini inline reviewer gets `.gemini/styleguide.md`; the tracking supplement moves to the archive; an internal sub-agent audit comes before each external audit; the bundle goes to the planning repository; Gemini 4 Neon is the second auditor of a HIGH prompt. R5a is LOW: an internal sub-agent audit and no external auditor; reviews A and B on its PR.
 - Done when: both files are on `main` and lint passes on them.
 
+### R5a.1: producer-contract fixes (documentation, LOW)
+
+- Why: reviews A and B of PR #241 found seven defects in the fixed texts of R5a. The operator routed them to issue #242 and put this step before R5b (PLAN-042).
+- Scope: the findings of issue #242 and of its comment 7060767358 in `prompts/producer-contract.md`, batch prompt v3.0 and the start prompt of `Docs/planner-start-here.md`; compile before dispatch for every prompt that carries code, in contract rules 3.4 and 9.7, process guide §2.1 and §3.1, the audit template, the blocks R5b, R9 and R13 and section 6 of this file; the reading of the escaped-defects metric in the consolidated-audit template and in §8 of the record of R5a; the routing of the Gemini style-guide sync in a row of `CURRENT-STATE.md` and in §9 of the record of R5a.
+- Who: the planning session writes the prompt, with one internal sub-agent audit (PLAN-040); the coding agent executes it; the inline round and review A run, reviews B and C do not.
+- Done when: merged, and issue #242 is closed.
+- State after: version unchanged. R5b is produced under the fixed contract.
+
 ### R5b: Batch 2 re-produced (documentation)
 
 - Who: a prompt-producing session; one or two independent auditors; the coding agent commits the files.
@@ -141,8 +150,8 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 
 | Step | Tier | Prompt style | Audit before dispatch |
 |---|---|---|---|
-| v7.7.1.2 | LOW | Intent and acceptance criteria | Lint |
-| v7.7.1.3 | MEDIUM | Intent and acceptance criteria; interface contracts prescribed | Lint and one independent auditor |
+| v7.7.1.2 | LOW | Intent and acceptance criteria | Lint; the compile of any embedded code (PLAN-042) |
+| v7.7.1.3 | MEDIUM | Intent and acceptance criteria; interface contracts prescribed | Lint and one independent auditor; the compile of any embedded code (PLAN-042) |
 | v7.7.1.4 | HIGH | Prescriptive | Lint, two auditors from different model families reconciled in one file, and the compile gate in R7 |
 
 - The assumption audit settles each leftover:
@@ -153,6 +162,7 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
   - no login literal: `-u "$ESP_USER:$ESP_PASS"` only (SEC-003);
   - `dashboard/dashboard.h` is in the regenerated outputs of every code prompt that bumps the version, because the version is in the dashboard (R5 made the header reproducible);
   - a `.bin` size checkpoint against the OTA slot from v7.7.1.3 on; the WROOM's `min_free_heap` after a fresh boot and a day later.
+- Compile before dispatch (PLAN-042): a prompt of any tier that carries code ending in a compiled artifact has that code compiled on a scratch branch first. If the prompt of v7.7.1.3 carries such code, its compile runs in its pre-dispatch gate, once v7.7.1.2 is on `main`; the compile of v7.7.1.4 runs in R7.
 - Budget: three to four producer sessions plus the audits. If the audit sessions pass twice the producer sessions, stop and decide (process guide §4.3 item 7).
 - Done when: the bundles, the assumption audit and the audit files are on `main`, and the batch metrics are recorded.
 - State after: version unchanged. v7.7.1.2 is cleared for its pre-dispatch gate.
@@ -204,7 +214,7 @@ Do not open a PR. Push nothing except the scratch branch, and delete it afterwar
 
 ### R9 and R13: Batch 3 and Batch 4 prompts
 
-- As R5b, with the producer contract and batch prompt v3.0. Batch 3: v7.7.2.1 (MEDIUM), v7.7.2.2 (HIGH), v7.7.2.3 (MEDIUM). Batch 4: v7.7.3.1 and v7.7.3.2 (MEDIUM), v7.7.3.3 (HIGH). One auditor for a MEDIUM step; two auditors from different model families for a HIGH step. The compile gate of a HIGH step waits until the step before it is on `main`. The bundles and their audits go into one documentation PR, with the batch metrics.
+- As R5b, with the producer contract and batch prompt v3.0. Batch 3: v7.7.2.1 (MEDIUM), v7.7.2.2 (HIGH), v7.7.2.3 (MEDIUM). Batch 4: v7.7.3.1 and v7.7.3.2 (MEDIUM), v7.7.3.3 (HIGH). One auditor for a MEDIUM step; two auditors from different model families for a HIGH step. The compile gate of a HIGH step waits until the step before it is on `main`; a prompt of another tier that carries code compiles it in its pre-dispatch gate (PLAN-042). The bundles and their audits go into one documentation PR, with the batch metrics.
 - From R9 to v1.0 the method does not change (PLAN-012, PLAN-017).
 
 ### R10: v7.7.2.1, engine switchover and storage-stats v2 (MEDIUM)
@@ -249,7 +259,7 @@ Do not open a PR. Push nothing except the scratch branch, and delete it afterwar
 
 Eight moves. The binding text is in `Docs/development-process-guide.md` §2; this is the short form.
 
-1. Pre-dispatch gate (process guide §2.1 item 6). On the day of dispatch the planning session runs the §2 block of the prompt against `origin/main`, runs lint on the prompt file, and checks that no fill-in is left. Device values come only from the operator's latest fleet output. The record is the first comment of the PR.
+1. Pre-dispatch gate (process guide §2.1 item 6). On the day of dispatch the planning session runs the §2 block of the prompt against `origin/main`, runs lint on the prompt file, checks that no fill-in is left, and compiles the code that the prompt carries and that ends in a compiled artifact (contract rule 3.4). Device values come only from the operator's latest fleet output. The record is the first comment of the PR.
 2. Dispatch. The operator pastes the setup block (process guide §2.2) and then the agent prompt, word for word. A step prompt closes its issue with `Fixes #N`: #214 for v7.7.1.2, #215 for v7.7.1.3, #216 for v7.7.1.4, #217 for v7.7.2.1, #218 for v7.7.2.2, #219 and #224 for v7.7.2.3, #220 for v7.7.3.1, #221 for v7.7.3.2, #222 for v7.7.3.3.
 3. Checkpoint failures. When the agent posts `⛔ CHECKPOINT FAILED`, it has stopped. If the prompt is wrong, the planning session corrects it; if the code is wrong, the agent investigates and reports. Nobody tells the agent to make the check pass.
 4. Reviews (process guide §2.4). The agent marks the PR ready and starts the inline round itself (PLAN-027). Then the external reviews run: reviews A and C side by side, then review B by the runner, always last (PLAN-023). Section 7 shows the scheme.
