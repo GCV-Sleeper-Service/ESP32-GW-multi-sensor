@@ -99,6 +99,8 @@ List every change the agent made that was NOT explicitly specified in the prompt
 
 _Completed after the last review round and committed before merge._
 
+_Defects that escaped the prompt gates into agent execution: the unique defects of the step's bundle (prompt, check file, supplied texts, tests) that the producer's gates and audits missed and that were found after dispatch, each counted once; an error of the agent's own is not one of them (PLAN-042)._
+
 ## §5 — Acceptance Criteria Checklist
 
 Copy each criterion from the agent prompt §7 (Acceptance Criteria). Mark each PASS or FAIL with evidence.

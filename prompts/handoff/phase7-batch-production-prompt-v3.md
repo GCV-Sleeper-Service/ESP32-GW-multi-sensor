@@ -11,7 +11,7 @@ _Precedence: `AGENTS.md`, `Docs/development-process-guide.md` and `prompts/produ
 
 | Batch | Step of the plan of record | Trigger | Steps to produce (tier, PLAN-017) | Key theme |
 |-------|------|---------|-----------------|-----------|
-| Batch 2 | R5b | R5a merged | v7.7.1.2 (LOW), v7.7.1.3 (MEDIUM), v7.7.1.4 (HIGH) | Per-device structs, persist write path, restore engine and retention budget |
+| Batch 2 | R5b | R5a.1 merged | v7.7.1.2 (LOW), v7.7.1.3 (MEDIUM), v7.7.1.4 (HIGH) | Per-device structs, persist write path, restore engine and retention budget |
 | Batch 3 | R9 | R18a merged | v7.7.2.1 (MEDIUM), v7.7.2.2 (HIGH), v7.7.2.3 (MEDIUM) | Engine switchover, migration, per-device delete and socket cap |
 | Batch 4 | R13 | R12 merged | v7.7.3.1 (MEDIUM), v7.7.3.2 (MEDIUM), v7.7.3.3 (HIGH) | Export and import, bundle export and import, Phase 7 closure |
 
@@ -76,9 +76,9 @@ git show origin/main:CURRENT-STATE.md | sed -n '3,4p'
 ls firmware/core/*.h | wc -l
 grep -c '^| [0-9]' prompts/prompt-index-and-workflow.md
 find tests -name '*.spec.js' | sort
-grep -n 'handle_history_\|handle_api_v2_history_\|SegmentSnapshot' firmware/core/web-handler.h | head -5
-grep -n 'struct.*Segment\|struct.*Device\|struct.*Event' firmware/core/data-model.h | head -5
-grep -n 'struct.*Segment\|struct.*Device\|struct.*Meta' firmware/core/nvs-persistence.h | head -5
+grep -n 'handle_history_\|handle_api_v2_history_\|SegmentSnapshot' firmware/core/web-handler.h
+grep -n 'struct.*Segment\|struct.*Device\|struct.*Event' firmware/core/data-model.h  # no match: no output and exit 1; record "none"
+grep -n 'struct.*Segment\|struct.*Device\|struct.*Meta' firmware/core/nvs-persistence.h
 grep -A6 '^static void maybe_yield_nvs_scan_(' firmware/core/nvs-persistence.h | grep -o 'pdMS_TO_TICKS([0-9]*)'
 ```
 
