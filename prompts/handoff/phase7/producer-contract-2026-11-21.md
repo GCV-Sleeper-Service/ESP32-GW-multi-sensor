@@ -116,10 +116,10 @@ No issue closes in this step, and no milestone changes. After the merge the oper
 | Producer sessions for this step's prompt | 1 |
 | Audit sessions for this step's prompt | 0 |
 | Fix-cycle commits after the first review round | 1 |
-| Defects that escaped the prompt gates into agent execution | 1 |
+| Defects that escaped the prompt gates into agent execution | 7 |
 | Defects that escaped to devices | 0 |
 
-Producer and audit counts come from the operator's explicit metrics comment 7059068448 on PR #241. They confirm 1 and 0; internal producer-audit rounds are excluded per PLAN-037/PLAN-040. The earlier gate record had forecast the same values but was not the final metrics confirmation. The execution-defect count is the premature metrics/provenance choice in A L4. The seven fixed-text review findings are tracked in sections 3 and 5 separately from execution failures. No device was contacted.
+Producer and audit counts come from the operator's explicit metrics comment 7059068448 on PR #241. They confirm 1 and 0; internal producer-audit rounds are excluded per PLAN-037/PLAN-040. The earlier gate record had forecast the same values but was not the final metrics confirmation. Corrected in R5a.1 (PLAN-042; issue #242, comment 7060767358): the execution-defect count is the seven fixed-text findings of issue #242 (review A's M1, M2, L1, L2, L3 and L5, and review B's check-file diagnostic), the unique defects of the bundle that the producer's gates and audits missed and that were found after dispatch. The count was 1 before, the premature metrics/provenance choice in A L4; that is an error of the agent's own, and section 4 records it. No device was contacted.
 
 ## §9 Recommendations and where each was routed
 
@@ -132,7 +132,7 @@ The prescribed CURRENT-STATE.md rows route runner regression tests, commit-pinne
 | Q1: rule 1.5's exception | Accepted by [operator comment 7060381647](https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pull/241#issuecomment-7060381647). Check board commands against AGENTS.md "Device Testing" and the operator's latest fleet output; wording is tracked in issue #242. |
 | Q2: credential rule scope | The same operator comment confirms that the rule covers written command text and check-file checks; AGENTS.md's curl -u "$ESP_USER:$ESP_PASS" remains allowed. Wording is tracked in issue #242. |
 | Q3 and S7 operator-decision fidelity | The same operator comment confirms PLAN-038 to PLAN-041 state the decisions of 2026-11-19 and 2026-11-21. Answer recorded; operator confirmation is no longer pending. |
-| A suggestion: automated Gemini style-guide sync | Reported for operator routing to a later tooling issue; no new gate added in this PR. |
+| A suggestion: automated Gemini style-guide sync | Routed by the operator to issue #242 (comment 7060767358); R5a.1 adds a row to "Unimplemented Recommendations" of `CURRENT-STATE.md` that routes it to a later tooling step (PLAN-042). |
 | A note: CI freshness before a later R5b dispatch | Existing contract 9.6 already requires a sufficiently recent successful main run; operator starts it if needed. No workflow was manually started here. |
 
 The task prompt's review step 4 expressly freezes CURRENT-STATE.md and the other Task Group 2 files, and scope forbids creating/editing issues or milestones. The operator has completed routing of all seven fixed-text findings to issue #242 and answered Q1 to Q3. Six fixes await R5a.1 before R5b; the diagnostic is retained as a lesson only. This update records those decisions without changing fixed texts, another repository file or the issue.
