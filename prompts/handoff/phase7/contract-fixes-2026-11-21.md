@@ -24,28 +24,35 @@ R5a.1 is the low-risk documentation step that applies producer-contract fixes be
 
 ## §3 Review findings by severity
 
-No actionable findings were posted in the current inline-review snapshot.
+Inline round and review comments were reassessed after the round completed.
 
 | Reviewer | Outcome | Findings | Disposition |
 |---|---|---|---|
-| Gemini | Posted note: unsupported file types | None | No code change warranted |
-| Codex | Status comment shows review still running | None posted yet | No code change warranted |
-| Copilot | No review/comment posted in current round snapshot | None | No code change warranted |
+| Gemini (`gemini-code-assist[bot]`) | Posted unsupported-file-types note and a COMMENTED review summary without code findings | No actionable findings | No code change warranted |
+| Copilot (`copilot-pull-request-reviewer[bot]`) | COMMENTED review with no open issues; explicitly states selected-tier completion was restricted by policy/plan | No actionable findings; review treated as incomplete per PLAN-032 | No code change warranted |
+| Codex (`chatgpt-codex-connector[bot]` / `Codex`) | Completed code and security review comments | No actionable findings | No code change warranted |
+| Review A (Claude Opus 5.5) | Posted findings F1-F3 in comment 7067240679 | 1 Medium + 2 Low | Warranted; fixed in this round by updating the record and posting a corrected assessment comment |
+
+Warranted findings addressed in this round:
+
+- F1 (Medium): the earlier assessment/record snapshot was posted before the inline round fully finished; §3 now records final reviewer outcomes, and §8 now uses the operator-provided values.
+- F2 (Low): §4/§5 inconsistency is corrected by recording the autonomous decision in §4.
+- F3 (Low): assessment attribution wording corrected in the new assessment comment by naming the agent/model explicitly and unambiguously.
 
 ## §4 Agent autonomous decisions
 
-none
+Used a fallback PR-body update path (`gh api ... --method PATCH`) after `gh pr edit` failed with a GitHub CLI GraphQL deprecation error on projectCards fields. Reason: complete required §8 PR-body update without changing scope or content intent.
 
 ## §5 Prompt Quality Score
 
 Prompt Quality Score:
 
-- Fix cycles: 0
+- Fix cycles: 1
 - Checkpoint saves: 0
-- Preventable review findings: 0
+- Preventable review findings: 3
 - Agent autonomous decisions: 1 (neutral)
 
-Notes: no known-tooling-defect recovery of the PRE-PR gate was used. The single autonomous decision was a neutral operational fallback from `gh pr edit` to `gh api ... --method PATCH` after a GitHub CLI GraphQL deprecation error blocked `gh pr edit`.
+Notes: no known-tooling-defect recovery of the PRE-PR gate was used. Preventable findings were F1-F3 from review A, all record/process-level and fixed in this round.
 
 ## §6 Operator decisions recorded by this PR
 
@@ -61,9 +68,9 @@ Issue #242 closes at the merge through the line `Fixes #242` of the PR body; no 
 
 | Metric | Value |
 |---|---|
-| producer sessions for this step's prompt | pending |
-| audit sessions for this step's prompt | pending |
-| fix-cycle commits after the first review round | 0 |
+| producer sessions for this step's prompt | 1 |
+| audit sessions for this step's prompt | 0 |
+| fix-cycle commits after the first review round | 2 |
 | defects that escaped the prompt gates into agent execution | 0 |
 | defects that escaped to devices | 0 |
 
