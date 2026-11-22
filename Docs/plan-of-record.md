@@ -30,7 +30,7 @@ Who starts where: a planning or prompt-producing session starts at `Docs/planner
 
 ## 2. You are here
 
-The next step is **R5b**, the Batch 2 prompts re-produced under the producer contract. The last merged step is **R5a.2**, the method fixes from the reviews of R5a.1 (PLAN-043). The review runner passed its dry run on 2026-11-20 and its posting run on 2026-11-21.
+The next step is **R4**, v7.7.1.2; its bundle came with R5b. The last merged step is **R5b**, the method fixes from the reviews of PR #244 and the bundle of v7.7.1.2 (PLAN-044). Batch 2 is produced rolling: the bundle of v7.7.1.3 after R4 merges, the one of v7.7.1.4 after R6 merges. The review runner passed its dry run on 2026-11-20 and its posting run on 2026-11-21.
 
 ## 3. The ladder
 
@@ -50,17 +50,17 @@ The steps in the order they run. Every step is on the path to v1.0, except R15, 
 | 6 | R5a | Producer contract and batch-production prompt v3.0 | Dispatch, review and merge one documentation PR | R5r | Unchanged | 1 to 2 | Done: the pull request that added `prompts/producer-contract.md` |
 | 6a | R5a.1 | Producer-contract fixes from the reviews of R5a, issue #242 (LOW, PLAN-042) | Dispatch, review and merge one documentation PR | R5a | Unchanged | 1 to 2 | Done: the pull request that fixes issue #242 |
 | 6b | R5a.2 | Method fixes from the reviews of R5a.1 (LOW, PLAN-043): an internal round at every tier, dispatch by a setup file, the checks `inline` and `body` of the review round | Dispatch, review and merge one documentation PR | R5a.1 | Unchanged | 1 to 2 | Done: the pull request that adds PLAN-043 |
-| 7 | R5b | Batch 2 re-produced under the method of record: three bundles and their assumption audit, audited by tier | The auditor sessions; dispatch, review and merge one documentation PR | R5a.2 | Unchanged | 4 to 6 | Waiting |
+| 7 | R5b | Batch 2, rolling (PLAN-044): the method fixes from the reviews of PR #244, the assumption audit and the bundle of v7.7.1.2; the bundles of v7.7.1.3 and v7.7.1.4 follow after R4 and R6 | Dispatch, review and merge one documentation PR | R5a.2 | Unchanged | 4 to 6 | Done: the pull request that adds PLAN-044 |
 | 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | Waiting |
-| 9 | R6 | v7.7.1.3: persist write path (MEDIUM); the test board .173 gets it too | SP | R4 | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 | Waiting |
+| 9 | R6 | v7.7.1.3: persist write path (MEDIUM); the test board .173 gets it too | SP | R4; its bundle, produced after R4 merges, and one auditor session | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 | Waiting |
 | 10 | R7 | Compile gate for v7.7.1.4; backups | Backups copied off the build host; USB cable ready | R6 | 7.7.1.3 | 1 to 2 | Waiting |
-| 11 | R8 | v7.7.1.4: restore engine and retention budgets (HIGH); .173 first, then the production boards | SP; stand by for USB recovery | R7 | 7.7.1.4 (`v7.7.1.4`) | 3 to 5 | Waiting |
+| 11 | R8 | v7.7.1.4: restore engine and retention budgets (HIGH); .173 first, then the production boards | SP; stand by for USB recovery | R7; its bundle, produced after R6 merges, and two auditor sessions | 7.7.1.4 (`v7.7.1.4`) | 3 to 5 | Waiting |
 | 12 | R18a | v7.7.1.5: new board secrets, per-board API key and OTA password (LOW) | New values; flash every project board in one sitting; paste the check output | R8 | 7.7.1.5 (`v7.7.1.5`) | 1 to 2 | Waiting |
-| 13 | R9 | Batch 3 prompts produced and audited | As R5b | R18a | 7.7.1.5 | 2 to 3 | Waiting |
+| 13 | R9 | Batch 3 prompts produced and audited | The auditor sessions; dispatch, review and merge one documentation PR | R18a | 7.7.1.5 | 2 to 3 | Waiting |
 | 14 | R10 | v7.7.2.1: engine switchover (MEDIUM) | SP | R9 | 7.7.2.1 (`v7.7.2.1`) | 3 to 5 | Waiting |
 | 15 | R11 | Compile gate, rehearsal on .173, v7.7.2.2 migration (HIGH) | The rehearsal and the backups; SP | R10 | 7.7.2.2 (`v7.7.2.2`) | 4 to 6 | Waiting |
 | 16 | R12 | v7.7.2.3: per-device delete and socket cap (MEDIUM) | SP; tag `v1.0-rc1` | R11 | 7.7.2.3 (`v7.7.2.3`, `v1.0-rc1`) | 2 to 3 | Waiting |
-| 17 | R13 | Batch 4 prompts produced and audited | As R5b | R12 | 7.7.2.3 | 1 to 2 | Waiting |
+| 17 | R13 | Batch 4 prompts produced and audited | The auditor sessions; dispatch, review and merge one documentation PR | R12 | 7.7.2.3 | 1 to 2 | Waiting |
 | 18 | R14 | v7.7.3.1: per-device export and import (MEDIUM) | SP | R13 | 7.7.3.1 (`v7.7.3.1`) | 3 to 5 | Waiting |
 | – | R15 | Critical-rule retirement PR, documentation only, beside Batch 4 | Dispatch, review and merge | R5a | Unchanged | 1 to 2, not counted | Waiting; may slip past v1.0 |
 | 19 | R16 | v7.7.3.2: bundle export and import (MEDIUM) | SP | R14 | 7.7.3.2 (`v7.7.3.2`) | 2 to 3 | Waiting |
@@ -154,13 +154,13 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 
 ### R5b: Batch 2 re-produced (documentation)
 
-- Who: a prompt-producing session; one or two independent auditors; the coding agent commits the files.
-- Scope: three bundles that replace the May 2026 files under the same names, and `prompts/handoff/phase7/phase7-batch2-assumption-audit.md` with the live-extract table. The May prompts are source material, not text to copy.
+- Who: a prompt-producing session; the coding agent commits the files. R5b itself is LOW: one internal round and no independent auditor; each bundle of the batch gets the auditors of its tier before its own dispatch (PLAN-044).
+- Scope, rolling (PLAN-044): R5b's PR holds the method fixes from the reviews of PR #244, `AGENTS.md` included, PLAN-044, the bundle of v7.7.1.2 that replaces its May 2026 files under the same names, and `prompts/handoff/phase7/phase7-batch2-assumption-audit.md` with the live-extract table of v7.7.1.2; it deletes the three two-step files of May 2026. The bundle of v7.7.1.3 is produced after R4 merges and the bundle of v7.7.1.4 after R6 merges, each from the code then on `main`; each reaches `main` in its own step's PR, with its section of the assumption audit. The May prompts are source material, not text to copy.
 
 | Step | Tier | Prompt style | Audit before dispatch |
 |---|---|---|---|
 | v7.7.1.2 | LOW | Intent and acceptance criteria | Lint and one internal round; the compile of any embedded code (PLAN-042) |
-| v7.7.1.3 | MEDIUM | Intent and acceptance criteria; interface contracts prescribed | Lint, one internal round and one independent auditor; the compile of any embedded code (PLAN-042) |
+| v7.7.1.3 | MEDIUM | Intent and acceptance criteria; interface contracts prescribed | Lint, one internal round (a second optional when the first finds a new HIGH or MEDIUM) and one independent auditor; the compile of any embedded code (PLAN-042) |
 | v7.7.1.4 | HIGH | Prescriptive | Lint, one or two internal rounds, two auditors from different model families reconciled in one file, and the compile gate in R7 |
 
 - The assumption audit settles each leftover:
@@ -172,19 +172,20 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
   - `dashboard/dashboard.h` is in the regenerated outputs of every code prompt that bumps the version, because the version is in the dashboard (R5 made the header reproducible);
   - a `.bin` size checkpoint against the OTA slot from v7.7.1.3 on; the WROOM's `min_free_heap` after a fresh boot and a day later.
 - Compile before dispatch (PLAN-042): a prompt of any tier that carries code ending in a compiled artifact has that code compiled on a scratch branch first. If the prompt of v7.7.1.3 carries such code, its compile runs in its pre-dispatch gate, once v7.7.1.2 is on `main`; the compile of v7.7.1.4 runs in R7.
-- Budget: three to four producer sessions plus the audits. If the audit sessions pass twice the producer sessions, stop and decide (process guide §4.3 item 7).
-- Done when: the bundles, the assumption audit and the audit files are on `main`, and the batch metrics are recorded.
+- Budget: one producer session for R5b and one for each later bundle, plus the audits. If the audit sessions pass twice the producer sessions, stop and decide (process guide §4.3 item 7).
+- Done when: R5b is merged. The batch metrics of Batch 2 are recorded in the reconciliation file of v7.7.1.4, the last bundle of the batch (audit template §9, PLAN-044).
 - State after: version unchanged. v7.7.1.2 is cleared for its pre-dispatch gate.
 
 ### R4: v7.7.1.2, per-device structs, key scheme, hash (LOW)
 
-- Extra checks before the merge: the changelog shows measured `sizeof()` values; the C3 heap is within 2 KB of the v7.7.1.1 baseline; the `.bin` size is in the PR body. It is the first intent-style prompt, so its review findings and fix cycles are recorded with care.
+- Extra checks before the merge: the changelog shows measured `sizeof()` values; the C3 heap is within 2 KB of the v7.7.1.1 baseline; the `.bin` size is in the PR body; the WROOM's `min_free_heap` after a fresh boot and 24 hours later is in the PR body (PLAN-044). It is the first intent-style prompt, so its review findings and fix cycles are recorded with care.
 - Done when: tag `v7.7.1.2` exists and #214 is closed.
 - State after: the new structs, key scheme and hash are in the code. Nothing uses them yet. Only the boards that the prompt's device tests flashed run 7.7.1.2; the fleet table in `CURRENT-STATE.md` records it.
 
 ### R6: v7.7.1.3, per-device persist write path (MEDIUM)
 
 - Extra checks: dual-write verified on .189, .170 and the test board .173; the WROOM's `nvs_used` before and after; the Rule 40 and Rule 61 checks in the PR.
+- Bundle: produced after R4 merges, from the code on `main`; one internal round, a second optional when the first finds a new HIGH or MEDIUM, and one auditor; it reaches `main` in this step's PR (PLAN-044).
 - Done when: tag `v7.7.1.3` exists and #215 is closed.
 - State after: every persist cycle writes the old blob and the new per-device blobs. Nothing reads the new ones yet. The operator watches the WROOM's NVS use for a few days.
 
@@ -211,6 +212,7 @@ Do not open a PR. Push nothing except the scratch branch, and delete it afterwar
 ### R8: v7.7.1.4, restore engine and retention budgets (HIGH)
 
 - Flash over OTA. The partition tables do not change in this step (PLAN-015).
+- Bundle: produced after R6 merges, from the code on `main`; one or two internal rounds and two auditors; its compile gate is R7; it reaches `main` in this step's PR, and its reconciliation file records the batch metrics of Batch 2 (audit template §9, PLAN-044).
 - Extra checks: boot restore works on .173 first; only after .173 has booted and served its history, on .189, .170 and .191; a retention-budget line is logged for each device; the declaration-order check is in the PR body; the `.bin` size is recorded.
 - Recovery: if a board boot-loops, flash the v7.7.1.3 build over USB with `timeout 300 esphome upload <yaml> --device=<serial port>`, post the boot log to the PR, and stop the step. If a board comes back with empty history, import its history again from the R7 backup with `scripts/history_backup.py import`; the login comes from the operator's environment.
 - Done when: tag `v7.7.1.4` exists, #216 is closed, the three production boards report 7.7.1.4, and each dashboard shows its history.
@@ -223,7 +225,7 @@ Do not open a PR. Push nothing except the scratch branch, and delete it afterwar
 
 ### R9 and R13: Batch 3 and Batch 4 prompts
 
-- As R5b, with the producer contract and batch prompt v3.0. Batch 3: v7.7.2.1 (MEDIUM), v7.7.2.2 (HIGH), v7.7.2.3 (MEDIUM). Batch 4: v7.7.3.1 and v7.7.3.2 (MEDIUM), v7.7.3.3 (HIGH). One auditor for a MEDIUM step; two auditors from different model families for a HIGH step. The compile gate of a HIGH step waits until the step before it is on `main`; a prompt of another tier that carries code compiles it in its pre-dispatch gate (PLAN-042). The bundles and their audits go into one documentation PR, with the batch metrics.
+- One documentation PR with every bundle of the batch, as R5b was planned before PLAN-044, with the producer contract and batch prompt v3.0. Batch 3: v7.7.2.1 (MEDIUM), v7.7.2.2 (HIGH), v7.7.2.3 (MEDIUM). Batch 4: v7.7.3.1 and v7.7.3.2 (MEDIUM), v7.7.3.3 (HIGH). One auditor for a MEDIUM step; two auditors from different model families for a HIGH step. The compile gate of a HIGH step waits until the step before it is on `main`; a prompt of another tier that carries code compiles it in its pre-dispatch gate (PLAN-042). The bundles and their audits go into one documentation PR, with the batch metrics.
 - From R9 to v1.0 the method does not change (PLAN-012, PLAN-017).
 
 ### R10: v7.7.2.1, engine switchover and storage-stats v2 (MEDIUM)
@@ -351,7 +353,7 @@ Only findings that a ladder step owns, and that no issue and no row of `CURRENT-
 
 | Finding | Owner |
 |---|---|
-| The leftovers of the May 2026 Batch 2 prompts (the list in section 5, R5b) | R5b |
+| The leftovers of the May 2026 Batch 2 prompts (the list in section 5, R5b) | R5b for v7.7.1.2; the bundle of v7.7.1.4 for H-1 and L-1 of PR #233 (PLAN-044) |
 | Whether a ChatGPT Plus plan carries a firmware step for the coding agent; how the management login reaches the coding agent's shell | Before R4 |
 
 ## 11. Risks

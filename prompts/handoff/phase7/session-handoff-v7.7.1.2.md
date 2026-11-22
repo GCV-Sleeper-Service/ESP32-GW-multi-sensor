@@ -1,171 +1,62 @@
-# Session Handoff — v7.7.1.2: Per-Device Structs, Key Scheme, Hash Function
+# Session handoff - v7.7.1.2 (R4)
 
-_Date: 2026-05-08_
-_Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
-_Status: v7.7.1.1 on `main`. Chunked HTTP streaming deployed. BUG-082 resolved._
+_Written 2026-11-22 by the planning session inside the PR of R5b (PLAN-044), from the template of HowTo v2.3.1 `templates/session-handoff.template.md`. It replaces the May 2026 handoff of this step. Amend it inside any later PR that changes these assumptions._
 
----
+## State snapshot this step was written against
 
-## Project State Summary
+| Item | Value | Source |
+| --- | --- | --- |
+| Version on main | 7.7.1.1 | `VERSION` |
+| Commit on main (SHA) | `1c95906` at production; the R5b merge at dispatch, which the pre-dispatch gate records | `git rev-parse --short origin/main` |
+| Last verified | 2026-11-14: .189, .170 and .191 report v7.7.1.1 | `CURRENT-STATE.md`, line 3 |
+| Deployment targets (name → address → deployed version and commit) | `esp32-c3-multi` → 192.168.120.189 → v7.7.1.1; `sat-esp32-4m-170` → 192.168.120.170 → v7.7.1.1 (2026-11-14) | `CURRENT-STATE.md`, "Board Fleet"; the operator's `fleet` output on the day of dispatch |
+| Measurements this step depends on | C3 `free_heap` 52,080 B after the v7.7.1.1 flash (2026-05-08); .170 `min_free_heap` 3,988 B at 7.5 days of uptime (2026-11-14); C3 image 1,435,840 B of the 1,769,472-byte OTA slot (81.1 %), compiled by the planning session from `1c95906` on 2026-11-22 | `CURRENT-STATE.md`, "Phase 7 Device Validation Snapshot" and "Open Issues"; the gate record of R5b |
 
-**v7.7.1.1 is complete.** History endpoints now stream CSV via `httpd_resp_send_chunk()`. BUG-082 is resolved — dashboards work on all boards regardless of NVS history size. Heap improvements on C3: `min_free` up 18 KB.
+## What this step does
 
-**This step is purely additive.** No runtime behavior changes. Define the structs and helpers that v7.7.1.3 and v7.7.1.4 will use for the per-device persistence engine.
+- Defines the per-device persistence model in `firmware/core/data-model.h`: `DeviceHistoryMeta`, `DeviceSegmentHeader`, `DeviceSegment`, `EventEntry`, `EventLog`, the constants `DEV_HIST_MAGIC`, `DEV_HIST_VERSION`, `MAX_PERSIST_METRICS` (6), `DEVICE_ID_MAX_LEN` (32), `MAX_DEVICE_SLOTS` (4,096), and the enum `PersistPriority`.
+- Defines the FNV-1a hash and the NVS keys in `firmware/core/nvs-persistence.h`: `dm_<8 hex>` for a device's meta blob and `ds_<8 hex>_<3 hex>` for a segment, both at most 15 characters.
+- Makes the generator write the persist defaults of each device: `PERSIST_DEVICE_COUNT`, `PERSIST_DEVICE_IDS[]`, `PERSIST_METRIC_COUNTS[]` and `PERSIST_PRIORITIES[]`.
+- Proves all of it at compile time with two supplied tests and five measured size assertions; bumps to 7.7.1.2; flashes .189 and .170.
 
-### v7.7.1.1 device validation snapshot (C3)
+## What this step does NOT do
 
-| Metric | v7.7.1.0 baseline | v7.7.1.1 observed | Delta |
-|---|---|---|---|
-| `heap_free` | 39,704 B | 52,080 B | +12,376 B |
-| `min_free` | 29,776 B | 48,096 B | +18,320 B |
-| `httpd_stack_wm` | 12,932 B | 11,976 B | -956 B |
-| `hc_stack_wm` | 2,176 B | 2,308 B | +132 B |
+- No runtime code uses the new definitions: no NVS read or write, no task, no endpoint, no dashboard change.
+- The served manifest does not change, and `config/sensors.json` gets no `persist` block; an explicit `persist` block per device waits for the step that needs it.
+- The old engine (`SegmentSnapshot`, `HistoryMeta`, `PERSIST_SLOTS`) is unchanged.
+- No partition change (PLAN-015).
 
-### Open issues entering v7.7.1.2
+## Risk tier and why
 
-| Issue | Severity | Notes |
-|---|---|---|
-| BUG-084 | High | Non-PSRAM boards crash under 8 concurrent HTTP connections. |
-| #137 | Low | Board-type SVG diagrams. Cosmetic. |
-| A-004 | Medium | C5 WROOM-1U BLE non-functional. |
-| C6 flash | Medium | C6 4MB uses 91.6% OTA partition. |
+LOW (PLAN-017): additive definitions only, proved at compile time on both CPU families of the fleet. The only runtime change is the version string and the image size.
 
-No new issues discovered during v7.7.1.1 that affect this step.
+## Critical rules that apply
 
----
+| # | Rule | Why here |
+| --- | --- | --- |
+| 2 | Version bump through `bump-version.sh` | The step bumps to 7.7.1.2 |
+| 5, 58 | No hand edit of generated files; code in `firmware/core/` | Two fragments and the generator change |
+| 62 | Fragment order unchanged | No fragment is added |
+| 63 | Session log in the PR | Firmware step |
+| 64 | Counts from the prompt's text | The checks count definitions |
+| 67 | Binary metrics use `EventLog` | This step defines it |
 
-## Phase 7 Progress Table
+## Risks and mitigations
 
-| Version | Scope | Status |
-|---------|-------|--------|
-| v7.7.0.0 | ESPHome component defaults audit (research) | Complete |
-| v7.7.1.0 | Health-check telemetry task | Complete (PR #225) |
-| v7.7.1.1 | Chunked HTTP streaming (BUG-082 fix) | Complete (PR #226) |
-| **v7.7.1.2** | **Per-device structs, key scheme, hash function** | **⬅️ Current** |
-| v7.7.1.3 | Per-device persist engine (write path) | Pending |
-| v7.7.1.4 | Per-device restore engine + retention budget | Pending |
+| Risk | Trigger | Mitigation |
+| --- | --- | --- |
+| A struct layout differs between RISC-V and Xtensa | The WROOM compile fails a size assertion | The agent stops and reports; the layout has explicit reserved fields, so no difference is expected |
+| The C3 heap moves | `c3heap` outside 52,080 B ± 2,048 B | The agent stops and reports; the step adds no runtime data, so a change points at the platform |
+| The WROOM heap keeps falling | `min_free_heap` of .170 lower after 24 h | Recorded, not fixed here; it decides the heap checks of v7.7.1.3 |
+| A slot count above 4,095 | A later budget on a 16 MB board | `MAX_DEVICE_SLOTS` caps it; v7.7.1.4 clamps its budget to it |
 
----
+## Context that carries forward to the next step
 
-## v7.7.1.2 Scope
+- v7.7.1.3 persists the structs of this step for the first time. Its bundle is produced by the planning session after this merge, from the code on `main` (PLAN-044): the measured sizes, the key helpers and the generated constants are its interface.
+- `NvsKey` holds its key in `s`; "no key" is `s[0] == '\0'`; the persist path must check it.
+- The 24-hour reading of .170 and the C3 image size are the baselines of v7.7.1.3's checks.
 
-### What this step does
+## Open questions for the operator (answer before dispatch)
 
-1. Adds `DeviceHistoryMeta` struct to `firmware/core/data-model.h` (36 bytes — per-device ring buffer state)
-2. Adds `DeviceSegmentHeader` + `DeviceSegment` structs (226 bytes — per-device hourly segment)
-3. Adds `EventLog` class + `EventEntry` struct for binary sensors (168 bytes — state-change dedup, Rule 67)
-4. Adds `device_id_hash_()` FNV-1a hash function to `firmware/core/nvs-persistence.h`
-5. Adds `make_device_meta_key_()` and `make_device_segment_key_()` NVS key helpers
-
-### What this step does NOT do
-
-- No runtime wiring — no persist calls, no restore calls, no dashboard integration
-- No new firmware fragments (count stays at 9)
-- No new HTTP endpoints
-- No changes to web-handler.h (chunked streaming untouched)
-- No changes to the old SegmentSnapshot engine
-- No changes to the C3 YAML template
-- No device testing needed (no runtime changes to test)
-
-### Architecture references
-
-- `Docs/v7.7-v7.8-persistence-architecture.md` §5 — struct definitions
-- `Docs/v7.7-v7.8-persistence-architecture.md` §6 — NVS key scheme, FNV-1a hash
-- `Docs/phase-V-capacity-study.md` §6 — EventLog design
-- Decision PLAN-002 — binary sensors use EventLog, not HistoryBuffer
-
-### Files modified
-
-- `firmware/core/data-model.h` — new structs and EventLog class
-- `firmware/core/nvs-persistence.h` — new key helper functions
-- `Docs/changelog.md` — v7.7.1.2 entry
-- `CURRENT-STATE.md` — version, "What Just Shipped", "What's Next"
-- `VERSION` + bump-version.sh artifacts
-- Session log `Docs/session-log-<DATE>-v7.7.1.2.md`
-- Consolidated audit `prompts/phase7/v7.7.1.2-PR<NN>-consolidated-audit-and-lessons.md`
-
----
-
-## Codebase state entering v7.7.1.2
-
-### Board fleet (verified from CURRENT-STATE.md)
-
-| Board | IP | Chip | Role |
-|-------|-----|------|------|
-| C3 SuperMini | 192.168.120.189 | ESP32-C3 | Satellite (production) |
-| WROOM-32D | 192.168.120.170 | ESP32 | Satellite (production) |
-| S3 DevKitC N16R8 | 192.168.120.191 | ESP32-S3 | Aggregator (production) |
-
-Credentials: `$ESP_USER` / `$ESP_PASS` in the operator's shell; the firmware reads `gateway_mgmt_username` / `gateway_mgmt_password` from the git-ignored `firmware/secrets.yaml`
-
-### Logger level (do not revert)
-
-`firmware/esp32-c3-multi-sensor.yaml` has `logger.level: INFO` with per-tag suppressors. This is intentional for HEALTH: telemetry.
-
-### Fragment count
-
-Assembly pipeline expects **9 fragments**. This step adds NO new fragments.
-
-### Key design decisions for this step
-
-| ID | Decision | Source |
-|----|----------|--------|
-| ARCH-001 | Per-device persistence replaces monolithic SegmentSnapshot | Architecture doc §1-4 |
-| ARCH-002 | FNV-1a hash for NVS keys, 15-char limit | Architecture doc §6 |
-| PLAN-002 | Binary sensors use EventLog (state-change dedup) | Planning session Point 3 |
-
----
-
-## Pre-merge Checklist for v7.7.1.2
-
-- [ ] Read the coding agent prompt completely
-- [ ] Read this handoff completely
-- [ ] Verify `main` is green: `bash scripts/preflight.sh` passes
-- [ ] All ⛔ CHECKPOINT gates (A, B) verified
-- [ ] All acceptance criteria in §7 met
-- [ ] ⛔ PRE-PR GATE in §8 passes
-- [ ] **In-PR deliverables (all committed to branch before marking ready):**
-  - [ ] CURRENT-STATE.md updated (mandatory — version, What Just Shipped)
-  - [ ] Changelog entry added
-  - [ ] Session log created (Rule 63)
-  - [ ] Consolidated audit produced
-- [ ] PR body references Phase 7 step tracking issue for v7.7.1.2
-
----
-
-## Critical Rules Relevant to v7.7.1.2
-
-| # | Rule | Why Relevant |
-|---|------|-------------|
-| 2 | Use bump-version.sh | Version bump |
-| 58 | Edit fragments, not assembled artifact | data-model.h and nvs-persistence.h are fragments |
-| 62 | Assembly order unchanged | No new fragments |
-| 63 | Session log is pre-merge acceptance criterion | Mandatory |
-| 64 | Checkpoint greps mechanically derived | All greps from code blocks |
-| 67 | Binary sensors use EventLog, not HistoryBuffer | EventLog struct added |
-
----
-
-## Risk: LOW — additive definitions only
-
-**Primary risk:** Struct size mismatch with architecture doc. Mitigated by explicit sizeof comments and compilation verification.
-
-**Secondary risk:** FNV-1a hash collisions for current device IDs. Mitigated by collision probability analysis in architecture doc §6 (5 × 10⁻⁸ for 20 devices). The `DeviceHistoryMeta` also stores the full device_id for collision detection at restore time.
-
-**No device testing needed.** This step adds definitions only — no runtime behavior to test.
-
----
-
-## Context That Carries Forward to v7.7.1.3
-
-- `DeviceHistoryMeta`, `DeviceSegment`, `EventLog` structs are defined and compile-verified
-- `device_id_hash_()`, `make_device_meta_key_()`, `make_device_segment_key_()` are available
-- The old SegmentSnapshot engine is untouched and continues operating
-- v7.7.1.3 will implement `persist_device_segment_()` and `persist_all_devices_v2()` using these definitions
-- Fragment count is 9 — no new fragments added
-- Logger level is INFO with per-tag suppressors — must be maintained
-- All in-PR deliverables pattern established — consolidated audit and session log are IN the PR
-
----
-
-_End of session handoff document._
+- [ ] The operator's latest `fleet` output on the day of dispatch: .189 and .170 report v7.7.1.1.
+- [ ] The harness and the model of the coding agent, for the gate record (PLAN-043).
