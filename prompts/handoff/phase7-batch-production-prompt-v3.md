@@ -11,7 +11,7 @@ _Precedence: `AGENTS.md`, `Docs/development-process-guide.md` and `prompts/produ
 
 | Batch | Step of the plan of record | Trigger | Steps to produce (tier, PLAN-017) | Key theme |
 |-------|------|---------|-----------------|-----------|
-| Batch 2 | R5b | R5a.1 merged | v7.7.1.2 (LOW), v7.7.1.3 (MEDIUM), v7.7.1.4 (HIGH) | Per-device structs, persist write path, restore engine and retention budget |
+| Batch 2 | R5b | R5a.2 merged | v7.7.1.2 (LOW), v7.7.1.3 (MEDIUM), v7.7.1.4 (HIGH) | Per-device structs, persist write path, restore engine and retention budget |
 | Batch 3 | R9 | R18a merged | v7.7.2.1 (MEDIUM), v7.7.2.2 (HIGH), v7.7.2.3 (MEDIUM) | Engine switchover, migration, per-device delete and socket cap |
 | Batch 4 | R13 | R12 merged | v7.7.3.1 (MEDIUM), v7.7.3.2 (MEDIUM), v7.7.3.3 (HIGH) | Export and import, bundle export and import, Phase 7 closure |
 

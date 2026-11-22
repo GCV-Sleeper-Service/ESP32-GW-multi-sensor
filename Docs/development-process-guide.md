@@ -61,11 +61,11 @@ Before starting any step:
    - Don't trust line numbers from the prompt — they decay with every merge
 
 5. After a pause of more than two weeks, run the restart checklist first (HowTo v2 `templates/restart-checklist.md`): environment, repository, documents, last conversation, then one documentation-only housekeeping PR. Re-validate every unapplied fix against the current tree before applying it; code and script fixes go in their own PR with the normal reviews.
-6. Pre-dispatch gate (PLAN-017): on the day a prompt is dispatched, a session that can run commands runs the prompt's §2 commands against `origin/main` and records each output beside its expected value, runs `bash scripts/lint-prompts.sh` on the prompt file (exit 0), confirms that every fill-in left for the operator (dates, pins, R1 values, `<LIVE>` markers) has been replaced, and, for a prompt of any tier that carries code ending in a compiled artifact, compiles that code on a scratch branch from `origin/main` (`prompts/producer-contract.md` rule 3.4, PLAN-042). Device values come only from the operator's latest `fleet` output. The record (date, `main` SHA, commands, outputs) is the PR's first comment. A mismatch is fixed in the prompt, never by changing an expected value to fit.
+6. Pre-dispatch gate (PLAN-017): on the day a prompt is dispatched, a session that can run commands runs the prompt's §2 commands against `origin/main` and records each output beside its expected value, runs `bash scripts/lint-prompts.sh` on the prompt file (exit 0), confirms that every fill-in left for the operator (dates, pins, R1 values, `<LIVE>` markers) has been replaced, and, for a prompt of any tier that carries code ending in a compiled artifact, compiles that code on a scratch branch from `origin/main` (`prompts/producer-contract.md` rule 3.4, PLAN-042). Device values come only from the operator's latest `fleet` output. The record (date, `main` SHA, commands, outputs, and the producer and audit numbers of the step) is the operator's first comment on the PR; an inline bot may post before it (PLAN-043). A mismatch is fixed in the prompt, never by changing an expected value to fit.
 
 ### 2.2 Agent Execution
 
-The operator gives the agent two things:
+The operator pulls the planning repository on the build host and pastes the dispatch paragraph of the planning session: the path of the step's setup file in `steps/<step>/` and its SHA-256. The agent checks that hash and stops if it differs; then the setup file gives it two things (PLAN-043):
 
 **A) Setup instructions:**
 ```
@@ -77,16 +77,17 @@ The operator gives the agent two things:
 4) Read required files in order, run pre-implementation gates, start edits
 5) Commit only to that branch, never to main
 6) When done: gh pr ready <PR#> --repo GCV-Sleeper-Service/ESP32-GW-multi-sensor
-7) Update PR description (use PR176-178 as reference)
+7) Write the PR body to §8 of the prompt, and edit it with `gh api --method PATCH repos/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pulls/<PR#> -F body=@<file>`
 8) Apply every edit with your file-edit tool; never with a script that parses the prompt
 9) If one of your own commands fails, repair it and repeat the step; run no checkpoint while an edit before it is missing
 10) Run one test command at a time: no second preflight, Playwright run or mock server while one is running
-11) After `gh pr ready`: post the comment `/gemini review` on the PR; wait up to 30 minutes for the inline reviews of Copilot, Codex and Gemini; then assess each finding, fix what is warranted, and post one comment with your assessment that names any reviewer that did not post. Never merge, approve or start an external review
+11) After `gh pr ready`: post the comment `/gemini review` on the PR; run the check block `inline <PR#>` until it prints `inline PASS` (it waits for Copilot, Codex and Gemini, at most 30 minutes after the comment), and push nothing before it; then assess each finding, fix what is warranted, and post one comment with your assessment that names any reviewer that did not post. Never merge, approve or start an external review
 12) Stops: a known tooling defect with a recovery written in the prompt gets that recovery once, with the result posted, and a second failure stops; a value you would have to ask for is in the prompt; a real mismatch (a missing anchor, a different value, a path out of scope, a test failing twice) always stops with the checkpoint-failure comment of §3.2
 13) Run every gate and checkpoint from the check file that the prompt names, exactly as the prompt says; never type a check by hand
+14) End every review round with the end-of-round step of the prompt: the record, the row of the round in the Round Summary, the criteria, the PRE-PR block and its last line in the body, the check block `body <PR#>`, then your assessment, whose first line names you and your model as your harness shows them
 ```
 
-Items 11 and 12 hold from R3c on (PLAN-027): the coding agent starts the inline review round itself, and the stop rules are decided in advance. Item 13 holds from R5 on (PLAN-031): the planning session hands over every check in one check file with its SHA-256.
+Items 11 and 12 hold from R3c on (PLAN-027): the coding agent starts the inline review round itself, and the stop rules are decided in advance. Item 13 holds from R5 on (PLAN-031): the planning session hands over every check in one check file with its SHA-256. The block `inline` of item 11 and item 14 hold from R5a.2 on, the dispatch paragraph from R5b on (PLAN-043).
 
 **B) The agent prompt** — word for word, from the step's bundle (`prompts/producer-contract.md` §6).
 
@@ -136,7 +137,7 @@ Reviews A and C get the common part and their own part of the step's review file
 
 If the runner cannot run, the step waits for it; the operator may instead run review B as a Muse session in three turns, and the consolidated audit names the change (PLAN-023). Gemini on the web is no fallback, because it cannot post the comment. The runner cannot review the pull request that installs it. A pull request that changes the runner is reviewed by the runner on `main`, which reads the change as data.
 
-Claude Code is the fallback coding agent (PLAN-026). The agent changes only at a step boundary, or at a passed checkpoint with a handoff comment on the PR, and two agents never work in one checkout.
+The coding agent runs an OpenAI Codex model, in the GitHub Copilot Chat agent of VS Code or in OpenAI's Codex agent; the gate record and the operator page name the harness and the model of each dispatch, and the agent names itself as its harness shows it (PLAN-043). Claude Code is the fallback coding agent (PLAN-026). The agent changes only at a step boundary, or at a passed checkpoint with a handoff comment on the PR, and two agents never work in one checkout.
 
 When Copilot posts no complete review, the agent's assessment says so, and the step goes on with the other inline reviews and the external reviews; the operator decides at the merge (PLAN-032).
 
@@ -202,9 +203,9 @@ The files of a step's bundle, their names and the rules that each must meet are 
 
 | Tier | Phase 7 steps | Producer audit before dispatch | Prompt style |
 |---|---|---|---|
-| LOW | v7.7.1.2 | Lint; embedded code compiled on a scratch branch before dispatch (PLAN-042) | Intent and acceptance criteria |
-| MEDIUM | v7.7.1.3, v7.7.2.1, v7.7.2.3, v7.7.3.1, v7.7.3.2 | Lint + an internal audit (PLAN-040), then one independent auditor (PLAN-037); embedded code compiled on a scratch branch before dispatch (PLAN-042) | Intent and acceptance criteria; prescribe only interface contracts |
-| HIGH | v7.7.1.4, v7.7.2.2, v7.7.3.3 | Lint + an internal audit (PLAN-040), then two auditors from different model families (PLAN-037, PLAN-041), reconciled in one file; embedded code compiled on a scratch branch before dispatch | Prescriptive allowed |
+| LOW | v7.7.1.2 | Lint + one internal audit round (PLAN-043); embedded code compiled on a scratch branch before dispatch (PLAN-042) | Intent and acceptance criteria |
+| MEDIUM | v7.7.1.3, v7.7.2.1, v7.7.2.3, v7.7.3.1, v7.7.3.2 | Lint + one internal audit round (PLAN-040, PLAN-043), then one independent auditor (PLAN-037); embedded code compiled on a scratch branch before dispatch (PLAN-042) | Intent and acceptance criteria; prescribe only interface contracts |
+| HIGH | v7.7.1.4, v7.7.2.2, v7.7.3.3 | Lint + one or two internal audit rounds (PLAN-040, PLAN-043), then two auditors from different model families (PLAN-037, PLAN-041), reconciled in one file; embedded code compiled on a scratch branch before dispatch | Prescriptive allowed |
 
 Transition (PLAN-017): the Batch 2 prompts of May 2026 (v7.7.1.2-v7.7.1.4) are not dispatched. They are re-produced under the method of record and audited at their tier before dispatch; the compile of v7.7.1.4's embedded code runs once v7.7.1.3 is on `main`. Embedded code of any tier that needs the step before it is compiled once that step is on `main`, in the pre-dispatch gate of §2.1 item 6 (PLAN-042).
 
@@ -331,7 +332,7 @@ There is no third option. Recommendations archived without tracking are recommen
 Track per phase:
 
 1. **Steps-per-feature ratio** — total steps / features delivered. Target: ≤8 for a feature phase.
-2. **Fix cycles per step** — times a PR needed additional commits after review. Track average.
+2. **Fix cycles per step** — review rounds that ended in at least one fix-cycle commit, as the consolidated-audit template defines it (PLAN-043). Track average.
 3. **Wall-clock hours per step** — from agent start to PR merge. Track average.
 4. **Checkpoint save count** — checkpoints that caught errors before they became PR findings. Higher = prompt had bugs the checkpoints caught.
 5. **Preventable review findings** — review findings that the prompt should have prevented. Higher = prompt gaps.

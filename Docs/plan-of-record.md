@@ -30,7 +30,7 @@ Who starts where: a planning or prompt-producing session starts at `Docs/planner
 
 ## 2. You are here
 
-The next step is **R5b**, the Batch 2 prompts re-produced under the producer contract. The last merged step is **R5a.1**, the fixes of the producer contract from the reviews of R5a (PLAN-042). The review runner passed its dry run on 2026-11-20 and its posting run on 2026-11-21.
+The next step is **R5b**, the Batch 2 prompts re-produced under the producer contract. The last merged step is **R5a.2**, the method fixes from the reviews of R5a.1 (PLAN-043). The review runner passed its dry run on 2026-11-20 and its posting run on 2026-11-21.
 
 ## 3. The ladder
 
@@ -49,7 +49,8 @@ The steps in the order they run. Every step is on the path to v1.0, except R15, 
 | 5b | R5r | Review-runner PR (MEDIUM): review B in three turns, started by hand from `main`, no stored key (PLAN-022) | Google Cloud project and federation provider; one auditor session; SP without the device moves; the dry run | R5c | Unchanged | 2 to 4 | Merged; dry run (2026-11-20) and posting run (2026-11-21) passed (runs 44828100924 and 44861784463); done when the next code step uses the runner for review B |
 | 6 | R5a | Producer contract and batch-production prompt v3.0 | Dispatch, review and merge one documentation PR | R5r | Unchanged | 1 to 2 | Done: the pull request that added `prompts/producer-contract.md` |
 | 6a | R5a.1 | Producer-contract fixes from the reviews of R5a, issue #242 (LOW, PLAN-042) | Dispatch, review and merge one documentation PR | R5a | Unchanged | 1 to 2 | Done: the pull request that fixes issue #242 |
-| 7 | R5b | Batch 2 re-produced under the method of record: three bundles and their assumption audit, audited by tier | The auditor sessions; dispatch, review and merge one documentation PR | R5a.1 | Unchanged | 4 to 6 | Waiting |
+| 6b | R5a.2 | Method fixes from the reviews of R5a.1 (LOW, PLAN-043): an internal round at every tier, dispatch by a setup file, the checks `inline` and `body` of the review round | Dispatch, review and merge one documentation PR | R5a.1 | Unchanged | 1 to 2 | Done: the pull request that adds PLAN-043 |
+| 7 | R5b | Batch 2 re-produced under the method of record: three bundles and their assumption audit, audited by tier | The auditor sessions; dispatch, review and merge one documentation PR | R5a.2 | Unchanged | 4 to 6 | Waiting |
 | 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | Waiting |
 | 9 | R6 | v7.7.1.3: persist write path (MEDIUM); the test board .173 gets it too | SP | R4 | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 | Waiting |
 | 10 | R7 | Compile gate for v7.7.1.4; backups | Backups copied off the build host; USB cable ready | R6 | 7.7.1.3 | 1 to 2 | Waiting |
@@ -143,6 +144,14 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 - Done when: merged, and issue #242 is closed.
 - State after: version unchanged. R5b is produced under the fixed contract.
 
+### R5a.2: method fixes from the reviews of R5a.1 (documentation, LOW)
+
+- Why: the reviews of PR #243 and the planner's process review of R5a.1 found that no check makes the agent wait for the inline round or keeps the PR body current, that the operator moves data that the planning session has already fixed, and four open questions of review A (PLAN-043).
+- Scope: the coding agent of PLAN-019; one internal sub-agent round at every tier; dispatch by a setup file in the planning repository; the producer and audit numbers in the gate record; the Round Summary, the end-of-round step and the check blocks `inline` and `body`; the gate record as the operator's first comment; the after-merge check by the planning session; the filled start prompt at the end of "Read first"; review A's Q1 to Q4 of PR #243; the counts of the record of R5a.1; three rows of `CURRENT-STATE.md`.
+- Who: the planning session writes the prompt, with one internal sub-agent round; the coding agent executes it; the inline round and review A run, reviews B and C do not.
+- Done when: merged. It is the last method PR before R5b (risks 7 and 10).
+- State after: version unchanged. R5b is produced under the changed contract, and its dispatch is the first by a setup file.
+
 ### R5b: Batch 2 re-produced (documentation)
 
 - Who: a prompt-producing session; one or two independent auditors; the coding agent commits the files.
@@ -150,9 +159,9 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 
 | Step | Tier | Prompt style | Audit before dispatch |
 |---|---|---|---|
-| v7.7.1.2 | LOW | Intent and acceptance criteria | Lint; the compile of any embedded code (PLAN-042) |
-| v7.7.1.3 | MEDIUM | Intent and acceptance criteria; interface contracts prescribed | Lint and one independent auditor; the compile of any embedded code (PLAN-042) |
-| v7.7.1.4 | HIGH | Prescriptive | Lint, two auditors from different model families reconciled in one file, and the compile gate in R7 |
+| v7.7.1.2 | LOW | Intent and acceptance criteria | Lint and one internal round; the compile of any embedded code (PLAN-042) |
+| v7.7.1.3 | MEDIUM | Intent and acceptance criteria; interface contracts prescribed | Lint, one internal round and one independent auditor; the compile of any embedded code (PLAN-042) |
+| v7.7.1.4 | HIGH | Prescriptive | Lint, one or two internal rounds, two auditors from different model families reconciled in one file, and the compile gate in R7 |
 
 - The assumption audit settles each leftover:
   - the third-audit findings of PR #233: H-1 (declaration order in v7.7.1.4), L-1 (boot test on both satellites), M-1 (pre-filled sizes), M-2 (line-number anchors);
@@ -259,14 +268,14 @@ Do not open a PR. Push nothing except the scratch branch, and delete it afterwar
 
 Eight moves. The binding text is in `Docs/development-process-guide.md` §2; this is the short form.
 
-1. Pre-dispatch gate (process guide §2.1 item 6). On the day of dispatch the planning session runs the §2 block of the prompt against `origin/main`, runs lint on the prompt file, checks that no fill-in is left, and compiles the code that the prompt carries and that ends in a compiled artifact (contract rule 3.4). Device values come only from the operator's latest fleet output. The record is the first comment of the PR.
-2. Dispatch. The operator pastes the setup block (process guide §2.2) and then the agent prompt, word for word. A step prompt closes its issue with `Fixes #N`: #214 for v7.7.1.2, #215 for v7.7.1.3, #216 for v7.7.1.4, #217 for v7.7.2.1, #218 for v7.7.2.2, #219 and #224 for v7.7.2.3, #220 for v7.7.3.1, #221 for v7.7.3.2, #222 for v7.7.3.3.
+1. Pre-dispatch gate (process guide §2.1 item 6). On the day of dispatch the planning session runs the §2 block of the prompt against `origin/main`, runs lint on the prompt file, checks that no fill-in is left, and compiles the code that the prompt carries and that ends in a compiled artifact (contract rule 3.4). Device values come only from the operator's latest fleet output. The operator posts the record as the first operator comment of the PR.
+2. Dispatch. The operator pulls the planning repository on the build host and pastes the dispatch paragraph; the agent checks the setup file by its SHA-256 and follows it, and the setup file gives it the agent prompt, word for word (process guide §2.2, PLAN-043). A step prompt closes its issue with `Fixes #N`: #214 for v7.7.1.2, #215 for v7.7.1.3, #216 for v7.7.1.4, #217 for v7.7.2.1, #218 for v7.7.2.2, #219 and #224 for v7.7.2.3, #220 for v7.7.3.1, #221 for v7.7.3.2, #222 for v7.7.3.3.
 3. Checkpoint failures. When the agent posts `⛔ CHECKPOINT FAILED`, it has stopped. If the prompt is wrong, the planning session corrects it; if the code is wrong, the agent investigates and reports. Nobody tells the agent to make the check pass.
-4. Reviews (process guide §2.4). The agent marks the PR ready and starts the inline round itself (PLAN-027). Then the external reviews run: reviews A and C side by side, then review B by the runner, always last (PLAN-023). Section 7 shows the scheme.
-5. Evidence check before the merge, by the operator. The PR body holds the gate outputs, the per-item verification and the device evidence. The branch holds the session log, the consolidated audit, `CURRENT-STATE.md`, the changelog entry, and this file with the step's row marked.
+4. Reviews (process guide §2.4). The agent marks the PR ready and starts the inline round itself (PLAN-027). Then the external reviews run: reviews A and C side by side, then review B by the runner, always last (PLAN-023). The agent waits for the inline round with the check block `inline` and ends each round with the check block `body` (PLAN-043). Section 7 shows the scheme.
+5. Evidence check before the merge, by the operator: the check block `body <PR#> final` prints `body final PASS`. The PR body holds the gate outputs, the per-item verification and the device evidence. The branch holds the session log, the consolidated audit, `CURRENT-STATE.md`, the changelog entry, and this file with the step's row marked.
 6. Merge and tag, by the operator.
-7. Post-merge check: `VERSION` shows the new version; the boards that the step flashed report it.
-8. Metrics and step closure. The agent fills the process-metrics block of the consolidated audit. The planning session reads the merged PR and the audit, and corrects the next prompt at its gate.
+7. Post-merge check: the operator updates the checkout on the build host to `main`, and the boards that the step flashed report the new version; the planning session checks `main` and `VERSION` at its next restart check (PLAN-043).
+8. Metrics and step closure. The agent fills the process-metrics block of the consolidated audit, with the producer and audit numbers of the gate record. The planning session reads the merged PR and the audit, and corrects the next prompt at its gate.
 
 ## 7. One code step with reviews A, B and C
 
@@ -278,7 +287,7 @@ sequenceDiagram
     participant A as Coding agent
     participant R as Reviewers
     P->>Y: Prompt, gate record, review file (common part, A, B, C)
-    Y->>A: Dispatch: setup block, then the prompt
+    Y->>A: Dispatch paragraph: the setup file and its SHA-256
     A->>A: Branch, edits, checks, device tests
     A->>R: PR ready, then it posts /gemini review
     R-->>A: Inline reviews: Copilot, Codex, Gemini

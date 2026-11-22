@@ -75,7 +75,7 @@ List every change the agent made that was NOT explicitly specified in the prompt
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Fix cycles | [0/1/2/...] | Times PR needed additional commits after review |
+| Fix cycles | [0/1/2/...] | Review rounds that ended in at least one fix-cycle commit (PLAN-043) |
 | Checkpoint saves | [N] | Checkpoints that caught errors before they became PR findings |
 | Preventable review findings | [N] | Review findings the prompt should have prevented |
 | Agent autonomous decisions | [N] (H/N/S) | Helpful / Neutral / Scope violation |
@@ -100,6 +100,8 @@ List every change the agent made that was NOT explicitly specified in the prompt
 _Completed after the last review round and committed before merge._
 
 _Defects that escaped the prompt gates into agent execution: the unique defects of the step's bundle (prompt, check file, supplied texts, tests) that the producer's gates and audits missed and that were found after dispatch, each counted once; an error of the agent's own is not one of them (PLAN-042)._
+
+_Fix-cycle commits after the first review round: the commits after the first review round that change a file because of a review finding, the fixes of the inline round's findings included; a commit that records a round and fixes no finding is not one. It is a count per step; HowTo §5.6 counts fix-cycle PRs per batch (PLAN-043)._
 
 ## §5 — Acceptance Criteria Checklist
 
