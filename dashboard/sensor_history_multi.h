@@ -727,6 +727,71 @@ static void make_segment_key_(int slot, char *key, size_t key_len) {
   snprintf(key, key_len, "seg_%03d", slot % PERSIST_SLOTS);
 }
 
+static constexpr uint32_t device_id_hash_(const char *id) {
+  uint32_t hash = 0x811c9dc5u;
+  if (id == nullptr) return hash;
+  for (const char *p = id; *p != '\0'; p++) {
+    hash ^= (uint8_t) *p;
+    hash *= 0x01000193u;
+  }
+  return hash;
+}
+
+struct NvsKey { char s[16]; };
+
+static constexpr NvsKey device_meta_key_(const char *device_id) {
+  NvsKey key = {};
+  if (device_id == nullptr || device_id[0] == '\0') return key;
+  key.s[0] = 'd';
+  key.s[1] = 'm';
+  key.s[2] = '_';
+  uint32_t hash = device_id_hash_(device_id);
+  for (int i = 0; i < 8; i++) {
+    key.s[3 + i] = "0123456789abcdef"[(hash >> (28 - 4 * i)) & 0xfu];
+  }
+  return key;
+}
+
+static constexpr NvsKey device_segment_key_(const char *device_id, int slot) {
+  NvsKey key = {};
+  if (device_id == nullptr || device_id[0] == '\0' ||
+      slot < 0 || slot >= MAX_DEVICE_SLOTS) return key;
+  key = device_meta_key_(device_id);
+  key.s[1] = 's';
+  key.s[11] = '_';
+  for (int i = 0; i < 3; i++) {
+    key.s[12 + i] = "0123456789abcdef"[(slot >> (8 - 4 * i)) & 0xf];
+  }
+  return key;
+}
+
+// ── Phase 7 compile-time test of the per-device keys (v7.7.1.2): a supplied test; do not change it ──
+static constexpr bool p7_key_is_(const NvsKey &k, const char *want) {
+  int i = 0;
+  for (; i < 16 && want[i] != '\0'; i++) {
+    if (k.s[i] != want[i]) return false;
+  }
+  return i < 16 && k.s[i] == '\0';
+}
+static_assert(sizeof(NvsKey) == 16, "an NVS key holds 15 characters and a NUL");
+static_assert(device_id_hash_("") == 0x811c9dc5u, "FNV-1a of the empty string");
+static_assert(device_id_hash_(nullptr) == 0x811c9dc5u, "nullptr hashes as the empty string");
+static_assert(device_id_hash_("a") == 0xe40c292cu, "FNV-1a of a");
+static_assert(device_id_hash_("foobar") == 0xbf9cf968u, "FNV-1a of foobar");
+static_assert(device_id_hash_("office") == 0xaa8eba31u, "FNV-1a of office");
+static_assert(device_id_hash_("first_floor") == 0x9ed41104u, "FNV-1a of first_floor");
+static_assert(p7_key_is_(device_meta_key_("office"), "dm_aa8eba31"), "meta key of office");
+static_assert(p7_key_is_(device_meta_key_("wan_ping"), "dm_7a81c392"), "meta key of wan_ping");
+static_assert(p7_key_is_(device_segment_key_("office", 0), "ds_aa8eba31_000"), "segment key, slot 0");
+static_assert(p7_key_is_(device_segment_key_("first_floor", 26), "ds_9ed41104_01a"), "segment key, slot 26");
+static_assert(p7_key_is_(device_segment_key_("office", MAX_DEVICE_SLOTS - 1), "ds_aa8eba31_fff"), "segment key, last slot");
+static_assert(p7_key_is_(device_segment_key_("office", MAX_DEVICE_SLOTS), ""), "a slot past the end has no key");
+static_assert(p7_key_is_(device_segment_key_("office", -1), ""), "a negative slot has no key");
+static_assert(p7_key_is_(device_meta_key_(""), ""), "an empty id has no key");
+static_assert(p7_key_is_(device_meta_key_(nullptr), ""), "a null id has no key");
+static_assert(p7_key_is_(device_segment_key_(nullptr, 0), ""), "a null id has no segment key");
+static_assert(MAX_DEVICE_SLOTS == 4096, "three hex digits address 4096 slots");
+
 static void clear_runtime_histories_() {
   for (int i = 0; i < NUM_DEVICES; i++) {
     for (uint8_t m = 0; m < devices[i].metric_count; m++) {
