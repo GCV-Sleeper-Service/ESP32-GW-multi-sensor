@@ -30,7 +30,7 @@ The tier is set at planning time and written in the prompt header; use the Phase
 | MEDIUM | Lint + one internal round, a second optional when the first finds a new HIGH or MEDIUM, + one independent auditor; compile embedded code on a scratch branch | One audit report; no reconciliation file; compile evidence if code is embedded |
 | HIGH | Lint + one or two internal rounds + two independent auditors from different model families; compile embedded code on a scratch branch | Two audit reports and one reconciliation file; compile evidence if code is embedded |
 
-These producer-audit tiers do not change the PR review pipeline of `Docs/development-process-guide.md` §2.4 (PLAN-023): three inline reviewers; reviews A and C side by side, with C required on MEDIUM and HIGH firmware steps; review B by the runner, last. Documentation-only PRs run the three inline reviewers, with external reviewers optional.
+These producer-audit tiers do not change the PR review pipeline of `Docs/development-process-guide.md` §2.4 (PLAN-023): two inline reviewers, Copilot and Gemini (PLAN-045); reviews A and C side by side, with C required on MEDIUM and HIGH firmware steps; review B by the runner, last. Documentation-only PRs run the two inline reviewers, Copilot and Gemini, with external reviewers optional.
 
 This bundle's classification: `<<LOW | MEDIUM | HIGH>>` — justification: `<<one-sentence rationale>>`.
 

@@ -36,36 +36,36 @@ The next step is **R4**, v7.7.1.2; its bundle came with R5b. The last merged ste
 
 The steps in the order they run. Every step is on the path to v1.0, except R15, which runs beside Batch 4. Step names are kept from earlier plans, so they are not in numeric order; the first column is. SP is the standard procedure of section 6. Estimates follow section 4.
 
-| # | Step | What happens | Operator's part | Needs | `VERSION` on `main` after (tag) | Estimate (sessions) | Status |
-|---|---|---|---|---|---|---|---|
-| – | R0 | HowTo guide fixed and tagged | None | – | 7.7.1.1 (HowTo `v2.3.1`) | – | Done |
-| 1 | R3a | Method-adoption PR: binds HowTo v2.3.1 and starts the pre-dispatch gate | Dispatch, review, merge | – | 7.7.1.1 | 2 to 3 | Done 2026-11-14, PR #234 (`8062726`) |
-| 2 | R1 | Environment check and history backups on the build host | Agent check, backups | – | 7.7.1.1 | 1 | Done 2026-11-14 |
-| 3 | R2 | Decisions | None left | – | 7.7.1.1 | – | Done 2026-11-11 |
-| 4 | R3b | Housekeeping PR: documents match the code, fleet table, login out of the files agents read | Dispatch, review, merge, tracker bookkeeping | R3a | 7.7.1.1 | 2 to 3 | Done 2026-11-15, PR #235 (`160e90c`) |
-| 4a | R3c | Plan into the repository: this file, entry points by role, the archive of `Docs/`, the instruction files, the stop rules | Dispatch, review, merge | R3b | 7.7.1.1 | 2 to 3 | Done 2026-11-16, PR #236 (`84e8569`) |
-| 5 | R5 | Tooling PR (LOW): scope gate, lint rules, CI fast path for documentation PRs, visible browser-test report, PR-body check, stress-test login, reproducible dashboard header | SP without the device moves | R3c | Unchanged | 2 to 3 | Done 2026-11-16, PR #237 (`1a7bf84`) |
-| 5a | R5c | CI runner pin (LOW): the four workflows on `ubuntu-24.04`, lint baseline mode in the C locale, two planner rules, the start prompt for a planning session | SP without the device moves | R5 | Unchanged | 1 to 2 | Done: the pull request that pinned the runners to `ubuntu-24.04` |
-| 5b | R5r | Review-runner PR (MEDIUM): review B in three turns, started by hand from `main`, no stored key (PLAN-022) | Google Cloud project and federation provider; one auditor session; SP without the device moves; the dry run | R5c | Unchanged | 2 to 4 | Merged; dry run (2026-11-20) and posting run (2026-11-21) passed (runs 44828100924 and 44861784463); done when the next code step uses the runner for review B |
-| 6 | R5a | Producer contract and batch-production prompt v3.0 | Dispatch, review and merge one documentation PR | R5r | Unchanged | 1 to 2 | Done: the pull request that added `prompts/producer-contract.md` |
-| 6a | R5a.1 | Producer-contract fixes from the reviews of R5a, issue #242 (LOW, PLAN-042) | Dispatch, review and merge one documentation PR | R5a | Unchanged | 1 to 2 | Done: the pull request that fixes issue #242 |
-| 6b | R5a.2 | Method fixes from the reviews of R5a.1 (LOW, PLAN-043): an internal round at every tier, dispatch by a setup file, the checks `inline` and `body` of the review round | Dispatch, review and merge one documentation PR | R5a.1 | Unchanged | 1 to 2 | Done: the pull request that adds PLAN-043 |
-| 7 | R5b | Batch 2, rolling (PLAN-044): the method fixes from the reviews of PR #244, the assumption audit and the bundle of v7.7.1.2; the bundles of v7.7.1.3 and v7.7.1.4 follow after R4 and R6 | Dispatch, review and merge one documentation PR | R5a.2 | Unchanged | 4 to 6 | Done: the pull request that adds PLAN-044 |
-| 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | Waiting |
-| 9 | R6 | v7.7.1.3: persist write path (MEDIUM); the test board .173 gets it too | SP | R4; its bundle, produced after R4 merges, and one auditor session | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 | Waiting |
-| 10 | R7 | Compile gate for v7.7.1.4; backups | Backups copied off the build host; USB cable ready | R6 | 7.7.1.3 | 1 to 2 | Waiting |
-| 11 | R8 | v7.7.1.4: restore engine and retention budgets (HIGH); .173 first, then the production boards | SP; stand by for USB recovery | R7; its bundle, produced after R6 merges, and two auditor sessions | 7.7.1.4 (`v7.7.1.4`) | 3 to 5 | Waiting |
-| 12 | R18a | v7.7.1.5: new board secrets, per-board API key and OTA password (LOW) | New values; flash every project board in one sitting; paste the check output | R8 | 7.7.1.5 (`v7.7.1.5`) | 1 to 2 | Waiting |
-| 13 | R9 | Batch 3 prompts produced and audited | The auditor sessions; dispatch, review and merge one documentation PR | R18a | 7.7.1.5 | 2 to 3 | Waiting |
-| 14 | R10 | v7.7.2.1: engine switchover (MEDIUM) | SP | R9 | 7.7.2.1 (`v7.7.2.1`) | 3 to 5 | Waiting |
-| 15 | R11 | Compile gate, rehearsal on .173, v7.7.2.2 migration (HIGH) | The rehearsal and the backups; SP | R10 | 7.7.2.2 (`v7.7.2.2`) | 4 to 6 | Waiting |
-| 16 | R12 | v7.7.2.3: per-device delete and socket cap (MEDIUM) | SP; tag `v1.0-rc1` | R11 | 7.7.2.3 (`v7.7.2.3`, `v1.0-rc1`) | 2 to 3 | Waiting |
-| 17 | R13 | Batch 4 prompts produced and audited | The auditor sessions; dispatch, review and merge one documentation PR | R12 | 7.7.2.3 | 1 to 2 | Waiting |
-| 18 | R14 | v7.7.3.1: per-device export and import (MEDIUM) | SP | R13 | 7.7.3.1 (`v7.7.3.1`) | 3 to 5 | Waiting |
-| – | R15 | Critical-rule retirement PR, documentation only, beside Batch 4 | Dispatch, review and merge | R5a | Unchanged | 1 to 2, not counted | Waiting; may slip past v1.0 |
-| 19 | R16 | v7.7.3.2: bundle export and import (MEDIUM) | SP | R14 | 7.7.3.2 (`v7.7.3.2`) | 2 to 3 | Waiting |
-| 20 | R17 | v7.7.3.3: Phase 7 closure (HIGH) | SP and the closure checks | R16 | 7.7.3.3 (`v7.7.3.3`) | 2 to 3 | Waiting |
-| 21 | R18 | Tag v1.0 | Tag, release, README PR | R17 | 7.7.3.3 (`v1.0`) | 1 to 2 | Waiting |
+| # | Step | What happens | Operator's part | Needs | `VERSION` on `main` after (tag) | Estimate (sessions) | Actual (sessions) | Status |
+|---|---|---|---|---|---|---|---|---|
+| – | R0 | HowTo guide fixed and tagged | None | – | 7.7.1.1 (HowTo `v2.3.1`) | – | – | Done |
+| 1 | R3a | Method-adoption PR: binds HowTo v2.3.1 and starts the pre-dispatch gate | Dispatch, review, merge | – | 7.7.1.1 | 2 to 3 | planning 3, operator 1 | Done 2026-11-14, PR #234 (`8062726`) |
+| 2 | R1 | Environment check and history backups on the build host | Agent check, backups | – | 7.7.1.1 | 1 | not recorded | Done 2026-11-14 |
+| 3 | R2 | Decisions | None left | – | 7.7.1.1 | – | – | Done 2026-11-11 |
+| 4 | R3b | Housekeeping PR: documents match the code, fleet table, login out of the files agents read | Dispatch, review, merge, tracker bookkeeping | R3a | 7.7.1.1 | 2 to 3 | planning 5, operator 1 | Done 2026-11-15, PR #235 (`160e90c`) |
+| 4a | R3c | Plan into the repository: this file, entry points by role, the archive of `Docs/`, the instruction files, the stop rules | Dispatch, review, merge | R3b | 7.7.1.1 | 2 to 3 | planning 4, operator 1 | Done 2026-11-16, PR #236 (`84e8569`) |
+| 5 | R5 | Tooling PR (LOW): scope gate, lint rules, CI fast path for documentation PRs, visible browser-test report, PR-body check, stress-test login, reproducible dashboard header | SP without the device moves | R3c | Unchanged | 2 to 3 | planning 2, operator 2 | Done 2026-11-16, PR #237 (`1a7bf84`) |
+| 5a | R5c | CI runner pin (LOW): the four workflows on `ubuntu-24.04`, lint baseline mode in the C locale, two planner rules, the start prompt for a planning session | SP without the device moves | R5 | Unchanged | 1 to 2 | planning 2, operator 1 | Done: the pull request that pinned the runners to `ubuntu-24.04` |
+| 5b | R5r | Review-runner PR (MEDIUM): review B in three turns, started by hand from `main`, no stored key (PLAN-022) | Google Cloud project and federation provider; one auditor session; SP without the device moves; the dry run | R5c | Unchanged | 2 to 4 | planning 5, operator 2 | Merged; dry run (2026-11-20) and posting run (2026-11-21) passed (runs 44828100924 and 44861784463); done when the next code step uses the runner for review B |
+| 6 | R5a | Producer contract and batch-production prompt v3.0 | Dispatch, review and merge one documentation PR | R5r | Unchanged | 1 to 2 | planning 2, operator 1 | Done: the pull request that added `prompts/producer-contract.md` |
+| 6a | R5a.1 | Producer-contract fixes from the reviews of R5a, issue #242 (LOW, PLAN-042) | Dispatch, review and merge one documentation PR | R5a | Unchanged | 1 to 2 | planning 2, operator 1 | Done: the pull request that fixes issue #242 |
+| 6b | R5a.2 | Method fixes from the reviews of R5a.1 (LOW, PLAN-043): an internal round at every tier, dispatch by a setup file, the checks `inline` and `body` of the review round | Dispatch, review and merge one documentation PR | R5a.1 | Unchanged | 1 to 2 | planning 2, operator 1 | Done: the pull request that adds PLAN-043 |
+| 7 | R5b | Batch 2, rolling (PLAN-044): the method fixes from the reviews of PR #244, the assumption audit and the bundle of v7.7.1.2; the bundles of v7.7.1.3 and v7.7.1.4 follow after R4 and R6 | Dispatch, review and merge one documentation PR | R5a.2 | Unchanged | 4 to 6 | planning 2, operator 1 | Done: the pull request that adds PLAN-044 |
+| 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | pending | Waiting |
+| 9 | R6 | v7.7.1.3: persist write path (MEDIUM); the test board .173 gets it too | SP | R4; its bundle, produced after R4 merges, and one auditor session | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 |  | Waiting |
+| 10 | R7 | Compile gate for v7.7.1.4; backups | Backups copied off the build host; USB cable ready | R6 | 7.7.1.3 | 1 to 2 |  | Waiting |
+| 11 | R8 | v7.7.1.4: restore engine and retention budgets (HIGH); .173 first, then the production boards | SP; stand by for USB recovery | R7; its bundle, produced after R6 merges, and two auditor sessions | 7.7.1.4 (`v7.7.1.4`) | 3 to 5 |  | Waiting |
+| 12 | R18a | v7.7.1.5: new board secrets, per-board API key and OTA password (LOW) | New values; flash every project board in one sitting; paste the check output | R8 | 7.7.1.5 (`v7.7.1.5`) | 1 to 2 |  | Waiting |
+| 13 | R9 | Batch 3 prompts produced and audited | The auditor sessions; dispatch, review and merge one documentation PR | R18a | 7.7.1.5 | 2 to 3 |  | Waiting |
+| 14 | R10 | v7.7.2.1: engine switchover (MEDIUM) | SP | R9 | 7.7.2.1 (`v7.7.2.1`) | 3 to 5 |  | Waiting |
+| 15 | R11 | Compile gate, rehearsal on .173, v7.7.2.2 migration (HIGH) | The rehearsal and the backups; SP | R10 | 7.7.2.2 (`v7.7.2.2`) | 4 to 6 |  | Waiting |
+| 16 | R12 | v7.7.2.3: per-device delete and socket cap (MEDIUM) | SP; tag `v1.0-rc1` | R11 | 7.7.2.3 (`v7.7.2.3`, `v1.0-rc1`) | 2 to 3 |  | Waiting |
+| 17 | R13 | Batch 4 prompts produced and audited | The auditor sessions; dispatch, review and merge one documentation PR | R12 | 7.7.2.3 | 1 to 2 |  | Waiting |
+| 18 | R14 | v7.7.3.1: per-device export and import (MEDIUM) | SP | R13 | 7.7.3.1 (`v7.7.3.1`) | 3 to 5 |  | Waiting |
+| – | R15 | Critical-rule retirement PR, documentation only, beside Batch 4 | Dispatch, review and merge | R5a | Unchanged | 1 to 2, not counted |  | Waiting; may slip past v1.0 |
+| 19 | R16 | v7.7.3.2: bundle export and import (MEDIUM) | SP | R14 | 7.7.3.2 (`v7.7.3.2`) | 2 to 3 |  | Waiting |
+| 20 | R17 | v7.7.3.3: Phase 7 closure (HIGH) | SP and the closure checks | R16 | 7.7.3.3 (`v7.7.3.3`) | 2 to 3 |  | Waiting |
+| 21 | R18 | Tag v1.0 | Tag, release, README PR | R17 | 7.7.3.3 (`v1.0`) | 1 to 2 |  | Waiting |
 
 v1.0 is v7.7.3.3 (PLAN-015). ESPHome stays at 2026.4.1 through v1.0 (PLAN-016).
 
@@ -76,6 +76,7 @@ Quality, functionality and security come before speed. No estimate justifies ski
 - The unit is one session: one sitting of the operator in which one pull request is dispatched, reviewed and merged, or one operator task is done.
 - An estimate is a range. Its low end is the planned length of the step. Its high end adds 40 %, rounded up.
 - Sessions to go to a milestone: add the estimates of the rows that are not done, up to the row of the milestone. R15 is not counted.
+- "Actual (sessions)" records what a step took, as "planning N, operator M" (PLAN-045). Planning: the producer and audit sessions of the step's gate record, plus the session that closed the step. Operator: the sittings from dispatch to merge, read from the PR's timeline; the operator corrects it. The PR of the next step writes it, from a line that the planning session gives. The rows before R4 were filled from the records and the PR timelines on 2026-11-22: a sitting there is a run of activity on the PR without a gap of 3 hours.
 - A forecast is computed, never typed in: the day of the last completed step, plus the sessions to go divided by the operator's pace in sessions a week. It is computed again when a step completes. This file stores no forecast date, because it would be stale after every step.
 
 ## 5. Steps: scope and done-when
@@ -178,7 +179,7 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 
 ### R4: v7.7.1.2, per-device structs, key scheme, hash (LOW)
 
-- Extra checks before the merge: the changelog shows measured `sizeof()` values; the C3 heap is within 2 KB of the v7.7.1.1 baseline; the `.bin` size is in the PR body; the WROOM's `min_free_heap` after a fresh boot and 24 hours later is in the PR body (PLAN-044). It is the first intent-style prompt, so its review findings and fix cycles are recorded with care.
+- Extra checks before the merge: the changelog shows measured `sizeof()` values; the C3 heap, read at an uptime of 180 s or more as the higher of two readings 30 s apart, is no more than 2 KB below the v7.7.1.1 baseline (PLAN-045); the `.bin` size is in the PR body; the WROOM's `min_free_heap` after a fresh boot and 24 hours later is in the PR body (PLAN-044). It is the first intent-style prompt, so its review findings and fix cycles are recorded with care. Its PR also commits the corrected texts of PLAN-045 (the R4 bundle, the process guide, the contract, the audit template, the planner page, this file and the decision row).
 - Done when: tag `v7.7.1.2` exists and #214 is closed.
 - State after: the new structs, key scheme and hash are in the code. Nothing uses them yet. Only the boards that the prompt's device tests flashed run 7.7.1.2; the fleet table in `CURRENT-STATE.md` records it.
 
@@ -292,7 +293,7 @@ sequenceDiagram
     Y->>A: Dispatch paragraph: the setup file and its SHA-256
     A->>A: Branch, edits, checks, device tests
     A->>R: PR ready, then it posts /gemini review
-    R-->>A: Inline reviews: Copilot, Codex, Gemini
+    R-->>A: Inline reviews: Copilot, Gemini
     A->>Y: Assessment and fixes posted
     Y->>R: Start reviews A and C
     R-->>A: Reviews A and C, one comment each
@@ -364,7 +365,7 @@ Ordered by expected effect on the schedule.
 |---|---|---|---|
 | 1 | The operator has fewer sessions a week than planned | Two planned sessions in a row slip | No date is promised; the critical path never has two firmware steps in parallel; R15 can be dropped without moving v1.0 |
 | 2 | The v7.7.2.2 migration loses retained history | `/api/storage-stats` after the migration shows fewer than 95 % of the segments; a boot loop | Backups in R7 and R11; rehearsal on .173 with real data; two auditors and a compile gate; old keys kept read-only until R17 |
-| 3 | Review rounds grow on the HIGH steps (R8, R11, R17) | A PR reaches review round 3 | Compile gates before dispatch; intent style on MEDIUM steps; checkpoints that stop and do not fix |
+| 3 | Review rounds grow on the HIGH steps (R8, R11, R17) | A PR reaches review round 3 | Compile gates before dispatch; intent style on MEDIUM steps; checkpoints that stop and do not fix, apart from one repair of the agent's own edit (PLAN-045) |
 | 4 | The v7.7.1.4 restore crashes on boot | A board boot-loops after the OTA update | .173 first; USB cable ready; the v7.7.1.3 build kept for recovery; history re-import from the R7 backups |
 | 5 | The C6 with 4 MB flash exceeds its OTA slot | A `.bin` above about 1,690 KB at any step from v7.7.1.3 | `.bin` size recorded at every step; a size checkpoint in every prompt from Batch 2 on |
 | 6 | ESPHome drifts: the container is updated, or an upgrade is tried inside a phase | A version other than 2026.4.1 at a pre-dispatch gate | PLAN-016; the upgrade spike only after v1.0 on test boards |
