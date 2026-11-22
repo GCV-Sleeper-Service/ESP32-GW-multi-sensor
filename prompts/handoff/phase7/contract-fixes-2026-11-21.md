@@ -70,9 +70,11 @@ Issue #242 closes at the merge through the line `Fixes #242` of the PR body; no 
 |---|---|
 | producer sessions for this step's prompt | 1 |
 | audit sessions for this step's prompt | 0 |
-| fix-cycle commits after the first review round | 2 |
-| defects that escaped the prompt gates into agent execution | 0 |
+| fix-cycle commits after the first review round | 1 |
+| defects that escaped the prompt gates into agent execution | 2 |
 | defects that escaped to devices | 0 |
+
+Corrected in R5a.2 (PLAN-043; review A of PR #243, Q3 and Q4): two defects of the bundle escaped into agent execution. The start prompt of `Docs/planner-start-here.md` allowed `curl -u "$ESP_USER:$ESP_PASS"` only "in a command that I run", against rule 4.3; the operator page and the review file named the coding agent "Codex", where the operator ran the GitHub Copilot Chat agent with GPT-5.3-Codex. One fix-cycle commit: `8bfb315` fixed review A's F1 and F2; `7b9d03d` recorded the inline round early and fixed no finding.
 
 ## §9 Recommendations and where each was routed
 
