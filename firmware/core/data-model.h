@@ -583,3 +583,8 @@ static constexpr bool p7_eventlog_selftest_() {
   return log.count() == 0 && log.newest_epoch() == 0;
 }
 static_assert(p7_eventlog_selftest_(), "EventLog does not behave as v7.7.1.2 specifies");
+static_assert(sizeof(DeviceHistoryMeta) == 60, "DeviceHistoryMeta layout changed; recompute the retention budget");
+static_assert(sizeof(DeviceSegmentHeader) == 24, "DeviceSegmentHeader layout changed; recompute the retention budget");
+static_assert(sizeof(DeviceSegment) == 228, "DeviceSegment layout changed; recompute the retention budget");
+static_assert(sizeof(EventEntry) == 8, "EventEntry layout changed; recompute the retention budget");
+static_assert(sizeof(EventLog) == 168, "EventLog layout changed; recompute the retention budget");
