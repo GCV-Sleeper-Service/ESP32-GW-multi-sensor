@@ -474,6 +474,14 @@ static SensorEntity devices[NUM_DEVICES] = {
     .last_rssi = 0, .last_seen_epoch = 0
   },
 };
+
+// ── Phase 7 persist configuration (generated, v7.7.1.2, PLAN-044) ─────
+// Defaults by category: environmental flash/high, network flash/low, system RAM only.
+static constexpr int PERSIST_DEVICE_COUNT = 4;
+static constexpr int PERSIST_DEVICE_ARRAY_LEN = PERSIST_DEVICE_COUNT > 0 ? PERSIST_DEVICE_COUNT : 1;
+static const char *const PERSIST_DEVICE_IDS[PERSIST_DEVICE_ARRAY_LEN] = {"office", "first_floor", "outside", "wan_ping"};
+static constexpr uint8_t PERSIST_METRIC_COUNTS[PERSIST_DEVICE_ARRAY_LEN] = {2, 2, 2, 2};
+static constexpr PersistPriority PERSIST_PRIORITIES[PERSIST_DEVICE_ARRAY_LEN] = {PERSIST_PRIORITY_HIGH, PERSIST_PRIORITY_HIGH, PERSIST_PRIORITY_HIGH, PERSIST_PRIORITY_LOW};
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════

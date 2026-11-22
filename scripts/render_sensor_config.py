@@ -251,6 +251,48 @@ def render_entity_block(sensors: List[Dict]) -> str:
             ])
 
     lines.append("};")
+    metric_tables = dict(re.findall(
+        r"static const MetricDef (metrics_\w+)\[\] = \{\n(.*?)\n\};",
+        "\n".join(lines), re.DOTALL,
+    ))
+    adapter_tables = {
+        "thermopro_ble": "metrics_thermopro",
+        "icmp_ping": "metrics_ping",
+        "external_push": "metrics_system",
+    }
+    category_priorities = {
+        "environmental": "PERSIST_PRIORITY_HIGH",
+        "network": "PERSIST_PRIORITY_LOW",
+    }
+    persist_ids = []
+    persist_counts = []
+    persist_priorities = []
+    for sensor in sensors:
+        priority = category_priorities.get(sensor["category"])
+        if priority is None:
+            continue
+        table = adapter_tables.get(sensor.get("adapter", "thermopro_ble"))
+        metric_count = len(re.findall(r",\s*true\s*\}", metric_tables.get(table, "")))
+        if not 1 <= metric_count <= 6:
+            raise RenderError(
+                f'Device "{sensor["id"]}" must persist between 1 and 6 history-enabled metrics; got {metric_count}.'
+            )
+        persist_ids.append(json.dumps(sensor["id"]))
+        persist_counts.append(str(metric_count))
+        persist_priorities.append(priority)
+    ids = ", ".join(persist_ids) if persist_ids else "nullptr"
+    counts = ", ".join(persist_counts) if persist_counts else "0"
+    priorities = ", ".join(persist_priorities) if persist_priorities else "PERSIST_PRIORITY_HIGH"
+    lines.extend([
+        "",
+        "// ── Phase 7 persist configuration (generated, v7.7.1.2, PLAN-044) ─────",
+        "// Defaults by category: environmental flash/high, network flash/low, system RAM only.",
+        f"static constexpr int PERSIST_DEVICE_COUNT = {len(persist_ids)};",
+        "static constexpr int PERSIST_DEVICE_ARRAY_LEN = PERSIST_DEVICE_COUNT > 0 ? PERSIST_DEVICE_COUNT : 1;",
+        f"static const char *const PERSIST_DEVICE_IDS[PERSIST_DEVICE_ARRAY_LEN] = {{{ids}}};",
+        f"static constexpr uint8_t PERSIST_METRIC_COUNTS[PERSIST_DEVICE_ARRAY_LEN] = {{{counts}}};",
+        f"static constexpr PersistPriority PERSIST_PRIORITIES[PERSIST_DEVICE_ARRAY_LEN] = {{{priorities}}};",
+    ])
     return "\n".join(lines)
 
 
