@@ -28,7 +28,7 @@ Inline round completed with `inline PASS`.
 | Reviewer | Outcome | Findings | Disposition |
 |---|---|---|---|
 | Copilot (`copilot-pull-request-reviewer[bot]`) | Posted an incomplete review (`model policy or plan restrictions`, PLAN-032) | No actionable findings | Not a blocker; proceed per PLAN-032 |
-| Codex (`chatgpt-codex-connector[bot]`) | Posted receipt and review summary on head `3a0cafa`; also posted review thread finding on head `f746bfd` | One actionable P2 finding: historical Copilot/Codex reviews can make block `inline` stop a correct round | Warranted; reported and routed. No file edit in this PR because the check file is fixed text |
+| Codex (`chatgpt-codex-connector[bot]`) | Posted receipt and review summary on head `3a0cafa`; its review 6009954842 with the thread finding is on head `3a0cafa` too (corrected in R5b) | One actionable P2 finding: historical Copilot/Codex reviews can make block `inline` stop a correct round | Warranted; reported and routed. No file edit in this PR because the check file is fixed text |
 | Gemini (`gemini-code-assist[bot]`) | Posted review summary on head `3a0cafa` | No actionable findings | No code change warranted |
 
 Review A (`claude-opus-5-5`) posted three findings:

@@ -11,7 +11,7 @@ _Precedence: `AGENTS.md`, `Docs/development-process-guide.md` and `prompts/produ
 
 | Batch | Step of the plan of record | Trigger | Steps to produce (tier, PLAN-017) | Key theme |
 |-------|------|---------|-----------------|-----------|
-| Batch 2 | R5b | R5a.2 merged | v7.7.1.2 (LOW), v7.7.1.3 (MEDIUM), v7.7.1.4 (HIGH) | Per-device structs, persist write path, restore engine and retention budget |
+| Batch 2 | R5b, then rolling (PLAN-044) | R5a.2 merged; v7.7.1.3 after R4, v7.7.1.4 after R6 | v7.7.1.2 (LOW), v7.7.1.3 (MEDIUM), v7.7.1.4 (HIGH) | Per-device structs, persist write path, restore engine and retention budget |
 | Batch 3 | R9 | R18a merged | v7.7.2.1 (MEDIUM), v7.7.2.2 (HIGH), v7.7.2.3 (MEDIUM) | Engine switchover, migration, per-device delete and socket cap |
 | Batch 4 | R13 | R12 merged | v7.7.3.1 (MEDIUM), v7.7.3.2 (MEDIUM), v7.7.3.3 (HIGH) | Export and import, bundle export and import, Phase 7 closure |
 
@@ -97,7 +97,7 @@ It replaces the Board Info Extraction Gate and the Spec File Path Gate of versio
 ### Deliverables
 
 - For each step: the bundle of contract section 6, with the names of contract 6.2.
-- For the batch: the assumption audit `prompts/handoff/phase7/phase7-batch<N>-assumption-audit.md` with the live-extract table and the six answers of process guide §4.1; the audit files that the tiers need (contract 5.3); the batch process metrics. All of it goes into one documentation PR (plan of record, R5b, R9 and R13).
+- For the batch: the assumption audit `prompts/handoff/phase7/phase7-batch<N>-assumption-audit.md` with the live-extract table and the six answers of process guide §4.1; the audit files that the tiers need (contract 5.3); the batch process metrics. All of it goes into one documentation PR (plan of record, R5b, R9 and R13); Batch 2 is rolling: R5b holds v7.7.1.2, and each later bundle and its section of the assumption audit go into the PR of its own step (PLAN-044).
 
 ### Phase 7 facts that every bundle uses
 

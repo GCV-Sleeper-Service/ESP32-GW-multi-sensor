@@ -204,7 +204,7 @@ The files of a step's bundle, their names and the rules that each must meet are 
 | Tier | Phase 7 steps | Producer audit before dispatch | Prompt style |
 |---|---|---|---|
 | LOW | v7.7.1.2 | Lint + one internal audit round (PLAN-043); embedded code compiled on a scratch branch before dispatch (PLAN-042) | Intent and acceptance criteria |
-| MEDIUM | v7.7.1.3, v7.7.2.1, v7.7.2.3, v7.7.3.1, v7.7.3.2 | Lint + one internal audit round (PLAN-040, PLAN-043), then one independent auditor (PLAN-037); embedded code compiled on a scratch branch before dispatch (PLAN-042) | Intent and acceptance criteria; prescribe only interface contracts |
+| MEDIUM | v7.7.1.3, v7.7.2.1, v7.7.2.3, v7.7.3.1, v7.7.3.2 | Lint + one internal audit round, a second optional when the first finds a new HIGH or MEDIUM (PLAN-040, PLAN-044), then one independent auditor (PLAN-037); embedded code compiled on a scratch branch before dispatch (PLAN-042) | Intent and acceptance criteria; prescribe only interface contracts |
 | HIGH | v7.7.1.4, v7.7.2.2, v7.7.3.3 | Lint + one or two internal audit rounds (PLAN-040, PLAN-043), then two auditors from different model families (PLAN-037, PLAN-041), reconciled in one file; embedded code compiled on a scratch branch before dispatch | Prescriptive allowed |
 
 Transition (PLAN-017): the Batch 2 prompts of May 2026 (v7.7.1.2-v7.7.1.4) are not dispatched. They are re-produced under the method of record and audited at their tier before dispatch; the compile of v7.7.1.4's embedded code runs once v7.7.1.3 is on `main`. Embedded code of any tier that needs the step before it is compiled once that step is on `main`, in the pre-dispatch gate of §2.1 item 6 (PLAN-042).

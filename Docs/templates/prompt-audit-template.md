@@ -2,7 +2,7 @@
 
 _Canonical audit-prompt skeleton for the ESP32-GW-multi-sensor prompt-audit gate._
 
-- **Template version:** v1.5
+- **Template version:** v1.6
 - **Authority:** [Docs/archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (as revised by §11)
 - **Worked example this template was extracted from:** [prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md](../../prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md)
 - **CHANGELOG:** see end of this file
@@ -27,7 +27,7 @@ The tier is set at planning time and written in the prompt header; use the Phase
 | Tier | Producer audit before dispatch | Required audit artifact |
 |---|---|---|
 | LOW | Lint + one internal round; compile embedded code on a scratch branch | No independent audit or reconciliation file; compile evidence if code is embedded |
-| MEDIUM | Lint + one internal round + one independent auditor; compile embedded code on a scratch branch | One audit report; no reconciliation file; compile evidence if code is embedded |
+| MEDIUM | Lint + one internal round, a second optional when the first finds a new HIGH or MEDIUM, + one independent auditor; compile embedded code on a scratch branch | One audit report; no reconciliation file; compile evidence if code is embedded |
 | HIGH | Lint + one or two internal rounds + two independent auditors from different model families; compile embedded code on a scratch branch | Two audit reports and one reconciliation file; compile evidence if code is embedded |
 
 These producer-audit tiers do not change the PR review pipeline of `Docs/development-process-guide.md` §2.4 (PLAN-023): three inline reviewers; reviews A and C side by side, with C required on MEDIUM and HIGH firmware steps; review B by the runner, last. Documentation-only PRs run the three inline reviewers, with external reviewers optional.
@@ -191,7 +191,7 @@ For LOW, steps 4 to 8 and the audit part of step 9 are not applicable; lint, the
 2. Open the bundle PR (status: draft or ready-for-review).
 3. Run `bash scripts/lint-prompts.sh --baseline main` and confirm exit 0.
 4. MEDIUM: launch one independent auditor using this template. HIGH: launch two independent auditors from different model families, in parallel.
-   PLAN-040 and PLAN-043 (2026-11-21): at every tier, before step 4, one internal sub-agent audits the bundle with this audit prompt and executes it; the planning session checks each finding and fixes what holds; LOW and MEDIUM run one round, HIGH a second when the first finds a new HIGH or MEDIUM, and never a third. It does not replace the audit of step 4. PLAN-037 and PLAN-041 name the auditors.
+   PLAN-040 and PLAN-043 (2026-11-21): at every tier, before step 4, one internal sub-agent audits the bundle with this audit prompt and executes it; the planning session checks each finding and fixes what holds; LOW runs one round; MEDIUM may run, and HIGH runs, a second when the first finds a new HIGH or MEDIUM, and neither runs a third (PLAN-044). It does not replace the audit of step 4. PLAN-037 and PLAN-041 name the auditors.
 5. Collect the single MEDIUM audit report or both HIGH audit reports as separate Markdown files in `prompts/handoff/<phase>/`.
 6. Assemble the action list (HIGH + CRITICAL findings → fix-in-PR; MEDIUM → track as follow-up issue under the bundle's tracking issue; LOW → triage at operator discretion).
 7. Apply fixes in the bundle PR; commit and push.
@@ -218,7 +218,7 @@ For HIGH: minimum viable is NOT permitted. Full audits by both independent audit
 
 ## §9 Batch process metrics (record in the reconciliation or single-audit file)
 
-Producer sessions · audit sessions · fix-cycle PRs · defects escaped to agent execution · defects escaped to devices · verification:production session ratio. Tier rule (PLAN-017, PLAN-043): every tier = one internal sub-agent round, HIGH at most two; LOW = lint; MEDIUM = one auditor, no reconciliation file; HIGH = two auditors from different model families, one reconciliation file; every tier = a compile gate for embedded code (PLAN-042).
+Producer sessions · audit sessions · fix-cycle PRs · defects escaped to agent execution · defects escaped to devices · verification:production session ratio. Tier rule (PLAN-017, PLAN-043): every tier = one internal sub-agent round, MEDIUM and HIGH at most two (PLAN-044); LOW = lint; MEDIUM = one auditor, no reconciliation file; HIGH = two auditors from different model families, one reconciliation file; every tier = a compile gate for embedded code (PLAN-042).
 
 ## CHANGELOG
 
@@ -230,6 +230,7 @@ Producer sessions · audit sessions · fix-cycle PRs · defects escaped to agent
 | v1.3 | 2026-11-21 | R5a (PLAN-038, PLAN-040): the doctrinal sources name the producer contract and batch prompt v3.0; a note under §7 step 4 sets the internal sub-agent audit before the external audit. |
 | v1.4 | 2026-11-21 | R5a.1 (PLAN-042): embedded code is compiled on a scratch branch before dispatch at every tier, not only HIGH: the note on how to use this file, the tier table, §6, §7 steps 9 and 10, §8 and §9. |
 | v1.5 | 2026-11-21 | R5a.2 (PLAN-043): one internal sub-agent round at every tier, LOW included, and HIGH at most two: the note on how to use this file, the tier table, §6, §7 (the note under step 4, the LOW paragraph and step 10), §8 and §9. |
+| v1.6 | 2026-11-22 | R5b (PLAN-044): MEDIUM may run a second internal round when the first finds a new HIGH or MEDIUM: the tier table, §7 (the note under step 4) and §9. |
 
 ---
 
