@@ -2,10 +2,10 @@
 # v7.7.1.2 check file: every gate and checkpoint of prompts/phase7/v7.7.1.2-agent-prompt-gpt-codex.md, so that the
 # agent types no check (PLAN-031). It also writes the scope list, inserts the three supplied texts of the prompt,
 # measures the struct sizes on the compiler, and reads the two boards of the step.
-# Written 2026-11-22 by the planning session for R5b (PLAN-044); do not edit it.
+# Written 2026-11-22 by the planning session for R5b (PLAN-044), corrected the same day for PLAN-045; do not edit it.
 # Fenced texts of the prompt are taken from the prompt by a tool (the function fence below), never retyped.
 #
-#   bash /root/v7712/v7.7.1.2-checks.sh <sec2 | scope <PR#> <YYYY-MM-DD> | insert <S1|T1|T2> | A | B | C | D | measure
+#   bash /root/v7712/v7.7.1.2-checks.sh <sec2 | scope <PR#> <YYYY-MM-DD> | copy [verify] | insert <S1|T1|T2> | A | B | C | D | measure
 #        | dev <IP> <version> [c3heap] | wroom24 <epoch> | E | prepr | inline <PR#> | body <PR#> [final]>
 #
 # Each block ends with one PASS line, or prints "⛔ CHECKPOINT FAILED - <block>: <reason>" and exits 1.
@@ -15,10 +15,10 @@ set -u
 REPO=/root/config/ESP32-GW-multi-sensor
 SAVE=/root/v7712
 BRANCH=feature/v7.7.1.2-per-device-structs
-PROD=1c95906
+PROD=92d1260
 GHREPO=GCV-Sleeper-Service/ESP32-GW-multi-sensor
 ROUNDS="Inline|Review A|Review B"
-CHECKS="preflight-and-compile|prompt-lint|pr-body-check|browser-tests"
+CHECKS="preflight-and-compile|prompt-lint|pr-body-check|browser-tests=7"   # name=N: N distinct jobs of that name
 P=prompts/phase7/v7.7.1.2-agent-prompt-gpt-codex.md
 CF=prompts/phase7/v7.7.1.2-checks.sh
 DM=firmware/core/data-model.h
@@ -39,6 +39,15 @@ trap 'rm -rf "$TMP"' EXIT
 fail() { echo "⛔ CHECKPOINT FAILED - ${LABEL}: $1"; exit 1; }
 sha() { sha256sum < "$1" | cut -d' ' -f1; }
 cnt() { grep -cE -- "$1" "$2"; }   # how many lines of $2 match the extended regex $1
+COPY="49b78d0f2881d388e2dc26208060bf1acfa78103dccab4a53fd5500206a6d6b0 Docs/development-process-guide.md
+63f3476770ea9a63a3336df44ccc8f29a6dffdc5971d0d3f869cd507570cfeaf prompts/producer-contract.md
+eaf1c1d1d8961448f568c9d3064e7336c146218a585486b6483d6837b77d48de Docs/templates/prompt-audit-template.md
+1a3ad6de306ef63c1ed9b80a2e95291ac963d557742aaaecf45f11ab72c47cd4 Docs/planner-start-here.md
+017a11a9afd5b355c4cac2c997b37d0bd3263f890fe06d15daa50c94a4935fd0 Docs/decisions/decision-log.md
+4434c32473002239b499082dcf9e6fccd0afdea2e40d98386160ef595204ceb2 Docs/plan-of-record.md
+0e57963328ae80fbbcbd85c43db75de6f9aafd9f75beea25fa8c7a63ea80c423 prompts/phase7/v7.7.1.2-review.md
+c807530d77b94cc29b2ba2a2084a1572ce3a5916b5d540ab0e35a62901abcb0f Docs/operator/R4-per-device-structs.md
+ae64e7d21be022a07e5355e5e8f87e2fd86c3690aefabd535f94f9108a51e885 prompts/handoff/phase7/session-handoff-v7.7.1.2.md"   # the files of Task Group 0: <SHA-256> <path>, one per line
 cd "$REPO" 2>/dev/null || fail "repository path $REPO"
 
 # fence <file> <start of the line before the fence> <out>: the text between the next fence lines after that line.
@@ -90,7 +99,7 @@ supplied() { # $1 S1|T1|T2 -> $TMP/$1.txt, checked against its SHA-256
   local label want
   case "$1" in
     S1) label="Supplied text S1 — "; want=622fca950f8c45dbe02d205984212273fa96be8267af0bbc57ba5aa0814e8d17 ;;
-    T1) label="Supplied text T1 — "; want=0991b125c0ff14726ea4d21c84c53f2f11bfc725df0bf564843924cef0064202 ;;
+    T1) label="Supplied text T1 — "; want=b7c01745519f6307ff1715e67a35d9c50ba0c436cfd95033a146c89482426578 ;;
     T2) label="Supplied text T2 — "; want=4ba97235b37c7bdd02b1291f813d46115fcfbc486e4e42b4abc086e34ec5f02c ;;
     *) fail "usage: insert <S1|T1|T2>" ;;
   esac
@@ -109,7 +118,7 @@ b_sec2() {
   test "$(git branch --show-current)" = "$BRANCH" || fail "the branch is not $BRANCH"
   git fetch -q origin || fail "git fetch"
   test "$(git merge-base origin/main HEAD)" = "$(git rev-parse origin/main)" || fail "the branch does not start at origin/main: branch again from origin/main"
-  git diff --quiet origin/main HEAD || fail "the branch already changes files against origin/main: $(git diff --name-only origin/main HEAD | head -n 3 | tr '\n' ' ')"
+  test "$(git diff --name-only origin/main HEAD | sort | tr '\n' ' ')" = "$(printf '%s\n' "$P" "$CF" | sort | tr '\n' ' ')" || fail "the branch must change only $P and $CF (the commit of the setup file); it changes: $(git diff --name-only origin/main HEAD | head -n 4 | tr '\n' ' ')"
   test "$(cat VERSION)" = "7.7.1.1" || fail "VERSION is not 7.7.1.1"
   test -z "$(git status --porcelain)" || fail "the working tree is not clean"
   cmp -s "$P" "$SAVE/v7.7.1.2-agent-prompt-gpt-codex.md" || fail "$P differs from $SAVE/v7.7.1.2-agent-prompt-gpt-codex.md"
@@ -125,6 +134,10 @@ b_sec2() {
   test "$(git show "$PROD:$RS" | sha256sum | cut -d' ' -f1)" = "$(sha "$RS")" || fail "$RS changed since $PROD"
   test "$(git show "$PROD:$ARCH" | sha256sum | cut -d' ' -f1)" = "$(sha "$ARCH")" || fail "$ARCH changed since $PROD"
   test "$(git show "$PROD:$CL" | sha256sum | cut -d' ' -f1)" = "$(sha "$CL")" || fail "$CL changed since $PROD"
+  while read -r _ f; do
+    test "$(git show "$PROD:$f" | sha256sum | cut -d' ' -f1)" = "$(sha "$f")" || fail "$f changed since $PROD: the planning session renders the bundle again"
+    test -f "$SAVE/files/$f" || fail "the supplied file $SAVE/files/$f is missing"
+  done <<< "$COPY"
   test "$(cnt 'DeviceHistoryMeta|EventLog|PersistPriority|PERSIST_DEVICE_COUNT|MAX_DEVICE_SLOTS' "$DM")" = "0" || fail "$DM already holds a Phase 7 symbol of this step"
   test "$(cnt 'device_id_hash_|NvsKey|device_meta_key_|device_segment_key_' "$NV")" = "0" || fail "$NV already holds a Phase 7 symbol of this step"
   test "$(cnt 'PERSIST_DEVICE_COUNT' "$RS")" = "0" || fail "$RS already writes PERSIST_DEVICE_COUNT"
@@ -152,6 +165,8 @@ b_scope() {
   [[ "$pr" =~ ^[0-9]+$ ]] && [[ "$day" =~ ^20[0-9]{2}-[01][0-9]-[0-3][0-9]$ ]] || fail "usage: scope <PR#> <YYYY-MM-DD>"
   a="$(scope_list)" || fail "git rev-parse"
   cat > "$a" <<'EOF'
+prompts/phase7/v7.7.1.2-agent-prompt-gpt-codex.md
+prompts/phase7/v7.7.1.2-checks.sh
 firmware/core/data-model.h
 firmware/core/nvs-persistence.h
 scripts/render_sensor_config.py
@@ -162,6 +177,14 @@ Docs/changelog.md
 Docs/v7.7-v7.8-persistence-architecture.md
 Docs/lessons/index.md
 Docs/lessons/firmware.md
+Docs/development-process-guide.md
+prompts/producer-contract.md
+Docs/templates/prompt-audit-template.md
+Docs/planner-start-here.md
+Docs/decisions/decision-log.md
+prompts/phase7/v7.7.1.2-review.md
+Docs/operator/R4-per-device-structs.md
+prompts/handoff/phase7/session-handoff-v7.7.1.2.md
 VERSION
 dashboard/core/app-shell.js
 dashboard/dashboard.h
@@ -181,8 +204,71 @@ tests/fixtures/variants/mixed/manifest.json
 tests/fixtures/variants/system/manifest.json
 EOF
   printf '%s\n' "Docs/session-log-$day-v7.7.1.2.md" "prompts/phase7/v7.7.1.2-PR$pr-consolidated-audit-and-lessons.md" >> "$a"
-  test "$(grep -c . "$a")" = "29" || fail "the scope list does not hold 29 paths"
-  echo "scope list written: 29 paths"
+  test "$(grep -c . "$a")" = "39" || fail "the scope list does not hold 39 paths"
+  echo "scope list written: 39 paths"
+}
+
+por_ok() { # the plan of record differs from its supplied text only as item 6.2 says: row 8 and section 2
+  python3 -I - "$SAVE/files/$POR" "$POR" <<'PYEOF'
+import sys
+a = open(sys.argv[1], encoding="utf-8").read().split("\n")
+b = open(sys.argv[2], encoding="utf-8").read().split("\n")
+def row8(lines):
+    r = [l for l in lines if l.startswith("| 8 | R4 |")]
+    return [c.strip() for c in r[0].strip().strip("|").split("|")] if len(r) == 1 else None
+def sec2(lines):
+    out, on = [], False
+    for l in lines:
+        if l.startswith("## "):
+            on = l.startswith("## 2. You are here")
+        elif on:
+            out.append(l)
+    return "\n".join(out).strip()
+ra, rb = row8(a), row8(b)
+if rb is None or len(rb) != len(ra) or rb[:-1] != ra[:-1] or not rb[-1].startswith("Done"):
+    sys.exit("row 8 (R4): only its status cell may change, to Done (item 6.2); the cell 'Actual (sessions)' stays pending")
+s2 = sec2(b)
+if s2 == sec2(a) or not all(w in s2 for w in ("R4", "v7.7.1.3", "R6")):
+    sys.exit("section 2, 'You are here', must be rewritten as item 6.2 says: it names R4, v7.7.1.3 and R6")
+def strip(lines):
+    out, skip = [], False
+    for l in lines:
+        if l.startswith("## "):
+            skip = l.startswith("## 2. You are here")
+        if skip or l.startswith("| 8 | R4 |"):
+            continue
+        out.append(l)
+    return out
+if strip(a) != strip(b):
+    x = next(i for i, (p, q) in enumerate(zip(strip(a) + [""], strip(b) + [""])) if p != q)
+    sys.exit("first difference: " + (strip(b) + [""])[x][:120])
+PYEOF
+}
+
+b_copy() { # copy [verify]: Task Group 0 copies the nine supplied files; verify (PRE-PR) checks them again
+  local mode="${1:-}" want f n=0
+  [ -z "$mode" ] || [ "$mode" = "verify" ] || fail "usage: copy [verify]"
+  while read -r want f; do
+    [ -n "$f" ] || continue
+    if [ "$mode" != "verify" ]; then
+      test "$(sha "$SAVE/files/$f")" = "$want" || fail "the supplied file $SAVE/files/$f differs from the bundle"
+    fi
+    if [ "$(sha "$f")" = "$want" ]; then
+      n=$((n + 1)); continue
+    fi
+    if [ "$f" = "$POR" ] && por_ok > "$TMP/por.log" 2>&1; then
+      n=$((n + 1)); continue   # copied before, then edited as item 6.2 says
+    fi
+    [ "$mode" != "verify" ] || fail "$f differs from its supplied text: a file that the block copy wrote was edited ($(tail -n 1 "$TMP/por.log" 2>/dev/null))"
+    test "$(git show "$PROD:$f" | sha256sum | cut -d' ' -f1)" = "$(sha "$f")" || fail "$f is neither the file of $PROD nor its supplied text"
+    cp "$SAVE/files/$f" "$f" || fail "cannot write $f"
+    test "$(sha "$f")" = "$want" || fail "$f does not equal its supplied text after the copy"
+    n=$((n + 1))
+  done <<< "$COPY"
+  test "$n" = "9" || fail "the list of the block copy holds $n files, not 9"
+  if [ "$mode" = "verify" ]; then echo "copy verify PASS: 9 files"; return; fi
+  echo "copied 9 files"
+  echo "CHECKPOINT 0 PASS"
 }
 
 b_insert() {
@@ -413,8 +499,21 @@ b_dev() {
   [[ "$up" =~ ^[0-9]+$ ]] && [[ "$fh" =~ ^[0-9]+$ ]] && [[ "$mh" =~ ^[0-9]+$ ]] && [[ "$now" =~ ^[0-9]+$ ]] || fail "unexpected answer of $ip: $(head -c 200 <<< "$out")"
   echo "dev $ip: version $v, uptime $up s, free_heap $fh B, min_free_heap $mh B, boot $((now - up))"
   test "$v" = "$want" || fail "$ip reports $v, not $want"
-  if [ "$mode" = "c3heap" ]; then
-    [ "$fh" -ge 50032 ] && [ "$fh" -le 54128 ] || fail "free_heap $fh B is not within 2,048 B of 52,080 B (CURRENT-STATE.md, v7.7.1.1 C3 value): STOP and report"
+  if [ "$mode" = "c3heap" ]; then # PLAN-045: at an uptime of 180 s or more, the higher of two readings 30 s apart
+    local boot=$((now - up)) hi=0 k
+    if [ "$up" -lt 180 ]; then echo "c3heap: the uptime is $up s; waiting $((180 - up)) s until 180 s"; sleep $((180 - up)); fi
+    for k in 1 2; do
+      [ "$k" = "1" ] || sleep 30
+      out="$(status_full "$ip" 2>&1)"
+      [[ "$out" != ERROR* ]] || fail "c3heap reading $k: ${out#ERROR }"
+      read -r v up fh mh now <<< "$out"
+      [[ "$up" =~ ^[0-9]+$ ]] && [[ "$fh" =~ ^[0-9]+$ ]] && [[ "$now" =~ ^[0-9]+$ ]] || fail "c3heap reading $k: unexpected answer of $ip: $(head -c 200 <<< "$out")"
+      [ $((now - up)) -ge $((boot - 30)) ] && [ $((now - up)) -le $((boot + 30)) ] || fail "c3heap reading $k: the board started at $((now - up)), not within 30 s of $boot: it rebooted. STOP and report"
+      echo "c3heap reading $k: uptime $up s, free_heap $fh B"
+      [ "$fh" -gt "$hi" ] && hi="$fh"
+    done
+    [ "$hi" -ge 50032 ] || fail "the higher free_heap, $hi B, is more than 2,048 B below 52,080 B (CURRENT-STATE.md, v7.7.1.1 C3 value): STOP and report"
+    echo "c3heap: the higher free_heap is $hi B, no more than 2,048 B below 52,080 B"
   fi
   echo "dev PASS"
 }
@@ -499,6 +598,7 @@ b_prepr() {
   test "$(ls firmware/core/*.h | wc -l)" = "9" || fail "the number of fragments is not 9"
   cmp -s "$P" "$SAVE/v7.7.1.2-agent-prompt-gpt-codex.md" || fail "the prompt differs from the saved one"
   cmp -s "$CF" "$SAVE/v7.7.1.2-checks.sh" || fail "the check file differs from the saved one"
+  ( b_copy verify ) || exit 1
   ( b_A ) || exit 1
   ( b_B ) || exit 1
   ( b_C ) || exit 1
@@ -513,10 +613,11 @@ b_prepr() {
   test -z "$(git status --porcelain)" || fail "preflight changed files in the tree: $(git status --porcelain | tr '\n' ' ')"
   echo "PRE-PR PASS at $(git rev-parse HEAD)"
 }
-# --- review round: the blocks inline and body (PLAN-043; F2 of review A on PR #244 fixed in R5b, PLAN-044) ---
+# --- review round: the blocks inline and body (PLAN-043; F2 of review A on PR #244 fixed in R5b, PLAN-044;
+#     Copilot and Gemini only, PLAN-045) ---
 # They read the PR through `gh api` and change nothing. GHREPO, ROUNDS and CHECKS are set at the top of the file.
 
-b_inline() { # inline <PR#>: waits for the three inline reviewers, at most 5 minutes per run and 30 minutes in all
+b_inline() { # inline <PR#>: waits for Copilot and Gemini, at most 5 minutes per run and 30 minutes in all; names a post of Codex
   local pr="${1:-}" t0 now out rc
   [[ "$pr" =~ ^[0-9]+$ ]] || fail "usage: inline <PR#>"
   t0="$(date -u +%s)" || fail "date"
@@ -550,7 +651,7 @@ def seen(name, commit, when, text):
     # A review of the head counts. A review of another commit counts as history when it came before
     # '/gemini review' and stops the block when it came after it: then a commit was pushed during the round.
     if commit and not head.startswith(commit):
-        if when < start:
+        if when < start or name == "Codex":  # Codex is not waited for (PLAN-045): a post of another commit is skipped
             return
         print("%s reviewed %s, not the head %s: a commit was pushed during the inline round" % (name, commit, head)); sys.exit(2)
     posted.setdefault(name, text)
@@ -579,14 +680,16 @@ for c in comments:
         if cr.get("status") == "completed" and cr.get("commit_sha") and head.startswith(cr["commit_sha"]):
             # the status comment counts on the head only and never stops the block: Codex edits it in place
             posted.setdefault("Codex", "Codex: status comment %s, completed on %s" % (c["id"], cr["commit_sha"][:7]))
-for n in ("Copilot", "Codex", "Gemini"):
+for n in ("Copilot", "Gemini"):
     print(posted.get(n, "%s: not posted" % n))
+print(posted.get("Codex", "Codex: not posted (no longer asked, PLAN-045)"))
+need = [n for n in ("Copilot", "Gemini") if n in posted]
 left = 30 - (now - start) // 60
-if len(posted) == 3:
+if len(need) == 2:
     sys.exit(0)
 if left <= 0:
     print("30 minutes have passed since '/gemini review'; the reviewers that did not post are named above"); sys.exit(0)
-print("%d of 3 posted; %d minutes left" % (len(posted), left)); sys.exit(3)
+print("%d of 2 posted; %d minutes left" % (len(need), left)); sys.exit(3)
 PYEOF
 )"; rc=$?
     case "$rc" in
@@ -658,10 +761,13 @@ for r in rounds:
 if mode == "final":
     if len(runs) >= 100:
         bad.append("the head has 100 or more check runs: this block reads only the first 100")
-    for name in checks:
+    for entry in checks:
+        name, _, need = entry.partition("=")
         mine = [x for x in runs if x.get("name") == name or (x.get("name") or "").startswith(name + " (")]
         if not mine:
             bad.append("no check run '%s' on the head %s" % (name, head[:7]))
+        elif need and len({x.get("name") for x in mine}) < int(need):
+            bad.append("%d distinct jobs '%s (...)' on the head %s, not %s" % (len({x.get("name") for x in mine}), name, head[:7], need))
     latest = {}
     for x in runs:  # a name can have several runs on one head (each edit of the body starts pr-body-check): the latest counts
         k = x.get("name") or ""
@@ -685,6 +791,7 @@ PYEOF
 case "$NAME" in
   sec2) b_sec2 ;;
   scope) b_scope "${2:-}" "${3:-}" ;;
+  copy) b_copy "${2:-}" ;;
   insert) b_insert "${2:-}" ;;
   A|B|C|D|E) "b_$NAME" ;;
   measure) b_measure ;;
@@ -693,5 +800,5 @@ case "$NAME" in
   prepr) b_prepr ;;
   inline) b_inline "${2:-}" ;;
   body) b_body "${2:-}" "${3:-}" ;;
-  *) echo "usage: bash $0 <sec2 | scope <PR#> <YYYY-MM-DD> | insert <S1|T1|T2> | A | B | C | D | measure | dev <IP> <version> [c3heap] | wroom24 <epoch> | E | prepr | inline <PR#> | body <PR#> [final]>"; exit 2 ;;
+  *) echo "usage: bash $0 <sec2 | scope <PR#> <YYYY-MM-DD> | copy [verify] | insert <S1|T1|T2> | A | B | C | D | measure | dev <IP> <version> [c3heap] | wroom24 <epoch> | E | prepr | inline <PR#> | body <PR#> [final]>"; exit 2 ;;
 esac
