@@ -28,10 +28,16 @@ Inline round completed with `inline PASS`.
 | Reviewer | Outcome | Findings | Disposition |
 |---|---|---|---|
 | Copilot (`copilot-pull-request-reviewer[bot]`) | Posted an incomplete review (`model policy or plan restrictions`, PLAN-032) | No actionable findings | Not a blocker; proceed per PLAN-032 |
-| Codex (`chatgpt-codex-connector[bot]`) | Posted receipt and review summary on head `3a0cafa` | No actionable findings | No code change warranted |
+| Codex (`chatgpt-codex-connector[bot]`) | Posted receipt and review summary on head `3a0cafa`; also posted review thread finding on head `f746bfd` | One actionable P2 finding: historical Copilot/Codex reviews can make block `inline` stop a correct round | Warranted; reported and routed. No file edit in this PR because the check file is fixed text |
 | Gemini (`gemini-code-assist[bot]`) | Posted review summary on head `3a0cafa` | No actionable findings | No code change warranted |
 
-No review finding required a scope change or a document edit in this round.
+Review A (`claude-opus-5-5`) posted three findings:
+
+- F1 (Medium) warranted: the inline assessment and record omitted Codex's actionable finding. Fixed in this round by correcting this record and the Round Summary row.
+- F2 (Medium) warranted: block `inline` can stop a correct round on historical Copilot/Codex reviews. Reported and routed; not edited here because the prompt/check files are fixed texts in this step.
+- F3 (Low) warranted: prior assessment comment rendered as one paragraph with literal `\n`. Fixed in this round by posting the next assessment with real markdown newlines.
+
+Reviews B and C do not run on this step (PLAN-043, PLAN-036).
 
 ## §4 Agent autonomous decisions
 
@@ -41,12 +47,12 @@ none
 
 Prompt Quality Score:
 
-- Fix cycles: 0
+- Fix cycles: 1
 - Checkpoint saves: 0
-- Preventable review findings: 0
+- Preventable review findings: 1
 - Agent autonomous decisions: 0 (none)
 
-Inline round had no actionable findings; process remains on track for Review A.
+Review A surfaced one escaped bundle defect (F2) and two execution/reporting defects (F1, F3) that were corrected in this round.
 
 ## §6 Operator decisions recorded by this PR
 
@@ -64,11 +70,16 @@ This step closes no issue; no milestone changes, and the step has no tag.
 |---|---|
 | producer sessions for this step's prompt | 1 |
 | audit sessions for this step's prompt | 0 |
-| fix-cycle commits after the first review round | 0 |
-| defects that escaped the prompt gates into agent execution | 0 |
+| fix-cycle commits after the first review round | 1 |
+| defects that escaped the prompt gates into agent execution | 1 |
 | defects that escaped to devices | 0 |
 
 ## §9 Recommendations and where each was routed
 
-Recommendations: none
-Candidate lessons: none
+Recommendations:
+
+- R5b prompt/check-file production should update block `inline` so Copilot/Codex historical reviews (before the `/gemini review` round start) are ignored, while preserving the stop on non-head reviews posted during the active round. Route: operator scheduling for R5b bundle production under PLAN-043.
+
+Candidate lessons:
+
+- Inline review wait logic should filter all reviewers by round start time, not only Gemini, to avoid false stops on historical reviews.
