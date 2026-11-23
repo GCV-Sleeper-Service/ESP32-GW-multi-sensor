@@ -1,7 +1,7 @@
 # Current Project State
 
 _Last verified: 2026-11-22 — .189 and .170 report v7.7.1.2 after OTA uploads in PR #246; the C3 and WROOM builds passed with ESPHome 2026.4.1, including the supplied compile-time tests and measured size assertions. The C3 heap threshold stopped on the May baseline and was accepted by the operator's decision dated 2026-11-23 (comment 7088682835); WROOM's 24-hour reading is pending. .191 was not read in this step._
-_Next action: the planning session produces the bundle of v7.7.1.3 after R4 merges, then R6 implements its persist write path (PLAN-044). PR #246 still needs the WROOM 24-hour reading and the scheduled reviews before merge. Batch 2 is rolling: the bundle of v7.7.1.4 follows R6. The order and scope are in `Docs/plan-of-record.md` (PLAN-024)._
+_Next action: the planning session produces the bundle of v7.7.1.3 after R4 merges, then R6 implements its persist write path (PLAN-044). PR #246 reviews A and B have been assessed; the WROOM 24-hour reading, second C3 reading and final validation remain before merge. Batch 2 is rolling: the bundle of v7.7.1.4 follows R6. The order and scope are in `Docs/plan-of-record.md` (PLAN-024)._
 
 ---
 
@@ -99,6 +99,7 @@ _Items from postmortems or phase closures that have NOT been acted on._
 
 | Source | Recommendation | Status |
 |---|---|---|
+| PR #246 review A Q3–Q5, endorsed by review B (comments 7089320312 and 7089569051) | In the v7.7.1.3 prompt, make persisted metric positions follow history-enabled manifest metrics and resolve persistent devices by full id rather than assuming persist-array indices equal devices[] indices. Confirm the blob contract: the current architecture uses the full fixed-size DeviceSegment; a shorter prefix needs a separate format/retention-budget decision. Consider EventLog export/load entries as the persisted interface rather than its private ring state. | **Routed to planning for the rolling v7.7.1.3 bundle** (PLAN-044); no new runtime mapping, serialized format or generated array is introduced in R4. The proposed NVS saving is an unmeasured estimate. |
 | PR #246 c3heap stop and operator decision dated 2026-11-23 (comment 7088682835) | Refresh the May 2026 C3 `free_heap` baseline before a later step uses it as a deployment gate. v7.7.1.1 read 42,596 B immediately before OTA; v7.7.1.2 read 41,956 B and 43,864 B at 180 s and 211 s. | **Deferred to the planning session in a later step**, as the operator decided; the 52,080 B historical baseline, supplied texts and check file remain unchanged in R4. Take a second C3 reading when the operator requests `wroom24`. |
 | BUG-075-076 postmortem | Add periodic health-check task logging stack HWM, heap stats, socket usage, NVS stats | **Partially implemented in v7.7.1.0** — heap, stack HWM, NVS stats, and uptime now logged; socket counters remain deferred |
 | BUG-075-076 postmortem | Monitor `nvs_get_stats()` for partition pressure | **Implemented in v7.7.1.0** |

@@ -13,7 +13,7 @@ Session opened 2026-11-22 (America/Los_Angeles); the filename retains the date s
 - Item 5.3: `bash scripts/provision.sh satellite` succeeded, then `git status --short` printed nothing.
 - One checkpoint stop on a stale baseline, accepted below; no agent error, gate alteration or c3heap retry.
 - CHECKPOINT E passed after the Task Group 6 documents were completed. PRE-PR runs after their commit; the PR body records its result for each current head.
-- Inline round: completed on reviewed head 1f85a71; Copilot's Low finding fixed, Gemini's Medium claim rejected with source evidence, Codex completed with no findings. Review A and review B: pending. Review C does not run (PLAN-036, PLAN-044).
+- Inline round: completed on reviewed head 1f85a71; Copilot's Low finding fixed, Gemini's Medium claim rejected with source evidence. Review A and review B subsequently reviewed 63a2e72 and are assessed below; later Codex code/security posts raised no findings. Review C does not run (PLAN-036, PLAN-044).
 
 Verbatim completed gate output:
 
@@ -150,6 +150,7 @@ The full repository pipeline passed after each code task group. The last local p
 | WROOM compile/upload/post-upload reading | PASS | Normal continuation authorized by operator |
 | WROOM 24-hour reading / second C3 reading | pending operator instruction | Required later observation |
 | PR-body file preparation | A JavaScript syntax error stopped the tool call before writing; corrected once and the body file was then written and posted | Invocation repair only; no repository change, checkpoint stop or altered gate |
+| Review follow-up data decoding | gh stdout included a trailing hint after its JSON; the read-only parser was corrected to select the JSON line | Invocation repair only; no repository mutation or checkpoint stop |
 
 ## Inline round
 
@@ -173,4 +174,43 @@ All reviews, inline comments/replies and reviewer issue comments were read befor
 Copilot explicitly could not complete the review at the selected tier due to model policy or plan restrictions. Its Low finding is assessed, but its coverage is incomplete (PLAN-032). Gemini completed a review; Codex posted a completed status despite no longer being requested. No inline reviewer was absent.
 
 The inline round is one fix cycle and one fix-cycle commit. Covering checkpoints and PRE-PR run again after its commit; the PR body holds the current-head result and CI rollup. The initial PRE-PR passed at 1f85a71cf642328f23845f7e2088d2ea0430f70c. No c3heap rerun or additional upload accompanies this generator-only fix because the generated output is unchanged.
+
+The completed inline follow-up also printed PRE-PR PASS at 63a2e721b3f79dfba5b83a4bcffc82ec494fc3e4 and body PASS. All ten required GitHub jobs passed on that head, including the seven browser jobs in run 45094036832 and preflight-and-compile in run 45094036837. These are completed historical results; each later head has its own evidence in the PR body.
+
+## External reviews A and B
+
+Both reviews were present when the operator requested this follow-up. The agent refreshed the PR body, all review submissions, inline threads/replies and every conversation comment before assessment.
+
+| Round | Reviewer | Head reviewed | Evidence |
+|---|---|---|---|
+| Review A | Claude Opus 5.5 (claude-opus-5-5), Claude Code cloud, reasoning medium | 63a2e721b3f79dfba5b83a4bcffc82ec494fc3e4 | Comment 7089320312 |
+| Review B | Runner gemini-4-hydrogen, thinking HIGH | 63a2e721b3f79dfba5b83a4bcffc82ec494fc3e4 | Comment 7089569051; prompt hash 9747f78defcf433bc6ffca9e763d76daf3110eb2a7ca8e59522bbf8834cb760f; review-file hash 0e57963328ae80fbbcbd85c43db75de6f9aafd9f75beea25fa8c7a63ea80c423 |
+
+The runner excluded generated diffs and did not read unchanged source outside diff hunks or external reference documents. Its published limitations are retained; its checks are not represented as new device tests. Both external reviewers posted. Copilot's earlier coverage remains incomplete.
+
+| Finding/question | Assessment | Action |
+|---|---|---|
+| A-L1, endorsed by B: fixed counts can drift from MetricDef flags | Warranted | Added a generator invariant validating emitted rows against fixed counts; drift fails with RenderError before persist output. No original emission lines, generated output, supplied text or check changed. |
+| A-L2, endorsed by B: audit statuses lag completed inline evidence | Warranted | Updated the record's acceptance rows, metadata, Delivery Status and completed 63a2e72 evidence; current-head PRE-PR/body/CI outputs are in the PR body and closing assessment under the required commit/check order. |
+| A-Q1: model identity | Answered | Harness instructions identify Codex based on GPT-6 and expose neither context-window size nor reasoning-effort setting. Retained the identity line; did not infer a model from the operator's picker. |
+| A-Q2: later Codex posts | Warranted process update | Read and recorded both receipts 7089200846 / 7089243328 and comments 7089208256 / 7089247060 on 63a2e72; no findings raised. Status 7088950437 was also updated to that head. |
+| A-Q3–Q5: future persistence contracts | Valid planning questions | Routed metric ordering, device-id lookup and serialization/budget questions to CURRENT-STATE.md, Unimplemented Recommendations; no R4 runtime or format change. |
+| B-M1: later device observations and round closure | Valid pre-merge requirements, partly addressed here | A/B dispositions and normal body validation close this review follow-up. The 24-hour WROOM check and second C3 reading remain outstanding until the operator's exact instruction; body final is not run early. |
+
+The generator invariant validates every emitted adapter table. A changed history flag or malformed row stops with RenderError; fixed counts never silently follow formatting changes. `python3 scripts/render_sensor_config.py --write` reported no generated-file changes.
+
+Five temporary in-memory AST mutation tests exercised the generator function without changing source files or supplied tests. The verbatim output was:
+
+```text
+drift rejected: office: Device "office" has 1 history-enabled MetricDef rows; the persist count is 2.
+drift rejected: wan_ping: Device "wan_ping" has 1 history-enabled MetricDef rows; the persist count is 2.
+drift rejected: nas01: Device "nas01" has 1 history-enabled MetricDef rows; the persist count is 0.
+malformed flag rejected
+whitespace variation accepted: persist counts unchanged
+metric-count invariant regression tests: 5 passed
+```
+
+Review A and B share one follow-up fix commit. Under the template's round-based definition, Inline, A and B are three rounds ending in fixes; there are two fix-cycle commits total because the A/B commit is shared. The repeated L1/L2 findings are counted once each. The stale-baseline checkpoint-stop count stays one, separate from these implementation/documentation findings.
+
+The complete regeneration pipeline and preflight passed after this generator change, ending playwright_manifest_spec: PASS. Covering C/E checkpoints and PRE-PR run on the committed follow-up, followed by the PR body update, normal body check and assessment. No board reading or upload is authorized merely by a reviewer asking for one. The operator's wroom24 instruction is still required for both later observations.
 
