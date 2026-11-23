@@ -1,13 +1,13 @@
 # Current Project State
 
-_Last verified: 2026-11-14 — restart re-verification by the operator: on 2026-11-11 the production boards .189, .170 and .191 reported v7.7.1.1, ESPHome was 2026.4.1, the httpd stack override check passed and a compile without upload succeeded; on 2026-11-14 the same three boards reported v7.7.1.1 again. No firmware change since v7.7.1.1._
-_Next action: R4, Phase 7 Step v7.7.1.2. Its bundle is on `main` since R5b; the planning session runs its pre-dispatch gate and gives the dispatch paragraph. Batch 2 is produced rolling: the bundle of v7.7.1.3 after R4 merges, the bundle of v7.7.1.4 after R6 merges (PLAN-044). R4 is the first code step with review B on the review runner (PLAN-022, PLAN-023). The order and the scope of every step are in `Docs/plan-of-record.md` (PLAN-024)._
+_Last verified: 2026-11-22 — .189 and .170 report v7.7.1.2 after OTA uploads in PR #246; the C3 and WROOM builds passed with ESPHome 2026.4.1, including the supplied compile-time tests and measured size assertions. The C3 heap threshold stopped on the May baseline and was accepted by the operator's decision dated 2026-11-23 (comment 7088682835); WROOM's 24-hour reading is pending. .191 was not read in this step._
+_Next action: the planning session produces the bundle of v7.7.1.3 after R4 merges, then R6 implements its persist write path (PLAN-044). PR #246 still needs the WROOM 24-hour reading and the scheduled reviews before merge. Batch 2 is rolling: the bundle of v7.7.1.4 follows R6. The order and scope are in `Docs/plan-of-record.md` (PLAN-024)._
 
 ---
 
 ## Version and Phase
 
-- **Current version:** 7.7.1.1
+- **Current version:** 7.7.1.2
 - **Active phase:** Phase 7 implementation underway
 - **Last completed phase:** Phase VX (board onboarding + auth refactor, 4 steps, 3 PRs)
 - **Next implementation phase:** Phase 7 (per-device persistence engine)
@@ -19,16 +19,16 @@ _Next action: R4, Phase 7 Step v7.7.1.2. Its bundle is on `main` since R5b; the 
 
 | Step | PR | Summary |
 |---|---|---|
+| v7.7.1.2 | #246 | Per-device persisted structs, EventLog, FNV-1a hash, 15-character NVS keys and generated persist defaults; compiler-measured layouts verified on C3 and WROOM, both flashed; no runtime use yet |
 | v7.7.1.1 | #226 | History endpoints now stream CSV with `httpd_resp_send_chunk()`, fixing BUG-082 heap exhaustion on larger retained history sets; follow-up preserved aggregator proxy compatibility, restored NI-002 `HEALTH:` evidence on WROOM/C3, and live-verified `.191` proxy history against the chunked C3 upstream |
 | v7.7.1.0 | #225 | Health-check telemetry task added as a ninth firmware fragment; boot startup, assembly, and preflight updated for periodic heap/NVS/stack telemetry |
-| v7.6.10.4 | #202 | Dashboard auth refactor: `authFetch()` wrapper, auth modal, eliminated browser native auth dialogs |
 
 ## What's Next
 
 The order, the scope and the status of every step are in `Docs/plan-of-record.md` (PLAN-024). In short:
 
-1. **R4, v7.7.1.2** — per-device structs, NVS key scheme, FNV-1a hash and persist defaults; its bundle came with R5b (PLAN-044). Review B runs on the review runner (PLAN-022, PLAN-023).
-2. **Phase 7 Steps v7.7.1.3 and v7.7.1.4** — persist engine (write path); restore engine (boot path) and retention budget. Each bundle is produced after the step before it merges (PLAN-044).
+1. **Produce the v7.7.1.3 bundle, then R6** — the planning session uses R4's merged structs, keys, defaults and measurements to produce the persist write-path prompt (PLAN-044).
+2. **Phase 7 Step v7.7.1.4** — restore engine (boot path) and retention budget; its bundle is produced after R6 merges (PLAN-044).
 3. **v7.7.1.5** — new board secrets (SEC-003).
 4. **Phase 7 Steps v7.7.2.1 to v7.7.3.3** — engine switchover, migration, export and import, and closure. v7.7.3.3 is v1.0 (PLAN-015).
 5. **After v1.0** — the ESPHome upgrade spike; v1.1 with the partition layouts and the former optimisation sprint; then Phases 8 and 9.
@@ -40,7 +40,7 @@ The order, the scope and the status of every step are in `Docs/plan-of-record.md
 | BUG-084 | High | Non-PSRAM boards crash under 8 concurrent HTTP connections. Safe limit: 4 concurrent. | Phase 7 (socket limit config) |
 | #137 | Low | Board-type SVG diagrams for documentation. Cosmetic. | Phase 7+ or standalone |
 | A-004 | Medium | C5 WROOM-1U BLE not verified. The external antenna is fitted (operator, 2026-11-05). The re-test needs a BLE-capable build on .180. | Test-board check |
-| WROOM heap | Medium | `.170` reported `min_free_heap` 3,988 B at 7.5 days uptime on v7.7.1.1 (operator reading, 2026-11-14; 5,156 B on 2026-11-11 in the same boot). It is the lowest value since boot: a deep dip, not a proven leak. | v7.7.1.2 reads `min_free_heap` of .170 after a fresh boot and 24 hours later (PLAN-044) |
+| WROOM heap | Medium | Before OTA, v7.7.1.1: `min_free_heap` 3,648 B at 185,237 s uptime. Fresh v7.7.1.2 boot: 12,336 B at 118 s uptime, `free_heap` 29,052 B, boot epoch 1795395664 (2026-11-22). The 24-hour v7.7.1.2 reading is pending; no leak conclusion yet. | Run `wroom24 1795395664` only when the operator requests it, and record the second `min_free_heap` and uptime (PLAN-044) |
 | C6 flash | Medium | C6 SuperMini uses 91.6% of OTA partition on 4MB flash. Phase 7 firmware growth may exceed. | Phase 7 planning |
 
 ## Recently Resolved
@@ -66,12 +66,12 @@ _Fleet: nine boards (BOARD-002). Identity comes from the operator's board file a
 
 | device_id | Board | Chip (esptool) | Module | Flash MB | PSRAM MB | USB | IP | Role | board_profile | firmware_now | Antenna | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| sat-esp32-4m-170 | ESP32 dev board | ESP32-D0WD-V3, rev v3.1 | WROOM-32D (module marking not checked) | 4 | 0 | USB-UART bridge | 192.168.120.170 | production satellite | `esp32-wroom-32d` | v7.7.1.1 (2026-11-14) | fitted | formerly at .190 |
+| sat-esp32-4m-170 | ESP32 dev board | ESP32-D0WD-V3, rev v3.1 | WROOM-32D (module marking not checked) | 4 | 0 | USB-UART bridge | 192.168.120.170 | production satellite | `esp32-wroom-32d` | v7.7.1.2 (2026-11-22) | fitted | formerly at .190 |
 | sat-s3-4m-173 | ESP32-S3 SuperMini | ESP32-S3 (QFN56), rev v0.2 | none (flash and PSRAM in the chip package) | 4 | 2 | native USB-Serial/JTAG | 192.168.120.173 | test | `esp32-s3-supermini-4m` | v7.6.10.1 (2026-11-11) | fitted | marginal as an aggregator |
 | sat-c5-8m-180 | ESP32-C5 dev board | ESP32-C5, rev v1.0 | WROOM-1U | 8 | 8 | USB-UART bridge | 192.168.120.180 | test | `esp32-c5-wroom1u-8m` | v7.6.10.1 (2026-11-11) | external, fitted | BLE not verified (A-004) |
 | sat-c5-8m-181 | Seeed XIAO ESP32C5 | ESP32-C5, rev v1.0 | ESP32-C5-WROOM-1 | 8 | 8 | native USB-Serial/JTAG | 192.168.120.181 | not yet on project firmware | none yet | minimum firmware (2026-11-14) | external, fitted | needs a board profile |
 | sat-c6-4m-184 | ESP32-C6 SuperMini | ESP32-C6FH4 (QFN32), rev v0.2 | none | 4 | 0 | native USB-Serial/JTAG | 192.168.120.184 | test | `esp32-c6-supermini-4m` | v7.6.10.1 (2026-11-11) | fitted | OTA slot 91.6 % full in May 2026 |
-| esp32-c3-multi | ESP32-C3 SuperMini | ESP32-C3 (QFN32), rev v0.4 | none | 4 | 0 | native USB-Serial/JTAG | 192.168.120.189 | production satellite | `esp32-c3-supermini` | v7.7.1.1 (2026-11-14) | fitted | renamed sat-c3-4m-176 at .176 after v1.0 |
+| esp32-c3-multi | ESP32-C3 SuperMini | ESP32-C3 (QFN32), rev v0.4 | none | 4 | 0 | native USB-Serial/JTAG | 192.168.120.189 | production satellite | `esp32-c3-supermini` | v7.7.1.2 (2026-11-22) | fitted | renamed sat-c3-4m-176 at .176 after v1.0 |
 | agg-s3-16m-1 | ESP32-S3-DevKitC-1 N16R8 | ESP32-S3 (QFN56), rev v0.2 | N16R8 | 16 | 8 | USB-UART bridge | 192.168.120.191 | production aggregator | `esp32-s3-devkitc1-n16r8` | v7.7.1.1 (2026-11-14) | fitted | renamed agg-s3-16m-191 after v1.0 |
 | agg-s3-16m-192 | ESP32-S3-DevKitC-1 N16R8 | ESP32-S3 (QFN56), rev v0.2 | N16R8 | 16 | 8 | USB-UART bridge | 192.168.120.192 | test aggregator | `esp32-s3-devkitc1-n16r8` | minimum firmware (2026-11-14) | fitted | its web page has an OTA upload form and no login |
 | agg-c5-8m-194 | Seeed XIAO ESP32C5 | ESP32-C5, rev v1.0 | ESP32-C5-WROOM-1 | 8 | 8 | native USB-Serial/JTAG | 192.168.120.194 | not yet on project firmware | none yet | minimum firmware (2026-11-14) | external, fitted | needs a board profile |
@@ -99,6 +99,7 @@ _Items from postmortems or phase closures that have NOT been acted on._
 
 | Source | Recommendation | Status |
 |---|---|---|
+| PR #246 c3heap stop and operator decision dated 2026-11-23 (comment 7088682835) | Refresh the May 2026 C3 `free_heap` baseline before a later step uses it as a deployment gate. v7.7.1.1 read 42,596 B immediately before OTA; v7.7.1.2 read 41,956 B and 43,864 B at 180 s and 211 s. | **Deferred to the planning session in a later step**, as the operator decided; the 52,080 B historical baseline, supplied texts and check file remain unchanged in R4. Take a second C3 reading when the operator requests `wroom24`. |
 | BUG-075-076 postmortem | Add periodic health-check task logging stack HWM, heap stats, socket usage, NVS stats | **Partially implemented in v7.7.1.0** — heap, stack HWM, NVS stats, and uptime now logged; socket counters remain deferred |
 | BUG-075-076 postmortem | Monitor `nvs_get_stats()` for partition pressure | **Implemented in v7.7.1.0** |
 | BUG-075-076 postmortem | Monitor socket exhaustion under load via lwIP counters | **Not implemented** |
@@ -138,7 +139,7 @@ _Items from postmortems or phase closures that have NOT been acted on._
 
 | Document | Written | Issue |
 |---|---|---|
-| `Docs/v7.7-v7.8-persistence-architecture.md` | 2026-03-19 | Architecture decisions still valid. Memory budget (§15) needs measured values from board-measurement-log. Update during Phase 7 prompt production. |
+| `Docs/v7.7-v7.8-persistence-architecture.md` | 2026-03-19 | §5 and §6 now carry v7.7.1.2 implementation notes matching the code: explicit reserved fields, 33-byte device id, compiler-measured layouts and a three-hex-digit slot suffix. The historical examples remain; the code wins where they differ. Memory budget (§15) still needs measured values during later Phase 7 prompt production. |
 | `Docs/phase-7-review-and-rewrite.md` | 2026-05-07 | Its section "Partition Table Changes" plans the USB reflash for v7.7.1.4. The partition change moves to v1.1 as its own step (PLAN-015). |
 | `Docs/phase-E-captive-portal-plan.md` | 2026-05-07 | Phase E is deferred until after Phase 9, and step E-b waits for the Zigbee spike (PLAN-014). Re-check the plan against the current ESPHome release before use. |
 | `Docs/phase-9-cloud-upload-plan.md` | 2026-05-07 | The primary upload target is now the Azure tier-2 ingest endpoint, not InfluxDB Cloud (PLAN-013). Rewrite at Phase 9 start. |

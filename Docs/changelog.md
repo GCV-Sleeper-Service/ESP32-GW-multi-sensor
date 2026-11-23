@@ -2,6 +2,20 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.7.1.2] - 2026-11-22 - Phase 7: Per-Device Persistence Definitions
+
+### Added
+- `PersistPriority`, `DEV_HIST_MAGIC`, `DEV_HIST_VERSION`, `MAX_PERSIST_METRICS`, `DEVICE_ID_MAX_LEN` and `MAX_DEVICE_SLOTS`; fixed-size persisted layouts with explicit reserved fields and a 33-byte device id.
+- Compiler-measured sizes: `DeviceHistoryMeta` 60 B, `DeviceSegmentHeader` 24 B, `DeviceSegment` 228 B, `EventEntry` 8 B and `EventLog` 168 B. Five size assertions and the supplied T1/T2 tests compile on both C3 and WROOM.
+- A constexpr `EventLog` with a capacity of 20 transitions, logical indexing, export and load operations.
+- `device_id_hash_()` implements 32-bit FNV-1a. `NvsKey`, `device_meta_key_()` and `device_segment_key_()` produce `dm_` + 8 lowercase hex digits and `ds_` + 8 lowercase hex digits + `_` + 3 lowercase hex digits, supporting 4,096 slots per device within the 15-character NVS limit.
+- Generated `PERSIST_DEVICE_COUNT`, `PERSIST_DEVICE_ARRAY_LEN`, `PERSIST_DEVICE_IDS`, `PERSIST_METRIC_COUNTS` and `PERSIST_PRIORITIES`: environmental devices default to flash/high, network devices to flash/low, and system devices remain in RAM.
+
+### Changed
+- Version sources and generated artifacts updated to 7.7.1.2; no runtime use yet for any new definition, no persistence-engine switchover and no change to the served manifest schema.
+- Copied the corrected prompt, check file and nine supplied method/bundle texts of PLAN-045 verbatim, with only the authorized plan-of-record status update.
+- Flashed C3 .189 and WROOM .170. The C3 heap threshold stopped on the May 2026 baseline; the operator accepted that stale-baseline stop in PR #246 (decision dated 2026-11-23). The WROOM 24-hour observation follows on operator instruction.
+
 ## [v7.7.1.1] - 2026-05-08 - Phase 7: Chunked HTTP Streaming (BUG-082 Fix)
 
 ### Fixed
