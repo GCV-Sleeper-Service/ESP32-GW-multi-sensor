@@ -13,7 +13,7 @@ Session opened 2026-11-22 (America/Los_Angeles); the filename retains the date s
 - Item 5.3: `bash scripts/provision.sh satellite` succeeded, then `git status --short` printed nothing.
 - One checkpoint stop on a stale baseline, accepted below; no agent error, gate alteration or c3heap retry.
 - CHECKPOINT E passed after the Task Group 6 documents were completed. PRE-PR runs after their commit; the PR body records its result for each current head.
-- Inline, review A and review B: pending. Review C does not run (PLAN-036, PLAN-044).
+- Inline round: completed on reviewed head 1f85a71; Copilot's Low finding fixed, Gemini's Medium claim rejected with source evidence, Codex completed with no findings. Review A and review B: pending. Review C does not run (PLAN-036, PLAN-044).
 
 Verbatim completed gate output:
 
@@ -149,4 +149,28 @@ The full repository pipeline passed after each code task group. The last local p
 | C3 heap re-run | Not run; prohibited by operator | No changed check, expected value or supplied text |
 | WROOM compile/upload/post-upload reading | PASS | Normal continuation authorized by operator |
 | WROOM 24-hour reading / second C3 reading | pending operator instruction | Required later observation |
+| PR-body file preparation | A JavaScript syntax error stopped the tool call before writing; corrected once and the body file was then written and posted | Invocation repair only; no repository change, checkpoint stop or altered gate |
+
+## Inline round
+
+The PR was marked ready at head 1f85a71 after PRE-PR passed, then /gemini review was posted in comment 7088948880. No file was changed and no commit was pushed until the supplied inline block printed:
+
+```text
+Copilot: review 6015577044 on 1f85a71 (incomplete: Copilot could not complete its review, PLAN-032)
+Gemini: review 6015561383 on 1f85a71
+Codex: status comment 7088950437, completed on 1f85a71
+inline PASS
+```
+
+All reviews, inline comments/replies and reviewer issue comments were read before assessing them.
+
+| Finding | Assessment | Action |
+|---|---|---|
+| Gemini thread 4660962567, Medium: RenderError is undefined | Not warranted: class RenderError(Exception) is defined at scripts/render_sensor_config.py:51 | Retained the prescribed RenderError type |
+| Copilot thread 4660975525, Low: regex-derived metric counts depend on generated C++ formatting | Warranted maintainability concern | Replaced parsing with explicit fixed-adapter counts 2/2/0; retained the 1–6 guard; render --write reported no generated-file changes |
+| Codex completed status 7088950437 | No findings or review threads | No code action |
+
+Copilot explicitly could not complete the review at the selected tier due to model policy or plan restrictions. Its Low finding is assessed, but its coverage is incomplete (PLAN-032). Gemini completed a review; Codex posted a completed status despite no longer being requested. No inline reviewer was absent.
+
+The inline round is one fix cycle and one fix-cycle commit. Covering checkpoints and PRE-PR run again after its commit; the PR body holds the current-head result and CI rollup. The initial PRE-PR passed at 1f85a71cf642328f23845f7e2088d2ea0430f70c. No c3heap rerun or additional upload accompanies this generator-only fix because the generated output is unchanged.
 

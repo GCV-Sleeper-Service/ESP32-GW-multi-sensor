@@ -251,14 +251,12 @@ def render_entity_block(sensors: List[Dict]) -> str:
             ])
 
     lines.append("};")
-    metric_tables = dict(re.findall(
-        r"static const MetricDef (metrics_\w+)\[\] = \{\n(.*?)\n\};",
-        "\n".join(lines), re.DOTALL,
-    ))
-    adapter_tables = {
-        "thermopro_ble": "metrics_thermopro",
-        "icmp_ping": "metrics_ping",
-        "external_push": "metrics_system",
+    # Counts of history_enabled entries in the fixed MetricDef tables above;
+    # keep these together with their adapter's metric definitions.
+    history_metric_counts = {
+        "thermopro_ble": 2,
+        "icmp_ping": 2,
+        "external_push": 0,
     }
     category_priorities = {
         "environmental": "PERSIST_PRIORITY_HIGH",
@@ -271,8 +269,7 @@ def render_entity_block(sensors: List[Dict]) -> str:
         priority = category_priorities.get(sensor["category"])
         if priority is None:
             continue
-        table = adapter_tables.get(sensor.get("adapter", "thermopro_ble"))
-        metric_count = len(re.findall(r",\s*true\s*\}", metric_tables.get(table, "")))
+        metric_count = history_metric_counts.get(sensor.get("adapter", "thermopro_ble"), 0)
         if not 1 <= metric_count <= 6:
             raise RenderError(
                 f'Device "{sensor["id"]}" must persist between 1 and 6 history-enabled metrics; got {metric_count}.'
