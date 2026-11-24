@@ -14,7 +14,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 ### Changed
 - Version sources and generated artifacts updated to 7.7.1.2; no runtime use yet for any new definition, no persistence-engine switchover and no change to the served manifest schema.
 - Copied the corrected prompt, check file and nine supplied method/bundle texts of PLAN-045 verbatim, with only the authorized plan-of-record status update.
-- Flashed C3 .189 and WROOM .170. The C3 heap threshold stopped on the May 2026 baseline; the operator accepted that stale-baseline stop in PR #246 (decision dated 2026-11-23). The WROOM 24-hour observation follows on operator instruction.
+- Flashed C3 .189 and WROOM .170. The C3 heap threshold stopped on the May 2026 baseline; the operator accepted that stale-baseline stop in PR #246 (decision dated 2026-11-23). On that date, the requested WROOM same-boot 24-hour observation passed at 89,973 s (28,436 B free, 2,252 B minimum heap); the second C3 reading passed at 98,414 s (42,888 B free, 30,156 B minimum heap). The lower WROOM minimum is carried forward to the next step's heap checks.
 
 ## [v7.7.1.1] - 2026-05-08 - Phase 7: Chunked HTTP Streaming (BUG-082 Fix)
 

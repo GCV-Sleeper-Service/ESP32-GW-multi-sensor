@@ -14,6 +14,7 @@ Session opened 2026-11-22 (America/Los_Angeles); the filename retains the date s
 - One checkpoint stop on a stale baseline, accepted below; no agent error, gate alteration or c3heap retry.
 - CHECKPOINT E passed after the Task Group 6 documents were completed. PRE-PR runs after their commit; the PR body records its result for each current head.
 - Inline round: completed on reviewed head 1f85a71; Copilot's Low finding fixed, Gemini's Medium claim rejected with source evidence. Review A and review B subsequently reviewed 63a2e72 and are assessed below; later Codex code/security posts raised no findings. Review C does not run (PLAN-036, PLAN-044).
+- On the operator's 2026-11-23 instruction, wroom24 and the second plain C3 dev block both passed; their full outputs are in item 5.4. This is the planned evidence follow-up, not another code fix cycle.
 
 Verbatim completed gate output:
 
@@ -109,7 +110,19 @@ The boot epoch for the future `wroom24` command is **1795395664**. Fresh v7.7.1.
 
 ### Item 5.4: WROOM 24-hour observation and second C3 reading
 
-Pending the operator's exact instruction, `Run the block wroom24 now.` Then run the supplied block with boot epoch 1795395664 and also `bash /root/v7712/v7.7.1.2-checks.sh dev 192.168.120.189 v7.7.1.2`. Add both outputs here, in the record and in the PR body. The C3 heap block is not repeated.
+The operator requested the blocks on 2026-11-23. Ran `bash /root/v7712/v7.7.1.2-checks.sh wroom24 1795395664`, then `bash /root/v7712/v7.7.1.2-checks.sh dev 192.168.120.189 v7.7.1.2`, one at a time. Verbatim outputs:
+
+```text
+wroom24 192.168.120.170: version v7.7.1.2, uptime 89973 s, free_heap 28436 B, min_free_heap 2252 B, boot 1795395666
+wroom24 PASS
+```
+
+```text
+dev 192.168.120.189: version v7.7.1.2, uptime 98414 s, free_heap 42888 B, min_free_heap 30156 B, boot 1795387234
+dev PASS
+```
+
+WROOM's boot estimate differs by 2 s from the post-upload epoch 1795395664, within the supplied 120 s tolerance, and uptime exceeds 86,400 s. Its minimum heap fell from 12,336 B at 118 s to 2,252 B at 89,973 s; current free heap changed from 29,052 B to 28,436 B. This records a lower since-boot minimum rather than proving a leak. CURRENT-STATE.md carries the measurements into the next step's heap checks. The second C3 reading is recorded as directed; c3heap was not repeated and the historical 52,080 B baseline remains unchanged.
 
 ## Accepted Exceptions
 
@@ -148,7 +161,7 @@ The full repository pipeline passed after each code task group. The last local p
 | Item 5.1 c3heap, first run | Stopped; failure comment posted; operator accepted continuation at item 5.2 | One checkpoint stop on a stale baseline; one bundle defect reaching execution, zero agent errors |
 | C3 heap re-run | Not run; prohibited by operator | No changed check, expected value or supplied text |
 | WROOM compile/upload/post-upload reading | PASS | Normal continuation authorized by operator |
-| WROOM 24-hour reading / second C3 reading | pending operator instruction | Required later observation |
+| WROOM 24-hour reading / second C3 reading | Both PASS on 2026-11-23, after operator instruction | Planned evidence follow-up; no new checkpoint stop or code fix |
 | PR-body file preparation | A JavaScript syntax error stopped the tool call before writing; corrected once and the body file was then written and posted | Invocation repair only; no repository change, checkpoint stop or altered gate |
 | Review follow-up data decoding | gh stdout included a trailing hint after its JSON; the read-only parser was corrected to select the JSON line | Invocation repair only; no repository mutation or checkpoint stop |
 
@@ -195,7 +208,7 @@ The runner excluded generated diffs and did not read unchanged source outside di
 | A-Q1: model identity | Answered | Harness instructions identify Codex based on GPT-6 and expose neither context-window size nor reasoning-effort setting. Retained the identity line; did not infer a model from the operator's picker. |
 | A-Q2: later Codex posts | Warranted process update | Read and recorded both receipts 7089200846 / 7089243328 and comments 7089208256 / 7089247060 on 63a2e72; no findings raised. Status 7088950437 was also updated to that head. |
 | A-Q3–Q5: future persistence contracts | Valid planning questions | Routed metric ordering, device-id lookup and serialization/budget questions to CURRENT-STATE.md, Unimplemented Recommendations; no R4 runtime or format change. |
-| B-M1: later device observations and round closure | Valid pre-merge requirements, partly addressed here | A/B dispositions and normal body validation close this review follow-up. The 24-hour WROOM check and second C3 reading remain outstanding until the operator's exact instruction; body final is not run early. |
+| B-M1: later device observations and round closure | Valid pre-merge requirements, now addressed | A/B dispositions and normal body validation completed on dee6a5d. The operator-requested observations both passed on 2026-11-23 and are recorded in item 5.4; final validation follows this evidence commit. |
 
 The generator invariant validates every emitted adapter table. A changed history flag or malformed row stops with RenderError; fixed counts never silently follow formatting changes. `python3 scripts/render_sensor_config.py --write` reported no generated-file changes.
 
@@ -212,5 +225,5 @@ metric-count invariant regression tests: 5 passed
 
 Review A and B share one follow-up fix commit. Under the template's round-based definition, Inline, A and B are three rounds ending in fixes; there are two fix-cycle commits total because the A/B commit is shared. The repeated L1/L2 findings are counted once each. The stale-baseline checkpoint-stop count stays one, separate from these implementation/documentation findings.
 
-The complete regeneration pipeline and preflight passed after this generator change, ending playwright_manifest_spec: PASS. Covering C/E checkpoints and PRE-PR run on the committed follow-up, followed by the PR body update, normal body check and assessment. No board reading or upload is authorized merely by a reviewer asking for one. The operator's wroom24 instruction is still required for both later observations.
+The complete regeneration pipeline and preflight passed after this generator change, ending playwright_manifest_spec: PASS. Covering C/E and PRE-PR passed on dee6a5d1aa9fac026d5e4a1c56b1b7be5b717042, followed by body PASS and all ten green required CI jobs. The later board readings ran only after the operator's direct instruction on 2026-11-23; their verbatim results are in item 5.4. No upload, c3heap retry, supplied-text edit or check alteration accompanied the observation follow-up. The final evidence commit receives its own E/PRE-PR/body/CI results in the PR body and closing assessment.
 

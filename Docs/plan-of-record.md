@@ -30,7 +30,7 @@ Who starts where: a planning or prompt-producing session starts at `Docs/planner
 
 ## 2. You are here
 
-After PR #246 merges, the last merged step is **R4**, v7.7.1.2: per-device structs, keys, hash and persist defaults. The next action is production of the **v7.7.1.3** bundle by the planning session, then **R6**, its persist write path (PLAN-044). The v7.7.1.4 bundle follows R6's merge. PR #246 retains the pending 24-hour WROOM observation and review evidence until those gates finish.
+After PR #246 merges, the last merged step is **R4**, v7.7.1.2: per-device structs, keys, hash and persist defaults. The next action is production of the **v7.7.1.3** bundle by the planning session, then **R6**, its persist write path (PLAN-044). The v7.7.1.4 bundle follows R6's merge. PR #246 records the completed WROOM 24-hour observation, second C3 reading and assessed reviews A/B; final validation precedes operator merge.
 
 ## 3. The ladder
 
@@ -51,7 +51,7 @@ The steps in the order they run. Every step is on the path to v1.0, except R15, 
 | 6a | R5a.1 | Producer-contract fixes from the reviews of R5a, issue #242 (LOW, PLAN-042) | Dispatch, review and merge one documentation PR | R5a | Unchanged | 1 to 2 | planning 2, operator 1 | Done: the pull request that fixes issue #242 |
 | 6b | R5a.2 | Method fixes from the reviews of R5a.1 (LOW, PLAN-043): an internal round at every tier, dispatch by a setup file, the checks `inline` and `body` of the review round | Dispatch, review and merge one documentation PR | R5a.1 | Unchanged | 1 to 2 | planning 2, operator 1 | Done: the pull request that adds PLAN-043 |
 | 7 | R5b | Batch 2, rolling (PLAN-044): the method fixes from the reviews of PR #244, the assumption audit and the bundle of v7.7.1.2; the bundles of v7.7.1.3 and v7.7.1.4 follow after R4 and R6 | Dispatch, review and merge one documentation PR | R5a.2 | Unchanged | 4 to 6 | planning 2, operator 1 | Done: the pull request that adds PLAN-044 |
-| 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | pending | Done: PR #246 (merge waits for the 24-hour reading and reviews) |
+| 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | pending | Done: PR #246 (24-hour observation and reviews recorded; operator merges after final validation) |
 | 9 | R6 | v7.7.1.3: persist write path (MEDIUM); the test board .173 gets it too | SP | R4; its bundle, produced after R4 merges, and one auditor session | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 |  | Waiting |
 | 10 | R7 | Compile gate for v7.7.1.4; backups | Backups copied off the build host; USB cable ready | R6 | 7.7.1.3 | 1 to 2 |  | Waiting |
 | 11 | R8 | v7.7.1.4: restore engine and retention budgets (HIGH); .173 first, then the production boards | SP; stand by for USB recovery | R7; its bundle, produced after R6 merges, and two auditor sessions | 7.7.1.4 (`v7.7.1.4`) | 3 to 5 |  | Waiting |
