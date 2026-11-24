@@ -79,15 +79,15 @@ The operator pulls the planning repository on the build host and pastes the disp
 6) When done: gh pr ready <PR#> --repo GCV-Sleeper-Service/ESP32-GW-multi-sensor
 7) Write the PR body to §8 of the prompt, and edit it with `gh api --method PATCH repos/GCV-Sleeper-Service/ESP32-GW-multi-sensor/pulls/<PR#> -F body=@<file>`
 8) Apply every edit with your file-edit tool; never with a script that parses the prompt
-9) If one of your own commands fails, repair it and repeat the step; run no checkpoint while an edit before it is missing
+9) If one of your own commands fails, repair it and repeat the step; run no checkpoint while an edit before it is missing. If a checkpoint fails on your own edit, post its failure line as a PR comment, repair the edit once and run the checkpoint again
 10) Run one test command at a time: no second preflight, Playwright run or mock server while one is running
-11) After `gh pr ready`: post the comment `/gemini review` on the PR; run the check block `inline <PR#>` until it prints `inline PASS` (it waits for Copilot, Codex and Gemini, at most 30 minutes after the comment), and push nothing before it; then assess each finding, fix what is warranted, and post one comment with your assessment that names any reviewer that did not post. Never merge, approve or start an external review
-12) Stops: a known tooling defect with a recovery written in the prompt gets that recovery once, with the result posted, and a second failure stops; a value you would have to ask for is in the prompt; a real mismatch (a missing anchor, a different value, a path out of scope, a test failing twice) always stops with the checkpoint-failure comment of §3.2
+11) After `gh pr ready`: post the comment `/gemini review` on the PR; run the check block `inline <PR#>` until it prints `inline PASS` (it waits for Copilot and Gemini, at most 30 minutes after the comment; a post of Codex, if one comes, is read and assessed like the others), and push nothing before it; then assess each finding, fix what is warranted, and post one comment with your assessment that names any reviewer that did not post. Never merge, approve or start an external review
+12) Stops: a known tooling defect with a recovery written in the prompt gets that recovery once, with the result posted, and a second failure stops; a value you would have to ask for is in the prompt; a real mismatch (a missing anchor, a different value, a path out of scope, a test failing twice) always stops with the checkpoint-failure comment of §3.2; so does a checkpoint that fails a second time after the one repair of item 9, and any mismatch of `main` (an anchor, a value or a file that is not as the prompt says)
 13) Run every gate and checkpoint from the check file that the prompt names, exactly as the prompt says; never type a check by hand
 14) End every review round with the end-of-round step of the prompt: the record, the row of the round in the Round Summary, the criteria, the PRE-PR block and its last line in the body, the check block `body <PR#>`, then your assessment, whose first line names you and your model as your harness shows them
 ```
 
-Items 11 and 12 hold from R3c on (PLAN-027): the coding agent starts the inline review round itself, and the stop rules are decided in advance. Item 13 holds from R5 on (PLAN-031): the planning session hands over every check in one check file with its SHA-256. The block `inline` of item 11 and item 14 hold from R5a.2 on, the dispatch paragraph from R5b on (PLAN-043).
+Items 11 and 12 hold from R3c on (PLAN-027): the coding agent starts the inline review round itself, and the stop rules are decided in advance. Item 13 holds from R5 on (PLAN-031): the planning session hands over every check in one check file with its SHA-256. The block `inline` of item 11 and item 14 hold from R5a.2 on, the dispatch paragraph from R5b on (PLAN-043). From R4 on, item 11 waits for Copilot and Gemini only, and items 9 and 12 allow one repair of a checkpoint that fails on the agent's own edit (PLAN-045).
 
 **B) The agent prompt** — word for word, from the step's bundle (`prompts/producer-contract.md` §6).
 
@@ -116,12 +116,12 @@ curl -s -u "$ESP_USER:$ESP_PASS" http://192.168.120.189/api/status/full | python
 
 ### 2.4 Review Pipeline
 
-Three inline reviews, then the external reviews: reviews A and C side by side, then review B by the review runner, always last (PLAN-022, PLAN-023). Review C is required on MEDIUM and HIGH firmware steps. It is optional on every other step: a MEDIUM or HIGH step that changes no firmware, a LOW step, a documentation PR (PLAN-036). The round summary says which reviews ran.
+Two inline reviews, by Copilot and Gemini, then the external reviews: reviews A and C side by side, then review B by the review runner, always last (PLAN-022, PLAN-023). Review C is required on MEDIUM and HIGH firmware steps. It is optional on every other step: a MEDIUM or HIGH step that changes no firmware, a LOW step, a documentation PR (PLAN-036). The round summary says which reviews ran.
 
 | # | Reviewer | Where | Type |
 |---|---|---|---|
 | 1 | Copilot | GitHub inline | Inline code review |
-| 2 | Codex | GitHub inline | Inline code review |
+| 2 | Codex: no longer asked since 2026-11-22, when the operator disabled its connector (PLAN-045). If it posts, the agent reads and assesses the post like any other | GitHub inline | Inline code review |
 | 3 | Gemini | GitHub inline | Inline code review |
 | 4 | Claude (external review A); a GPT model when Claude Code coded the step (PLAN-026) | Its own session, apart from planning and from the coding agent | Whole-PR review: findings by severity, each acceptance criterion checked |
 | 5 | Meta Muse, Spark or Wonder (external review C) | Its own session | Whole-PR review by a fourth model family |
@@ -137,7 +137,7 @@ Reviews A and C get the common part and their own part of the step's review file
 
 If the runner cannot run, the step waits for it; the operator may instead run review B as a Muse session in three turns, and the consolidated audit names the change (PLAN-023). Gemini on the web is no fallback, because it cannot post the comment. The runner cannot review the pull request that installs it. A pull request that changes the runner is reviewed by the runner on `main`, which reads the change as data.
 
-The coding agent runs an OpenAI Codex model, in the GitHub Copilot Chat agent of VS Code or in OpenAI's Codex agent; the gate record and the operator page name the harness and the model of each dispatch, and the agent names itself as its harness shows it (PLAN-043). Claude Code is the fallback coding agent (PLAN-026). The agent changes only at a step boundary, or at a passed checkpoint with a handoff comment on the PR, and two agents never work in one checkout.
+The coding agent is Codex, an OpenAI Codex model, whichever provider serves it: OpenAI's Codex extension or CLI, the GitHub Copilot agent, or another (PLAN-045); the gate record and the operator page name the harness and the model of each dispatch, and the agent names itself as its harness shows it (PLAN-043). The PR body states the agent's harness, model, context window and reasoning effort as the harness shows them, `not shown` for a value that it does not show (PLAN-045). Claude Code is the fallback coding agent (PLAN-026). The agent changes only at a step boundary, or at a passed checkpoint with a handoff comment on the PR, and two agents never work in one checkout.
 
 When Copilot posts no complete review, the agent's assessment says so, and the step goes on with the other inline reviews and the external reviews; the operator decides at the merge (PLAN-032).
 
@@ -199,7 +199,7 @@ Run `bash scripts/lint-prompts.sh` locally before pushing to catch violations be
 
 The files of a step's bundle, their names and the rules that each must meet are in `prompts/producer-contract.md` (PLAN-038): the agent prompt and its check file, the review file, the operator page, the setup block of §2.2 and the supplied files; for a MEDIUM or HIGH step the audit file; for a firmware step the session handoff. The agent prompt follows the skeleton of the HowTo agent-prompt template: a header and preamble, the lessons of the step, and §1 to §9. A firmware step has no two-step prompt: its review file takes that place (PLAN-023). The coding agent writes the record of the step in the PR (§2.5 item 4). A batch of Phase 7 steps is produced with `prompts/handoff/phase7-batch-production-prompt-v3.md`.
 
-**Risk tiers (PLAN-017).** Set per step at planning time and written in the prompt header. The tier sets the producer-side audit and the prompt style. It does not change the review pipeline of §2.4, except that review C is required on MEDIUM and HIGH firmware steps (PLAN-023) and optional on every other step (PLAN-036). Documentation-only PRs run the three inline reviewers; external reviewers are optional, and the round summary says which ran.
+**Risk tiers (PLAN-017).** Set per step at planning time and written in the prompt header. The tier sets the producer-side audit and the prompt style. It does not change the review pipeline of §2.4, except that review C is required on MEDIUM and HIGH firmware steps (PLAN-023) and optional on every other step (PLAN-036). Documentation-only PRs run the two inline reviewers, Copilot and Gemini (PLAN-045); external reviewers are optional, and the round summary says which ran.
 
 | Tier | Phase 7 steps | Producer audit before dispatch | Prompt style |
 |---|---|---|---|
@@ -234,7 +234,7 @@ Awaiting operator decision.
 
 Agents that "explain away" a checkpoint failure instead of posting this template are exhibiting the plausible-narrative trap. The comment forces structured reporting.
 
-A checkpoint tests whether the repository matches what the prompt assumed, and the agent never fixes a failing checkpoint. A failing test inside a task group is ordinary work: fix it within the §3 scope and record the fix in the session log (HowTo v2 §4.3).
+A checkpoint tests whether the repository matches what the prompt assumed, and the agent never fixes a failing checkpoint, with one exception (PLAN-045): when the checkpoint fails on the agent's own edit of the step, the agent posts the failure line as a PR comment, repairs its edit once and runs the checkpoint again. A second failure, or any mismatch of `main` (an anchor, a value or a file that is not as the prompt says), stops with the comment above. A failing test inside a task group is ordinary work: fix it within the §3 scope and record the fix in the session log (HowTo v2 §4.3).
 
 ### 3.3 Scope Guards
 

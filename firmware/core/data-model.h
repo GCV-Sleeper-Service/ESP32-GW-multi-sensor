@@ -255,6 +255,12 @@ struct SensorEntity {
 // Global sensor array — CONFIGURE SENSORS HERE
 // ═══════════════════════════════════════════════════════════════════
 
+// ── Phase 7: persist configuration types (v7.7.1.2, PLAN-044) ──────────
+enum PersistPriority : uint8_t {
+  PERSIST_PRIORITY_HIGH = 0,
+  PERSIST_PRIORITY_NORMAL = 1,
+  PERSIST_PRIORITY_LOW = 2,
+};
 // <<< SENSOR_MANIFEST:HEADER_BEGIN >>>
 // SensorSlot removed in v7.5.3.8 — all runtime state in SensorEntity devices[].
 // NUM_ENV_SENSORS / NUM_SENSORS = persisted environmental-sensor count only (backward-compat alias for SegmentSnapshot / HistoryMeta).
@@ -373,10 +379,18 @@ static SensorEntity devices[NUM_DEVICES] = {
     .last_rssi = 0, .last_seen_epoch = 0
   },
 };
+
+// ── Phase 7 persist configuration (generated, v7.7.1.2, PLAN-044) ─────
+// Defaults by category: environmental flash/high, network flash/low, system RAM only.
+static constexpr int PERSIST_DEVICE_COUNT = 4;
+static constexpr int PERSIST_DEVICE_ARRAY_LEN = PERSIST_DEVICE_COUNT > 0 ? PERSIST_DEVICE_COUNT : 1;
+static const char *const PERSIST_DEVICE_IDS[PERSIST_DEVICE_ARRAY_LEN] = {"office", "first_floor", "outside", "wan_ping"};
+static constexpr uint8_t PERSIST_METRIC_COUNTS[PERSIST_DEVICE_ARRAY_LEN] = {2, 2, 2, 2};
+static constexpr PersistPriority PERSIST_PRIORITIES[PERSIST_DEVICE_ARRAY_LEN] = {PERSIST_PRIORITY_HIGH, PERSIST_PRIORITY_HIGH, PERSIST_PRIORITY_HIGH, PERSIST_PRIORITY_LOW};
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.7.1.1) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.7.1.2) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
@@ -432,3 +446,145 @@ static const char *const HISTORY_NAMESPACE = "histv631";
 // Namespace intentionally preserved from v6.3.1 so retained history survives
 // an in-place v6.3.1 -> v6.4 / v6.5 upgrade. Storage schema is unchanged.
 static const char *const HISTORY_PARTITION_LABEL = "history";
+
+// ═══════════════════════════════════════════════════════════════════
+// Phase 7 — per-device persistence model (v7.7.1.2, PLAN-044)
+//   Defined here; no runtime code uses it until a later Phase 7 step.
+//   Every persisted struct is plain data with explicit reserved fields,
+//   so that its layout has no implicit padding.
+// ═══════════════════════════════════════════════════════════════════
+
+static constexpr uint32_t DEV_HIST_MAGIC = 0x44485632UL;  // "DHV2"
+static constexpr uint16_t DEV_HIST_VERSION = 1;
+static constexpr int MAX_PERSIST_METRICS = 6;
+static constexpr int DEVICE_ID_MAX_LEN = 32;    // the manifest allows ids of up to 32 characters
+static constexpr int MAX_DEVICE_SLOTS = 4096;   // three hex digits of the segment key
+
+// One blob per persistent device: the state of its ring of segments.
+struct DeviceHistoryMeta {
+  uint32_t magic = DEV_HIST_MAGIC;
+  uint16_t version = DEV_HIST_VERSION;
+  uint16_t metric_count = 0;           // metrics this device persists
+  uint16_t points_per_segment = 0;     // points per hourly segment
+  uint16_t max_slots = 0;              // ring capacity, at most MAX_DEVICE_SLOTS
+  uint16_t valid_segments = 0;         // slots that hold valid data
+  uint16_t next_slot = 0;              // write cursor
+  uint16_t last_written_slot = 0xFFFF; // most recent slot, 0xFFFF for none
+  uint16_t reserved = 0;
+  uint32_t last_persist_epoch = 0;     // epoch of the last persist
+  char device_id[DEVICE_ID_MAX_LEN + 1] = {};  // NUL-terminated; detects hash collisions
+  uint8_t reserved_tail[3] = {};
+};
+
+// The header of one segment blob.
+struct DeviceSegmentHeader {
+  uint32_t magic = DEV_HIST_MAGIC;
+  uint16_t version = DEV_HIST_VERSION;
+  uint16_t metric_count = 0;           // populated metrics in this blob
+  uint16_t points_per_segment = 0;
+  uint16_t reserved = 0;
+  uint32_t saved_at_epoch = 0;
+  uint32_t first_epoch = 0;
+  uint32_t last_epoch = 0;
+};
+
+// One blob per device per hour; metric positions follow the manifest order.
+struct DeviceSegment {
+  DeviceSegmentHeader header;
+  uint16_t counts[MAX_PERSIST_METRICS] = {};
+  HistEntry data[MAX_PERSIST_METRICS][PERSIST_POINTS_PER_SEGMENT] = {};
+};
+
+// One state change of a binary metric (Rule 67).
+struct EventEntry {
+  uint32_t epoch = 0;
+  uint8_t state = 0;
+  uint8_t reserved[3] = {};
+};
+
+class EventLog {
+ public:
+  static constexpr int CAP = 20;
+
+  constexpr void clear() {
+    for (int i = 0; i < CAP; i++) events_[i] = {};
+    head_ = 0;
+    count_ = 0;
+  }
+
+  constexpr void add(uint32_t epoch, uint8_t state) {
+    events_[head_] = {epoch, state, {}};
+    head_ = (head_ + 1) % CAP;
+    if (count_ < CAP) count_++;
+  }
+
+  constexpr int count() const { return count_; }
+
+  constexpr EventEntry at_logical(int i) const {
+    if (i < 0 || i >= count_) return {};
+    int start = count_ < CAP ? 0 : head_;
+    return events_[(start + i) % CAP];
+  }
+
+  constexpr uint32_t newest_epoch() const {
+    return count_ == 0 ? 0 : at_logical(count_ - 1).epoch;
+  }
+
+  constexpr int export_entries(EventEntry *out, int max_entries) const {
+    if (out == nullptr || max_entries <= 0) return 0;
+    int n = count_ < max_entries ? count_ : max_entries;
+    for (int i = 0; i < n; i++) out[i] = at_logical(i);
+    return n;
+  }
+
+  constexpr void load_from(const EventEntry *in, int n) {
+    clear();
+    if (in == nullptr || n <= 0) return;
+    for (int i = 0; i < n; i++) {
+      if (in[i].epoch != 0) add(in[i].epoch, in[i].state);
+    }
+  }
+
+ private:
+  EventEntry events_[CAP] = {};
+  int head_ = 0;
+  int count_ = 0;
+};
+
+// ── Phase 7 compile-time test of EventLog (v7.7.1.2): a supplied test; do not change it ──
+static constexpr bool p7_eventlog_selftest_() {
+  EventLog log;
+  if (log.count() != 0 || log.newest_epoch() != 0 || log.at_logical(0).epoch != 0) return false;
+  log.add(100, 1);
+  log.add(200, 0);
+  if (log.count() != 2 || log.at_logical(0).epoch != 100 || log.at_logical(1).state != 0) return false;
+  if (log.newest_epoch() != 200 || log.at_logical(2).epoch != 0 || log.at_logical(-1).epoch != 0) return false;
+  for (uint32_t e = 301; e <= 325; e++) log.add(e, (uint8_t) (e & 1u));
+  if (log.count() != EventLog::CAP) return false;
+  if (log.at_logical(0).epoch != 306 || log.newest_epoch() != 325 || log.at_logical(0).state != 0 || log.at_logical(1).state != 1) return false;
+  EventEntry out[EventLog::CAP + 2] = {};
+  if (log.export_entries(out, EventLog::CAP + 2) != EventLog::CAP || out[19].epoch != 325) return false;
+  if (log.export_entries(out, 3) != 3 || log.export_entries(nullptr, 3) != 0 || log.export_entries(out, 0) != 0) return false;
+  EventEntry few[3] = {};
+  if (log.export_entries(few, 3) != 3 || few[0].epoch != 306 || few[2].epoch != 308) return false;
+  EventEntry in[3] = {};
+  in[0].epoch = 10; in[0].state = 1;
+  in[2].epoch = 30;
+  log.load_from(in, 3);
+  if (log.count() != 2 || log.at_logical(0).epoch != 10 || log.at_logical(0).state != 1 || log.at_logical(1).epoch != 30) return false;
+  EventEntry many[EventLog::CAP + 2] = {};
+  for (int i = 0; i < EventLog::CAP + 2; i++) many[i].epoch = (uint32_t) (i + 1);
+  log.load_from(many, EventLog::CAP + 2);
+  if (log.count() != EventLog::CAP || log.at_logical(0).epoch != 3 || log.newest_epoch() != (uint32_t) (EventLog::CAP + 2)) return false;
+  log.load_from(nullptr, 3);
+  if (log.count() != 0) return false;
+  log.add(5, 1);
+  log.clear();
+  return log.count() == 0 && log.newest_epoch() == 0;
+}
+static_assert(p7_eventlog_selftest_(), "EventLog does not behave as v7.7.1.2 specifies");
+static_assert(sizeof(DeviceHistoryMeta) == 60, "DeviceHistoryMeta layout changed; recompute the retention budget");
+static_assert(sizeof(DeviceSegmentHeader) == 24, "DeviceSegmentHeader layout changed; recompute the retention budget");
+static_assert(sizeof(DeviceSegment) == 228, "DeviceSegment layout changed; recompute the retention budget");
+static_assert(sizeof(EventEntry) == 8, "EventEntry layout changed; recompute the retention budget");
+static_assert(sizeof(EventLog) == 168, "EventLog layout changed; recompute the retention budget");

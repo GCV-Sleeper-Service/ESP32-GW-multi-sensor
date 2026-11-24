@@ -46,7 +46,7 @@ LOW (PLAN-017): additive definitions only, proved at compile time on both CPU fa
 | Risk | Trigger | Mitigation |
 | --- | --- | --- |
 | A struct layout differs between RISC-V and Xtensa | The WROOM compile fails a size assertion | The agent stops and reports; the layout has explicit reserved fields, so no difference is expected |
-| The C3 heap moves | `c3heap` outside 52,080 B ± 2,048 B | The agent stops and reports; the step adds no runtime data, so a change points at the platform |
+| The C3 heap moves | `c3heap`: the higher of two readings at an uptime of 180 s or more, 30 s apart, is more than 2,048 B below 52,080 B (PLAN-045) | The agent stops and reports; the step adds no runtime data, so a change points at the platform |
 | The WROOM heap keeps falling | `min_free_heap` of .170 lower after 24 h | Recorded, not fixed here; it decides the heap checks of v7.7.1.3 |
 | A slot count above 4,095 | A later budget on a 16 MB board | `MAX_DEVICE_SLOTS` caps it; v7.7.1.4 clamps its budget to it |
 

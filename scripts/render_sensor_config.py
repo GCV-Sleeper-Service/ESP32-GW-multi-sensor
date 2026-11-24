@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_aggregator_config, load_board_profile, load_gateway_config, load_manifest, manifest_v2
 
-VERSION = "7.7.1.1"
+VERSION = "7.7.1.2"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"
@@ -251,6 +251,80 @@ def render_entity_block(sensors: List[Dict]) -> str:
             ])
 
     lines.append("};")
+    # Fixed adapter counts are checked against the emitted MetricDef rows below.
+    # Parsing validates this invariant; it never silently changes persist counts.
+    history_metric_counts = {
+        "thermopro_ble": 2,
+        "icmp_ping": 2,
+        "external_push": 0,
+    }
+    metric_table_adapters = {
+        "metrics_thermopro": "thermopro_ble",
+        "metrics_ping": "icmp_ping",
+        "metrics_system": "external_push",
+    }
+    observed_history_counts = {}
+    active_adapter = None
+    for line in lines:
+        tokens = line.split()
+        if tokens[:3] == ["static", "const", "MetricDef"]:
+            active_adapter = metric_table_adapters.get(tokens[3].split("[", 1)[0])
+            if active_adapter is not None:
+                observed_history_counts[active_adapter] = 0
+        elif active_adapter is not None:
+            row = line.strip().rstrip(",").rstrip()
+            if row == "};":
+                active_adapter = None
+            elif row:
+                flag = row[:-1].rsplit(",", 1)[-1].strip()
+                if not row.startswith("{") or not row.endswith("}") or flag not in ("true", "false"):
+                    raise RenderError(f'Cannot validate MetricDef history flag for adapter "{active_adapter}".')
+                observed_history_counts[active_adapter] += int(flag == "true")
+    for adapter, observed_count in observed_history_counts.items():
+        if observed_count != history_metric_counts[adapter]:
+            device_id = next(
+                (s["id"] for s in sensors if s.get("adapter", "thermopro_ble") == adapter),
+                adapter,
+            )
+            raise RenderError(
+                f'Device "{device_id}" has {observed_count} history-enabled MetricDef rows; '
+                f'the persist count is {history_metric_counts[adapter]}.'
+            )
+    category_priorities = {
+        "environmental": "PERSIST_PRIORITY_HIGH",
+        "network": "PERSIST_PRIORITY_LOW",
+    }
+    persist_ids = []
+    persist_counts = []
+    persist_priorities = []
+    for sensor in sensors:
+        priority = category_priorities.get(sensor["category"])
+        if priority is None:
+            continue
+        adapter = sensor.get("adapter", "thermopro_ble")
+        metric_count = history_metric_counts.get(adapter, 0)
+        if not 1 <= metric_count <= 6:
+            raise RenderError(
+                f'Device "{sensor["id"]}" must persist between 1 and 6 history-enabled metrics; got {metric_count}.'
+            )
+        if adapter not in observed_history_counts:
+            raise RenderError(f'Device "{sensor["id"]}" has no emitted MetricDef table.')
+        persist_ids.append(json.dumps(sensor["id"]))
+        persist_counts.append(str(metric_count))
+        persist_priorities.append(priority)
+    ids = ", ".join(persist_ids) if persist_ids else "nullptr"
+    counts = ", ".join(persist_counts) if persist_counts else "0"
+    priorities = ", ".join(persist_priorities) if persist_priorities else "PERSIST_PRIORITY_HIGH"
+    lines.extend([
+        "",
+        "// ── Phase 7 persist configuration (generated, v7.7.1.2, PLAN-044) ─────",
+        "// Defaults by category: environmental flash/high, network flash/low, system RAM only.",
+        f"static constexpr int PERSIST_DEVICE_COUNT = {len(persist_ids)};",
+        "static constexpr int PERSIST_DEVICE_ARRAY_LEN = PERSIST_DEVICE_COUNT > 0 ? PERSIST_DEVICE_COUNT : 1;",
+        f"static const char *const PERSIST_DEVICE_IDS[PERSIST_DEVICE_ARRAY_LEN] = {{{ids}}};",
+        f"static constexpr uint8_t PERSIST_METRIC_COUNTS[PERSIST_DEVICE_ARRAY_LEN] = {{{counts}}};",
+        f"static constexpr PersistPriority PERSIST_PRIORITIES[PERSIST_DEVICE_ARRAY_LEN] = {{{priorities}}};",
+    ])
     return "\n".join(lines)
 
 

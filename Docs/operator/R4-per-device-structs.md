@@ -1,6 +1,6 @@
 # R4: v7.7.1.2, per-device structs and keys
 
-_Operator guide: one page for one step. Written 2026-11-22 by the planning session for R5b (PLAN-044), for the dispatch of R4 after R5b is merged._
+_Operator guide: one page for one step. Written 2026-11-22 by the planning session for R5b (PLAN-044), for the dispatch of R4 after R5b is merged; corrected 2026-11-22 after the review of PR #245 (PLAN-045)._
 
 ## What this step does
 
@@ -13,19 +13,20 @@ The agent adds the data model of Phase 7 to the firmware: the structs that later
 | `scripts/render_sensor_config.py` | The list of devices that keep history in flash, from their category |
 | Version files and generated files | v7.7.1.2 everywhere |
 | `CURRENT-STATE.md`, plan of record, changelog, session log, record | The documents of the step |
+| The corrected texts of PLAN-045: this page, the prompt, the check file, the review file, the handoff, the process guide, the producer contract, the audit template, the planner page, the plan of record and the decision log | The corrections after the review of PR #245: the inline round without Codex, the new `c3heap` reading, one repair of a checkpoint that fails on the agent's own edit, and the column "Actual (sessions)" in the ladder |
 
-The step is LOW (PLAN-017). The PR gets the inline round, review A and review B. Review C does not run (PLAN-044). It closes issue #214.
+The step is LOW (PLAN-017). The PR gets the inline round (Copilot and Gemini; Codex no longer reviews, PLAN-045), review A and review B. Review C does not run (PLAN-044). It closes issue #214.
 
 ## Words on this page
 
 | Word | Meaning |
 |---|---|
 | You | The operator |
-| The agent | The coding agent in VS Code on the LXC, as the gate record names it |
+| The agent | The coding agent on the LXC, with the harness and the model that the gate record names (from R4 on, OpenAI Codex with GPT-6.1 Sol, as you named it) |
 | The planning session | The session that wrote and checks the prompt |
-| The setup file | The file in `steps/R4/` of your clone of the planning repository that starts the agent |
+| The setup file | `/root/Planning-Workflow/steps/R4/r4-setup.txt`: the file that starts the agent |
 | The dispatch paragraph | The text that the planning session gives you in chat: the path of the setup file and its SHA-256 |
-| The gate record | The record of the checks that the planning session ran on the prompt; your first comment on the PR |
+| The gate record | `/root/Planning-Workflow/steps/R4/r4-gate-record.md`: the record of the checks that the planning session ran on the prompt; your first comment on the PR |
 | The review line | The one line that you paste to the agent after each external review |
 
 ## Before you start
@@ -33,6 +34,19 @@ The step is LOW (PLAN-017). The PR gets the inline round, review A and review B.
 - [ ] R5b is merged, and the planning session has run the pre-dispatch gate of R4 today and given you the dispatch paragraph.
 - [ ] You ran `fleet` today, and .189 and .170 report v7.7.1.1. You pasted the output into the planning session.
 - [ ] No other agent session works in the checkout.
+- [ ] The agent's own commands can reach GitHub and the boards, write to `/root/v7712` and to the checkout's `.git`, and see the login variables. A local OpenAI Codex agent starts with the network off and with writes limited to its workspace, unless you change its sandbox settings (PLAN-045). Open a separate agent session on the LXC, paste the block below, ask the agent to run it as written and show the output, then close that session. It needs the build host (the planning session cannot run it there).
+
+```bash
+cd /tmp && git -C /root/config/ESP32-GW-multi-sensor ls-remote origin refs/heads/main
+gh auth status >/dev/null 2>&1 && echo "gh is logged in" || echo "gh is NOT logged in"
+[ -n "$ESP_USER" ] && [ -n "$ESP_PASS" ] && echo "login variables are set" || echo "login variables are NOT set"
+curl -s -o /dev/null -w 'board .189 answers HTTP %{http_code}\n' --max-time 5 http://192.168.120.189/api/status
+mkdir -p /root/v7712 && touch /root/v7712/.write-test && rm /root/v7712/.write-test && echo "/root/v7712 is writable"
+touch /root/config/ESP32-GW-multi-sensor/.git/write-test && rm /root/config/ESP32-GW-multi-sensor/.git/write-test && echo "the checkout's .git is writable"
+esphome version
+```
+
+Expected: the commit of `main` that the gate record names, then `gh is logged in`, `login variables are set`, `board .189 answers HTTP 200`, `/root/v7712 is writable`, `the checkout's .git is writable` and `Version: 2026.4.1`. `HTTP 000`, an error, or an approval request for a line means that the agent's settings block it: do not dispatch; change the settings or tell the planning session.
 - [ ] The check below prints what is expected. It needs the build host (the planning session cannot run it).
 
 ```bash
@@ -47,12 +61,12 @@ If the output differs, do not start the agent. Paste the output into the plannin
 
 ## Steps
 
-1. Pull your clone of the planning repository: `git -C /root/Planning-Workflow pull`.
+1. Pull your clone of the planning repository: `git -C /root/Planning-Workflow pull --ff-only`. It must end at the commit that the planning session named in chat, or a later one.
 2. Open a new session of the agent in VS Code. Paste the dispatch paragraph.
-3. Wait for the address of the draft PR. Post the gate record as your first comment. A bot may post before you; that is fine.
-4. Wait for the agent. It works through the checks, compiles, and flashes .189 and .170 by itself. If it posts `⛔ CHECKPOINT FAILED`, paste its comment into the planning session. Do not tell the agent to make the check pass.
-5. The agent marks the PR ready and runs the inline round. It waits with the check `inline`, up to 30 minutes, then posts its assessment.
-6. Start review A: Claude, in a new session. Paste the common part and part A of `prompts/phase7/v7.7.1.2-review.md`. Put the PR number in place of `<NN>` and `review A` in place of `<A | B>`. It posts one comment. Paste the review line to the agent and wait for its assessment.
+3. Wait for the address of the draft PR. Post the text of `/root/Planning-Workflow/steps/R4/r4-gate-record.md` as your first comment. A bot may post before you; that is fine.
+4. Wait for the agent. It works through the checks, compiles, and flashes .189 and .170 by itself. If a checkpoint fails on the agent's own edit, it posts the failure line, repairs its edit once and runs the check again (PLAN-045); let it. If it posts the full `⛔ CHECKPOINT FAILED` comment and stops, paste that comment into the planning session. Do not tell the agent to make the check pass.
+5. The agent marks the PR ready and runs the inline round. It waits with the check `inline` for Copilot and Gemini, up to 30 minutes, then posts its assessment.
+6. Start review A: Claude, in a new session. Paste the common part and part A of the review file of this PR, `https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor/blob/feature/v7.7.1.2-per-device-structs/prompts/phase7/v7.7.1.2-review.md` (the only review file of this PR). Put the PR number in place of `<NN>` and `review A` in place of `<A | B>`. It posts one comment. Paste the review line to the agent and wait for its assessment.
 7. Start review B from the Actions tab, as `Docs/operator/R5r-review-runner.md` says under "From the next code step on": the PR number, `prompts/phase7/v7.7.1.2-agent-prompt-gpt-codex.md` and `prompts/phase7/v7.7.1.2-review.md`; clear `dry_run`. Compare the two SHA-256 values in its header with the gate record. Paste the review line to the agent and wait for its assessment.
 8. At least 24 hours after the agent flashed .170 (the session log has the time), paste this line to the agent: `Run the block wroom24 now.` It reads .170 and ends the round.
 9. Do the checks of "Before you merge". Merge the PR.
@@ -62,7 +76,7 @@ If the output differs, do not start the agent. Paste the output into the plannin
 flowchart TD
     A["You: pull the planning repository, paste the dispatch paragraph"] --> B["Agent: draft PR. You: post the gate record"]
     B --> C["Agent: checks, code, compile, flash .189 and .170"]
-    C --> D{"Did a check fail?"}
+    C --> D{"Did the agent stop on a check?"}
     D -- "yes" --> E["You: send its comment to the planning session"]
     E --> C
     D -- "no" --> F["Agent: inline round, assessment"]
@@ -112,9 +126,10 @@ The tag `v7.7.1.2` and the closing of #214 (by the line `Fixes #214`) are the on
 | What you see | What you do |
 |---|---|
 | `⛔ CHECKPOINT FAILED` | Paste the agent's comment into the planning session. |
-| `c3heap` fails: `free_heap ... is not within 2,048 B` | The agent stops. Paste its comment into the planning session; do not merge. |
+| `c3heap` fails: `the higher free_heap ... is more than 2,048 B below 52,080 B` | The agent stops. Paste its comment into the planning session; do not merge. |
 | The WROOM compile fails on a size assertion | The agent stops. Paste its comment into the planning session. |
-| `wroom24` says the uptime is below 86,400 s | Wait, if 24 hours have not passed. If they have, .170 rebooted: paste the line into the planning session. |
+| `wroom24` says the board rebooted after the upload | The agent stops. Paste its line into the planning session. |
+| `wroom24` says the uptime is below 86,400 s | 24 hours have not passed: wait, then paste `Run the block wroom24 now.` again. |
 | An upload ends with a timeout | Paste the agent's comment into the planning session. Do not flash by hand. |
 | A check on GitHub is red | Open the run, copy the last lines of the failed step, and paste them into the planning session. |
 | The agent asks for a login | Do not type it into the agent. The login stays in `$ESP_USER` and `$ESP_PASS` in your shell. |
