@@ -232,6 +232,7 @@ time:
               auto now = id(sntp_time).now();
               if (!now.is_valid()) return;
               persist_hourly_segment(now.timestamp);
+              persist_all_devices_v2(now.timestamp);
 
 
 

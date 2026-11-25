@@ -1016,6 +1016,7 @@ def generate_board_yaml(
         lines.append("              auto now = id(sntp_time).now();")
         lines.append("              if (!now.is_valid()) return;")
         lines.append("              persist_hourly_segment(now.timestamp);")
+        lines.append("              persist_all_devices_v2(now.timestamp);")
 
     lines.append("")
     lines.append("")
