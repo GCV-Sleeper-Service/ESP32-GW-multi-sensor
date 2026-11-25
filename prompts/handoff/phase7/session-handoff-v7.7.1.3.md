@@ -1,152 +1,72 @@
-# Session Handoff — v7.7.1.3: Per-Device Persist Engine (Write Path)
+# Session handoff - v7.7.1.3 (R6)
 
-_Date: 2026-05-08_
-_Repo: https://github.com/GCV-Sleeper-Service/ESP32-GW-multi-sensor_
-_Status: v7.7.1.2 on `main`. Per-device structs and key helpers defined._
+_Written 2026-11-24 by the planning session for R6 (PLAN-044, PLAN-046), corrected 2026-11-25 after GPT Astra's audit (PLAN-047), from the template of HowTo v2.3.1 `templates/session-handoff.template.md`. It replaces the May 2026 handoff of this step, which is source material only. Amend it inside any later PR that changes what it says._
 
----
+## State snapshot this step was written against
 
-## Project State Summary
+| Item | Value | Source |
+| --- | --- | --- |
+| Version on main | 7.7.1.2 | `VERSION` |
+| Commit on main (SHA) | `a33a5cc` (PR #246, tag `v7.7.1.2`) at production; the commit at dispatch is in the gate record | `git rev-parse --short origin/main` |
+| Last verified | 2026-11-23: .189 and .170 report v7.7.1.2 | `CURRENT-STATE.md`, line 3 |
+| Deployment targets (name → address → deployed version) | `sat-s3-4m-173` → 192.168.120.173 → v7.7.1.2, erased and flashed over USB on 2026-11-24 with the project's partition table; `esp32-c3-multi` → 192.168.120.189 → v7.7.1.2; `sat-esp32-4m-170` → 192.168.120.170 → v7.7.1.2 | `CURRENT-STATE.md`, "Board Fleet"; the operator's `fleet` output of 2026-11-24 |
+| Measurements this step depends on | History partition of .189 and .170: `used_entries` 10,804, `free_entries` 5,324, `total_entries` 16,128, old ring 1,080 of 1,080 segments of 232 B (2026-11-24); .173: no history partition before the USB flash (`history_bytes` 0, nvs 446,464 B), `history_bytes` 524,288 after it; .170 `min_free_heap` 2,252 B after 25 hours on v7.7.1.2; .189 `min_free_heap` 28,376 B (fleet, 2026-11-24 morning); later the same day .170 7,332 B and .189 29,456 B: both had restarted, since the value is the lowest since boot (`esp_get_minimum_free_heap_size()`); C3 image of `a33a5cc` 1,435,444 B in the planning session's build (2026-11-24) | The operator's readings of `/api/storage-stats` and `fleet`; the planning session's compile with ESPHome 2026.4.1 |
 
-**v7.7.1.2 is complete.** `DeviceHistoryMeta`, `DeviceSegment`, `EventLog` structs and FNV-1a key helpers are defined. No runtime wiring yet.
+## What this step does
 
-**This step implements the write path.** Per-device segments are written to NVS alongside the old persist engine (dual-write). The old engine continues to be the restore source until v7.7.1.4.
+- Writes, at every hourly persist, one `DeviceSegment` per persistent device into a ring of 24 slots per device (`ds_<8 hex>_<3 hex>`), and updates the device's meta blob (`dm_<8 hex>`) after the segment, beside the old engine (dual-write).
+- Skips a device's write when the history partition has fewer than 252 free NVS entries, so the old engine always has room for its hourly overwrite.
+- Reports each device's ring under `persist_v2` in `/api/storage-stats`, from RAM.
+- Gives the sensor `outside` the MAC of its replacement.
+- Tests the write path at compile time (T3) and on the host (H1); bumps to 7.7.1.3; flashes .173 first, then .189 and .170.
 
-### Open issues entering v7.7.1.3
+## What this step does NOT do
 
-| Issue | Severity | Notes |
-|---|---|---|
-| BUG-084 | High | Non-PSRAM boards crash under 8 concurrent HTTP connections. |
-| #137 | Low | Board-type SVG diagrams. Cosmetic. |
+- No read of the new blobs: restore stays on the old engine until v7.7.1.4; the dashboard reads the old engine until v7.7.2.1.
+- No retention budget: the ring of 24 slots is provisional; v7.7.1.4 replaces it.
+- No EventLog persist: the manifest has no binary metric.
+- No change of the old engine, the partition tables, the RAM window (PLAN-011) or the persist minute.
 
----
+## Risk tier and why
 
-## Phase 7 Progress Table
+MEDIUM (PLAN-044): the first runtime writes of the per-device engine on three boards. A wrong write cannot corrupt the old engine's blobs (other keys), but a full partition would stop its saves; the guard and the small ring keep it from that.
 
-| Version | Scope | Status |
-|---------|-------|--------|
-| v7.7.0.0 | ESPHome component defaults audit | Complete |
-| v7.7.1.0 | Health-check telemetry task | Complete (PR #225) |
-| v7.7.1.1 | Chunked HTTP streaming (BUG-082 fix) | Complete (PR #226) |
-| v7.7.1.2 | Per-device structs, key scheme, hash | Complete |
-| **v7.7.1.3** | **Per-device persist engine (write path)** | **⬅️ Current** |
-| v7.7.1.4 | Per-device restore engine + retention budget | Pending |
+## Critical rules that apply
 
----
+| # | Rule | Why here |
+| --- | --- | --- |
+| 2 | Version bump through `bump-version.sh` | The step bumps to 7.7.1.3 |
+| 5, 58 | No hand edit of generated files; code in `firmware/core/` | One fragment gets the write path, one handler the status |
+| 11, 61 | NVS loops yield with `maybe_yield_nvs_scan_()` | The device loop of the write path |
+| 40 | No NVS operation on the httpd task | `/api/storage-stats` reports from RAM only |
+| 62 | Fragment order unchanged | No fragment is added |
+| 63 | Session log in the PR | Firmware step |
+| 64 | Counts from the prompt's text | The checks count definitions and lines |
 
-## Workflow
+## Risks and mitigations
 
-**Prerequisites:** v7.7.1.2 must be merged to `main` before starting this step.
-**Successor:** v7.7.1.4 (restore engine + retention budget) depends on the NVS blobs written by
-this step — test that v7.7.1.4 can actually read them before closing out v7.7.1.4.
+| Risk | Trigger | Mitigation |
+| --- | --- | --- |
+| The partition fills and the old engine stops saving | `free_entries` near 252, `nvs_low` in `persist_v2` | Ring of 24 slots (about 976 entries for 4 devices); the guard writes nothing below 252 free entries |
+| The WROOM runs out of heap | `min_free_heap` of .170 below 1,024 B | The blocks `dev`, `v2` and `wroom24` stop the step (PLAN-046). About 100 new blob keys are about 200 hash-list items of NVS: about 1.0 to 1.5 KB of heap once the rings are full (ESP-IDF 5.5.4 source: 4 bytes per item in blocks of 128 B per page), plus 96 B of static RAM; against 2,252 B, a stop at the 24-hour reading is a real possibility (internal audit of R6, M2) |
+| The C3 heap falls | `c3heap`: the higher reading more than 2,048 B below the reading before the upload | The agent stops and reports (PLAN-046) |
+| Power loss between the segment and its meta | A segment without a meta update | The meta is written after the segment; the next cycle writes the same slot again; v7.7.1.4 reads only the slots that the meta counts |
+| .173 still has no history partition | `v2 192.168.120.173 before` stops | The operator's USB flash before dispatch (operator page) |
 
-Per `Docs/writing-guide/methodology.md` §4.3, the agent must confirm the chain:
-- v7.7.1.2 structs and key helpers compiled and tested ✓ (prerequisite, already on `main`)
-- v7.7.1.3 writes blobs in the format that v7.7.1.4 restore expects
-- The consolidated audit for this step must note any format deviations that would break restore
+## Context that carries forward to the next step
 
-Chain-inspection responsibility: before marking this PR ready, the agent must confirm
-`DeviceHistoryMeta` initialisation uses `DEV_HIST_MAGIC` + `DEV_HIST_VERSION` constants so
-v7.7.1.4's restore validation checks can pass.
+- v7.7.1.4 reads these blobs at boot. Its budget must count the RAM that NVS keeps for each key on boards without PSRAM, not only flash: two hash-list items of 4 bytes per blob key, in blocks of 128 B per page (ESP-IDF 5.5.4 source); per-device hourly blobs multiply the keys by the devices (PLAN-046).
+- Restore: with a full ring, a power loss between a segment and its meta leaves a newer segment at `next_slot`, which the meta counts as the oldest; v7.7.1.4 orders the segments by their header epochs and checks magic, version, `metric_count`, `points_per_segment` and `counts[k]` of each before use; it tests an interruption between the segment and the meta at the first fill and at the wrap, and states whether a complete newer segment at `next_slot` is used (GPT Astra's audit of R6, H3; Cowork M01). The rows carry no metric identity, only their position: v7.7.1.4 decides how a change of a device's history metrics is detected, for example a hash of the metric keys in a reserved field (internal audit of R6, L4).
+- The blob size: this step writes the full 228-byte `DeviceSegment`; v7.7.1.4 decides whether later blobs hold only the filled rows, with the measurements of this step.
+- A meta of another ring size starts a fresh ring in this step; v7.7.1.4 decides how a new budget keeps the old slots. A failed read of a meta that exists writes nothing (`load_device_meta_` returns -1, PLAN-047): the restore path keeps that distinction and never treats a read error as an empty ring.
+- The status of each device is copied under a short critical section (`dev_persist_status_get_` and `dev_persist_status_put_` of S2, PLAN-047); a later reader of it uses the same two functions.
+- The `persist_v2` object of `/api/storage-stats` is the place for the budget's report (architecture doc §7.5).
+- .180 and .184 may run a partition table without a history partition too (plan of record, section 10).
+- `handle_storage_stats_()` on `main` opens the history partition through `open_history_nvs_`, on the HTTP task; its recovery, `ensure_history_nvs_ready_`, erases the partition when `nvs_flash_init_partition` reports no free pages or a new NVS version. This step adds no such call and keeps that one (GPT Astra's second re-audit, H07); the read path of v7.7.1.4 reviews it.
 
----
+## Open questions for the operator (answer before dispatch)
 
-## v7.7.1.3 Scope
-
-### What this step does
-1. Adds `persist_device_segment_()`, `persist_all_devices_v2()`, `load_device_meta_()`, `save_device_meta_()` to nvs-persistence.h
-2. Wires `persist_all_devices_v2()` into the hourly persist lambda alongside `persist_hourly_segment()` (dual-write)
-3. Uses provisional slot limit of 360 (~15 days) until budget calculator (v7.7.1.4)
-
-### What this step does NOT do
-- No restore from per-device NVS (v7.7.1.4)
-- No retention budget calculation (v7.7.1.4)
-- No new HTTP endpoints
-- No old engine removal
-- No EventLog persist path yet (binary sensors not in current manifest)
-
-### Files modified
-- `firmware/core/nvs-persistence.h` — new persist functions
-- `firmware/esp32-c3-multi-sensor.yaml` — dual-write call
-- `Docs/changelog.md`, `CURRENT-STATE.md`, session log, consolidated audit
-
-### Device testing required
-YES — verify board boots cleanly with dual-write. Hourly persist produces "V2 persist complete" in serial logs.
-
-### Board fleet (from CURRENT-STATE.md)
-
-| Board | IP | Role |
-|-------|-----|------|
-| C3 SuperMini | 192.168.120.189 | Satellite (production) |
-| WROOM-32D | 192.168.120.170 | Satellite (production) |
-| S3 DevKitC N16R8 | 192.168.120.191 | Aggregator (production) |
-
----
-
-## Architecture References
-
-- `Docs/v7.7-v7.8-persistence-architecture.md` §5 — `DeviceHistoryMeta`, `DeviceSegment` struct definitions
-- `Docs/v7.7-v7.8-persistence-architecture.md` §6 — NVS key scheme, FNV-1a hash (key helpers from v7.7.1.2)
-- `Docs/v7.7-v7.8-persistence-architecture.md` §10 — persist flow (write path design)
-- `Docs/v7.7-v7.8-persistence-architecture.md` §8 — write path sequence and dedup guard logic
-
----
-
-## Critical Rules in Force at v7.7.1.3 Entry
-
-| # | Rule | Why Relevant |
-|---|------|-------------|
-| 2 | Use `bash scripts/bump-version.sh 7.7.1.3` | Version bump must be step 1 of §6, before compile |
-| 11 | NVS scan loops must yield (`vTaskDelay` every N blobs) — general principle, source: LESSON-OPS-053 | Pre-existing requirement: any NVS iteration loop MUST yield to FreeRTOS scheduler. Scope: ALL NVS loop patterns across the entire codebase. Does NOT prescribe the helper function or delay value — only that yielding must occur. |
-| 40 | Deferred task for HTTP handlers with NVS | NOT applicable: persist runs from hourly lambda (main loop), not httpd. Only applicable if adding an HTTP-triggered persist endpoint (not planned for this step). |
-| 58 | Edit fragments, not assembled artifact | `nvs-persistence.h` is a fragment; `sensor_history_multi.h` is generated |
-| 61 | Use `maybe_yield_nvs_scan_()` (defined once in `firmware/core/nvs-persistence.h`) in every NVS scan loop — specific implementation, source: Phase Y v7.6.6.5 + BUG-043 rev2 | Scope: THIS codebase only. Prescribes the specific helper function (NOT a custom `vTaskDelay` call). The helper uses `vTaskDelay(pdMS_TO_TICKS(5))` at every 2 iterations (NVS_SCAN_YIELD_INTERVAL). BUG-043 rev2 established 5ms — 1ms proved insufficient for ESP32-C3 single-core stability. Verified: `firmware/core/nvs-persistence.h:248`. |
-| 62 | Assembly fragment order unchanged | No new fragments — count stays at 9 |
-| 63 | Session log is pre-merge acceptance criterion | Mandatory — committed to branch before marking ready |
-| 64 | Checkpoint greps mechanically derived | All greps from code blocks in the agent prompt |
-| 67 | Binary sensors use EventLog | EventLog persist NOT in this step; no binary sensors in current manifest |
-
-New rule added during v7.7.1.2 closure: **Rule 61 yield** — `vTaskDelay(pdMS_TO_TICKS(5))` in
-NVS scan loops is mandatory on single-core ESP32-C3 (BUG-043 rev2 — 1ms proved insufficient;
-verified against `firmware/core/nvs-persistence.h:248`). Omitting it causes watchdog resets under
-multi-device iteration.
-
----
-
-## Risk Profile
-
-**Risk level: MEDIUM** — first runtime use of per-device NVS writes.
-
-| Risk | Severity | Mitigation |
-|------|----------|-----------|
-| **NVS flash wear** | Medium | Hourly writes per device. At 1 write/hour × 6 devices × 360 slots = 2,160 write cycles before wrap. NVS has ~100,000 erase cycles per page. Conservative by design. |
-| **Mid-write power loss** | High | `DeviceHistoryMeta` is written AFTER the segment blob. If power fails between the segment write and the meta update, the segment exists but `valid_segments` is not incremented. On next boot, v7.7.1.4 restore reads `valid_segments` from meta and will simply miss the un-incremented segment — no corruption, just one missed segment. |
-| **Key collision (FNV-1a)** | Low | Probability 5 × 10⁻⁸ for 20 devices (architecture doc §6). The `DeviceHistoryMeta.device_id` field stores the full ID string for collision detection at restore time. |
-
----
-
-## Pre-merge Checklist
-
-- [ ] All checkpoints pass
-- [ ] ESPHome compiles
-- [ ] Board boots and responds
-- [ ] **In-PR deliverables committed (per `Docs/development-process-guide.md` §2.5):**
-  - [ ] CURRENT-STATE.md updated
-  - [ ] Changelog entry
-  - [ ] Session log (Rule 63)
-  - [ ] Consolidated audit
-
----
-
-## Context That Carries Forward to v7.7.1.4
-
-- Per-device segments are being written to NVS alongside old engine (dual-write verified)
-- `DeviceHistoryMeta` is initialized with `DEV_PERSIST_PROVISIONAL_SLOTS = 360`
-- v7.7.1.4 replaces the provisional slot limit with the retention budget calculator
-- v7.7.1.4 implements `restore_device_history_v2_()` that reads the per-device segments written by this step
-- Fragment count is 9
-- All in-PR deliverables pattern: consolidated audit and session log committed to branch
-
----
-
-_End of session handoff document._
+- [x] .173 is erased and flashed with v7.7.1.2 over USB, and its `/api/storage-stats` shows `history_bytes 524288` (operator page, "Before you start"; done 2026-11-24).
+- [ ] The operator's latest `fleet` output on the day of dispatch: .173, .189 and .170 report v7.7.1.2.
+- [x] `g++` exists on the build host (`/usr/bin/g++`, 2026-11-24).
+- [ ] The harness and the model of the coding agent, for the gate record (PLAN-043).

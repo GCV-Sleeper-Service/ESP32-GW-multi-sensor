@@ -73,3 +73,57 @@ Read on 2026-11-22 from `origin/main` at `1c95906` (PR #244), unless the source 
 | FNV-1a 32-bit: offset basis 0x811c9dc5, prime 0x01000193 | — | `Docs/v7.7-v7.8-persistence-architecture.md` §6.2; the values of T2 were computed in Python |
 
 **6. Decision changes.** PLAN-044 (R5b) records the rolling production of Batch 2 and the design decisions of v7.7.1.2; it changes the R5b block of the plan of record and the key format of the architecture doc §6.3.
+
+## 4. v7.7.1.3 (R6): live-extract table and the six answers
+
+_Written 2026-11-24 by the planning session for R6 (PLAN-044, PLAN-046). Read from `origin/main` at `a33a5cc` (PR #246), unless the source says otherwise._
+
+| Value | Live value | Source |
+|---|---|---|
+| `VERSION` | 7.7.1.2 | `git show origin/main:VERSION` |
+| Commit of `origin/main` | `a33a5cc`; tag `v7.7.1.2` on it | `git rev-parse --short origin/main` |
+| Fragments | 9 | `ls firmware/core/*.h \| wc -l` |
+| Rule 61 delay in `maybe_yield_nvs_scan_()` | `pdMS_TO_TICKS(5)`, every 2 iterations (`NVS_SCAN_YIELD_INTERVAL`) | `firmware/core/nvs-persistence.h` |
+| The last function of `nvs-persistence.h` | `persist_hourly_segment(uint32_t saved_at_epoch = 0)`; the file ends with its `}` and one empty line | `tail -n 2` |
+| The persist call | `persist_hourly_segment(now.timestamp);` in the lambda at `minutes: ${persist_minute}` (`persist_minute: "10"`) of `firmware/esp32-c3-multi-sensor.yaml`, and the same line in `generate_board_yaml()` of `scripts/render_sensor_config.py` | `grep -n` |
+| Generated persist constants | `PERSIST_DEVICE_COUNT` 4: `office`, `first_floor`, `outside`, `wan_ping`; `PERSIST_METRIC_COUNTS` {2, 2, 2, 2}; `PERSIST_DEVICE_ARRAY_LEN` | `firmware/core/data-model.h` |
+| `devices[]` order | office, first_floor, outside, wan_ping, nas01 (system) | `firmware/core/data-model.h`, the generated block |
+| Phase 7 model | `DeviceHistoryMeta` 60 B, `DeviceSegmentHeader` 24 B, `DeviceSegment` 228 B (6 rows × 4 points), `MAX_DEVICE_SLOTS` 4,096, `DEVICE_ID_MAX_LEN` 32 | the size assertions of `firmware/core/data-model.h` |
+| Old engine | `SegmentSnapshot` 232 B, `PERSIST_SLOTS` 1,080 (45 days × 24) | `/api/storage-stats` of .189 and .170; `firmware/core/data-model.h` |
+| History partition, .189 and .170 | 0x80000; `used_entries` 10,804, `free_entries` 5,324, `total_entries` 16,128; old ring 1,080 of 1,080 | the operator's reading of `/api/storage-stats`, 2026-11-24 |
+| .173 | `layout.nvs_bytes` 446,464, `ota_0`, `ota_1`, `history`, `coredump` 0 bytes: an older ESPHome default partition table; `nvs_stats.available` false; `free_heap` 126,504 B, `min_free_heap` 2,213,076 B (with PSRAM), v7.6.10.1, uptime 292,050 s | the operator's readings of `/api/storage-stats` and `/api/status/full`, 2026-11-24 |
+| `/api/storage-stats` | public (no login); fields `layout.history_bytes`, `nvs_stats.{available, used_entries, free_entries, total_entries}`, `history.{valid_segments, last_persist_epoch}`; the format string `"\"last_persist_epoch\":%u,\"namespace_initialized\":%s}}",` closes the answer | `handle_storage_stats_()` in `firmware/core/web-handler.h` |
+| Sensor `outside` | old MAC in `config/sensors.json` and four `config/sensors-sat-*.json.bak`; new MAC from the operator, 2026-11-24 | `git grep` |
+| Builds | C3 `firmware/esp32-c3-multi-sensor.yaml`; WROOM `firmware/esp32-wroom-32d-gw.yaml` from `bash scripts/provision.sh wroom`; S3 `firmware/esp32-s3-supermini-4m-gw.yaml` from `config/gateway-sat-s3-4m-173.json.bak` copied to `config/gateway.json` and the renderer | the planning session's rehearsal |
+| OTA slots | `ota_0` 0x1B0000 = 1,769,472 B on the C3, WROOM and S3 4 MB tables | `partitions/*.csv` |
+| Images at `a33a5cc` with the reference write path | C3 RAM 60,532 B, flash 1,438,054 B; WROOM RAM 72,256 B, flash 1,284,567 B; S3 RAM 66,844 B, flash 1,309,987 B (`main` alone: C3 RAM 60,436 B, flash 1,435,444 B) | the planning session's compiles with ESPHome 2026.4.1, 2026-11-24 |
+| Playwright specs | 12 files; CI runs 7 fixture jobs | `find tests -name '*.spec.js'`; `.github/workflows/browser-tests.yml` |
+
+**1. Exact current state.** Above. R4's structs, keys and generated constants are on `main`; nothing uses them.
+
+**2. What the step changes.** One fragment gets the write path (S2, eight functions, T3); one handler gets the object `persist_v2`; the hourly lambda of the C3 YAML and of the generator gets one call; five config files get one MAC; the version and its regenerated files.
+
+**3. Simplest thing that could go wrong.** The new rings fill the history partition and the old engine stops saving: the May plan's 360 slots would do it in about 5 days. The ring of 24 slots and the guard of 252 free entries prevent it, and the block `v2` reads the counts on each board.
+
+**4. Three weeks of continuous operation.** After 24 hours each device's ring is full and wraps; its NVS entries stay at about 244 per device. The RAM that NVS keeps for the about 100 new blob keys stays: about 200 hash-list items, about 1.0 to 1.5 KB of heap (ESP-IDF 5.5.4 source; the page's figure of 5.5 KB for 1,000 keys counts one hash-list item per key, and a blob key has two). The WROOM's heap is the open risk; the floor of 1,024 B stops the step, and the operator watches `fleet` for a few days.
+
+**5. Platform capabilities.**
+
+| Capability | Version | Source, read 2026-11-24 |
+|---|---|---|
+| 126 entries of 32 B per page; a blob is a blob index entry and data chunks of 32 B entries; one empty page is kept for garbage collection; an overwrite adds the new pair first; "each 1000 keys consumes 5.5 KB of RAM" | ESP-IDF v5.5 | https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32/api-reference/storage/nvs_flash.html |
+| A 232-byte blob takes 10 entries (8 data, 2 overhead): confirmed by 1,080 × 10 + 4 = 10,804 used entries on .189 and .170 | — | the planning session's computation from the page above, and the operator's reading |
+| ESPHome 2026.4.1's default ESP-IDF partition table: `app0`, `app1`, `nvs` 0x70000, no history partition; a serial upload writes the bootloader, the partition table and the image | ESPHome 2026.4.1 | `esphome/components/esp32/__init__.py` (`get_partition_csv`) and `esphome/__main__.py` (`upload_using_esptool`) of the 2026.4.1 wheel |
+| `esptool --port <port> erase-flash`; "Flash memory erased successfully" | esptool 5.2.0 | `esptool erase-flash --help` and `esptool/cmds.py` of the version that ESPHome 2026.4.1 installs |
+
+**6. Decision changes.** PLAN-046 records the operator's decisions of 2026-11-24 and the planning session's design of this step; it changes the R6 block of the plan of record, process guide §2.2 item 14 and §2.4, and producer contract rules 7.13 and 8.3.
+
+| Leftover | Source | Disposition |
+|---|---|---|
+| Test board first | plan of record, R5b | Implemented: .173 first, after its USB flash; .189 and .170 only after `v2` passed on .173 |
+| `.bin` size against the OTA slot | plan of record, R5b | Implemented: CHECKPOINT E (C3) and the block `image` (S3, WROOM) |
+| WROOM `min_free_heap` after a fresh boot and a day later | plan of record, R5b | Implemented with the floor of PLAN-046: `dev ... floor`, `v2` and `wroom24` |
+| PR #246 review A Q3, Q4 | `CURRENT-STATE.md`, Unimplemented Recommendations | Implemented: row k is the k-th metric with a history buffer; a device is found by its full id |
+| PR #246 review A Q5 | the same | Decided: the full `DeviceSegment` in this step; the blob size and the EventLog format return in v7.7.1.4 |
+| The C3 baseline of 52,080 B | PR #246, operator decision 7088682835 | Replaced by the reading before the upload (PLAN-046) |
+| H-1, declaration order; L-1, boot test on both satellites (PR #233) | v7.7.1.4 | Still deferred to the bundle of v7.7.1.4 |
