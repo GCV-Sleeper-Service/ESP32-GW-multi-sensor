@@ -215,7 +215,7 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
       "category": "environmental",
       "adapter": "thermopro_ble",
       "source": {
-        "mac": "DF:EB:DE:19:11:6C"
+        "mac": "FA:2B:65:2C:98:39"
       },
       "measurements": [
         {

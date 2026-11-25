@@ -413,10 +413,10 @@ sensor:
               if (devices[1].batt_last >= 0) id(battery_first_floor).publish_state(devices[1].batt_str);
 
   # ══════════════════════════════════════════════════════════════════
-  # SENSOR 3: OUTSIDE — MAC DF:EB:DE:19:11:6C
+  # SENSOR 3: OUTSIDE — MAC FA:2B:65:2C:98:39
   # ══════════════════════════════════════════════════════════════════
   - platform: thermopro_ble
-    mac_address: "DF:EB:DE:19:11:6C"
+    mac_address: "FA:2B:65:2C:98:39"
     temperature:
       id: raw_temp_outside
       name: "Outside Temp Raw"
@@ -543,7 +543,7 @@ sensor:
       sorting_weight: 16
 
   - platform: ble_rssi
-    mac_address: "DF:EB:DE:19:11:6C"
+    mac_address: "FA:2B:65:2C:98:39"
     name: "Outside RSSI"
     id: outside_rssi
     icon: "mdi:signal"
