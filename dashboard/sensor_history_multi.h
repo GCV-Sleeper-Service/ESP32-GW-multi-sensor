@@ -1331,6 +1331,289 @@ static void persist_hourly_segment(uint32_t saved_at_epoch = 0) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// Phase 7 — per-device persist write path (v7.7.1.3, PLAN-046)
+//   Each hourly persist also writes one DeviceSegment per persistent
+//   device (dual-write). Nothing reads these blobs until v7.7.1.4.
+// ═══════════════════════════════════════════════════════════════════
+
+// The ring of each device in this step: one day of hourly segments. v7.7.1.4
+// replaces it by the retention budget (PLAN-046: the 360 slots of May 2026 do not fit).
+static constexpr uint16_t DEV_PERSIST_PROVISIONAL_SLOTS = 24;
+// A v2 write needs this many free NVS entries in the history partition, so that the
+// old engine keeps room for its hourly overwrite: two pages of 126 entries.
+static constexpr uint32_t DEV_PERSIST_MIN_FREE_ENTRIES = 252;
+
+// The result of the last persist cycle of one device.
+enum DevPersistResult : uint8_t {
+  DEV_PERSIST_PENDING = 0,    // no cycle since the boot
+  DEV_PERSIST_OK = 1,         // the segment and the meta are written
+  DEV_PERSIST_DEDUP = 2,      // the newest point is already persisted
+  DEV_PERSIST_EMPTY = 3,      // the device has no point to persist
+  DEV_PERSIST_NVS_LOW = 4,    // fewer free entries than DEV_PERSIST_MIN_FREE_ENTRIES
+  DEV_PERSIST_MISSING = 5,    // the id is not in devices[]
+  DEV_PERSIST_COLLISION = 6,  // the meta blob of the key holds another device id
+  DEV_PERSIST_ERROR = 7,      // an allocation, a metric mismatch or an NVS call failed
+};
+
+static constexpr const char *dev_persist_result_name_(uint8_t result) {
+  return result == DEV_PERSIST_PENDING ? "pending"
+       : result == DEV_PERSIST_OK ? "ok"
+       : result == DEV_PERSIST_DEDUP ? "dedup"
+       : result == DEV_PERSIST_EMPTY ? "empty"
+       : result == DEV_PERSIST_NVS_LOW ? "nvs_low"
+       : result == DEV_PERSIST_MISSING ? "missing"
+       : result == DEV_PERSIST_COLLISION ? "collision"
+       : result == DEV_PERSIST_ERROR ? "error" : "unknown";
+}
+
+// RAM only: the persist path writes it, /api/storage-stats reads it, on two tasks. Both take a copy of
+// one device's status through the two functions below, never the array itself (PLAN-047).
+struct DevicePersistStatus {
+  uint32_t last_persist_epoch = 0;  // from the device's meta after the cycle
+  uint32_t writes_ok = 0;           // results OK since the boot
+  uint32_t writes_skipped = 0;      // results DEDUP, EMPTY and NVS_LOW since the boot
+  uint32_t writes_failed = 0;       // results MISSING, COLLISION and ERROR since the boot
+  uint16_t valid_segments = 0;      // from the device's meta after the cycle
+  uint16_t next_slot = 0;           // from the device's meta after the cycle
+  uint8_t last_result = DEV_PERSIST_PENDING;
+};
+static DevicePersistStatus g_dev_persist_status[PERSIST_DEVICE_ARRAY_LEN] = {};
+static portMUX_TYPE g_dev_persist_status_mux = portMUX_INITIALIZER_UNLOCKED;
+
+// A copy of the status of one persistent device, taken under a short critical section.
+static DevicePersistStatus dev_persist_status_get_(int persist_index) {
+  DevicePersistStatus status;
+  if (persist_index < 0 || persist_index >= PERSIST_DEVICE_COUNT) return status;
+  portENTER_CRITICAL(&g_dev_persist_status_mux);
+  status = g_dev_persist_status[persist_index];
+  portEXIT_CRITICAL(&g_dev_persist_status_mux);
+  return status;
+}
+
+// Publishes the status of one persistent device, under the same critical section.
+static void dev_persist_status_put_(int persist_index, const DevicePersistStatus &status) {
+  if (persist_index < 0 || persist_index >= PERSIST_DEVICE_COUNT) return;
+  portENTER_CRITICAL(&g_dev_persist_status_mux);
+  g_dev_persist_status[persist_index] = status;
+  portEXIT_CRITICAL(&g_dev_persist_status_mux);
+}
+
+static constexpr uint16_t dev_ring_next_(uint16_t slot, uint16_t max_slots) {
+  return slot + 1 < max_slots ? slot + 1 : 0;
+}
+
+static constexpr uint16_t dev_ring_valid_(uint16_t valid, uint16_t max_slots) {
+  return valid < max_slots ? valid + 1 : max_slots;
+}
+
+static int find_device_index_(const char *device_id) {
+  if (device_id == nullptr) return -1;
+  for (int i = 0; i < NUM_DEVICES; i++) {
+    if (devices[i].id != nullptr && std::strcmp(devices[i].id, device_id) == 0) return i;
+  }
+  return -1;
+}
+
+static int build_device_segment_(int device_index, uint8_t metric_count, uint32_t saved_at_epoch, DeviceSegment *seg) {
+  if (seg == nullptr) return -1;
+  *seg = DeviceSegment();
+  if (device_index < 0 || device_index >= NUM_DEVICES ||
+      metric_count == 0 || metric_count > MAX_PERSIST_METRICS) return -1;
+  seg->header.metric_count = metric_count;
+  seg->header.points_per_segment = PERSIST_POINTS_PER_SEGMENT;
+  seg->header.saved_at_epoch = saved_at_epoch;
+  const SensorEntity &device = devices[device_index];
+  int row = 0;
+  int points = 0;
+  for (int m = 0; m < device.metric_count && row < metric_count; m++) {
+    const HistoryBuffer *history = device.metric_states[m].history;
+    if (history == nullptr) continue;
+    int count = export_latest_entries_(*history, seg->data[row], PERSIST_POINTS_PER_SEGMENT);
+    seg->counts[row] = count;
+    points += count;
+    if (count > 0) {
+      uint32_t first = seg->data[row][0].epoch;
+      uint32_t last = seg->data[row][count - 1].epoch;
+      if (first != 0 && (seg->header.first_epoch == 0 || first < seg->header.first_epoch)) {
+        seg->header.first_epoch = first;
+      }
+      if (last > seg->header.last_epoch) seg->header.last_epoch = last;
+    }
+    row++;
+  }
+  return row == metric_count ? points : -1;
+}
+
+static int load_device_meta_(nvs_handle_t handle, const char *device_id, DeviceHistoryMeta *meta) {
+  const NvsKey key = device_meta_key_(device_id);
+  if (meta == nullptr || key.s[0] == '\0') {
+    ESP_LOGE(TAG, "V2 meta read: invalid destination or id");
+    return -1;
+  }
+  DeviceHistoryMeta loaded;
+  size_t size = sizeof(loaded);
+  esp_err_t err = nvs_get_blob(handle, key.s, &loaded, &size);
+  if (err == ESP_ERR_NVS_NOT_FOUND || err == ESP_ERR_NVS_INVALID_LENGTH) return 0;
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "V2 nvs_get_blob(%s) failed: %s", key.s, esp_err_to_name(err));
+    return -1;
+  }
+  if (size != sizeof(loaded) || loaded.magic != DEV_HIST_MAGIC ||
+      loaded.version != DEV_HIST_VERSION) return 0;
+  *meta = loaded;
+  return 1;
+}
+
+static bool save_device_meta_(nvs_handle_t handle, const char *device_id, const DeviceHistoryMeta &meta) {
+  const NvsKey key = device_meta_key_(device_id);
+  if (key.s[0] == '\0') {
+    ESP_LOGE(TAG, "V2 meta write: invalid id");
+    return false;
+  }
+  esp_err_t err = nvs_set_blob(handle, key.s, &meta, sizeof(meta));
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "V2 nvs_set_blob(%s) failed: %s", key.s, esp_err_to_name(err));
+    return false;
+  }
+  err = nvs_commit(handle);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "V2 nvs_commit(%s) failed: %s", key.s, esp_err_to_name(err));
+    return false;
+  }
+  return true;
+}
+
+static uint8_t persist_device_segment_(nvs_handle_t handle, int persist_index, uint32_t saved_at_epoch, DeviceSegment *seg) {
+  if (persist_index < 0 || persist_index >= PERSIST_DEVICE_COUNT) return DEV_PERSIST_ERROR;
+  const char *id = PERSIST_DEVICE_IDS[persist_index];
+  const uint8_t metric_count = PERSIST_METRIC_COUNTS[persist_index];
+  DevicePersistStatus status = dev_persist_status_get_(persist_index);
+  DeviceHistoryMeta meta;
+  bool have_meta = false;
+  uint8_t result = DEV_PERSIST_ERROR;
+  do {
+    int device_index = find_device_index_(id);
+    if (device_index < 0) {
+      result = DEV_PERSIST_MISSING;
+      break;
+    }
+    int points = build_device_segment_(device_index, metric_count, saved_at_epoch, seg);
+    if (points < 0) break;
+    if (points == 0 || seg->header.last_epoch == 0) {
+      result = DEV_PERSIST_EMPTY;
+      break;
+    }
+    int loaded = load_device_meta_(handle, id, &meta);
+    if (loaded < 0) break;
+    if (loaded == 1 && std::strncmp(meta.device_id, id, sizeof(meta.device_id)) != 0) {
+      result = DEV_PERSIST_COLLISION;
+      break;
+    }
+    if (loaded == 0 || meta.metric_count != metric_count ||
+        meta.points_per_segment != PERSIST_POINTS_PER_SEGMENT ||
+        meta.max_slots != DEV_PERSIST_PROVISIONAL_SLOTS) {
+      meta = DeviceHistoryMeta();
+      meta.metric_count = metric_count;
+      meta.points_per_segment = PERSIST_POINTS_PER_SEGMENT;
+      meta.max_slots = DEV_PERSIST_PROVISIONAL_SLOTS;
+      std::strncpy(meta.device_id, id, DEVICE_ID_MAX_LEN);
+      meta.device_id[DEVICE_ID_MAX_LEN] = '\0';
+    }
+    have_meta = true;
+    if (meta.last_persist_epoch == seg->header.last_epoch) {
+      result = DEV_PERSIST_DEDUP;
+      break;
+    }
+    nvs_stats_t stats{};
+    if (nvs_get_stats(HISTORY_PARTITION_LABEL, &stats) != ESP_OK ||
+        stats.free_entries < DEV_PERSIST_MIN_FREE_ENTRIES) {
+      result = DEV_PERSIST_NVS_LOW;
+      break;
+    }
+    uint16_t slot = meta.next_slot < meta.max_slots ? meta.next_slot : 0;
+    const NvsKey key = device_segment_key_(id, slot);
+    esp_err_t err = nvs_set_blob(handle, key.s, seg, sizeof(*seg));
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "V2 nvs_set_blob(%s) failed: %s", key.s, esp_err_to_name(err));
+      break;
+    }
+    DeviceHistoryMeta written = meta;
+    written.last_written_slot = slot;
+    written.next_slot = dev_ring_next_(slot, meta.max_slots);
+    written.valid_segments = dev_ring_valid_(meta.valid_segments, meta.max_slots);
+    written.last_persist_epoch = seg->header.last_epoch;
+    if (!save_device_meta_(handle, id, written)) break;
+    meta = written;
+    result = DEV_PERSIST_OK;
+  } while (false);
+
+  if (have_meta) {
+    status.valid_segments = meta.valid_segments;
+    status.next_slot = meta.next_slot;
+    status.last_persist_epoch = meta.last_persist_epoch;
+  }
+  status.last_result = result;
+  if (result == DEV_PERSIST_OK) status.writes_ok++;
+  else if (result == DEV_PERSIST_DEDUP || result == DEV_PERSIST_EMPTY || result == DEV_PERSIST_NVS_LOW) status.writes_skipped++;
+  else status.writes_failed++;
+  dev_persist_status_put_(persist_index, status);
+  if (result != DEV_PERSIST_OK && result != DEV_PERSIST_DEDUP) {
+    ESP_LOGW(TAG, "V2 persist %s: %s", id, dev_persist_result_name_(result));
+  }
+  return result;
+}
+
+static void persist_all_devices_v2(uint32_t saved_at_epoch = 0) {
+  if (PERSIST_DEVICE_COUNT == 0) return;
+  DeviceSegment *seg = new (std::nothrow) DeviceSegment();
+  nvs_handle_t handle;
+  esp_err_t err = ESP_OK;
+  if (seg != nullptr) {
+    err = nvs_open_from_partition(HISTORY_PARTITION_LABEL, HISTORY_NAMESPACE, NVS_READWRITE, &handle);
+  }
+  if (seg == nullptr || err != ESP_OK) {
+    for (int i = 0; i < PERSIST_DEVICE_COUNT; i++) {
+      DevicePersistStatus status = dev_persist_status_get_(i);
+      status.last_result = DEV_PERSIST_ERROR;
+      status.writes_failed++;
+      dev_persist_status_put_(i, status);
+    }
+    ESP_LOGE(TAG, "V2 persist allocation or open failed: %s", esp_err_to_name(err));
+    delete seg;
+    return;
+  }
+  unsigned written = 0;
+  unsigned skipped = 0;
+  unsigned failed = 0;
+  for (int i = 0; i < PERSIST_DEVICE_COUNT; i++) {
+    maybe_yield_nvs_scan_(i);
+    uint8_t result = persist_device_segment_(handle, i, saved_at_epoch, seg);
+    if (result == DEV_PERSIST_OK) written++;
+    else if (result == DEV_PERSIST_DEDUP || result == DEV_PERSIST_EMPTY || result == DEV_PERSIST_NVS_LOW) skipped++;
+    else failed++;
+  }
+  nvs_close(handle);
+  delete seg;
+  ESP_LOGI(TAG, "V2 persist: %u written, %u skipped, %u failed", written, skipped, failed);
+}
+
+// ── Phase 7 compile-time test of the write path (v7.7.1.3): a supplied test; do not change it ──
+static_assert(dev_ring_next_(0, 24) == 1, "the cursor moves to the next slot");
+static_assert(dev_ring_next_(22, 24) == 23, "the cursor moves to the last slot");
+static_assert(dev_ring_next_(23, 24) == 0, "the cursor wraps after the last slot");
+static_assert(dev_ring_next_(30, 24) == 0, "a cursor outside the ring restarts at 0");
+static_assert(dev_ring_next_(0, 1) == 0, "a ring of one slot stays at 0");
+static_assert(dev_ring_next_(5, 0) == 0, "a ring of no slot stays at 0");
+static_assert(dev_ring_valid_(0, 24) == 1, "one more valid segment");
+static_assert(dev_ring_valid_(23, 24) == 24, "the ring becomes full");
+static_assert(dev_ring_valid_(24, 24) == 24, "valid_segments stops at max_slots");
+static_assert(dev_ring_valid_(30, 24) == 24, "valid_segments never passes max_slots");
+static_assert(dev_ring_valid_(0, 0) == 0, "a ring of no slot has no valid segment");
+static_assert(DEV_PERSIST_PROVISIONAL_SLOTS >= 1 && DEV_PERSIST_PROVISIONAL_SLOTS <= MAX_DEVICE_SLOTS, "the ring fits the 3-hex-digit slot suffix");
+static_assert(dev_persist_result_name_(DEV_PERSIST_OK)[0] == 'o' && dev_persist_result_name_(DEV_PERSIST_NVS_LOW)[0] == 'n', "result names");
+static_assert(dev_persist_result_name_(200)[0] == 'u', "an unknown result has a name");
+
+// ═══════════════════════════════════════════════════════════════════
 // health-check.h — Periodic telemetry task (Phase 7 Step v7.7.1.0)
 // Source fragment: firmware/core/health-check.h
 // Assembled output: dashboard/sensor_history_multi.h
