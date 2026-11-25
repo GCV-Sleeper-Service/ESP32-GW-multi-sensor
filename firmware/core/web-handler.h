@@ -1432,10 +1432,35 @@ class HistoryWebHandler : public AsyncWebHandler {
     resp->print(num);
 
     snprintf(num, sizeof(num),
-             "\"last_persist_epoch\":%u,\"namespace_initialized\":%s}}",
+             "\"last_persist_epoch\":%u,\"namespace_initialized\":%s},",
              (unsigned) meta.last_persist_epoch,
              namespace_initialized ? "true" : "false");
     resp->print(num);
+    snprintf(num, sizeof(num),
+             "\"persist_v2\":{\"slots\":%u,\"min_free_entries\":%u,\"devices\":[",
+             (unsigned) DEV_PERSIST_PROVISIONAL_SLOTS,
+             (unsigned) DEV_PERSIST_MIN_FREE_ENTRIES);
+    resp->print(num);
+    for (int i = 0; i < PERSIST_DEVICE_COUNT; i++) {
+      const DevicePersistStatus st = dev_persist_status_get_(i);
+      snprintf(num, sizeof(num),
+               "%s{\"id\":\"%s\",\"meta_key\":\"%s\",\"result\":\"%s\",",
+               i == 0 ? "" : ",", PERSIST_DEVICE_IDS[i],
+               device_meta_key_(PERSIST_DEVICE_IDS[i]).s,
+               dev_persist_result_name_(st.last_result));
+      resp->print(num);
+      snprintf(num, sizeof(num),
+               "\"valid_segments\":%u,\"next_slot\":%u,\"last_persist_epoch\":%u,",
+               (unsigned) st.valid_segments, (unsigned) st.next_slot,
+               (unsigned) st.last_persist_epoch);
+      resp->print(num);
+      snprintf(num, sizeof(num),
+               "\"writes_ok\":%u,\"writes_skipped\":%u,\"writes_failed\":%u}",
+               (unsigned) st.writes_ok, (unsigned) st.writes_skipped,
+               (unsigned) st.writes_failed);
+      resp->print(num);
+    }
+    resp->print("]}}");
     request->send(resp);
   }
 
