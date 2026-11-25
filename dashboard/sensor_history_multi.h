@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════════
-// config-v7.7.1.2.h - hourly persistence with dedicated history NVS partition
+// config-v7.7.1.3.h - hourly persistence with dedicated history NVS partition
 // Source fragment: firmware/core/config.h. Assembled output: dashboard/sensor_history_multi.h.
 //
 // v7.4.0.2: single-sensor import merges into existing segments without erasing
@@ -485,7 +485,7 @@ static constexpr PersistPriority PERSIST_PRIORITIES[PERSIST_DEVICE_ARRAY_LEN] = 
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.7.1.2) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.7.1.3) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.

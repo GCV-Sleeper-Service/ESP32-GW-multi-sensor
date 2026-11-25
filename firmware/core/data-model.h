@@ -390,7 +390,7 @@ static constexpr PersistPriority PERSIST_PRIORITIES[PERSIST_DEVICE_ARRAY_LEN] = 
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.7.1.2) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.7.1.3) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.
