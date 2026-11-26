@@ -166,5 +166,16 @@ The 24-hour readings are pending the operator's exact trigger, `Run the block wr
 
 ## PRE-PR and review rounds
 
-Pending the documentation checkpoint and PRE-PR gate. Inline review has not run yet.
+CHECKPOINT F passed. PRE-PR passed at `26fb1d16702e235f3046c3089e4e46be615d74c6`; all required GitHub checks subsequently passed on that head. The full body was posted, the PR marked ready and `/gemini review` posted as comment 7181048684. No edit or push occurred before the inline block passed.
+
+```text
+Copilot: review 6067937428 on 26fb1d1 (incomplete: Copilot could not complete its review, PLAN-032)
+Gemini: review 6067862942 on 26fb1d1
+Codex: status comment 7181049513, completed on 26fb1d1
+inline PASS
+```
+
+All reviews, review-thread comments and reviewer issue comments were refreshed after this PASS. G1 is not warranted: default member initializers set the meta magic/version, H1 checks them and ring wrap, and the production rings advanced. C1 requests a change to the fixed stats-error contract and is routed to the named current-state row. C2 is warranted: allocation failure could log ESP_OK. The initializer is now ESP_FAIL; CHECKPOINT B and H1 passed again. Full three-board revalidation is required by the review-round instructions, and the 24-hour readings will restart from the new WROOM upload.
+
+A scratch PR-body patch invocation was rejected for targeting one path with both delete and add. No file changed; it was repaired with a normal update patch before publication. No checkpoint or test failure resulted.
 

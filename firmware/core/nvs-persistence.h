@@ -882,7 +882,7 @@ static void persist_all_devices_v2(uint32_t saved_at_epoch = 0) {
   if (PERSIST_DEVICE_COUNT == 0) return;
   DeviceSegment *seg = new (std::nothrow) DeviceSegment();
   nvs_handle_t handle;
-  esp_err_t err = ESP_OK;
+  esp_err_t err = ESP_FAIL;
   if (seg != nullptr) {
     err = nvs_open_from_partition(HISTORY_PARTITION_LABEL, HISTORY_NAMESPACE, NVS_READWRITE, &handle);
   }
