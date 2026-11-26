@@ -291,3 +291,15 @@ v2 PASS
 
 The updated record and this log precede the end-of-round commit, PRE-PR and body checks. Their current-head PASS evidence is published in the PR body and assessment. The 24-hour observations and external reviews remain pending their operator triggers.
 
+## Operator-directed recovery of the remote-head mismatch
+
+The push of the local round record `5286b9e` was rejected because remote commit `2d247a88acda1d4120a57c2b236e6e9fc6301ea7` advanced the feature branch. The operator's comment 7183584518, `@codex[agent]+gpt-5.3-codex security review`, had triggered a Codex coding-agent change to the stats-error result, reported in comment 7183634484. That change conflicted with fixed R6 item 2.2 step 6; checkpoint-failure comment 7184295730 records the stop and full push output.
+
+The operator authorized a fetch, rebase of the unpushed record, and a new revert commit. The rebase completed as `75b40d6`; `git revert --no-edit 2d247a8` created `3a5cb1e512f20f142a1bc28821e7ce9b888c8fd7`. No pushed history was rewritten. The subsequent command printed nothing:
+
+```bash
+git diff --stat 48debeb HEAD -- firmware config src scripts/render_sensor_config.py dashboard/sensor_history_multi.h
+```
+
+The restored history was pushed normally. Per the operator's decision, the firmware is the one already validated on `48debeb`, and Task Group 6 does not run again. The existing device outputs and WROOM boot `1795670617` remain the observation baseline. Copilot C1 stays a v7.7.1.4 recommendation in CURRENT-STATE.md, row "PR #247 inline Copilot C1". The supplied prompt, check file and item 2.2 contract are unchanged. A C3 rebuild supplies the image required by checkpoint E; there is no OTA upload or live-board read in this recovery.
+
