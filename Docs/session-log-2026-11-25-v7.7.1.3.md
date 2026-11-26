@@ -313,3 +313,9 @@ Muse Spark review C (7186297014) reports no formal findings. Assessed A Q1–Q4 
 
 This round changes only CURRENT-STATE, this log and the consolidated audit. No firmware change, build, OTA upload or board read is performed for these findings. The fixed prompt, check file and item 2.2 contract remain unchanged. The operator decides whether an observation at 36 h or later is needed; no extra check is added. Review B has not posted, Copilot's selected-tier review was incomplete, and the reserved 24-hour blocks have not been triggered. Current-head F, PRE-PR, CI and body evidence are published in the PR body before the assessment comment.
 
+Checkpoint F rejected commit 296c6c0 because my date wording did not start with the required `_Last verified: <date> ...` prefix. Posted failure comment 7186509829 before repairing the line once; the corrected wording distinguishes today's review update from the older device measurements. The supplied check file and expectations remain unchanged.
+
+```text
+⛔ CHECKPOINT FAILED - F: 7.1 CURRENT-STATE.md line 3: '_Last verified: <date> ...' naming v7.7.1.3
+```
+
