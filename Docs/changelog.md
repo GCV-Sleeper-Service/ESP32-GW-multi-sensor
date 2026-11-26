@@ -14,7 +14,7 @@ All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 - The replacement `outside` sensor uses MAC `FA:2B:65:2C:98:39`, retaining its device id and history.
 - Version sources and generated artifacts updated to 7.7.1.3; no read path yet. The old engine continues restore and hourly persistence. The retention budget and EventLog persistence remain deferred.
 - Copied the supplied method, operator, review, audit and handoff texts of PLAN-046, PLAN-047 and PLAN-048.
-- Validated .173 first, then uploaded .189 and .170; all devices on each board persisted without failures and the old engines advanced. The C3 heap comparison passed against its own pre-upload baseline. WROOM's first persist validation read 8,316 B minimum heap at 18,572 s; the operator-triggered 24-hour readings remain pending.
+- Validated .173 first, then uploaded .189 and .170; all devices on each board persisted without failures and the old engines advanced. Repeated all three builds/uploads/persist checks after inline fix C2: allocation failure now logs `ESP_FAIL` instead of `ESP_OK`. The repeat C3 heap comparison passed at +1,172 B against its own pre-upload baseline. WROOM's repeat persist validation read 8,292 B minimum heap at 2,980 s, boot 1795670617; the operator-triggered 24-hour readings restart from that boot and remain pending.
 
 ## [v7.7.1.2] - 2026-11-22 - Phase 7: Per-Device Persistence Definitions
 

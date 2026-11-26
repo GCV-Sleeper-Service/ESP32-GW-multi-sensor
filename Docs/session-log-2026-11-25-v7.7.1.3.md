@@ -6,7 +6,7 @@ Date: 2026-11-25, America/Los_Angeles. PR #247, branch `feature/v7.7.1.3-persist
 
 The supplied setup and bundle hashes matched. Checkpoints 0, A–E and H passed. All three builds and OTA uploads succeeded. The first S3 persist check passed before the production uploads. C3 and WROOM each completed five writes per device without failures, and both old engines advanced. The C3 heap comparison passed. Every WROOM reading met the floor.
 
-The C3 snapshot uses the higher c3heap reading: free heap 42,972 B before, 43,372 B after (+400 B); minimum heap 28,552 B before, 34,700 B after (+6,148 B). WROOM boot epoch: `1795641987`.
+The latest C3 snapshot uses the repeat c3heap reading: free heap 42,144 B before, 43,316 B after (+1,172 B); minimum heap 29,868 B before, 32,368 B after (+2,500 B). Latest WROOM boot epoch: `1795670617`. Initial readings are preserved below as historical evidence.
 
 ## ESPHome output and supplied checks
 
@@ -162,7 +162,7 @@ None of the supplied checkpoints or local tests failed. Both image gates and the
 
 ## Reserved observations and reviews
 
-The 24-hour readings are pending the operator's exact trigger, `Run the block wroom24 now.` They will use boot `1795641987`, followed by the two `v2 ... later` blocks in the prescribed order. External reviews A, C and B are pending operator dispatch. No external review has been started, no issue edited, and no merge or tag performed.
+The 24-hour readings are pending the operator's exact trigger, `Run the block wroom24 now.` They will use the latest boot `1795670617`, followed by the two `v2 ... later` blocks in the prescribed order. External reviews A, C and B are pending operator dispatch. No external review has been started, no issue edited, and no merge or tag performed.
 
 ## PRE-PR and review rounds
 
@@ -178,4 +178,116 @@ inline PASS
 All reviews, review-thread comments and reviewer issue comments were refreshed after this PASS. G1 is not warranted: default member initializers set the meta magic/version, H1 checks them and ring wrap, and the production rings advanced. C1 requests a change to the fixed stats-error contract and is routed to the named current-state row. C2 is warranted: allocation failure could log ESP_OK. The initializer is now ESP_FAIL; CHECKPOINT B and H1 passed again. Full three-board revalidation is required by the review-round instructions, and the 24-hour readings will restart from the new WROOM upload.
 
 A scratch PR-body patch invocation was rejected for targeting one path with both delete and add. No file changed; it was repaired with a normal update patch before publication. No checkpoint or test failure resulted.
+
+
+## Inline C2 — completed firmware revalidation
+
+All three clean builds, image gates, OTA uploads, boot checks and persist checks passed again on firmware commit `48debeb`, with .173 passing before either production upload. The repeat C3 snapshot is 42,144 → 43,316 B free (+1,172 B), and 29,868 → 32,368 B minimum (+2,500 B). The latest WROOM boot is `1795670617`; the earlier deployment remains historical evidence and is superseded for the delayed observations.
+
+# Inline C2 firmware revalidation — 2026-11-25
+
+Firmware commit: 48debeb. Initial deployment readings remain preserved in the committed session log.
+The new WROOM upload will replace boot 1795641987 as the epoch for the operator-triggered 24-hour checks.
+
+```text
+CHECKPOINT B PASS
+H1: all checks passed
+host PASS
+RAM:   [==        ]  18.6% (used 60816 bytes from 327680 bytes)
+Flash: [========  ]  81.2% (used 1437646 bytes from 1769472 bytes)
+======================== [SUCCESS] Took 517.36 seconds ========================
+INFO Build Info: config_hash=0xa39c7dd8 build_time_str=2026-11-25 11:38:16 -0800
+INFO Successfully compiled program.
+C3 image: 1438048 B of the OTA slot of 1769472 B (81.2 %)
+CHECKPOINT E PASS
+dev 192.168.120.173: version v7.7.1.3, uptime 24936 s, free_heap 118216 B, min_free_heap 2212592 B, boot 1795637543
+dev PASS
+v2 192.168.120.173 before: version v7.7.1.3, used_entries 660, free_entries 15468, old engine segments 40, last_persist_epoch 1795658400, boot 1795637543, rings 6 6 6 6 (-1: not known)
+v2 PASS (before)
+
+S3 repeat build and upload at 19:17 Pacific:
+RAM:   [==        ]  20.4% (used 66844 bytes from 327680 bytes)
+Flash: [=======   ]  74.1% (used 1310511 bytes from 1769472 bytes)
+======================== [SUCCESS] Took 550.53 seconds ========================
+INFO Build Info: config_hash=0xbbfe25a3 build_time_str=2026-11-25 11:47:56 -0800
+INFO Successfully compiled program.
+s3 image: 1310912 B of the OTA slot of 1769472 B (74.0 %)
+image PASS
+INFO Upload took 6.76 seconds, waiting for result...
+INFO OTA successful
+INFO Successfully uploaded program.
+dev 192.168.120.173: version v7.7.1.3, uptime 121 s, free_heap 116072 B, min_free_heap 2215380 B, boot 1795663085
+dev PASS
+
+S3 repeat persist validation:
+v2 192.168.120.173 office: ok, meta_key dm_aa8eba31, valid_segments 8, next_slot 8, last_persist_epoch 1795665600, writes ok 1 skipped 0 failed 0
+v2 192.168.120.173 first_floor: ok, meta_key dm_9ed41104, valid_segments 8, next_slot 8, last_persist_epoch 1795665600, writes ok 1 skipped 0 failed 0
+v2 192.168.120.173 outside: ok, meta_key dm_c38eecc4, valid_segments 8, next_slot 8, last_persist_epoch 1795665600, writes ok 1 skipped 0 failed 0
+v2 192.168.120.173 wan_ping: ok, meta_key dm_7a81c392, valid_segments 8, next_slot 8, last_persist_epoch 1795665600, writes ok 1 skipped 0 failed 0
+v2 192.168.120.173 nvs: used_entries 760 (before 660), free_entries 15368, old engine segments 42, last_persist_epoch 1795665600 (before 1795658400, 789 s ago), uptime 3304 s
+v2 PASS
+
+C3 repeat pre-upload readings:
+dev 192.168.120.189: version v7.7.1.3, uptime 25183 s, free_heap 42144 B, min_free_heap 29868 B, boot 1795641211
+dev PASS
+v2 192.168.120.189 before: version v7.7.1.3, used_entries 11100, free_entries 5028, old engine segments 1080, last_persist_epoch 1795665600, boot 1795641211, rings 7 7 7 7 (-1: not known)
+v2 PASS (before)
+
+C3 repeat upload and heap validation:
+INFO Upload took 5.30 seconds, waiting for result...
+INFO OTA successful
+INFO Successfully uploaded program.
+dev 192.168.120.189: version v7.7.1.3, uptime 114 s, free_heap 42936 B, min_free_heap 42708 B, boot 1795666412
+c3heap: the uptime is 114 s; waiting 66 s until 180 s
+c3heap reading 1: uptime 180 s, free_heap 43316 B, min_free_heap 32368 B
+c3heap reading 2: uptime 211 s, free_heap 43316 B, min_free_heap 32368 B
+c3heap: the higher free_heap is 43316 B; before the upload 42144 B; no more than 2,048 B below it
+dev PASS
+
+WROOM repeat pre-upload readings:
+dev 192.168.120.170: version v7.7.1.3, uptime 24654 s, free_heap 27728 B, min_free_heap 5764 B, boot 1795641987
+dev PASS
+v2 192.168.120.170 before: version v7.7.1.3, used_entries 11100, free_entries 5028, old engine segments 1080, last_persist_epoch 1795665600, boot 1795641987, rings 7 7 7 7 (-1: not known)
+v2 PASS (before)
+
+WROOM repeat build:
+RAM:   [==        ]  22.1% (used 72272 bytes from 327680 bytes)
+Flash: [=======   ]  72.6% (used 1285035 bytes from 1769472 bytes)
+======================== [SUCCESS] Took 511.03 seconds ========================
+INFO Build Info: config_hash=0x16d49d4b build_time_str=2026-11-25 13:17:36 -0800
+INFO Successfully compiled program.
+wroom image: 1285440 B of the OTA slot of 1769472 B (72.6 %)
+image PASS
+
+Refreshed readings after the operator's continuation, before the upload at 21:23 Pacific:
+dev 192.168.120.170: version v7.7.1.3, uptime 28604 s, free_heap 27608 B, min_free_heap 5764 B, boot 1795641987
+dev PASS
+v2 192.168.120.170 before: version v7.7.1.3, used_entries 11140, free_entries 4988, old engine segments 1080, last_persist_epoch 1795669200, boot 1795641987, rings 8 8 8 8 (-1: not known)
+v2 PASS (before)
+
+INFO Upload took 7.81 seconds, waiting for result...
+INFO OTA successful
+INFO Successfully uploaded program.
+dev 192.168.120.170: version v7.7.1.3, uptime 133 s, free_heap 28584 B, min_free_heap 21656 B, boot 1795670617
+dev PASS
+
+WROOM build cleaned, satellite configuration restored, git status --short empty.
+Latest WROOM boot for the operator-triggered 24-hour blocks: 1795670617 (supersedes 1795641987).
+Production repeat persist checks after the 22:10 Pacific cycle:
+v2 192.168.120.189 office: ok, meta_key dm_aa8eba31, valid_segments 9, next_slot 9, last_persist_epoch 1795672800, writes ok 2 skipped 0 failed 0
+v2 192.168.120.189 first_floor: ok, meta_key dm_9ed41104, valid_segments 9, next_slot 9, last_persist_epoch 1795672800, writes ok 2 skipped 0 failed 0
+v2 192.168.120.189 outside: ok, meta_key dm_c38eecc4, valid_segments 9, next_slot 9, last_persist_epoch 1795672800, writes ok 2 skipped 0 failed 0
+v2 192.168.120.189 wan_ping: ok, meta_key dm_7a81c392, valid_segments 9, next_slot 9, last_persist_epoch 1795672800, writes ok 2 skipped 0 failed 0
+v2 192.168.120.189 nvs: used_entries 11180 (before 11100), free_entries 4948, old engine segments 1080, last_persist_epoch 1795672800 (before 1795665600, 792 s ago), uptime 7180 s
+v2 PASS
+v2 192.168.120.170 office: ok, meta_key dm_aa8eba31, valid_segments 9, next_slot 9, last_persist_epoch 1795672800, writes ok 1 skipped 0 failed 0
+v2 192.168.120.170 first_floor: ok, meta_key dm_9ed41104, valid_segments 9, next_slot 9, last_persist_epoch 1795672800, writes ok 1 skipped 0 failed 0
+v2 192.168.120.170 outside: ok, meta_key dm_c38eecc4, valid_segments 9, next_slot 9, last_persist_epoch 1795672800, writes ok 1 skipped 0 failed 0
+v2 192.168.120.170 wan_ping: ok, meta_key dm_7a81c392, valid_segments 9, next_slot 9, last_persist_epoch 1795672800, writes ok 1 skipped 0 failed 0
+v2 192.168.120.170 nvs: used_entries 11180 (before 11140), free_entries 4948, old engine segments 1080, last_persist_epoch 1795672800 (before 1795669200, 797 s ago), uptime 2980 s
+v2 192.168.120.170 heap: free_heap 27900 B, min_free_heap 8292 B, uptime 2980 s
+v2 PASS
+```
+
+The updated record and this log precede the end-of-round commit, PRE-PR and body checks. Their current-head PASS evidence is published in the PR body and assessment. The 24-hour observations and external reviews remain pending their operator triggers.
 

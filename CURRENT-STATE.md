@@ -1,6 +1,6 @@
 # Current Project State
 
-_Last verified: 2026-11-25 — .173, .189 and .170 report v7.7.1.3. All three builds and first persist checks passed; .173 passed before the production uploads. At 18,572 s uptime WROOM had free_heap 27,848 B and min_free_heap 8,316 B, boot 1795641987. Both production boards completed five writes per device without failures, and their old engines advanced. C3's higher c3heap reading was 43,372 B versus 42,972 B before upload. The operator-triggered 24-hour readings and external reviews remain pending. No other board was read._
+_Last verified: 2026-11-25 — .173, .189 and .170 report v7.7.1.3. After inline fix C2, all three builds, uploads and persist checks passed again, with .173 first. The repeat C3/WROOM readings showed two/one writes per device without failures and both old engines advancing. WROOM had free_heap 27,900 B and min_free_heap 8,292 B at 2,980 s uptime, boot 1795670617. C3's higher c3heap reading was 43,316 B versus 42,144 B before the repeat upload. Inline findings are recorded; operator-triggered 24-hour readings and external reviews remain pending. No other board was read._
 _Next action: the planning session produces the v7.7.1.4 bundle from R6's merged write path and readings (PLAN-044), then R7. PR #247 still requires the operator-triggered 24-hour readings, review rounds and final validation before operator merge. The order and scope are in `Docs/plan-of-record.md` (PLAN-024)._
 
 ---
@@ -40,7 +40,7 @@ The order, the scope and the status of every step are in `Docs/plan-of-record.md
 | BUG-084 | High | Non-PSRAM boards crash under 8 concurrent HTTP connections. Safe limit: 4 concurrent. | Phase 7 (socket limit config) |
 | #137 | Low | Board-type SVG diagrams for documentation. Cosmetic. | Phase 7+ or standalone |
 | A-004 | Medium | C5 WROOM-1U BLE not verified. The external antenna is fitted (operator, 2026-11-05). The re-test needs a BLE-capable build on .180. | Test-board check |
-| WROOM heap | Medium | R4's 24-hour reference was 2,252 B at 89,973 s. R6 before OTA on v7.7.1.2: `min_free_heap` 1,288 B at 127,785 s. Fresh v7.7.1.3: 22,756 B at 125 s, `free_heap` 28,824 B, boot 1795641987. First persist validation at 18,572 s: minimum 8,316 B, free 27,848 B. Every R6 reading meets the 1,024 B floor; the 24-hour check is pending the operator's trigger. A lower since-boot minimum alone is not proof of a leak. | R6 observation in progress (PLAN-046); reserve the same-boot 24-hour checks for the operator's line. |
+| WROOM heap | Medium | R4's 24-hour reference was 2,252 B at 89,973 s. Initial R6 before OTA: minimum 1,288 B at 127,785 s; fresh 22,756 B at 125 s; first persist check 8,316 B at 18,572 s. Before the repeat upload: 5,764 B at 28,604 s. Repaired build: minimum 21,656 B at 133 s, then 8,292 B at 2,980 s, free_heap 27,900 B, boot 1795670617. Every R6 reading meets the 1,024 B floor; the initial boot is superseded for the 24-hour checks. A lower since-boot minimum alone is not proof of a leak. | R6 observation in progress (PLAN-046); the operator-triggered 24-hour blocks use boot 1795670617. |
 | C6 flash | Medium | C6 SuperMini uses 91.6% of OTA partition on 4MB flash. Phase 7 firmware growth may exceed. | Phase 7 planning |
 
 ## Recently Resolved
@@ -51,12 +51,12 @@ The order, the scope and the status of every step are in `Docs/plan-of-record.md
 
 ## Phase 7 Device Validation Snapshot
 
-_Observed on 2026-11-25 on .189, before and after the upload of v7.7.1.3 (PLAN-046); before the upload it ran v7.7.1.2. The May 2026 baseline of 52,080 B no longer applies._
+_Observed on 2026-11-25 on .189, before and after the upload of v7.7.1.3 (PLAN-046); before the upload it ran v7.7.1.3. The May 2026 baseline of 52,080 B no longer applies._
 
 | Metric | Before the upload | v7.7.1.3 (c3heap, the higher reading) | Delta |
 |---|---|---|---|
-| `free_heap` | 42,972 B | 43,372 B | +400 B |
-| `min_free_heap` | 28,552 B | 34,700 B | +6,148 B |
+| `free_heap` | 42,144 B | 43,316 B | +1,172 B |
+| `min_free_heap` | 29,868 B | 32,368 B | +2,500 B |
 
 ## Board Fleet and Measurements
 
@@ -98,7 +98,7 @@ _Items from postmortems or phase closures that have NOT been acted on._
 | Source | Recommendation | Status |
 |---|---|---|
 | PR #246 review A Q3–Q5, endorsed by review B (comments 7089320312 and 7089569051) | Persisted metric positions follow metrics with history buffers, and persistent devices are resolved by full id. The blob contract remains the full fixed-size DeviceSegment; a shorter prefix needs a separate format/retention-budget decision. EventLog export/load entries remain a candidate persisted interface. | Q3 and Q4 **Implemented in v7.7.1.3**; Q5 **Decided**: the full 228-byte `DeviceSegment` in R6, with blob size and EventLog persistence returning in v7.7.1.4 (PLAN-046). |
-| PR #246 c3heap stop and operator decision dated 2026-11-23 (comment 7088682835) | Refresh the May 2026 C3 `free_heap` baseline before a later step uses it as a deployment gate. | **Implemented in v7.7.1.3** (PLAN-046): compare the higher post-upload reading with the same board just before upload. Measured 43,372 B versus 42,972 B, a +400 B delta; the snapshot above replaces the May baseline. |
+| PR #246 c3heap stop and operator decision dated 2026-11-23 (comment 7088682835) | Refresh the May 2026 C3 `free_heap` baseline before a later step uses it as a deployment gate. | **Implemented in v7.7.1.3** (PLAN-046): compare the higher post-upload reading with the same board just before upload. Repeat measured 43,316 B versus 42,144 B, a +1,172 B delta; the snapshot above replaces the May baseline, and the session log preserves the initial readings. |
 | BUG-075-076 postmortem | Add periodic health-check task logging stack HWM, heap stats, socket usage, NVS stats | **Partially implemented in v7.7.1.0** — heap, stack HWM, NVS stats, and uptime now logged; socket counters remain deferred |
 | BUG-075-076 postmortem | Monitor `nvs_get_stats()` for partition pressure | **Implemented in v7.7.1.0** |
 | BUG-075-076 postmortem | Monitor socket exhaustion under load via lwIP counters | **Not implemented** |
