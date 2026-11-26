@@ -1525,13 +1525,8 @@ static uint8_t persist_device_segment_(nvs_handle_t handle, int persist_index, u
       break;
     }
     nvs_stats_t stats{};
-    esp_err_t stats_err = nvs_get_stats(HISTORY_PARTITION_LABEL, &stats);
-    if (stats_err != ESP_OK) {
-      ESP_LOGE(TAG, "V2 nvs_get_stats failed: %s", esp_err_to_name(stats_err));
-      result = DEV_PERSIST_ERROR;
-      break;
-    }
-    if (stats.free_entries < DEV_PERSIST_MIN_FREE_ENTRIES) {
+    if (nvs_get_stats(HISTORY_PARTITION_LABEL, &stats) != ESP_OK ||
+        stats.free_entries < DEV_PERSIST_MIN_FREE_ENTRIES) {
       result = DEV_PERSIST_NVS_LOW;
       break;
     }
@@ -1617,6 +1612,7 @@ static_assert(dev_ring_valid_(0, 0) == 0, "a ring of no slot has no valid segmen
 static_assert(DEV_PERSIST_PROVISIONAL_SLOTS >= 1 && DEV_PERSIST_PROVISIONAL_SLOTS <= MAX_DEVICE_SLOTS, "the ring fits the 3-hex-digit slot suffix");
 static_assert(dev_persist_result_name_(DEV_PERSIST_OK)[0] == 'o' && dev_persist_result_name_(DEV_PERSIST_NVS_LOW)[0] == 'n', "result names");
 static_assert(dev_persist_result_name_(200)[0] == 'u', "an unknown result has a name");
+
 // ═══════════════════════════════════════════════════════════════════
 // health-check.h — Periodic telemetry task (Phase 7 Step v7.7.1.0)
 // Source fragment: firmware/core/health-check.h
