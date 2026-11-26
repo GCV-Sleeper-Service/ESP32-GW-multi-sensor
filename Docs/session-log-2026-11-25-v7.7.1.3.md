@@ -303,3 +303,13 @@ git diff --stat 48debeb HEAD -- firmware config src scripts/render_sensor_config
 
 The restored history was pushed normally. Per the operator's decision, the firmware is the one already validated on `48debeb`, and Task Group 6 does not run again. The existing device outputs and WROOM boot `1795670617` remain the observation baseline. Copilot C1 stays a v7.7.1.4 recommendation in CURRENT-STATE.md, row "PR #247 inline Copilot C1". The supplied prompt, check file and item 2.2 contract are unchanged. A C3 rebuild supplies the image required by checkpoint E; there is no OTA upload or live-board read in this recovery.
 
+## Reviews A and C — 2026-11-26
+
+Codex (VS Code extension), GPT-6; context window and reasoning effort not shown. Refreshed PR reviews, threads and comments. Both external reviews name head `50ff835f5bfa69b04f50e19731013d5181d1a20f`; all ten required CI jobs pass on that head.
+
+Claude Opus 5.5 review A (7186138464) has three warranted documentation findings: F1 routes the measured WROOM 1,288 B low by 127,785 s against the planning texts' 2,252 B; F2 refreshes the record's stale acceptance table and distinguishes a workflow stop from a supplied-block failure; F3 clarifies the resolved Copilot C1 thread. Reply 4705518038 names the deferred current-state row and the operator-directed revert of `2d247a8` by `3a5cb1e`, following the coding-agent mention in comment 7183584518.
+
+Muse Spark review C (7186297014) reports no formal findings. Assessed A Q1–Q4 and notes 1–5 and C Q1–Q3. The current-state recommendations route NVS allocatable-space semantics, transient response RAM, meta-first/epoch-validated restore, interruption and overlap handling, compact buffered-row identity, layout changes, stale keys and the WROOM budget to v7.7.1.4. Installed ESP-IDF 5.5.4 and ESPHome 2026.4.1 sources answer the counter and build-info questions. Equal build-info strings and image sizes are not binary-revision identifiers; the recorded freshness gates and uploads remain the validation evidence.
+
+This round changes only CURRENT-STATE, this log and the consolidated audit. No firmware change, build, OTA upload or board read is performed for these findings. The fixed prompt, check file and item 2.2 contract remain unchanged. The operator decides whether an observation at 36 h or later is needed; no extra check is added. Review B has not posted, Copilot's selected-tier review was incomplete, and the reserved 24-hour blocks have not been triggered. Current-head F, PRE-PR, CI and body evidence are published in the PR body before the assessment comment.
+
