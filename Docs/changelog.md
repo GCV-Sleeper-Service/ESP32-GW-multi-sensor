@@ -2,6 +2,20 @@
 
 All notable changes to the ESP32-C3 Multi-Sensor BLE Gateway.
 
+## [v7.7.1.3] - 2026-11-25 - Phase 7: Per-Device Persist Write Path
+
+### Added
+- Hourly dual-write beside the existing engine: `dev_ring_next_()`, `dev_ring_valid_()`, `find_device_index_()`, `build_device_segment_()`, `load_device_meta_()`, `save_device_meta_()`, `persist_device_segment_()` and `persist_all_devices_v2()`.
+- A provisional ring of 24 slots per device and a guard of 252 free NVS entries; each write stores the full 228-byte `DeviceSegment` before its meta. Devices are found by full id, and row positions follow metrics with history buffers. A failed meta read or an id collision writes nothing for that device.
+- Synchronized RAM status exposed as `persist_v2` in `/api/storage-stats`; no added NVS calls in the handler.
+- Supplied host test H1 and compile-time test T3, validated on C3, WROOM and S3 with measured image sizes below the OTA stop.
+
+### Changed
+- The replacement `outside` sensor uses MAC `FA:2B:65:2C:98:39`, retaining its device id and history.
+- Version sources and generated artifacts updated to 7.7.1.3; no read path yet. The old engine continues restore and hourly persistence. The retention budget and EventLog persistence remain deferred.
+- Copied the supplied method, operator, review, audit and handoff texts of PLAN-046, PLAN-047 and PLAN-048.
+- Validated .173 first, then uploaded .189 and .170; all devices on each board persisted without failures and the old engines advanced. The C3 heap comparison passed against its own pre-upload baseline. WROOM's first persist validation read 8,316 B minimum heap at 18,572 s; the operator-triggered 24-hour readings remain pending.
+
 ## [v7.7.1.2] - 2026-11-22 - Phase 7: Per-Device Persistence Definitions
 
 ### Added

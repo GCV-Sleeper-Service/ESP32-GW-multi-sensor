@@ -30,7 +30,7 @@ Who starts where: a planning or prompt-producing session starts at `Docs/planner
 
 ## 2. You are here
 
-After PR #246 merges, the last merged step is **R4**, v7.7.1.2: per-device structs, keys, hash and persist defaults. The next action is production of the **v7.7.1.3** bundle by the planning session, then **R6**, its persist write path (PLAN-044). The v7.7.1.4 bundle follows R6's merge. PR #246 records the completed WROOM 24-hour observation, second C3 reading and assessed reviews A/B; final validation precedes operator merge.
+After PR #247 merges, the last merged step is **R6**, v7.7.1.3: the per-device persist write path and dual-write validation on .173, .189 and .170. The next action is production of the **v7.7.1.4** bundle by the planning session from R6's merged code and readings, then **R7**, its compile gate and backups (PLAN-044). PR #247 carries the device evidence and review record; the operator-triggered 24-hour readings, review rounds and final validation precede operator merge.
 
 ## 3. The ladder
 
@@ -52,7 +52,7 @@ The steps in the order they run. Every step is on the path to v1.0, except R15, 
 | 6b | R5a.2 | Method fixes from the reviews of R5a.1 (LOW, PLAN-043): an internal round at every tier, dispatch by a setup file, the checks `inline` and `body` of the review round | Dispatch, review and merge one documentation PR | R5a.1 | Unchanged | 1 to 2 | planning 2, operator 1 | Done: the pull request that adds PLAN-043 |
 | 7 | R5b | Batch 2, rolling (PLAN-044): the method fixes from the reviews of PR #244, the assumption audit and the bundle of v7.7.1.2; the bundles of v7.7.1.3 and v7.7.1.4 follow after R4 and R6 | Dispatch, review and merge one documentation PR | R5a.2 | Unchanged | 4 to 6 | planning 2, operator 1 | Done: the pull request that adds PLAN-044 |
 | 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | planning 3, operator 1 | Done 2026-11-24, PR #246 (`a33a5cc`) |
-| 9 | R6 | v7.7.1.3: persist write path (MEDIUM), dual-write into a one-day ring; the test board .173 first; the new MAC of the sensor "outside" (PLAN-046) | SP; before dispatch, erase .173 and flash it over USB | R4; its bundle, produced after R4 merges, and one auditor session | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 |  | Waiting |
+| 9 | R6 | v7.7.1.3: persist write path (MEDIUM), dual-write into a one-day ring; the test board .173 first; the new MAC of the sensor "outside" (PLAN-046) | SP; before dispatch, erase .173 and flash it over USB | R4; its bundle, produced after R4 merges, and one auditor session | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 |  | Done: PR #247 |
 | 10 | R7 | Compile gate for v7.7.1.4; backups | Backups copied off the build host; USB cable ready | R6 | 7.7.1.3 | 1 to 2 |  | Waiting |
 | 11 | R8 | v7.7.1.4: restore engine and retention budgets (HIGH); .173 first, then the production boards | SP; stand by for USB recovery | R7; its bundle, produced after R6 merges, and two auditor sessions | 7.7.1.4 (`v7.7.1.4`) | 3 to 5 |  | Waiting |
 | 12 | R18a | v7.7.1.5: new board secrets, per-board API key and OTA password (LOW) | New values; flash every project board in one sitting; paste the check output | R8 | 7.7.1.5 (`v7.7.1.5`) | 1 to 2 |  | Waiting |
