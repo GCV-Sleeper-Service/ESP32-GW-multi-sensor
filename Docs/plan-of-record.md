@@ -30,7 +30,7 @@ Who starts where: a planning or prompt-producing session starts at `Docs/planner
 
 ## 2. You are here
 
-After PR #247 merges, the last merged step is **R6**, v7.7.1.3: the per-device persist write path and dual-write validation on .173, .189 and .170. The next action is production of the **v7.7.1.4** bundle by the planning session from R6's merged code and readings, then **R7**, its compile gate and backups (PLAN-044). PR #247 carries the device evidence and review record; the operator-triggered 24-hour readings, review rounds and final validation precede operator merge.
+After PR #247 merges, the last merged step is **R6**, v7.7.1.3: the per-device persist write path and dual-write validation on .173, .189 and .170. The next action is production of the **v7.7.1.4** bundle by the planning session from R6's merged code and readings, then **R7**, its compile gate and backups (PLAN-044). PR #247 records the completed same-boot 24-hour observations and assessed reviews A, C and B; final validation precedes operator merge.
 
 ## 3. The ladder
 
