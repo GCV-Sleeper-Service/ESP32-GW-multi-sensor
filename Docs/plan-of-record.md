@@ -30,7 +30,7 @@ Who starts where: a planning or prompt-producing session starts at `Docs/planner
 
 ## 2. You are here
 
-After PR #246 merges, the last merged step is **R4**, v7.7.1.2: per-device structs, keys, hash and persist defaults. The next action is production of the **v7.7.1.3** bundle by the planning session, then **R6**, its persist write path (PLAN-044). The v7.7.1.4 bundle follows R6's merge. PR #246 records the completed WROOM 24-hour observation, second C3 reading and assessed reviews A/B; final validation precedes operator merge.
+After PR #247 merges, the last merged step is **R6**, v7.7.1.3: the per-device persist write path and dual-write validation on .173, .189 and .170. The next action is production of the **v7.7.1.4** bundle by the planning session from R6's merged code and readings, then **R7**, its compile gate and backups (PLAN-044). PR #247 records the completed same-boot 24-hour observations and assessed reviews A, C and B; final validation precedes operator merge.
 
 ## 3. The ladder
 
@@ -51,8 +51,8 @@ The steps in the order they run. Every step is on the path to v1.0, except R15, 
 | 6a | R5a.1 | Producer-contract fixes from the reviews of R5a, issue #242 (LOW, PLAN-042) | Dispatch, review and merge one documentation PR | R5a | Unchanged | 1 to 2 | planning 2, operator 1 | Done: the pull request that fixes issue #242 |
 | 6b | R5a.2 | Method fixes from the reviews of R5a.1 (LOW, PLAN-043): an internal round at every tier, dispatch by a setup file, the checks `inline` and `body` of the review round | Dispatch, review and merge one documentation PR | R5a.1 | Unchanged | 1 to 2 | planning 2, operator 1 | Done: the pull request that adds PLAN-043 |
 | 7 | R5b | Batch 2, rolling (PLAN-044): the method fixes from the reviews of PR #244, the assumption audit and the bundle of v7.7.1.2; the bundles of v7.7.1.3 and v7.7.1.4 follow after R4 and R6 | Dispatch, review and merge one documentation PR | R5a.2 | Unchanged | 4 to 6 | planning 2, operator 1 | Done: the pull request that adds PLAN-044 |
-| 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | pending | Done: PR #246 (24-hour observation and reviews recorded; operator merges after final validation) |
-| 9 | R6 | v7.7.1.3: persist write path (MEDIUM); the test board .173 gets it too | SP | R4; its bundle, produced after R4 merges, and one auditor session | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 |  | Waiting |
+| 8 | R4 | v7.7.1.2: per-device structs, keys, hash (LOW) | SP | R5b | 7.7.1.2 (`v7.7.1.2`) | 2 to 3 | planning 3, operator 1 | Done 2026-11-24, PR #246 (`a33a5cc`) |
+| 9 | R6 | v7.7.1.3: persist write path (MEDIUM), dual-write into a one-day ring; the test board .173 first; the new MAC of the sensor "outside" (PLAN-046) | SP; before dispatch, erase .173 and flash it over USB | R4; its bundle, produced after R4 merges, and one auditor session | 7.7.1.3 (`v7.7.1.3`) | 3 to 5 |  | Done: PR #247 |
 | 10 | R7 | Compile gate for v7.7.1.4; backups | Backups copied off the build host; USB cable ready | R6 | 7.7.1.3 | 1 to 2 |  | Waiting |
 | 11 | R8 | v7.7.1.4: restore engine and retention budgets (HIGH); .173 first, then the production boards | SP; stand by for USB recovery | R7; its bundle, produced after R6 merges, and two auditor sessions | 7.7.1.4 (`v7.7.1.4`) | 3 to 5 |  | Waiting |
 | 12 | R18a | v7.7.1.5: new board secrets, per-board API key and OTA password (LOW) | New values; flash every project board in one sitting; paste the check output | R8 | 7.7.1.5 (`v7.7.1.5`) | 1 to 2 |  | Waiting |
@@ -161,8 +161,8 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 | Step | Tier | Prompt style | Audit before dispatch |
 |---|---|---|---|
 | v7.7.1.2 | LOW | Intent and acceptance criteria | Lint and one internal round; the compile of any embedded code (PLAN-042) |
-| v7.7.1.3 | MEDIUM | Intent and acceptance criteria; interface contracts prescribed | Lint, one internal round (a second optional when the first finds a new HIGH or MEDIUM) and one independent auditor; the compile of any embedded code (PLAN-042) |
-| v7.7.1.4 | HIGH | Prescriptive | Lint, one or two internal rounds, two auditors from different model families reconciled in one file, and the compile gate in R7 |
+| v7.7.1.3 | MEDIUM | Intent and acceptance criteria; interface contracts prescribed | Lint, one internal round (a further one optional when a round or an external audit finds a new HIGH or MEDIUM; at most three per planning session, PLAN-048) and one independent auditor; the compile of any embedded code (PLAN-042) |
+| v7.7.1.4 | HIGH | Prescriptive | Lint, one internal round (a further one when a round or an external audit finds a new HIGH or MEDIUM; at most three per planning session, PLAN-048), two auditors from different model families reconciled in one file, and the compile gate in R7 |
 
 - The assumption audit settles each leftover:
   - the third-audit findings of PR #233: H-1 (declaration order in v7.7.1.4), L-1 (boot test on both satellites), M-1 (pre-filled sizes), M-2 (line-number anchors);
@@ -185,10 +185,13 @@ One block for each step from R3c on. A prompt may narrow a scope. Only a decisio
 
 ### R6: v7.7.1.3, per-device persist write path (MEDIUM)
 
-- Extra checks: dual-write verified on .189, .170 and the test board .173; the WROOM's `nvs_used` before and after; the Rule 40 and Rule 61 checks in the PR.
-- Bundle: produced after R4 merges, from the code on `main`; one internal round, a second optional when the first finds a new HIGH or MEDIUM, and one auditor; it reaches `main` in this step's PR (PLAN-044).
+- Scope (PLAN-046): every hourly persist also writes one `DeviceSegment` per persistent device (dual-write) into a ring of 24 slots per device, one day; a v2 write is skipped when the history partition has fewer than 252 free NVS entries, so the old engine keeps its room; `/api/storage-stats` reports each device's ring from RAM; the sensor "outside" takes the MAC of its replacement. Nothing reads the new blobs yet.
+- Before dispatch: the operator erases .173 and flashes v7.7.1.2 over USB, because .173 runs an older ESPHome default partition table without a history partition (PLAN-046).
+- Extra checks: the host test of the write path; dual-write verified on the test board .173 first, then on .189 and .170, each after a persist cycle; the history partition's `used_entries` before and after; `c3heap` against .189's own reading just before the upload; the WROOM's `min_free_heap` at least 1,024 B at every reading of the step: fresh, after the first persist cycle and 24 hours later; the `.bin` size against the OTA slot; the Rule 40 and Rule 61 checks in the PR.
+- Reviews: inline, A and C (Muse), then B: Gemini 4 Neon in Google Antigravity with part B of the review file, another surface of the AI Pro subscription as fallback; the runner cannot take R6's PR (PLAN-046, PLAN-047).
+- Bundle: produced after R4 merged, from the code on `main`; one internal round, a second optional when the first finds a new HIGH or MEDIUM, and one auditor; after the auditor's second re-audit, a third internal round in place of a third re-audit (PLAN-048); it reaches `main` in this step's PR (PLAN-044).
 - Done when: tag `v7.7.1.3` exists and #215 is closed.
-- State after: every persist cycle writes the old blob and the new per-device blobs. Nothing reads the new ones yet. The operator watches the WROOM's NVS use for a few days.
+- State after: every persist cycle writes the old blob and the new per-device blobs. Nothing reads the new ones yet. The operator watches the WROOM's NVS use and heap for a few days.
 
 ### R7: compile gate and backups before v7.7.1.4
 
@@ -213,7 +216,7 @@ Do not open a PR. Push nothing except the scratch branch, and delete it afterwar
 ### R8: v7.7.1.4, restore engine and retention budgets (HIGH)
 
 - Flash over OTA. The partition tables do not change in this step (PLAN-015).
-- Bundle: produced after R6 merges, from the code on `main`; one or two internal rounds and two auditors; its compile gate is R7; it reaches `main` in this step's PR, and its reconciliation file records the batch metrics of Batch 2 (audit template §9, PLAN-044).
+- Bundle: produced after R6 merges, from the code on `main`; one internal round, a further one when a round or an external audit finds a new HIGH or MEDIUM (at most three per planning session, PLAN-048), and two auditors; its compile gate is R7; it reaches `main` in this step's PR, and its reconciliation file records the batch metrics of Batch 2 (audit template §9, PLAN-044).
 - Extra checks: boot restore works on .173 first; only after .173 has booted and served its history, on .189, .170 and .191; a retention-budget line is logged for each device; the declaration-order check is in the PR body; the `.bin` size is recorded.
 - Recovery: if a board boot-loops, flash the v7.7.1.3 build over USB with `timeout 300 esphome upload <yaml> --device=<serial port>`, post the boot log to the PR, and stop the step. If a board comes back with empty history, import its history again from the R7 backup with `scripts/history_backup.py import`; the login comes from the operator's environment.
 - Done when: tag `v7.7.1.4` exists, #216 is closed, the three production boards report 7.7.1.4, and each dashboard shows its history.
@@ -274,8 +277,8 @@ Eight moves. The binding text is in `Docs/development-process-guide.md` §2; thi
 1. Pre-dispatch gate (process guide §2.1 item 6). On the day of dispatch the planning session runs the §2 block of the prompt against `origin/main`, runs lint on the prompt file, checks that no fill-in is left, and compiles the code that the prompt carries and that ends in a compiled artifact (contract rule 3.4). Device values come only from the operator's latest fleet output. The operator posts the record as the first operator comment of the PR.
 2. Dispatch. The operator pulls the planning repository on the build host and pastes the dispatch paragraph; the agent checks the setup file by its SHA-256 and follows it, and the setup file gives it the agent prompt, word for word (process guide §2.2, PLAN-043). A step prompt closes its issue with `Fixes #N`: #214 for v7.7.1.2, #215 for v7.7.1.3, #216 for v7.7.1.4, #217 for v7.7.2.1, #218 for v7.7.2.2, #219 and #224 for v7.7.2.3, #220 for v7.7.3.1, #221 for v7.7.3.2, #222 for v7.7.3.3.
 3. Checkpoint failures. When the agent posts `⛔ CHECKPOINT FAILED`, it has stopped. If the prompt is wrong, the planning session corrects it; if the code is wrong, the agent investigates and reports. Nobody tells the agent to make the check pass.
-4. Reviews (process guide §2.4). The agent marks the PR ready and starts the inline round itself (PLAN-027). Then the external reviews run: reviews A and C side by side, then review B by the runner, always last (PLAN-023). The agent waits for the inline round with the check block `inline` and ends each round with the check block `body` (PLAN-043). Section 7 shows the scheme.
-5. Evidence check before the merge, by the operator: the check block `body <PR#> final` prints `body final PASS`. The PR body holds the gate outputs, the per-item verification and the device evidence. The branch holds the session log, the consolidated audit, `CURRENT-STATE.md`, the changelog entry, and this file with the step's row marked.
+4. Reviews (process guide §2.4). The agent marks the PR ready and starts the inline round itself (PLAN-027). Then the external reviews run: reviews A and C side by side, then review B, always last: Gemini 4 Neon in Google Antigravity with part B of the review file, or the runner (PLAN-023, PLAN-046, PLAN-047). The agent waits for the inline round with the check block `inline` and ends each round with the check block `body` (PLAN-043). Section 7 shows the scheme.
+5. Evidence check before the merge: the agent runs the check block `body <PR#> final` as the last step of its last round and posts its last line, `body final PASS at <commit>`; the operator confirms that the commit is the head, and runs it again only if a commit came after (PLAN-046). The PR body holds the gate outputs, the per-item verification and the device evidence. The branch holds the session log, the consolidated audit, `CURRENT-STATE.md`, the changelog entry, and this file with the step's row marked.
 6. Merge and tag, by the operator.
 7. Post-merge check: the operator updates the checkout on the build host to `main`, and the boards that the step flashed report the new version; the planning session checks `main` and `VERSION` at its next restart check (PLAN-043).
 8. Metrics and step closure. The agent fills the process-metrics block of the consolidated audit, with the producer and audit numbers of the gate record. The planning session reads the merged PR and the audit, and corrects the next prompt at its gate.
@@ -298,14 +301,14 @@ sequenceDiagram
     Y->>R: Start reviews A and C
     R-->>A: Reviews A and C, one comment each
     A->>Y: Second assessment and fixes
-    Y->>R: Run the runner from main: PR number, two paths
-    R-->>A: Review B, three turns, one bot comment
+    Y->>R: Review B: Antigravity from the line of the block reviewb, or the runner from main
+    R-->>A: Review B, one comment: Antigravity, one line and three passes, the file checked and posted by the operator; the runner, three turns
     A->>Y: Last fixes, then the consolidated audit
     Y->>P: Merged and tagged, then the report back
     P->>P: Step closure: correct the next prompt
 ```
 
-This scheme holds from the merge of the review-runner PR, R5r (PLAN-022, PLAN-023). If the runner cannot run, the step waits for it, or the operator runs review B as a Muse session in three turns and the consolidated audit names the change. Review C is required on MEDIUM and HIGH firmware steps and optional elsewhere (PLAN-036).
+This scheme holds from the merge of the review-runner PR, R5r (PLAN-022, PLAN-023). Review B runs in Gemini 4 Neon in Google Antigravity, in the runner or, on a step without review C, in Muse, each with part B of the review file; the step's review file names the default and the fallback, and the consolidated audit names any change (PLAN-046, PLAN-047). Review C is required on MEDIUM and HIGH firmware steps and optional elsewhere (PLAN-036).
 
 Two files have similar names. The review file of a step holds the instructions for the reviewers; the planning session writes it before dispatch. The consolidated audit is the record of all reviews: each finding, whether it was warranted, and what was done; the coding agent writes it in the PR and completes it after the last review round (HowTo §6.2).
 
@@ -355,7 +358,8 @@ Only findings that a ladder step owns, and that no issue and no row of `CURRENT-
 | Finding | Owner |
 |---|---|
 | The leftovers of the May 2026 Batch 2 prompts (the list in section 5, R5b) | R5b for v7.7.1.2; the bundle of v7.7.1.4 for H-1 and L-1 of PR #233 (PLAN-044) |
-| Whether a ChatGPT Plus plan carries a firmware step for the coding agent; how the management login reaches the coding agent's shell | Before R4 |
+| The RAM that NVS keeps for each key limits retention on boards without PSRAM, besides flash: ESP-IDF v5.5's page gives about 5.5 KB for 1,000 keys, and its source keeps one hash-list node of 4 bytes per item, in blocks of 29 nodes (128 B) per page, two items for a blob key; the per-device ring multiplies the keys by the devices | The bundle of v7.7.1.4 (PLAN-046) |
+| .180 and .184 may also run a partition table without a history partition, as .173 did (read their `/api/storage-stats`) | Before U1 |
 
 ## 11. Risks
 
@@ -373,6 +377,7 @@ Ordered by expected effect on the schedule.
 | 8 | The TLS client path of Phase 8 does not exist in this build | The 8.0 spike cannot post to Telegram from the S3 within 40 KB peak heap | 8.0 is a research step with a go or no-go; the fallback is the aggregator posting to the tier-2 ingest |
 | 9 | Tier-2 grows into a product | A `tier2/` PR adds a component that the reference document does not list | A not-in-scope list from the first tier-2 PR; a hard stop at the Phase 9 closure |
 | 10 | Planning produces documents and no merged steps | A session between two steps writes a methodology document; R5 or R5r grows beyond its list | PLAN-012; R5b has a session budget and a stop at two audit sessions for each producer session |
+| 11 | The WROOM .170 runs out of heap | `min_free_heap` below 1,024 B at a reading of R6 or a later step | The floor stops the step (PLAN-046); memory changes measured later (BLE connection slots, the socket cap of #224, the RAM window of PLAN-011); .170 leaves the fleet if it cannot keep the floor |
 
 ## 12. What still holds of the feature roadmap
 

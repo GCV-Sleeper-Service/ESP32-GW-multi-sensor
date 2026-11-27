@@ -1,4 +1,4 @@
-# ESP32-C3 Multi-Sensor Gateway - v7.7.1.2
+# ESP32-C3 Multi-Sensor Gateway - v7.7.1.3
 #
 # Current package summary
 # - ESP32-C3 SuperMini gateway for multiple ThermoPro TP357 BLE sensors
@@ -53,7 +53,7 @@ esphome:
       priority: -100
       then:
         - lambda: |-
-            register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.7.1.2");
+            register_history_handler(id(web_base), "${mgmt_auth_username}", "${mgmt_auth_password}", "v7.7.1.3");
             id(dashboard_link).publish_state(
               "Dashboard: /dashboard or /dashboard.html — Download: /dashboard-download");
     - # Priority 600: run after WiFi and SNTP are available.
@@ -232,6 +232,7 @@ time:
               auto now = id(sntp_time).now();
               if (!now.is_valid()) return;
               persist_hourly_segment(now.timestamp);
+              persist_all_devices_v2(now.timestamp);
 
 
 
@@ -413,10 +414,10 @@ sensor:
               if (devices[1].batt_last >= 0) id(battery_first_floor).publish_state(devices[1].batt_str);
 
   # ══════════════════════════════════════════════════════════════════
-  # SENSOR 3: OUTSIDE — MAC DF:EB:DE:19:11:6C
+  # SENSOR 3: OUTSIDE — MAC FA:2B:65:2C:98:39
   # ══════════════════════════════════════════════════════════════════
   - platform: thermopro_ble
-    mac_address: "DF:EB:DE:19:11:6C"
+    mac_address: "FA:2B:65:2C:98:39"
     temperature:
       id: raw_temp_outside
       name: "Outside Temp Raw"
@@ -543,7 +544,7 @@ sensor:
       sorting_weight: 16
 
   - platform: ble_rssi
-    mac_address: "DF:EB:DE:19:11:6C"
+    mac_address: "FA:2B:65:2C:98:39"
     name: "Outside RSSI"
     id: outside_rssi
     icon: "mdi:signal"

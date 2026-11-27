@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from sensor_manifest_lib import ManifestError, fixture_manifest, load_aggregator_config, load_board_profile, load_gateway_config, load_manifest, manifest_v2
 
-VERSION = "7.7.1.2"
+VERSION = "7.7.1.3"
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY_MANIFEST_H_PATH = ROOT / "src" / "gateway_manifest.h"
 AGGREGATOR_CONFIG_H_PATH = ROOT / "src" / "aggregator_config.h"
@@ -1016,6 +1016,7 @@ def generate_board_yaml(
         lines.append("              auto now = id(sntp_time).now();")
         lines.append("              if (!now.is_valid()) return;")
         lines.append("              persist_hourly_segment(now.timestamp);")
+        lines.append("              persist_all_devices_v2(now.timestamp);")
 
     lines.append("")
     lines.append("")

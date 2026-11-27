@@ -23,7 +23,7 @@ _Agent: [Copilot / Codex / GPT / Kiro]._
 | Step Version | v7.7.X.Y |
 | Executing Agent | [agent name] |
 | Inline Reviewers | [Copilot, Codex, Gemini — list which participated] |
-| External Reviewers | [A: Claude (a GPT model when Claude Code coded the step); C: Meta Muse (required on MEDIUM and HIGH firmware steps); B: the review runner, or a Muse session in three turns when the runner cannot run — list which participated and the model each one named] |
+| External Reviewers | [A: Claude (a GPT model when Claude Code coded the step); C: Meta Muse (required on MEDIUM and HIGH firmware steps); B: Gemini 4 Neon in Google Antigravity, or the fallback that the step's prompt names (the review runner where the PR fits its input limit, another Gemini surface of the subscription, or Muse on a step without review C), with part B of the review file (PLAN-046, PLAN-047) — list which participated and the model each one named] |
 | Device Testing | [YES / NO / CRITICAL] |
 | Fix Cycles | [0 / 1 / 2 / ...] |
 

@@ -8,13 +8,13 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
   "ok": true,
   "schema_version": 2,
   "source": "active-manifest",
-  "version": "v7.7.1.2",
+  "version": "v7.7.1.3",
   "gateway": {
     "id": "gw-main",
     "name": "Main Gateway",
     "role": "satellite",
     "hardware": "ESP32-C3",
-    "firmware_version": "v7.7.1.2",
+    "firmware_version": "v7.7.1.3",
     "api_version": "v2"
   },
   "history": {
@@ -215,7 +215,7 @@ static const char GATEWAY_MANIFEST_JSON[] = R"MANIFEST(
       "category": "environmental",
       "adapter": "thermopro_ble",
       "source": {
-        "mac": "DF:EB:DE:19:11:6C"
+        "mac": "FA:2B:65:2C:98:39"
       },
       "measurements": [
         {

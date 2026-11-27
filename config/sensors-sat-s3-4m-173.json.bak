@@ -18,7 +18,7 @@
     {
       "id": "outside",
       "name": "Outside",
-      "mac": "DF:EB:DE:19:11:6C",
+      "mac": "FA:2B:65:2C:98:39",
       "category": "environmental",
       "adapter": "thermopro_ble"
     },

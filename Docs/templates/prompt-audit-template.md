@@ -2,7 +2,7 @@
 
 _Canonical audit-prompt skeleton for the ESP32-GW-multi-sensor prompt-audit gate._
 
-- **Template version:** v1.6
+- **Template version:** v1.9
 - **Authority:** [Docs/archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md](../archive/methodology-audits-2026-05/prompt-producing-methodology-audit-claude-opus-4.7-2026-05-10.md) §6 (as revised by §11)
 - **Worked example this template was extracted from:** [prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md](../../prompts/handoff/phase7/pr-233-third-independent-audit-prompt.md)
 - **CHANGELOG:** see end of this file
@@ -27,10 +27,10 @@ The tier is set at planning time and written in the prompt header; use the Phase
 | Tier | Producer audit before dispatch | Required audit artifact |
 |---|---|---|
 | LOW | Lint + one internal round; compile embedded code on a scratch branch | No independent audit or reconciliation file; compile evidence if code is embedded |
-| MEDIUM | Lint + one internal round, a second optional when the first finds a new HIGH or MEDIUM, + one independent auditor; compile embedded code on a scratch branch | One audit report; no reconciliation file; compile evidence if code is embedded |
-| HIGH | Lint + one or two internal rounds + two independent auditors from different model families; compile embedded code on a scratch branch | Two audit reports and one reconciliation file; compile evidence if code is embedded |
+| MEDIUM | Lint + one internal round, a further one optional when a round or an external audit finds a new HIGH or MEDIUM (at most three internal rounds per planning session, PLAN-048), + one independent auditor; compile embedded code on a scratch branch | One audit report; no reconciliation file; compile evidence if code is embedded |
+| HIGH | Lint + one internal round, a further one when a round or an external audit finds a new HIGH or MEDIUM (at most three internal rounds per planning session, PLAN-048), + two independent auditors from different model families; compile embedded code on a scratch branch | Two audit reports and one reconciliation file; compile evidence if code is embedded |
 
-These producer-audit tiers do not change the PR review pipeline of `Docs/development-process-guide.md` §2.4 (PLAN-023): two inline reviewers, Copilot and Gemini (PLAN-045); reviews A and C side by side, with C required on MEDIUM and HIGH firmware steps; review B by the runner, last. Documentation-only PRs run the two inline reviewers, Copilot and Gemini, with external reviewers optional.
+These producer-audit tiers do not change the PR review pipeline of `Docs/development-process-guide.md` §2.4 (PLAN-023): two inline reviewers, Copilot and Gemini (PLAN-045); reviews A and C side by side, with C required on MEDIUM and HIGH firmware steps; review B, last: Gemini 4 Neon in Google Antigravity, or the fallback that the step's prompt names (the runner where the PR fits its input limit, another Gemini surface of the subscription, or Muse on a step without review C), with part B of the review file (PLAN-046, PLAN-047). The auditors: MEDIUM, GPT Astra in a ChatGPT Cowork session; HIGH, GPT Astra (Cowork) and Gemini 4 Neon, effort High, in Google Antigravity; GPT Astra in Codex is the fallback; Muse and Gemini 4 Carbon audit no bundle (PLAN-047). A Gemini session gets only public data: the bundle and the setup file as attachments, never the private planning repository. Documentation-only PRs run the two inline reviewers, Copilot and Gemini, with external reviewers optional.
 
 This bundle's classification: `<<LOW | MEDIUM | HIGH>>` — justification: `<<one-sentence rationale>>`.
 
@@ -114,6 +114,8 @@ In addition to the six scenarios, perform these specific traces if applicable to
 
 Produce a single Markdown report titled `<<bundle name>> audit — <auditor name / model> — <date>` and commit it to `prompts/handoff/<<phase>>/<<bundle-name>>-audit-report-<auditor-slug>-<date>.md`.
 
+Under the title, a table (PLAN-047): the model, as the interface names it; the harness or environment; the context window; the reasoning effort; the tokens read, written and thinking; whether the context was compacted, and how often; whether the session stopped on a usage limit and was resumed; the commits read. Write `not shown` where the interface shows nothing.
+
 Required sections:
 
 1. **Verdict** — one of:
@@ -191,7 +193,7 @@ For LOW, steps 4 to 8 and the audit part of step 9 are not applicable; lint, the
 2. Open the bundle PR (status: draft or ready-for-review).
 3. Run `bash scripts/lint-prompts.sh --baseline main` and confirm exit 0.
 4. MEDIUM: launch one independent auditor using this template. HIGH: launch two independent auditors from different model families, in parallel.
-   PLAN-040 and PLAN-043 (2026-11-21): at every tier, before step 4, one internal sub-agent audits the bundle with this audit prompt and executes it; the planning session checks each finding and fixes what holds; LOW runs one round; MEDIUM may run, and HIGH runs, a second when the first finds a new HIGH or MEDIUM, and neither runs a third (PLAN-044). It does not replace the audit of step 4. PLAN-037 and PLAN-041 name the auditors.
+   PLAN-040 and PLAN-043 (2026-11-21): at every tier, before step 4, one internal sub-agent audits the bundle with this audit prompt and executes it; the planning session checks each finding and fixes what holds; LOW runs one round; MEDIUM may run, and HIGH runs, a further one when a round or an external audit finds a new HIGH or MEDIUM (PLAN-044); a planning session runs at most three internal rounds in all, over every step that it produces, and when a further round is due after its third, it stops and asks the operator (PLAN-048). It does not replace the audit of step 4. PLAN-037 and PLAN-041 name the auditors.
 5. Collect the single MEDIUM audit report or both HIGH audit reports as separate Markdown files in `prompts/handoff/<phase>/`.
 6. Assemble the action list (HIGH + CRITICAL findings → fix-in-PR; MEDIUM → track as follow-up issue under the bundle's tracking issue; LOW → triage at operator discretion).
 7. Apply fixes in the bundle PR; commit and push.
@@ -218,7 +220,7 @@ For HIGH: minimum viable is NOT permitted. Full audits by both independent audit
 
 ## §9 Batch process metrics (record in the reconciliation or single-audit file)
 
-Producer sessions · audit sessions · fix-cycle PRs · defects escaped to agent execution · defects escaped to devices · verification:production session ratio. Tier rule (PLAN-017, PLAN-043): every tier = one internal sub-agent round, MEDIUM and HIGH at most two (PLAN-044); LOW = lint; MEDIUM = one auditor, no reconciliation file; HIGH = two auditors from different model families, one reconciliation file; every tier = a compile gate for embedded code (PLAN-042).
+Producer sessions · audit sessions · fix-cycle PRs · defects escaped to agent execution · defects escaped to devices · verification:production session ratio. Tier rule (PLAN-017, PLAN-043): every tier = one internal sub-agent round, MEDIUM and HIGH a further one after a new HIGH or MEDIUM, at most three per planning session (PLAN-044, PLAN-048); LOW = lint; MEDIUM = one auditor, no reconciliation file; HIGH = two auditors from different model families, one reconciliation file; every tier = a compile gate for embedded code (PLAN-042).
 
 ## CHANGELOG
 
@@ -231,6 +233,9 @@ Producer sessions · audit sessions · fix-cycle PRs · defects escaped to agent
 | v1.4 | 2026-11-21 | R5a.1 (PLAN-042): embedded code is compiled on a scratch branch before dispatch at every tier, not only HIGH: the note on how to use this file, the tier table, §6, §7 steps 9 and 10, §8 and §9. |
 | v1.5 | 2026-11-21 | R5a.2 (PLAN-043): one internal sub-agent round at every tier, LOW included, and HIGH at most two: the note on how to use this file, the tier table, §6, §7 (the note under step 4, the LOW paragraph and step 10), §8 and §9. |
 | v1.6 | 2026-11-22 | R5b (PLAN-044): MEDIUM may run a second internal round when the first finds a new HIGH or MEDIUM: the tier table, §7 (the note under step 4) and §9. |
+| v1.7 | 2026-11-24 | R6 (PLAN-046): the review-pipeline line under the tier table names the places of review B: the runner, Gemini 4 Neon in AI Studio, or Muse on a step without review C. |
+| v1.8 | 2026-11-25 | R6 (PLAN-047): review B in Google Antigravity, the runner its fallback; the auditors of each tier and their sessions; public data only for a Gemini session; the header table of every report (§3). |
+| v1.9 | 2026-11-25 | R6 (PLAN-048): at most three internal rounds per planning session, in place of at most two per step: the tier table, §7 (the note under step 4) and §9. |
 
 ---
 

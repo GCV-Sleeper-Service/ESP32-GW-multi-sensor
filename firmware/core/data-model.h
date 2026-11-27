@@ -347,7 +347,7 @@ static SensorEntity devices[NUM_DEVICES] = {
       {.current_value = NAN, .accumulator = 0, .sample_count = 0, .valid = false, .last_update_epoch = 0, .history = nullptr}
     },
     .metric_count = 4,
-    .mac = "DF:EB:DE:19:11:6C",
+    .mac = "FA:2B:65:2C:98:39",
     .last_rssi = 0, .last_seen_epoch = 0
   },
   {
@@ -390,7 +390,7 @@ static constexpr PersistPriority PERSIST_PRIORITIES[PERSIST_DEVICE_ARRAY_LEN] = 
 // <<< SENSOR_MANIFEST:ENTITY_END >>>
 
 // ═══════════════════════════════════════════════════════════════════
-// ── SENSOR COUNT CONFIGURATION GUIDE (v7.7.1.2) ──
+// ── SENSOR COUNT CONFIGURATION GUIDE (v7.7.1.3) ──
 //
 // NUM_ENV_SENSORS = number of environmental (ThermoPro BLE) sensors.
 // Supported environmental sensor counts: 1, 2, 3 (default), 4.

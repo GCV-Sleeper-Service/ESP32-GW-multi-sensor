@@ -1,13 +1,13 @@
 # Current Project State
 
-_Last verified: 2026-11-23 — .189 and .170 report v7.7.1.2. WROOM's same-boot 24-hour block passed at 89,973 s uptime (free_heap 28,436 B, min_free_heap 2,252 B); the second C3 reading passed at 98,414 s (free_heap 42,888 B, min_free_heap 30,156 B). The C3 and WROOM builds previously passed with ESPHome 2026.4.1, including the supplied tests and measured size assertions. The earlier C3 heap stop against the May baseline remains accepted by operator decision 7088682835. .191 was not read in this step._
-_Next action: the planning session produces the bundle of v7.7.1.3 after R4 merges, then R6 implements its persist write path (PLAN-044). PR #246 reviews A and B are assessed, and the WROOM 24-hour and second C3 readings are recorded; final validation and operator merge remain. Batch 2 is rolling: the bundle of v7.7.1.4 follows R6. The order and scope are in `Docs/plan-of-record.md` (PLAN-024)._
+_Last verified: 2026-11-27 — operator-triggered wroom24 and both later writer checks PASS on v7.7.1.3. WROOM at 139,314 s (38.7 h) had free_heap 24,440 B and min_free_heap 1,824 B; its boot estimate 1795670620 is within 3 s of the recorded upload boot. C3 at 143,529 s (39.9 h) had free_heap 39,344 B and min_free_heap 21,892 B. All four device rings on each board are full at 24 slots; successful writes are 38 per device on WROOM and 39 on C3, with zero skipped/failed writes and both old engines advancing. S3's validation remains from 2026-11-25. Inline and reviews A/C/B are assessed; B's three Low documentation findings are addressed in the closing update. No new device reading was taken for review B._
+_Next action: final validation of PR #247, then operator merge. The required observations and review assessments are complete. After merge, the planning session produces the v7.7.1.4 bundle from R6's merged write path and readings (PLAN-044), then R7. The order and scope are in `Docs/plan-of-record.md` (PLAN-024)._
 
 ---
 
 ## Version and Phase
 
-- **Current version:** 7.7.1.2
+- **Current version:** 7.7.1.3
 - **Active phase:** Phase 7 implementation underway
 - **Last completed phase:** Phase VX (board onboarding + auth refactor, 4 steps, 3 PRs)
 - **Next implementation phase:** Phase 7 (per-device persistence engine)
@@ -19,15 +19,15 @@ _Next action: the planning session produces the bundle of v7.7.1.3 after R4 merg
 
 | Step | PR | Summary |
 |---|---|---|
+| v7.7.1.3 | #247 | Hourly per-device dual-write into 24-slot rings with a 252-free-entry guard and synchronized RAM status; supplied host and compile-time tests passed; .173 validated first, then .189 and .170; no read path yet |
 | v7.7.1.2 | #246 | Per-device persisted structs, EventLog, FNV-1a hash, 15-character NVS keys and generated persist defaults; compiler-measured layouts verified on C3 and WROOM, both flashed; no runtime use yet |
 | v7.7.1.1 | #226 | History endpoints now stream CSV with `httpd_resp_send_chunk()`, fixing BUG-082 heap exhaustion on larger retained history sets; follow-up preserved aggregator proxy compatibility, restored NI-002 `HEALTH:` evidence on WROOM/C3, and live-verified `.191` proxy history against the chunked C3 upstream |
-| v7.7.1.0 | #225 | Health-check telemetry task added as a ninth firmware fragment; boot startup, assembly, and preflight updated for periodic heap/NVS/stack telemetry |
 
 ## What's Next
 
 The order, the scope and the status of every step are in `Docs/plan-of-record.md` (PLAN-024). In short:
 
-1. **Produce the v7.7.1.3 bundle, then R6** — the planning session uses R4's merged structs, keys, defaults and measurements to produce the persist write-path prompt (PLAN-044).
+1. **Produce the v7.7.1.4 bundle, then R7** — the planning session produces the restore-path prompt from R6's merged write path and readings (PLAN-044).
 2. **Phase 7 Step v7.7.1.4** — restore engine (boot path) and retention budget; its bundle is produced after R6 merges (PLAN-044).
 3. **v7.7.1.5** — new board secrets (SEC-003).
 4. **Phase 7 Steps v7.7.2.1 to v7.7.3.3** — engine switchover, migration, export and import, and closure. v7.7.3.3 is v1.0 (PLAN-015).
@@ -40,7 +40,7 @@ The order, the scope and the status of every step are in `Docs/plan-of-record.md
 | BUG-084 | High | Non-PSRAM boards crash under 8 concurrent HTTP connections. Safe limit: 4 concurrent. | Phase 7 (socket limit config) |
 | #137 | Low | Board-type SVG diagrams for documentation. Cosmetic. | Phase 7+ or standalone |
 | A-004 | Medium | C5 WROOM-1U BLE not verified. The external antenna is fitted (operator, 2026-11-05). The re-test needs a BLE-capable build on .180. | Test-board check |
-| WROOM heap | Medium | Before OTA, v7.7.1.1: `min_free_heap` 3,648 B at 185,237 s. Fresh v7.7.1.2: 12,336 B at 118 s, `free_heap` 29,052 B, boot 1795395664. Same-boot 24-hour check on 2026-11-23: `min_free_heap` 2,252 B at 89,973 s, `free_heap` 28,436 B, boot estimate 1795395666 (within 2 s). This records a lower since-boot minimum, not proof of a leak. | R4 observation complete (PLAN-044). Use the fresh/24-hour readings to set v7.7.1.3 heap checks; the low minimum remains an open heap observation. |
+| WROOM heap | Medium | R4's 24-hour reference was 2,252 B at 89,973 s. Initial R6 before OTA: minimum 1,288 B at 127,785 s; fresh 22,756 B at 125 s; first persist check 8,316 B at 18,572 s. Before the repeat upload: 5,764 B at 28,604 s. Repaired build: minimum 21,656 B at 133 s, then 8,292 B at 2,980 s. On 2026-11-27, wroom24 and later v2 PASS: minimum 1,824 B, free_heap 24,440 B at 139,314 s (38.7 h); boot estimate 1795670620 is within 3 s of 1795670617. Every R6 reading meets the 1,024 B floor. A lower since-boot minimum alone is not proof of a leak. | Required R6 same-boot observations PASS (PLAN-046); full rings and writers advancing. Remaining measured margin is 800 B above the floor; retain the v7.7.1.4 RAM-budget recommendation. |
 | C6 flash | Medium | C6 SuperMini uses 91.6% of OTA partition on 4MB flash. Phase 7 firmware growth may exceed. | Phase 7 planning |
 
 ## Recently Resolved
@@ -51,14 +51,12 @@ The order, the scope and the status of every step are in `Docs/plan-of-record.md
 
 ## Phase 7 Device Validation Snapshot
 
-_Observed on 2026-05-08 after flashing v7.7.1.1 production builds._
+_Observed on 2026-11-25 on .189, before and after the upload of v7.7.1.3 (PLAN-046); before the upload it ran v7.7.1.3. The May 2026 baseline of 52,080 B no longer applies._
 
-| Metric | v7.7.1.0 baseline (C3) | v7.7.1.1 (C3 observed) | Delta |
+| Metric | Before the upload | v7.7.1.3 (c3heap, the higher reading) | Delta |
 |---|---|---|---|
-| `heap_free` | 39,704 B | 52,080 B | +12,376 B |
-| `min_free` | 29,776 B | 48,096 B | +18,320 B |
-| `httpd_stack_wm` | 12,932 B | 11,976 B | -956 B |
-| `hc_stack_wm` | 2,176 B | 2,308 B | +132 B |
+| `free_heap` | 42,144 B | 43,316 B | +1,172 B |
+| `min_free_heap` | 29,868 B | 32,368 B | +2,500 B |
 
 ## Board Fleet and Measurements
 
@@ -66,12 +64,12 @@ _Fleet: nine boards (BOARD-002). Identity comes from the operator's board file a
 
 | device_id | Board | Chip (esptool) | Module | Flash MB | PSRAM MB | USB | IP | Role | board_profile | firmware_now | Antenna | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| sat-esp32-4m-170 | ESP32 dev board | ESP32-D0WD-V3, rev v3.1 | WROOM-32D (module marking not checked) | 4 | 0 | USB-UART bridge | 192.168.120.170 | production satellite | `esp32-wroom-32d` | v7.7.1.2 (2026-11-23) | fitted | formerly at .190 |
-| sat-s3-4m-173 | ESP32-S3 SuperMini | ESP32-S3 (QFN56), rev v0.2 | none (flash and PSRAM in the chip package) | 4 | 2 | native USB-Serial/JTAG | 192.168.120.173 | test | `esp32-s3-supermini-4m` | v7.6.10.1 (2026-11-11) | fitted | marginal as an aggregator |
+| sat-esp32-4m-170 | ESP32 dev board | ESP32-D0WD-V3, rev v3.1 | WROOM-32D (module marking not checked) | 4 | 0 | USB-UART bridge | 192.168.120.170 | production satellite | `esp32-wroom-32d` | v7.7.1.3 (2026-11-27) | fitted | formerly at .190 |
+| sat-s3-4m-173 | ESP32-S3 SuperMini | ESP32-S3 (QFN56), rev v0.2 | none (flash and PSRAM in the chip package) | 4 | 2 | native USB-Serial/JTAG | 192.168.120.173 | test | `esp32-s3-supermini-4m` | v7.7.1.3 (2026-11-25) | fitted | operator flashed over USB with the project's partition table before R6; marginal as an aggregator |
 | sat-c5-8m-180 | ESP32-C5 dev board | ESP32-C5, rev v1.0 | WROOM-1U | 8 | 8 | USB-UART bridge | 192.168.120.180 | test | `esp32-c5-wroom1u-8m` | v7.6.10.1 (2026-11-11) | external, fitted | BLE not verified (A-004) |
 | sat-c5-8m-181 | Seeed XIAO ESP32C5 | ESP32-C5, rev v1.0 | ESP32-C5-WROOM-1 | 8 | 8 | native USB-Serial/JTAG | 192.168.120.181 | not yet on project firmware | none yet | minimum firmware (2026-11-14) | external, fitted | needs a board profile |
 | sat-c6-4m-184 | ESP32-C6 SuperMini | ESP32-C6FH4 (QFN32), rev v0.2 | none | 4 | 0 | native USB-Serial/JTAG | 192.168.120.184 | test | `esp32-c6-supermini-4m` | v7.6.10.1 (2026-11-11) | fitted | OTA slot 91.6 % full in May 2026 |
-| esp32-c3-multi | ESP32-C3 SuperMini | ESP32-C3 (QFN32), rev v0.4 | none | 4 | 0 | native USB-Serial/JTAG | 192.168.120.189 | production satellite | `esp32-c3-supermini` | v7.7.1.2 (2026-11-23) | fitted | renamed sat-c3-4m-176 at .176 after v1.0 |
+| esp32-c3-multi | ESP32-C3 SuperMini | ESP32-C3 (QFN32), rev v0.4 | none | 4 | 0 | native USB-Serial/JTAG | 192.168.120.189 | production satellite | `esp32-c3-supermini` | v7.7.1.3 (2026-11-27) | fitted | renamed sat-c3-4m-176 at .176 after v1.0 |
 | agg-s3-16m-1 | ESP32-S3-DevKitC-1 N16R8 | ESP32-S3 (QFN56), rev v0.2 | N16R8 | 16 | 8 | USB-UART bridge | 192.168.120.191 | production aggregator | `esp32-s3-devkitc1-n16r8` | v7.7.1.1 (2026-11-14) | fitted | renamed agg-s3-16m-191 after v1.0 |
 | agg-s3-16m-192 | ESP32-S3-DevKitC-1 N16R8 | ESP32-S3 (QFN56), rev v0.2 | N16R8 | 16 | 8 | USB-UART bridge | 192.168.120.192 | test aggregator | `esp32-s3-devkitc1-n16r8` | minimum firmware (2026-11-14) | fitted | its web page has an OTA upload form and no login |
 | agg-c5-8m-194 | Seeed XIAO ESP32C5 | ESP32-C5, rev v1.0 | ESP32-C5-WROOM-1 | 8 | 8 | native USB-Serial/JTAG | 192.168.120.194 | not yet on project firmware | none yet | minimum firmware (2026-11-14) | external, fitted | needs a board profile |
@@ -99,8 +97,8 @@ _Items from postmortems or phase closures that have NOT been acted on._
 
 | Source | Recommendation | Status |
 |---|---|---|
-| PR #246 review A Q3–Q5, endorsed by review B (comments 7089320312 and 7089569051) | In the v7.7.1.3 prompt, make persisted metric positions follow history-enabled manifest metrics and resolve persistent devices by full id rather than assuming persist-array indices equal devices[] indices. Confirm the blob contract: the current architecture uses the full fixed-size DeviceSegment; a shorter prefix needs a separate format/retention-budget decision. Consider EventLog export/load entries as the persisted interface rather than its private ring state. | **Routed to planning for the rolling v7.7.1.3 bundle** (PLAN-044); no new runtime mapping, serialized format or generated array is introduced in R4. The proposed NVS saving is an unmeasured estimate. |
-| PR #246 c3heap stop and operator decision dated 2026-11-23 (comment 7088682835) | Refresh the May 2026 C3 `free_heap` baseline before a later step uses it as a deployment gate. v7.7.1.1 read 42,596 B before OTA; v7.7.1.2 read 41,956 B and 43,864 B at 180 s and 211 s. The requested second reading on 2026-11-23 is 42,888 B free / 30,156 B minimum at 98,414 s. | **Deferred baseline correction to the planning session**, as the operator decided; the 52,080 B historical baseline, supplied texts and check file remain unchanged in R4. The second C3 reading is now recorded with the passing WROOM 24-hour observation. |
+| PR #246 review A Q3–Q5, endorsed by review B (comments 7089320312 and 7089569051) | Persisted metric positions follow metrics with history buffers, and persistent devices are resolved by full id. The blob contract remains the full fixed-size DeviceSegment; a shorter prefix needs a separate format/retention-budget decision. EventLog export/load entries remain a candidate persisted interface. | Q3 and Q4 **Implemented in v7.7.1.3**; Q5 **Decided**: the full 228-byte `DeviceSegment` in R6, with blob size and EventLog persistence returning in v7.7.1.4 (PLAN-046). |
+| PR #246 c3heap stop and operator decision dated 2026-11-23 (comment 7088682835) | Refresh the May 2026 C3 `free_heap` baseline before a later step uses it as a deployment gate. | **Implemented in v7.7.1.3** (PLAN-046): compare the higher post-upload reading with the same board just before upload. Repeat measured 43,316 B versus 42,144 B, a +1,172 B delta; the snapshot above replaces the May baseline, and the session log preserves the initial readings. |
 | BUG-075-076 postmortem | Add periodic health-check task logging stack HWM, heap stats, socket usage, NVS stats | **Partially implemented in v7.7.1.0** — heap, stack HWM, NVS stats, and uptime now logged; socket counters remain deferred |
 | BUG-075-076 postmortem | Monitor `nvs_get_stats()` for partition pressure | **Implemented in v7.7.1.0** |
 | BUG-075-076 postmortem | Monitor socket exhaustion under load via lwIP counters | **Not implemented** |
@@ -108,7 +106,7 @@ _Items from postmortems or phase closures that have NOT been acted on._
 | Phase V closure | Show `min_free_heap` instead of `free_heap` on dashboard | **Not implemented** — deferred post-v7.6.9.0 |
 | v7.6.10.4 session log | 10 prompt recommendations for writing guide | **Not implemented** — pending Phase VY |
 | Restart check 2026-11 | Full-length WROOM history export at 60 % NVS fill or more, with peak heap recorded (BUG-082 acceptance evidence) | **Partly done** — a full-length export completed on 2026-11-11 without a reboot; peak heap and NVS fill were not recorded. Routed to the Phase 7 closure step (v7.7.3.3) |
-| Restart check 2026-11 | Firmware `.bin` size checkpoint against the OTA slot in every Phase 7 prompt from v7.7.1.3 on (C6 4 MB at 91.6 %) | **Not implemented** — routed to the Batch 2 re-production |
+| Restart check 2026-11 | Firmware `.bin` size checkpoint against the OTA slot in every Phase 7 prompt from v7.7.1.3 on (C6 4 MB at 91.6 %) | **Implemented in v7.7.1.3** — CHECKPOINT E and the block `image` measure all three images and enforce the 95 % stop (PLAN-047). |
 | Restart check 2026-11 | Test counts disagree across README (402 and 117), `AGENTS.md` (~370) and this file (~370+); reconcile all three with `npx playwright test --list` | **Not implemented** — routed to the v7.7.3.3 documentation rewrite |
 | Restart check 2026-11 | Make `dashboard/dashboard.h` reproducible: `scripts/generate-header.sh` compresses with `gzip -9 -c`, which stores a file name and a time, so every build changes the file (for example use `gzip -n`) | **Implemented in R5** — `scripts/generate-header.sh` compresses with `gzip -n`; the pipeline wrote the header once (PLAN-031) |
 | PR #234 | `scripts/preflight.sh` sends the browser test's report to `/dev/null`, so a failure leaves no evidence | **Implemented in R5** — preflight prints the report when the browser test fails (PLAN-020) |
@@ -135,6 +133,11 @@ _Items from postmortems or phase closures that have NOT been acted on._
 | R5a.1 process review (2026-11-21) | The required check `pr-body-check.yml` also checks what the block `body` of a check file checks (the last `PRE-PR PASS at <commit>` names the head; no ticked criterion says pending; one Round Summary row for each round), so that GitHub enforces the PR body, edits after the merge included | **Not implemented** — routed to a later tooling step that the operator schedules (PLAN-043) |
 | R5a.2 production (2026-11-21) | `AGENTS.md`, "PR Description Standards", still says "Use PRs #176-178 as reference for description format"; those PRs have no Round Summary, and process guide §2.2 item 7 no longer names them. Until it changes, §8 of the step's prompt governs the PR body | **Implemented in R5b** — the section says to follow §8 of the step's prompt (PLAN-044) |
 | R5b internal audit (2026-11-22) | `AGENTS.md`, "PR Description Standards", keeps its list after "Include:" ("Files modified (source files, not generated)", "Known limitations or deferred items"), which differs from §8 of the step prompts; §8 governs the PR body | **Not implemented** — routed to the next pull request that changes `AGENTS.md` |
+| Operator decision 2026-11-24 (PLAN-047) | C6 test board .184: its 4 MB build was at 91.6 % of the OTA slot on 2026-05-05, above the trigger of 90 % that applies to every board. First measure a build without the native `api:` for this board alone; if it stays above 90 %, retire the board and use one with 8 MB of flash | **Open** — after R6 |
+| PR #247 inline Copilot C1 | Distinguish a failed `nvs_get_stats()` from actual low free space in the per-device writer's result and counters | **Deferred to planning for v7.7.1.4** — R6's fixed item 2.2 step 6 explicitly requires `DEV_PERSIST_NVS_LOW` for either condition. Both fail closed without writing, and the device gate stops on this result. Changing the classification requires changing that contract; R6 preserves it. |
+| PR #247 review A F1 | Base the v7.7.1.4 WROOM RAM budget on the measured v7.7.1.2 low of 1,288 B by 127,785 s (35.5 h), against the 2,252 B historical low in the supplied planning texts. Allow for the estimated 1.0–1.5 KB retained NVS key RAM when rings fill. | **Open for v7.7.1.4 planning** — the operator-triggered readings on 2026-11-27 exceed 36 h: v7.7.1.3 minimum 1,824 B at 139,314 s (38.7 h), full 24-slot rings, zero write failures. Required same-boot gates pass with 800 B above the floor; the budget concern remains. No extra check was added, and the observations do not establish a leak or unlimited long-term headroom (review C Q3). |
+| PR #247 review A Q1–Q2 | In the v7.7.1.4 budget, distinguish NVS free entries (including reserved entries) from allocatable entries; installed ESP-IDF 5.5.4 subtracts one 126-entry page for `available_entries`. Include transient `/api/storage-stats` response-string capacity alongside retained per-key RAM. | **Open for v7.7.1.4 planning** — 252 free entries can mean 126 allocatable entries. The existing string-backed response grows with device status; no peak allocation was measured in R6. Preserve the fixed R6 guard and supplied S2; decide the next contract using the measured budget. |
+| PR #247 reviews A/C restore contract | Define meta-first full-device-id validation; header validation and epoch ordering; treatment of segment writes newer than durable meta; deduplication and epoch-zero rejection; compact buffered-metric row mapping; layout changes with the same metric count; and stale segment/key cleanup budgeting. Test interrupted segment/meta updates, full-ring overwrite, shared-handle commits, overlap, missed cycles, and an unbuffered metric before a buffered metric. | **Open for v7.7.1.4 prompt production** — routes review A notes 1–5 and review C Q1–Q2. Do not assume multi-key atomicity, or scan keys without valid matching meta. The producer must decide how validated newer segments are treated, how a layout fingerprint or fresh-ring rule protects row identity, and whether old keys are reclaimed. R6 remains write-only and erases nothing. |
 
 ## Stale Documents Requiring Update Before Use
 
