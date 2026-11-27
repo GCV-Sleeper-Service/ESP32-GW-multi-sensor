@@ -319,3 +319,30 @@ Checkpoint F rejected commit 296c6c0 because my date wording did not start with 
 ⛔ CHECKPOINT FAILED - F: 7.1 CURRENT-STATE.md line 3: '_Last verified: <date> ...' naming v7.7.1.3
 ```
 
+## Operator-triggered same-boot observations — 2026-11-27
+
+Codex (VS Code extension), GPT-6; context window and reasoning effort not shown. On the operator's trigger, ran wroom24 with the recorded upload boot `1795670617`, then later v2 on .170, then later v2 on .189, one at a time. All three blocks passed. Only these two boards were read; no firmware change or upload was performed.
+
+```text
+wroom24 192.168.120.170: version v7.7.1.3, uptime 139311 s, free_heap 24524 B, min_free_heap 1824 B, boot 1795670620
+wroom24 PASS: 192.168.120.170, boot 1795670620, uptime 139311 s, min_free_heap 1824 B
+v2 192.168.120.170 office: ok, meta_key dm_aa8eba31, valid_segments 24, next_slot 22, last_persist_epoch 1795806000, writes ok 38 skipped 0 failed 0
+v2 192.168.120.170 first_floor: ok, meta_key dm_9ed41104, valid_segments 24, next_slot 22, last_persist_epoch 1795806000, writes ok 38 skipped 0 failed 0
+v2 192.168.120.170 outside: ok, meta_key dm_c38eecc4, valid_segments 24, next_slot 22, last_persist_epoch 1795806000, writes ok 38 skipped 0 failed 0
+v2 192.168.120.170 wan_ping: ok, meta_key dm_7a81c392, valid_segments 24, next_slot 22, last_persist_epoch 1795806000, writes ok 38 skipped 0 failed 0
+v2 192.168.120.170 nvs: used_entries 11780 (before 11140), free_entries 4348, old engine segments 1080, last_persist_epoch 1795806000 (before 1795669200, 3934 s ago), uptime 139314 s
+v2 192.168.120.170 since the first v2 PASS (uptime 2980 s): old engine last_persist_epoch 1795672800 -> 1795806000; writes_ok grew for ['office', 'first_floor', 'outside', 'wan_ping']
+v2 192.168.120.170 heap: free_heap 24440 B, min_free_heap 1824 B, uptime 139314 s
+v2 192.168.120.170 PASS (later): boot 1795670620, uptime 139314 s, free_heap 24440 B, min_free_heap 1824 B, since the first v2 PASS at 1795673597: old engine last_persist_epoch 1795672800 -> 1795806000, writes_ok grew for office, first_floor, outside, wan_ping
+v2 192.168.120.189 office: ok, meta_key dm_aa8eba31, valid_segments 24, next_slot 22, last_persist_epoch 1795806000, writes ok 39 skipped 0 failed 0
+v2 192.168.120.189 first_floor: ok, meta_key dm_9ed41104, valid_segments 24, next_slot 22, last_persist_epoch 1795806000, writes ok 39 skipped 0 failed 0
+v2 192.168.120.189 outside: ok, meta_key dm_c38eecc4, valid_segments 24, next_slot 22, last_persist_epoch 1795806000, writes ok 39 skipped 0 failed 0
+v2 192.168.120.189 wan_ping: ok, meta_key dm_7a81c392, valid_segments 24, next_slot 22, last_persist_epoch 1795806000, writes ok 39 skipped 0 failed 0
+v2 192.168.120.189 nvs: used_entries 11780 (before 11100), free_entries 4348, old engine segments 1080, last_persist_epoch 1795806000 (before 1795665600, 3938 s ago), uptime 143529 s
+v2 192.168.120.189 since the first v2 PASS (uptime 7180 s): old engine last_persist_epoch 1795672800 -> 1795806000; writes_ok grew for ['office', 'first_floor', 'outside', 'wan_ping']
+v2 192.168.120.189 PASS (later): boot 1795666409, uptime 143529 s, free_heap 39344 B, min_free_heap 21892 B, since the first v2 PASS at 1795673592: old engine last_persist_epoch 1795672800 -> 1795806000, writes_ok grew for office, first_floor, outside, wan_ping
+```
+
+WROOM's boot estimate `1795670620` is within 3 s of the recorded epoch. The observation is at 38.7 h, also exceeding the 36 h duration raised by review A F1. Minimum heap 1,824 B leaves 800 B above the required floor. Both boards have full 24-slot rings, all four writers advanced (WROOM 38 successes each, C3 39), and skipped/failed counts remain zero. The old engines advanced to epoch 1795806000 as well. The RAM-budget recommendation remains open for v7.7.1.4; this is no proof of a leak or of unlimited long-term margin.
+
+Updated CURRENT-STATE and the audit, including criterion 9 and the exact saved PASS lines. The firmware diff against validated 48debeb is empty. F, PRE-PR, CI and normal body validation for this documentation head are published in the PR body and closing comment. Review B has not posted, so final body mode is not run and no merge is performed. This observation update adds no fix cycle.
